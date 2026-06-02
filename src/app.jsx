@@ -1,5 +1,17 @@
+import React from 'react';
 // Main app — wires everything together, owns Tweaks state
+import "./data";
+import "./menu-data";
 import { motion, useScroll, useTransform } from "framer-motion";
+import { CocktailExperience } from "./cocktail-experience";
+import { FullMenu } from "./full-menu";
+import { Hero } from "./hero";
+import { Ristorante, Bar } from "./ristorante-bar";
+import { Eventi, SocialFeed, Attrazioni, Recensioni, Contatti, Footer } from "./sections";
+import { Storia } from "./storia";
+import { useTweaks, TweaksPanel, TweakSection, TweakToggle, TweakRadio, TweakSelect, TweakColor } from "./tweaks-panel";
+import { CustomCursor, Preloader, Navigation, useReveal } from "./shell";
+
 const { useState: useStateA, useEffect: useEffectA, useRef: useRefA } = React;
 
 // ─── Scroll-controlled card reveal (Framer Motion, scrubbed) ──────────────────
@@ -7,14 +19,14 @@ const { useState: useStateA, useEffect: useEffectA, useRef: useRefA } = React;
 // animation). `peek` renders a small header that rises first and then tucks back
 // under the card as it slides up over the previous section (used for the Bar).
 // `z` controls stacking so each card cleanly covers the one before it.
-function RiseCard({ children, z = 2, distance = 240, peek = null, bg = "transparent", riseTo = "start center", id = null }) {
+function RiseCard({ children, z = 2, distance = 240, peek = null, peekBg = "linear-gradient(180deg, #BFE6F5 0%, #FFFFFF 100%)", peekColor = "var(--c-deep)", bg = "transparent", riseTo = "start center", id = null }) {
   const ref = useRefA(null);
   const { scrollYProgress } = useScroll({
     target: ref,
     offset: ["start end", riseTo],
   });
   // Whole card rises from `distance`px below to its resting place.
-  const y = useTransform(scrollYProgress, [0, 1], [distance, 0]);
+  const transform = useTransform(scrollYProgress, (p) => p >= 0.99 ? "none" : `translateY(${distance * (1 - p)}px)`);
   // Peek header: rises up first, lingers on screen, then tucks under the card.
   const peekY = useTransform(scrollYProgress, [0, 0.5, 0.95], [80, 0, 70]);
   const peekOpacity = useTransform(scrollYProgress, [0, 0.1, 0.82, 0.98], [0, 1, 1, 0]);
@@ -33,8 +45,8 @@ function RiseCard({ children, z = 2, distance = 240, peek = null, bg = "transpar
         >
           <div style={{
             width: "100%", padding: "24px 0", textAlign: "center",
-            background: "linear-gradient(180deg, #BFE6F5 0%, #FFFFFF 100%)",
-            color: "var(--c-deep)",
+            background: peekBg,
+            color: peekColor,
             fontFamily: "var(--f-display)", fontWeight: 800,
             letterSpacing: "0.08em", textTransform: "uppercase",
             fontSize: "clamp(48px, 9vw, 120px)", lineHeight: 1,
@@ -42,7 +54,7 @@ function RiseCard({ children, z = 2, distance = 240, peek = null, bg = "transpar
           }}>{peek}</div>
         </motion.div>
       )}
-      <motion.div style={{ y, willChange: "transform" }}>
+      <motion.div style={{ transform }}>
         {children}
       </motion.div>
     </div>
@@ -59,7 +71,7 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "preloader": true
 }/*EDITMODE-END*/;
 
-function App() {
+export default function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
   const [preloadDone, setPreloadDone] = useStateA(!t.preloader);
   const [activeSection, setActiveSection] = useStateA("top");
@@ -178,9 +190,10 @@ function App() {
     const el = id === "top" ? document.body : document.getElementById(id);
     if (el) {
       if (window.lenis) {
-        window.lenis.scrollTo(id === "top" ? 0 : el.offsetTop - 60, { duration: 1.2 });
+        window.lenis.scrollTo(el, { offset: -60, duration: 1.2 });
       } else {
-        window.scrollTo({ top: id === "top" ? 0 : el.offsetTop - 60, behavior: "smooth" });
+        const topPos = el.getBoundingClientRect().top + window.scrollY;
+        window.scrollTo({ top: id === "top" ? 0 : topPos - 60, behavior: "smooth" });
       }
     }
   };
@@ -214,8 +227,12 @@ function App() {
         <Storia t={tr} orientation={t.storiaOrientation} />
         <Ristorante t={tr} />
         <FullMenu />
-        <RiseCard id="bar-rise" z={2} peek="Bar" bg="var(--c-bg)" riseTo="start start"><Bar t={tr} dark={t.barDark} /></RiseCard>
-        <Cocktail3D />
+        <RiseCard id="bar-rise" z={2} peek="Bar" bg="var(--c-bg)" riseTo="start start">
+          <Bar t={tr} dark={t.barDark} />
+        </RiseCard>
+        <RiseCard id="cocktail-rise" z={3} peek="Cocktail" peekBg="linear-gradient(180deg, #BFE6F5 0%, #173445 100%)" bg="var(--c-deep)" riseTo="start start">
+          <CocktailExperience />
+        </RiseCard>
         <Eventi t={tr} />
         <Attrazioni t={tr} />
         <SocialFeed t={tr} />
@@ -286,5 +303,3 @@ function App() {
     </>
   );
 }
-
-ReactDOM.createRoot(document.getElementById("root")).render(<App />);

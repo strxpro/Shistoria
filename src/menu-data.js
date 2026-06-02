@@ -169,14 +169,20 @@ window.COCKTAIL_INGREDIENTS = [
   { id: "gin", label: "Gin", group: "Distillati", side: "right", color: "#E5EEEA", volume: 25, isAlcohol: true },
   { id: "tequila", label: "Tequila", group: "Distillati", side: "right", color: "#E8DDA0", volume: 25, isAlcohol: true },
   { id: "triple-sec", label: "Triple Sec", group: "Distillati", side: "right", color: "#F0E5C0", volume: 15, isAlcohol: true },
+  { id: "whisky", label: "Whisky (Bourbon)", group: "Distillati", side: "right", color: "#C67123", volume: 25, isAlcohol: true },
+  { id: "whisky-scotch", label: "Whisky (Scotch)", group: "Distillati", side: "right", color: "#B85D19", volume: 25, isAlcohol: true },
   { id: "caffe-liq", label: "Liquore caffè", group: "Distillati", side: "right", color: "#3A2418", volume: 20, isAlcohol: true },
   { id: "espresso", label: "Espresso", group: "Distillati", side: "right", color: "#2A1810", volume: 30, isAlcohol: false },
   // RIGHT — AMARI E LIQUORI
   { id: "aperol", label: "Aperol", group: "Amari e liquori", side: "right", color: "#F08540", volume: 30, isAlcohol: true },
   { id: "campari", label: "Campari", group: "Amari e liquori", side: "right", color: "#C84A2A", volume: 25, isAlcohol: true },
-  { id: "prosecco", label: "Prosecco", group: "Amari e liquori", side: "right", color: "#F2EBC8", volume: 60, isAlcohol: true },
   { id: "mirto", label: "Mirto", group: "Amari e liquori", side: "right", color: "#5B2A4E", volume: 25, isAlcohol: true },
   { id: "blue-curacao", label: "Blue Curaçao", group: "Amari e liquori", side: "right", color: "#3DB6E0", volume: 20, isAlcohol: true },
+  { id: "baileys", label: "Crema Whisky", group: "Amari e liquori", side: "right", color: "#E1D2B8", volume: 20, isAlcohol: true },
+  // RIGHT — VINI
+  { id: "prosecco", label: "Prosecco", group: "Vini", side: "right", color: "#F2EBC8", volume: 60, isAlcohol: true },
+  { id: "vino-bianco", label: "Vino Bianco", group: "Vini", side: "right", color: "#EAE1B0", volume: 60, isAlcohol: true },
+  { id: "vino-rosso", label: "Vino Rosso", group: "Vini", side: "right", color: "#4A0E1A", volume: 60, isAlcohol: true },
 
   // LEFT — BOLLICINE
   { id: "tonica", label: "Acqua tonica", group: "Bollicine", side: "left", color: "#E0EDF0", volume: 80, isAlcohol: false },

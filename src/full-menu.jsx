@@ -1,3 +1,6 @@
+import React from 'react';
+import { SplitReveal } from "./shell";
+
 // FullMenu (categorized food list) + DrinksList (filtered drinks/wine carousel)
 import { motion } from "framer-motion";
 const { useState: useStateM, useEffect: useEffectM, useRef: useRefM, useMemo: useMemoM } = React;
@@ -408,4 +411,4 @@ function DrinkGlassSVG({ cat }) {
   );
 }
 
-Object.assign(window, { FullMenu, DrinksList, DrinkGlassSVG });
+export { FullMenu, DrinksList, DrinkGlassSVG };

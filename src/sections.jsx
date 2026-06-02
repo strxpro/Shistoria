@@ -1,3 +1,6 @@
+import React from 'react';
+import { SplitReveal, Placeholder, TextClipReveal } from "./shell";
+
 // Eventi, SocialFeed, Attrazioni, Recensioni, Contatti, Footer
 const { useState: useStateE, useEffect: useEffectE, useRef: useRefE } = React;
 
@@ -623,4 +626,4 @@ function Footer({ t }) {
   );
 }
 
-Object.assign(window, { Eventi, SocialFeed, Attrazioni, Recensioni, Contatti, Footer });
+export { Eventi, SocialFeed, Attrazioni, Recensioni, Contatti, Footer };

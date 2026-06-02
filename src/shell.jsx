@@ -1,3 +1,6 @@
+import React from 'react';
+import { Footer } from "./sections";
+
 // Shared components: Cursor, Preloader, Navigation, Footer, SplitReveal, Marquee
 const { useState, useEffect, useRef, useLayoutEffect, useCallback, useMemo } = React;
 
@@ -356,6 +359,9 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
         .nav { position: fixed; top: 0; left: 0; right: 0; height: 100px; z-index: 1000; display: flex; align-items: center; justify-content: center; pointer-events: none; transition: transform 0.6s var(--ease-out), height 0.6s cubic-bezier(0.65, 0, 0.35, 1); }
         .nav.scrolled { height: 80px; }
         .nav.hidden { transform: translateY(-120%); }
+        /* schowaj header gdy otwarty jest dolny drawer butelek (mobile) */
+        body[data-cx-drawer="open"] .nav { transform: translateY(-120%); }
+        body[data-cx-drawer="open"] .hamburger-mobile { opacity: 0; pointer-events: none; }
         
         .nav-bg { position: absolute; top: 0; left: 50%; transform: translateX(-50%); height: 100%; width: calc(var(--center-w) + var(--scroll-p) * (100vw - var(--center-w))); background: rgba(255,255,255, calc(1 - var(--scroll-p) * 0.35)); border-radius: 0 0 calc((1 - var(--scroll-p)) * 24px) calc((1 - var(--scroll-p)) * 24px); border-bottom: calc(var(--scroll-p) * 1px) solid rgba(255,255,255,0.5); z-index: -1; backdrop-filter: blur(calc(var(--scroll-p) * 20px)); -webkit-backdrop-filter: blur(calc(var(--scroll-p) * 20px)); transition: transform 0.4s var(--ease-out); transform-origin: top center; }
         .nav.hidden .nav-bg { transform: translate(-50%, -100%); }
@@ -378,12 +384,13 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
 
         @media (max-width: 1023px) {
           .nav-bg { display: none !important; }
-          .nav-inner { justify-content: center; padding: 0 24px; }
-          .nav-logo { color: var(--c-deep); transition: color 0.3s; }
+          .nav-inner { justify-content: center; padding: 0 20px; }
+          .nav-logo { color: var(--c-deep); transition: color 0.3s; font-size: 24px; }
           .nav-logo-sub { color: var(--c-deep); }
-          .nav-left { position: absolute; left: 24px; top: 50%; transform: translate(calc((1 - var(--scroll-p)) * -40px), -50%); }
-          .nav-right { position: absolute; right: 24px; top: 50%; transform: translate(calc((1 - var(--scroll-p)) * 40px), -50%); }
-          .nav-cta { display: none; } /* Hide prenota button on mobile header to save space */
+          .nav-left { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); justify-content: center; }
+          .nav-right { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); gap: 10px; }
+          .btn-nav { display: none; } /* ukryj CTA na mobile — zostają tylko flagi */
+          .nav-cta { display: none; }
         }
 
         .nav-center { display: none; }
@@ -422,9 +429,10 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
             width: 52px;
             height: 52px;
             position: fixed;
-            bottom: 24px;
-            left: calc(50% + 55px);
-            transform: translateX(-50%);
+            bottom: calc(20px + env(safe-area-inset-bottom));
+            right: 20px;
+            left: auto;
+            transform: none;
             z-index: 2100;
             background: var(--c-deep);
             border: 1px solid rgba(255,255,255,0.1);
@@ -750,11 +758,13 @@ function Marquee({ items, separator = "✦" }) {
   );
 }
 
-window.CustomCursor = CustomCursor;
-window.Preloader = Preloader;
-window.Navigation = Navigation;
-window.SplitReveal = SplitReveal;
-window.Placeholder = Placeholder;
-window.useReveal = useReveal;
-window.TextClipReveal = TextClipReveal;
-window.Marquee = Marquee;
+export {
+  CustomCursor,
+  Preloader,
+  Navigation,
+  SplitReveal,
+  Placeholder,
+  useReveal,
+  TextClipReveal,
+  Marquee
+};

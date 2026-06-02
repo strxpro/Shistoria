@@ -1,3 +1,4 @@
+import React from 'react';
 // Cocktail Builder v2 — 100vh fit, power meter, mL HUD, accordions, pour animation
 const { useState: useStateC, useEffect: useEffectC, useRef: useRefC, useMemo: useMemoC } = React;
 
@@ -855,4 +856,4 @@ function CommunityCard({ c, ingredients, index }) {
   );
 }
 
-Object.assign(window, { CocktailBuilder });
+export { CocktailBuilder };

@@ -1,3 +1,6 @@
+import React from 'react';
+import { Storia } from "./storia";
+
 // Hero — 3 variants: video, liquid 3D blobs, crystal float
 const { useState: useStateH, useEffect: useEffectH, useRef: useRefH } = React;
 
@@ -90,7 +93,7 @@ function Hero({ t, variant = "launchex" }) {
         .hero-sub { opacity: 0; transform: translateY(20px); transition: all 0.7s var(--ease-out); }
         .hero-sub.in { opacity: 1; transform: translateY(0); }
         .hero-sub .eyebrow { color: ${isLight ? "var(--c-coral)" : "#fff"}; font-size: clamp(14px, 1.3vw, 18px); letter-spacing: 0.25em; text-transform: uppercase; font-family: var(--f-body); font-style: normal; font-weight: 500; }
-        .hero-title { font-family: var(--f-display); font-weight: 800; font-size: clamp(44px, 11vw, 220px); letter-spacing: -0.055em; line-height: 0.9; color: ${isLight ? "var(--c-deep)" : "#fff"}; text-shadow: ${isLight ? "none" : "0 4px 60px rgba(0,0,0,0.3)"}; margin: 24px 0; display: flex; justify-content: center; flex-wrap: nowrap; white-space: nowrap; max-width: 100%; }
+        .hero-title { font-family: var(--f-display); font-weight: 700; font-size: clamp(44px, 11vw, 220px); letter-spacing: -0.08em; line-height: 0.9; color: ${isLight ? "var(--c-deep)" : "#fff"}; text-shadow: ${isLight ? "none" : "0 4px 60px rgba(0,0,0,0.3)"}; margin: 24px 0; display: flex; justify-content: center; flex-wrap: nowrap; white-space: nowrap; max-width: 100%; }
         .hero-title span { display: inline-block; opacity: 0; transform: translateY(80px); transition: opacity 0.9s var(--ease-out), transform 0.9s var(--ease-out); }
         .hero-title span.in { opacity: 1; transform: translateY(0); }
         .hero-location { font-family: var(--f-body); font-weight: 500; font-size: clamp(12px, 1vw, 14px); letter-spacing: 0.35em; text-transform: uppercase; opacity: 0; transform: translateY(20px); transition: all 0.7s 0.6s var(--ease-out); color: ${isLight ? "var(--c-deep)" : "#fff"}; }
@@ -276,4 +279,4 @@ function HeroCrystal() {
   );
 }
 
-Object.assign(window, { Hero });
+export { Hero };

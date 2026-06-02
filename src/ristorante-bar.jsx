@@ -1,3 +1,7 @@
+import React from 'react';
+import { DrinksList } from "./full-menu";
+import { SplitReveal, Placeholder, TextClipReveal, Marquee } from "./shell";
+
 // Ristorante + Bar sections
 import { motion, useScroll, useTransform } from "framer-motion";
 const { useState: useStateR, useEffect: useEffectR, useRef: useRefR } = React;
@@ -222,7 +226,11 @@ function Bar({ t, dark = true }) {
         .bar-light { background: linear-gradient(180deg, #FFFFFF 0%, #F0E5D4 100%); }
         .bar-head { max-width: 720px; margin-bottom: 64px; }
         .bar-head .kicker { display: block; margin-bottom: 24px; }
-        .bar.dark-section .bar-head .srt .char { color: #fff !important; -webkit-text-stroke: 0 !important; background: none !important; }
+        /* Let the global .dark-section .srt rule (white outline → white
+           scroll-fill) drive the heading. We only force the section's text
+           colour to white as a safety net; the per-char gradient still
+           animates. */
+        .bar.dark-section .bar-head .srt { color: #fff; }
         .bar-intro { font-family: var(--f-serif); font-style: italic; font-size: clamp(20px, 2vw, 28px); line-height: 1.4; margin-top: 32px; color: ${dark ? "rgba(255,255,255,0.75)" : "var(--c-deep)"}; max-width: 600px; }
         .bar-hours { display: grid; grid-template-columns: 1fr; gap: 48px; padding-top: 80px; margin-top: 80px; border-top: 1px solid ${dark ? "rgba(255,255,255,0.1)" : "var(--c-line)"}; }
         @media (min-width: 768px) { .bar-hours { grid-template-columns: 1fr 1fr; gap: 96px; align-items: center; } }
@@ -365,4 +373,4 @@ function BarCarousel({ cocktails, dark }) {
   );
 }
 
-Object.assign(window, { Ristorante, Bar });
+export { Ristorante, Bar };

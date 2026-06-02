@@ -1,3 +1,8 @@
+import React from 'react';
+import { createPortal } from 'react-dom';
+import { Ristorante } from "./ristorante-bar";
+import { SplitReveal, Placeholder, TextClipReveal } from "./shell";
+
 // Storia — timeline section with horizontal-pin or vertical-parallax variants
 const { useState: useStateS, useEffect: useEffectS, useRef: useRefS, useMemo: useMemoS } = React;
 
@@ -324,7 +329,7 @@ function StoriaCard({ item, index, progress, total, isLast }) {
     const w = typeof window !== "undefined" ? window.innerWidth : 1440;
     const h = typeof window !== "undefined" ? window.innerHeight : 900;
     imgWrapStyle = {
-      position: "fixed",
+      position: "absolute",
       left: "50%",
       top: "50%",
       // center offset calculation: the center of the image in a 420x580 card with 24px padding and 320px height
@@ -404,7 +409,7 @@ function StoriaCard({ item, index, progress, total, isLast }) {
         <>
           {/* Spacer inside the card to maintain height while the real photo is portalled */}
           <div style={{ height: "320px", flexShrink: 0 }} />
-          {portalContainer && window.createPortal(imgContent, portalContainer)}
+          {portalContainer && createPortal(imgContent, portalContainer)}
         </>
       ) : (
         imgContent
@@ -522,4 +527,4 @@ function StoriaVerticalRow({ item, index }) {
   );
 }
 
-Object.assign(window, { Storia });
+export { Storia };
