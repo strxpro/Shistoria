@@ -260,7 +260,7 @@ function StoriaArc({ data }) {
         ) : (
           <div className="sarc-expand" style={{
             position: "absolute", left: "0", top: "0",
-            width: "100%", height: `${62 + ease * 38}vh`,
+            width: "100%", height: `${72 + ease * 28}vh`,
             borderRadius: `0 0 ${24 - ease * 24}px ${24 - ease * 24}px`,
           }}>
             <Placeholder type={lastItem.phType} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
@@ -278,31 +278,36 @@ function StoriaArc({ data }) {
 
         {/* PÓŁKOLE z datami u dołu — zjeżdża w dół i znika podczas rozszerzania zdjęcia */}
         <div className="sarc-wheel" style={{
-          transform: `translateY(${ease * 60}vh)`,
-          opacity: 1 - ease * 1.6,
+          transform: `translateY(${ease * 70}vh)`,
+          opacity: 1 - ease * 1.8,
         }}>
+          <div className="sarc-wheel-ring" />
           {data.map((item, i) => {
             const angle = (i - exact) * SPREAD - 90; // -90 = góra koła
             const rad = angle * Math.PI / 180;
             const x = Math.cos(rad) * R;
             const y = Math.sin(rad) * R;
             const dist = Math.abs(i - exact);
-            const op = Math.max(0.15, 1 - dist * 0.32);
-            const sc = Math.max(0.6, 1 - dist * 0.14);
+            const op = Math.max(0.4, 1 - dist * 0.22);   // ZAWSZE widoczne (min 0.4)
+            const sc = Math.max(0.78, 1 - dist * 0.08);
             const isActive = i === activeIdx;
+            // kropka na samym okręgu + etykieta tuż nad kropką, ułożona stycznie ("na pilo")
             return (
-              <button key={i} className={`sarc-date ${isActive ? "active" : ""}`}
-                style={{ transform: `translate(-50%,-50%) translate(${x}px, ${y}px) rotate(${angle + 90}deg) scale(${sc})`, opacity: op }}
-                onClick={() => isActive && setPopout(item)}>
-                {item.year}
-              </button>
+              <div key={i} className="sarc-tick"
+                style={{ transform: `translate(-50%,-50%) translate(${x}px, ${y}px) rotate(${angle + 90}deg)`, opacity: op }}>
+                <button className={`sarc-date ${isActive ? "active" : ""}`} style={{ transform: `scale(${sc})` }}
+                  onClick={() => setPopout(item)}>
+                  {item.year}
+                </button>
+                <span className={`sarc-dot ${isActive ? "active" : ""}`} />
+              </div>
             );
           })}
-          <div className="sarc-wheel-ring" />
           <div className="sarc-wheel-marker" />
         </div>
 
         <div className="sarc-progress"><div className="sarc-progress-bar" style={{ width: `${travelP * 100}%` }} /></div>
+
       </div>
 
       {popout && typeof document !== "undefined" && createPortal(
@@ -335,25 +340,28 @@ function StoriaArc({ data }) {
       <style>{`
         .sarc-wrap { position: relative; }
         .sarc-sticky { position: sticky; top: 0; height: 100vh; overflow: hidden; transition: background .6s ease; }
-        /* ZDJĘCIE u góry — większe, z mocnym fade u dołu (tekst na dolnej części) */
-        .sarc-photo { position: absolute; top: 0; left: 0; right: 0; height: 66vh; overflow: hidden; animation: sarcPhotoIn .5s ease; }
+        /* ZDJĘCIE u góry — wysokie, gładki gradient wtapiający w tło; białe napisy na dole */
+        .sarc-photo { position: absolute; top: 0; left: 0; right: 0; height: 72vh; overflow: hidden; animation: sarcPhotoIn .5s ease; }
         @keyframes sarcPhotoIn { from { opacity: 0; } to { opacity: 1; } }
-        .sarc-photo-grad { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 30%, rgba(0,0,0,0.35) 62%, var(--sarc-bg, #0f2f3d) 100%); pointer-events: none; }
-        .sarc-photo-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 24px 28px; color: #fff; }
-        .sarc-photo-year { font-family: var(--f-display); font-weight: 800; font-size: 44px; line-height: 1; color: #fff; letter-spacing: -0.03em; }
-        .sarc-photo-title { font-family: var(--f-display); font-weight: 700; font-size: 22px; margin: 6px 0 8px; }
-        .sarc-photo-text { font-family: var(--f-serif); font-style: italic; font-size: 14px; line-height: 1.45; color: rgba(255,255,255,0.88); max-width: 92%; }
-        .sarc-photo-more { margin-top: 12px; background: none; border: none; color: var(--c-sky, #5BB8D4); font-family: var(--f-body); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; padding: 0; }
-        /* PÓŁKOLE z datami — niżej, pod zdjęciem */
-        .sarc-wheel { position: absolute; left: 50%; top: calc(66vh + 150px); width: 1px; height: 1px; transition: transform .15s ease-out, opacity .15s ease-out; }
-        .sarc-wheel-ring { position: absolute; left: 50%; top: 50%; width: 480px; height: 480px; margin: -240px 0 0 -240px; border-radius: 50%; border: 1px dashed rgba(255,255,255,0.16); }
-        .sarc-wheel-marker { position: absolute; left: 50%; top: -240px; width: 14px; height: 14px; border-radius: 50%; background: var(--c-sky, #5BB8D4); transform: translate(-50%, -50%); box-shadow: 0 0 0 6px rgba(91,184,212,0.18); }
-        .sarc-date { position: absolute; left: 0; top: 0; background: none; border: none; cursor: pointer;
-          font-family: var(--f-display); font-weight: 800; font-size: 22px; color: #fff; white-space: nowrap;
-          transition: opacity .3s ease, transform .4s cubic-bezier(.2,.85,.2,1); will-change: transform, opacity; }
-        .sarc-date.active { color: var(--c-sky, #5BB8D4); font-size: 30px; }
+        .sarc-photo-grad { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 25%, rgba(0,0,0,0.15) 45%, rgba(0,0,0,0.55) 72%, var(--sarc-bg, #0f2f3d) 100%); pointer-events: none; }
+        .sarc-photo-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 24px 22px; color: #fff; text-shadow: 0 2px 12px rgba(0,0,0,0.4); }
+        .sarc-photo-year { font-family: var(--f-display); font-weight: 800; font-size: 46px; line-height: 1; color: #fff; letter-spacing: -0.03em; }
+        .sarc-photo-title { font-family: var(--f-display); font-weight: 700; font-size: 22px; margin: 6px 0 8px; color: #fff; }
+        .sarc-photo-text { font-family: var(--f-serif); font-style: italic; font-size: 14px; line-height: 1.45; color: rgba(255,255,255,0.92); max-width: 92%; }
+        .sarc-photo-more { margin-top: 12px; background: none; border: none; color: #fff; font-family: var(--f-body); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; padding: 0; opacity: 0.85; }
+        /* PÓŁKOLE z datami — niżej; kropki NA okręgu, etykiety ułożone stycznie ("na pilo"), zawsze widoczne */
+        .sarc-wheel { position: absolute; left: 50%; top: calc(72vh + 200px); width: 1px; height: 1px; transition: transform .15s ease-out, opacity .15s ease-out; }
+        .sarc-wheel-ring { position: absolute; left: 50%; top: 50%; width: 520px; height: 520px; margin: -260px 0 0 -260px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.14); }
+        .sarc-wheel-marker { position: absolute; left: 50%; top: -260px; width: 16px; height: 16px; border-radius: 50%; background: var(--c-coral, #E8927C); transform: translate(-50%, -50%); box-shadow: 0 0 0 6px rgba(232,146,124,0.22), 0 4px 14px rgba(0,0,0,0.3); z-index: 3; }
+        /* tick = kontener obrócony stycznie do okręgu; w środku data + kropka na obwodzie */
+        .sarc-tick { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; transition: opacity .3s ease, transform .4s cubic-bezier(.2,.85,.2,1); will-change: transform, opacity; }
+        .sarc-date { background: none; border: none; cursor: pointer; font-family: var(--f-display); font-weight: 800;
+          font-size: 18px; color: rgba(255,255,255,0.92); white-space: nowrap; padding: 0 0 6px; transition: color .3s, font-size .3s; }
+        .sarc-date.active { color: var(--c-coral, #E8927C); font-size: 24px; }
+        .sarc-dot { width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,0.55); transition: all .3s; }
+        .sarc-dot.active { width: 13px; height: 13px; background: var(--c-coral, #E8927C); box-shadow: 0 0 0 5px rgba(232,146,124,0.2); }
         .sarc-expand { overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,0.5); will-change: width, height; }
-        .sarc-expand-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 24px 28px; color: #fff; }
+        .sarc-expand-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 24px 28px; color: #fff; text-shadow: 0 2px 12px rgba(0,0,0,0.4); }
         .sarc-progress { position: absolute; left: 8vw; right: 8vw; bottom: 4vh; height: 2px; background: rgba(255,255,255,0.12); border-radius: 2px; }
         .sarc-progress-bar { height: 100%; background: var(--c-sky, #5BB8D4); border-radius: 2px; transition: width .12s ease-out; }
       `}</style>
