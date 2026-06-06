@@ -1823,9 +1823,8 @@ function CocktailExperience() {
       };
 
       // ile fly-inu wykonujemy JESZCZE przed pinem (podczas wjazdu sekcji od dołu)
-      // Na mobile kończymy CAŁY wlot zanim sekcja zostanie przypięta → szejker jest
-      // już wycentrowany gdy sekcja wypełni ekran (brak efektu "podwójnej animacji").
-      const K_APPROACH = isMobileCx ? 1 : 0.6;
+      // Approach (przed pinem) robi część wlotu; pinned "enter" dokańcza — jedna płynna animacja.
+      const K_APPROACH = 0.55;
 
       const applyEnter = (e: number) => {
         const k = lerp(K_APPROACH, 1, easeOutCubic(clamp01(e)));
@@ -1915,9 +1914,9 @@ function CocktailExperience() {
         onRefresh: () => api.invalidate(),
         onUpdate: (self) => {
           const p = self.progress;
-          // Na mobile faza "enter" jest minimalna — szejker wjechał już podczas approach,
-          // więc pin od razu pokazuje wyśrodkowany szejker (brak ponownej animacji = brak "przeskoku").
-          const enterEnd = isMobileCx ? 0.02 : CONFIG.enterEnd;
+          // Na mobile cała animacja wjazdu szejkera dzieje się w przypiętym scrollu (stabilnie,
+          // bez przeskoku między triggerami). enterEnd dłuższy → wjazd jest widoczny podczas scrollu.
+          const enterEnd = isMobileCx ? 0.16 : CONFIG.enterEnd;
           let np: "enter" | "hold" | "exit";
           if (p < enterEnd) np = "enter";
           else if (p < CONFIG.exitStart) np = "hold";
@@ -1951,7 +1950,7 @@ function CocktailExperience() {
           const isGlassExiting = phase === "exit" && stageRef.current === "glassReady";
           const isGlassActive = !!inSceneGlassRef.current || stageRef.current === "glassReady" || stageRef.current === "pickGlass";
           api.shakerRoot.visible = !isGlassActive && !isGlassExiting;
-          if (phase === "enter") applyEnter(p / (isMobileCx ? 0.02 : CONFIG.enterEnd));
+          if (phase === "enter") applyEnter(p / (isMobileCx ? 0.16 : CONFIG.enterEnd));
           else if (phase === "exit") applyExit((p - CONFIG.exitStart) / (1 - CONFIG.exitStart));
 
           // Neonowy „pop": pojawia się gdy UI znika (wczesny exit). Scroll w dół → strzałka
@@ -1985,16 +1984,15 @@ function CocktailExperience() {
       const approach = ScrollTrigger.create({
         trigger: rootRef.current,
         start: "top bottom",
-        end: isMobileCx ? "top center" : "top top",
+        end: "top top",
         scrub: reduce ? 0.6 : (isMobileCx ? 0.8 : true),
         invalidateOnRefresh: true,
         onUpdate: (self) => {
           if (phase === "hold" || phase === "exit") return; // pin już steruje sceną
-          // Na mobile: szejker dojeżdża do centrum WCZEŚNIEJ (eased) i pozostaje wyśrodkowany,
-          // więc gdy sekcja wypełni ekran szejker jest już na środku — bez efektu "przeskoku".
-          const k = isMobileCx ? easeOutCubic(clamp01(self.progress * 1.35)) * K_APPROACH : self.progress * K_APPROACH;
+          // Approach: częściowy wlot (do K_APPROACH). Pinned "enter" dokańcza płynnie.
+          const k = self.progress * K_APPROACH;
           flyInPose(k);
-          dom(titleRef, { opacity: clamp01(self.progress * (isMobileCx ? 2.2 : 1.4)), y: lerp(60, 30, self.progress) });
+          dom(titleRef, { opacity: clamp01(self.progress * 1.6), y: lerp(60, 30, self.progress) });
           api.invalidate();
         },
       });

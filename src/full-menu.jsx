@@ -354,8 +354,8 @@ function FullMenu() {
         }
         .fmenu-row-price { font-family: var(--f-display); font-weight: 700; font-size: 18px; color: var(--c-sky); white-space: nowrap; letter-spacing: -0.01em; }
         .fmenu-row-note { font-family: var(--f-serif); font-style: italic; font-size: 13px; color: var(--c-mute); margin-left: 4px; font-weight: 400; }
-        .fmenu-footer { margin-top: 64px; padding: 48px; background: var(--c-sand); border-radius: 24px; text-align: center; width: 100%; max-width: 100%; box-sizing: border-box; overflow: hidden; }
-        .fmenu-footer-quote { overflow-wrap: anywhere; word-break: break-word; hyphens: auto; max-width: 100%; width: 100%; margin: 0 auto; font-size: clamp(16px, 4vw, 24px); white-space: normal; box-sizing: border-box; }
+        .fmenu-footer { margin: 64px auto 0; padding: 48px; background: var(--c-sand); border-radius: 24px; text-align: center; width: 100%; max-width: 100%; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
+        .fmenu-footer-quote { overflow-wrap: anywhere; word-break: break-word; hyphens: auto; max-width: 100%; width: 100%; margin: 0; font-size: clamp(16px, 4vw, 24px); white-space: normal; box-sizing: border-box; text-align: center; }
         @media (max-width: 768px) { .fmenu-footer { padding: 22px 14px; margin-top: 36px; border-radius: 16px; } .fmenu-footer-quote { font-size: clamp(13px, 3.6vw, 17px) !important; line-height: 1.45; letter-spacing: 0; } }
       `}</style>
     </section>
@@ -373,11 +373,13 @@ function DrinksList({ dark = true }) {
 
   // Drag scroll
   const drag = useRefM({ active: false, x: 0, scroll: 0 });
+  const isMob = typeof window !== "undefined" && window.innerWidth < 768;
   const onDown = (e) => {
+    if (isMob) return;
     drag.current = { active: true, x: e.pageX || e.touches?.[0]?.pageX || 0, scroll: trackRef.current?.scrollLeft || 0 };
   };
   const onMove = (e) => {
-    if (!drag.current.active || !trackRef.current) return;
+    if (isMob || !drag.current.active || !trackRef.current) return;
     const x = e.pageX || e.touches?.[0]?.pageX || 0;
     trackRef.current.scrollLeft = drag.current.scroll - (x - drag.current.x);
   };
@@ -432,7 +434,8 @@ function DrinksList({ dark = true }) {
 
       <div className="drinks-hint">
         <span className="kicker">{items.length} pos.</span>
-        <span style={{ fontFamily: "var(--f-serif)", fontStyle: "italic" }}>← trascina per scorrere →</span>
+        <span className="drinks-hint-desktop" style={{ fontFamily: "var(--f-serif)", fontStyle: "italic" }}>← trascina per scorrere →</span>
+        <span className="drinks-hint-mobile" style={{ fontFamily: "var(--f-serif)", fontStyle: "italic" }}>↕ scorri per vedere tutto</span>
       </div>
 
       <DrinkStyles dark={dark} />
@@ -460,11 +463,13 @@ function DrinkCard({ it, i, total }) {
 function DrinksCategorySection({ label, items, dark }) {
   const trackRef = useRefM(null);
   const drag = useRefM({ active: false, x: 0, scroll: 0 });
+  const isMobSeg = typeof window !== "undefined" && window.innerWidth < 768;
   const onDown = (e) => {
+    if (isMobSeg) return;
     drag.current = { active: true, x: e.pageX || e.touches?.[0]?.pageX || 0, scroll: trackRef.current?.scrollLeft || 0 };
   };
   const onMove = (e) => {
-    if (!drag.current.active || !trackRef.current) return;
+    if (isMobSeg || !drag.current.active || !trackRef.current) return;
     const x = e.pageX || e.touches?.[0]?.pageX || 0;
     trackRef.current.scrollLeft = drag.current.scroll - (x - drag.current.x);
   };
@@ -504,9 +509,15 @@ function DrinkStyles({ dark }) {
       .drinks-card { flex: 0 0 300px; min-height: 400px; scroll-snap-align: start; background: ${dark ? "rgba(255,255,255,0.04)" : "#fff"}; border: 1px solid ${dark ? "rgba(255,255,255,0.1)" : "var(--c-line)"}; border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 16px; position: relative; transition: transform 0.4s var(--ease-out), border-color 0.3s; }
       @media (max-width: 768px) {
         /* Bar/drinks menu na telefonie: 2 kolumny, widoczne ~4 pozycje, scroll w pionie w sekcji */
-        .drinks-track { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; overflow-x: hidden; overflow-y: auto; max-height: 64vh; padding: 8px 2px 16px; scroll-snap-type: none; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; touch-action: pan-y; }
+        .drinks-track { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; overflow-x: hidden; overflow-y: auto; max-height: 64vh; padding: 8px 2px 16px; scroll-snap-type: none; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; touch-action: pan-y; position: relative; }
+        /* cienki widoczny pasek przewijania, żeby było jasne że można scrollować */
+        .drinks-track { scrollbar-width: thin; scrollbar-color: var(--c-coral, #E8927C) transparent; }
+        .drinks-track::-webkit-scrollbar { display: block; width: 4px; }
+        .drinks-track::-webkit-scrollbar-thumb { background: var(--c-coral, #E8927C); border-radius: 4px; }
         .drinks-card { flex: initial !important; width: auto !important; min-height: 200px !important; padding: 14px; border-radius: 14px; gap: 10px; scroll-snap-align: none; }
         .drinks-card-name { font-size: 15px !important; } .drinks-card-price { font-size: 18px !important; } .drinks-card-glass { height: 80px; } .drinks-card-desc { font-size: 12px !important; }
+        /* hint przewijania pod siatką */
+        .drinks-scrollhint { display: flex !important; }
       }
       .drinks-card:hover { transform: translateY(-4px); border-color: var(--c-coral); }
       .drinks-card-num { font-family: var(--f-display); font-weight: 800; font-size: 11px; letter-spacing: 0.1em; color: var(--c-coral); }
@@ -518,6 +529,8 @@ function DrinkStyles({ dark }) {
       .drinks-card-price { font-family: var(--f-display); font-weight: 800; font-size: 26px; color: var(--c-coral); letter-spacing: -0.02em; }
       .drinks-empty { padding: 64px; opacity: 0.5; font-family: var(--f-serif); font-style: italic; }
       .drinks-hint { display: flex; justify-content: space-between; opacity: 0.5; font-size: 12px; }
+      .drinks-hint-mobile { display: none; }
+      @media (max-width: 768px) { .drinks-hint-desktop { display: none; } .drinks-hint-mobile { display: inline; } }
       .drinks-allsegments { display: flex; flex-direction: column; gap: 40px; }
       .drinks-cat-head { display: flex; align-items: baseline; gap: 16px; margin-bottom: 16px; }
       .drinks-cat-title { font-family: var(--f-display); font-weight: 800; font-size: clamp(24px, 2.5vw, 36px); letter-spacing: -0.02em; color: ${dark ? "#fff" : "var(--c-deep)"}; }

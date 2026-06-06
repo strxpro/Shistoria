@@ -199,7 +199,8 @@ function StoriaResponsive({ data }) {
   return isMobile ? <StoriaArc data={data} /> : <StoriaHorizontal data={data} />;
 }
 
-// ─── Mobile ARC timeline (daty na łuku, magnetyczne przewijanie, ostatnie zdjęcie pełny ekran) ─
+// ─── Mobile ARC timeline: koło z datami u DOŁU, zdjęcie u GÓRY, obrót przy scrollu,
+//     ostatnie zdjęcie rozszerza się na pełny ekran (zmiana zdjęcia podczas powiększania) ─
 function StoriaArc({ data }) {
   const sectionRef = useRefS(null);
   const [progress, setProgress] = useStateS(0);
@@ -222,68 +223,84 @@ function StoriaArc({ data }) {
   }, []);
 
   const n = data.length;
-  const travelP = progress < 0.82 ? progress / 0.82 : 1;
+  // przewijanie obraca koło 0..0.84; ostatnia faza 0.84..1 = rozszerzenie zdjęcia
+  const travelP = progress < 0.84 ? progress / 0.84 : 1;
   const exact = travelP * (n - 1);
   const activeIdx = Math.min(n - 1, Math.round(exact));
   const active = data[activeIdx];
-  const tailP = progress > 0.82 ? (progress - 0.82) / 0.18 : 0;
+  const tailP = progress > 0.84 ? (progress - 0.84) / 0.16 : 0;
+  const isExpanding = tailP > 0;
   const lastItem = data[n - 1];
+  const prevItem = data[Math.max(0, n - 2)];
 
   const bgFor = (ph) => ph === "sea" ? "#0f2f3d" : ph === "food" ? "#2a1f16" : "#241a22";
-  const bg = bgFor(active.phType);
+  const bg = bgFor(isExpanding ? lastItem.phType : active.phType);
 
   const ease = tailP < 0.5 ? 4 * tailP * tailP * tailP : 1 - Math.pow(-2 * tailP + 2, 3) / 2;
-  const isExpanding = tailP > 0;
 
-  const R = 150;
-  const SPREAD = 32;
-
+  // KOŁO dat u dołu: środek koła poniżej ekranu, daty na obwodzie u góry koła.
+  const R = 240;            // promień koła (px)
+  const SPREAD = 26;        // stopni między kolejnymi datami
+  // aktywny obrót: aktywna data na samej górze koła (kąt -90°)
   return (
-    <div ref={sectionRef} className="sarc-wrap" style={{ height: `${n * 42 + 90}vh` }}>
+    <div ref={sectionRef} className="sarc-wrap" style={{ height: `${n * 40 + 90}vh` }}>
       <div className="sarc-sticky" style={{ background: bg }}>
-        <div className="sarc-ghost" aria-hidden="true"><span key={active.year}>{active.year}</span></div>
+        {/* ZDJĘCIE u góry — odpowiada aktywnej dacie; podczas tail rozszerza się na cały ekran */}
+        {!isExpanding ? (
+          <div className="sarc-photo" key={active.year}>
+            <Placeholder type={active.phType} style={{ width: "100%", height: "100%" }} />
+            <div className="sarc-photo-grad" />
+            <div className="sarc-photo-cap">
+              <span className="sarc-photo-year">{active.year}</span>
+              <h4 className="sarc-photo-title">{active.title}</h4>
+              <p className="sarc-photo-text">{active.text}</p>
+              <button className="sarc-photo-more" onClick={() => setPopout(active)}>Tocca per aprire →</button>
+            </div>
+          </div>
+        ) : (
+          <div className="sarc-expand" style={{
+            position: "absolute", left: "50%", top: "50%",
+            transform: "translate(-50%,-50%)",
+            width: `${66 + ease * 34}vw`, height: `${44 + ease * 56}vh`,
+            borderRadius: `${24 - ease * 24}px`,
+          }}>
+            {/* pod spodem ostatnie zdjęcie, na wierzchu przedostatnie które zanika → "zmiana zdjęcia" */}
+            <Placeholder type={lastItem.phType} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
+            <div style={{ position: "absolute", inset: 0, opacity: Math.max(0, 1 - ease * 1.8) }}>
+              <Placeholder type={prevItem.phType} style={{ width: "100%", height: "100%" }} />
+            </div>
+            <div className="sarc-photo-grad" />
+            <div className="sarc-expand-cap" style={{ opacity: Math.max(0, 1 - ease * 1.4) }}>
+              <span className="sarc-photo-year">{lastItem.year}</span>
+              <h4 className="sarc-photo-title">{lastItem.title}</h4>
+            </div>
+          </div>
+        )}
 
+        {/* KOŁO z datami u dołu */}
         {!isExpanding && (
-          <div className="sarc-arc">
+          <div className="sarc-wheel">
             {data.map((item, i) => {
-              const angle = (i - exact) * SPREAD;
-              const rad = (angle - 90) * Math.PI / 180;
+              const angle = (i - exact) * SPREAD - 90; // -90 = góra koła
+              const rad = angle * Math.PI / 180;
               const x = Math.cos(rad) * R;
-              const y = Math.sin(rad) * R + R;
+              const y = Math.sin(rad) * R;
               const dist = Math.abs(i - exact);
-              const op = Math.max(0.18, 1 - dist * 0.4);
-              const sc = Math.max(0.7, 1 - dist * 0.12);
+              const op = Math.max(0.15, 1 - dist * 0.32);
+              const sc = Math.max(0.6, 1 - dist * 0.14);
               const isActive = i === activeIdx;
               return (
                 <button key={i} className={`sarc-date ${isActive ? "active" : ""}`}
-                  style={{ transform: `translate(-50%,-50%) translate(${x}px, ${y}px) rotate(${angle}deg) scale(${sc})`, opacity: op }}
+                  style={{ transform: `translate(-50%,-50%) translate(${x}px, ${y}px) rotate(${angle + 90}deg) scale(${sc})`, opacity: op }}
                   onClick={() => isActive && setPopout(item)}>
                   {item.year}
                 </button>
               );
             })}
-            <div className="sarc-marker" />
-          </div>
-        )}
-
-        {!isExpanding && (
-          <div className="sarc-info" key={activeIdx}>
-            <h4 className="sarc-title">{active.title}</h4>
-            <p className="sarc-text">{active.text}</p>
-            <span className="sarc-tag">— Capitolo {String(activeIdx + 1).padStart(2, "0")} · tocca per aprire</span>
-          </div>
-        )}
-
-        {isExpanding && (
-          <div className="sarc-expand" style={{
-            width: `${60 + ease * 40}vw`, height: `${40 + ease * 60}vh`,
-            borderRadius: `${24 - ease * 24}px`,
-          }}>
-            <Placeholder type={lastItem.phType} style={{ width: "100%", height: "100%" }} />
-            <div className="sarc-expand-cap" style={{ opacity: 1 - ease * 1.5 }}>
-              <span className="sarc-expand-year">{lastItem.year}</span>
-              <h4>{lastItem.title}</h4>
-            </div>
+            {/* okrąg-linia */}
+            <div className="sarc-wheel-ring" />
+            {/* znacznik aktywnej (na górze koła) */}
+            <div className="sarc-wheel-marker" />
           </div>
         )}
 
@@ -319,32 +336,33 @@ function StoriaArc({ data }) {
 
       <style>{`
         .sarc-wrap { position: relative; }
-        .sarc-sticky { position: sticky; top: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column;
-          align-items: center; justify-content: center; transition: background .6s ease; }
-        .sarc-ghost { position: absolute; inset: 0; display: flex; align-items: flex-start; justify-content: center; pointer-events: none; padding-top: 4vh; }
-        .sarc-ghost span { font-family: var(--f-display); font-weight: 800; font-size: 42vw; line-height: 0.8; color: rgba(255,255,255,0.05); animation: yearIn .5s ease; }
-        .sarc-arc { position: absolute; top: 14vh; left: 50%; width: 1px; height: 1px; }
+        .sarc-sticky { position: sticky; top: 0; height: 100vh; overflow: hidden; transition: background .6s ease; }
+        /* ZDJĘCIE u góry */
+        .sarc-photo { position: absolute; top: 0; left: 0; right: 0; height: 62vh; overflow: hidden; animation: sarcPhotoIn .5s ease; }
+        @keyframes sarcPhotoIn { from { opacity: 0; } to { opacity: 1; } }
+        .sarc-photo-grad { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.55) 100%); pointer-events: none; }
+        .sarc-photo-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 24px 24px; color: #fff; }
+        .sarc-photo-year { font-family: var(--f-display); font-weight: 800; font-size: 44px; line-height: 1; color: #fff; letter-spacing: -0.03em; }
+        .sarc-photo-title { font-family: var(--f-display); font-weight: 700; font-size: 22px; margin: 6px 0 8px; }
+        .sarc-photo-text { font-family: var(--f-serif); font-style: italic; font-size: 14px; line-height: 1.45; color: rgba(255,255,255,0.85); max-width: 90%; }
+        .sarc-photo-more { margin-top: 12px; background: none; border: none; color: var(--c-sky, #5BB8D4); font-family: var(--f-body); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; padding: 0; }
+        /* KOŁO z datami u dołu */
+        .sarc-wheel { position: absolute; left: 50%; top: calc(62vh + 120px); width: 1px; height: 1px; }
+        .sarc-wheel-ring { position: absolute; left: 50%; top: 50%; width: 480px; height: 480px; margin: -240px 0 0 -240px; border-radius: 50%; border: 1px dashed rgba(255,255,255,0.16); }
+        .sarc-wheel-marker { position: absolute; left: 50%; top: -240px; width: 14px; height: 14px; border-radius: 50%; background: var(--c-sky, #5BB8D4); transform: translate(-50%, -50%); box-shadow: 0 0 0 6px rgba(91,184,212,0.18); }
         .sarc-date { position: absolute; left: 0; top: 0; background: none; border: none; cursor: pointer;
-          font-family: var(--f-display); font-weight: 800; font-size: 26px; color: #fff; white-space: nowrap;
-          transition: opacity .35s ease, transform .45s cubic-bezier(.2,.85,.2,1); will-change: transform, opacity; }
-        .sarc-date.active { color: var(--c-sky, #5BB8D4); font-size: 34px; }
-        .sarc-marker { position: absolute; top: 0; left: 50%; width: 12px; height: 12px; border-radius: 50%;
-          background: var(--c-sky, #5BB8D4); transform: translate(-50%, -50%); box-shadow: 0 0 0 6px rgba(91,184,212,0.18); }
-        .sarc-info { position: absolute; top: 52vh; left: 0; right: 0; padding: 0 28px; text-align: center; animation: sarcInfoIn .45s ease; }
-        @keyframes sarcInfoIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
-        .sarc-title { font-family: var(--f-display); font-weight: 800; font-size: 26px; color: #fff; margin: 0 0 12px; letter-spacing: -0.01em; }
-        .sarc-text { font-family: var(--f-serif); font-style: italic; font-size: 15px; line-height: 1.5; color: rgba(255,255,255,0.7); margin: 0 auto 16px; max-width: 360px; }
-        .sarc-tag { font-family: var(--f-body); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--c-coral, #E8927C); }
-        .sarc-expand { position: relative; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,0.5); will-change: width, height; }
-        .sarc-expand-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 24px; background: linear-gradient(0deg, rgba(0,0,0,0.7), transparent); color: #fff; }
-        .sarc-expand-year { font-family: var(--f-display); font-weight: 800; font-size: 40px; color: var(--c-sky, #5BB8D4); }
-        .sarc-expand-cap h4 { font-family: var(--f-display); font-weight: 700; font-size: 20px; margin-top: 4px; }
-        .sarc-progress { position: absolute; left: 8vw; right: 8vw; bottom: 6vh; height: 2px; background: rgba(255,255,255,0.12); border-radius: 2px; }
+          font-family: var(--f-display); font-weight: 800; font-size: 22px; color: #fff; white-space: nowrap;
+          transition: opacity .3s ease, transform .4s cubic-bezier(.2,.85,.2,1); will-change: transform, opacity; }
+        .sarc-date.active { color: var(--c-sky, #5BB8D4); font-size: 30px; }
+        .sarc-expand { overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,0.5); will-change: width, height; }
+        .sarc-expand-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 24px; color: #fff; }
+        .sarc-progress { position: absolute; left: 8vw; right: 8vw; bottom: 4vh; height: 2px; background: rgba(255,255,255,0.12); border-radius: 2px; }
         .sarc-progress-bar { height: 100%; background: var(--c-sky, #5BB8D4); border-radius: 2px; transition: width .12s ease-out; }
       `}</style>
     </div>
   );
 }
+
 
 // ─── Horizontal (pinned, scrolls sideways) ────────────────────────────────────
 function StoriaHorizontal({ data }) {

@@ -614,12 +614,12 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
             pointer-events: auto;
           }
           .hamburger-mobile.open {
-            right: calc(50% - 90px);
+            right: calc(50% - 30px);
             transform: none;
             background: var(--c-deep);
-            border-color: rgba(255, 255, 255, 0.12);
-            box-shadow: none;
-            z-index: 1900;
+            border-color: rgba(255, 255, 255, 0.18);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+            z-index: 2100;
           }
           /* Gdy otwarta szuflada butelek — hamburger płynnie na samą górę po prawej */
           body[data-cx-drawer="open"] .hamburger-mobile { right: 16px; top: calc(16px + env(safe-area-inset-top)); bottom: auto; transform:none; }
@@ -705,9 +705,9 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
         /* Highlight Cocktail Maker link in mobile menu */
         .mobile-links a.nav-highlight { color:var(--c-coral,#E8927C) !important; }
         
-        .mobile-menu-inner { position: relative; z-index: 2; padding: 40px 24px; margin-top: 100px; max-width: 100%; box-sizing: border-box; }
-        .nav.scrolled .mobile-menu-inner { margin-top: 80px; }
-        .mobile-links { display: flex; flex-direction: column; gap: 8px; margin-top: 5vh; max-width: 100%; }
+        .mobile-menu-inner { position: relative; z-index: 2; padding: 40px 24px calc(120px + env(safe-area-inset-bottom)); margin-top: 0; max-width: 100%; box-sizing: border-box; flex: 1; display: flex; flex-direction: column; justify-content: center; min-height: 100%; }
+        .nav.scrolled .mobile-menu-inner { margin-top: 0; }
+        .mobile-links { display: flex; flex-direction: column; gap: 8px; margin-top: 0; max-width: 100%; }
         .mobile-links a {
           font-family: var(--f-display);
           font-weight: 800;
