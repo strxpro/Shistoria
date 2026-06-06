@@ -1981,8 +1981,11 @@ function CocktailExperience() {
         invalidateOnRefresh: true,
         onUpdate: (self) => {
           if (phase === "hold" || phase === "exit") return; // pin już steruje sceną
-          flyInPose(self.progress * K_APPROACH);
-          dom(titleRef, { opacity: clamp01(self.progress * 1.4), y: lerp(60, 30, self.progress) });
+          // Na mobile: szejker dojeżdża do centrum WCZEŚNIEJ (eased) i pozostaje wyśrodkowany,
+          // więc gdy sekcja wypełni ekran szejker jest już na środku — bez efektu "przeskoku".
+          const k = isMobileCx ? easeOutCubic(clamp01(self.progress * 1.35)) * K_APPROACH : self.progress * K_APPROACH;
+          flyInPose(k);
+          dom(titleRef, { opacity: clamp01(self.progress * (isMobileCx ? 2.2 : 1.4)), y: lerp(60, 30, self.progress) });
           api.invalidate();
         },
       });
@@ -2508,13 +2511,13 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
   const cloned = useMemo(() => scene.clone(true), [scene]);
   const { actions, mixer } = useAnimations(animations, inner);
 
-  // CEL = punkt w przestrzeni overlay gdzie strumień powinien trafiać.
-  // Target = górna krawędź wlotu shakera widocznego pod spodem. X=0 = środek ekranu.
-  // Z mocno ujemne = strumień idzie ZA shaker w overlay (głębiej w scenę), więc wizualnie
-  // wpada do środka otwartego wlotu. Na mobile shaker jest niżej i bliżej → korekta.
+  // CEL = punkt w przestrzeni overlay gdzie strumień powinien trafiać = OTWÓR wlotu szejkera.
+  // Kamera overlay = kamera sceny (CONFIG.camPos), więc współrzędne pokrywają się z realnym
+  // szejkerem widocznym pod spodem. Szejker spoczywa w shakerRest, wlot ~górna krawędź.
   const target = useMemo(() => {
-    const isMob = typeof window !== "undefined" && window.innerWidth < 768;
-    return isMob ? new THREE.Vector3(0, -1.55, -1.1) : new THREE.Vector3(0, -1.2, -0.9);
+    const r = CONFIG.shakerRest;
+    // wlot szejkera: trochę powyżej środka modelu (mouth), lekko z przodu
+    return new THREE.Vector3(r.x, r.y + 1.7, r.z + 0.1);
   }, []);
 
   const liquidMat = useMemo(() => new THREE.MeshStandardMaterial({
@@ -2606,7 +2609,8 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
     // pozycja "obok szejkera": butelka niżej — cała widoczna, dopasowana do mobile
     const offX = isMob ? 0.7 : 1.0;
     const bodyX = side === "right" ? offX : -offX;
-    const bodyY = isMob ? 0.7 : 1.0;       // niżej na mobile żeby nie wychodziła poza viewport
+    const bodyY = isMob ? 1.4 : 1.7;       // nad wlotem szejkera (target ~y0.35) — szyjka leje w dół
+    const bodyZ = CONFIG.shakerRest.z;      // ta sama głębia co szejker → strumień trafia do otworu
     const tilt = side === "right" ? deg(isMob ? 145 : 140) : deg(isMob ? -145 : -140);
     const sPour = isMob ? 0.5 : 0.6;
 
@@ -2662,7 +2666,7 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
       // (przód do nas) i przechył wierzchem ku kamerze, żeby było widać otwór.
       const canTilt = side === "right" ? deg(70) : deg(-70);
       tl.to(o.scale, { x: sPour, y: sPour, z: sPour, duration: 0.55, ease: "power2.inOut" }, 1.6)
-        .to(o.position, { x: bodyX, y: bodyY, duration: 0.6, ease: "power1.inOut" }, 1.6)
+        .to(o.position, { x: bodyX, y: bodyY, z: bodyZ, duration: 0.6, ease: "power1.inOut" }, 1.6)
         .to(o.rotation, { x: deg(20), y: 0, z: canTilt, duration: 0.55, ease: "power1.inOut" }, 1.7);
       // lanie z otworu puszki — strumień TRWA do cx-pour-release
       tl.call(() => { pouringRef.current = true; window.dispatchEvent(new Event('cx-pour-begin')); }, [], 2.45)
@@ -2679,8 +2683,8 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
       // 3) BUTELKA: kurczy się i lukiem schodzi WYŻEJ obok szejkera, przechyla szyjką ku środkowi
       tl.to(o.scale, { x: sPour, y: sPour, z: sPour, duration: 0.6, ease: "power2.inOut" }, 1.6)
         // łuk: najpierw w bok i w górę, potem opada do pozycji nalewania (kuliste podejście)
-        .to(o.position, { x: bodyX * 0.7, y: bodyY + 0.5, duration: 0.35, ease: "power2.out" }, 1.6)
-        .to(o.position, { x: bodyX, y: bodyY, duration: 0.4, ease: "power1.inOut" }, 1.95)
+        .to(o.position, { x: bodyX * 0.7, y: bodyY + 0.5, z: bodyZ, duration: 0.35, ease: "power2.out" }, 1.6)
+        .to(o.position, { x: bodyX, y: bodyY, z: bodyZ, duration: 0.4, ease: "power1.inOut" }, 1.95)
         .to(o.rotation, { y: 0, z: tilt, duration: 0.6, ease: "power1.inOut" }, 1.7);
 
       // 4) lanie: head (czoło) szybko wybiega do wlotu, STRUMIEŃ TRWA do cx-pour-release
@@ -2835,7 +2839,7 @@ function PourOverlay({ req, onDone }: { req: PourReq | null; onDone: () => void 
         frameloop="always"
         dpr={[1, 2]}
         gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
-        camera={{ position: [0, 0, 8], fov: 34 }}
+        camera={{ position: [CONFIG.camPos.x, CONFIG.camPos.y, CONFIG.camPos.z], fov: 36 }}
       >
         <ambientLight intensity={0.8} />
         <directionalLight position={[4, 6, 5]} intensity={2.6} castShadow />
