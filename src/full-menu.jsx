@@ -317,7 +317,7 @@ function FullMenu() {
         .fmenu-nav-count { margin-left: auto; font-family: var(--f-display); font-weight: 700; font-size: 11px; opacity: 0.6; }
         .fmenu-nav-note { margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--c-line); font-size: 12px; color: var(--c-mute); }
         .fmenu-nav-note p { margin-bottom: 6px; line-height: 1.4; }
-        .fmenu-cats { display: flex; flex-direction: column; gap: 80px; min-width: 0; }
+        .fmenu-cats { display: flex; flex-direction: column; gap: 80px; min-width: 0; max-width: 100%; }
         .fmenu-cat-head { display: flex; align-items: baseline; gap: 16px; margin-bottom: 32px; }
         .fmenu-cat-num { font-family: var(--f-display); font-weight: 800; font-size: 14px; color: var(--c-sky); }
         .fmenu-cat-title { font-family: var(--f-display); font-weight: 800; font-size: clamp(36px, 4vw, 56px); letter-spacing: -0.025em; color: var(--c-deep); line-height: 1; }

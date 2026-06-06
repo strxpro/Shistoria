@@ -601,7 +601,7 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
             height: 52px;
             position: fixed;
             bottom: calc(24px + env(safe-area-inset-bottom));
-            right: 20px;
+            right: calc(50% - 90px);
             left: auto;
             transform: none;
             z-index: 2100;
@@ -614,11 +614,12 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
             pointer-events: auto;
           }
           .hamburger-mobile.open {
-            right: 20px;
+            right: calc(50% - 90px);
             transform: none;
-            background: rgba(255, 255, 255, 0.15);
-            border-color: rgba(255, 255, 255, 0.25);
+            background: var(--c-deep);
+            border-color: rgba(255, 255, 255, 0.12);
             box-shadow: none;
+            z-index: 1900;
           }
           /* W sekcji kreatora hamburger przesuwa się w prawo żeby nie blokował slide-to-shake */
           body[data-cx-drawer="open"] .hamburger-mobile { right: 16px; transform:none; }
@@ -702,17 +703,18 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
         /* Highlight Cocktail Maker link in mobile menu */
         .mobile-links a.nav-highlight { color:var(--c-coral,#E8927C) !important; }
         
-        .mobile-menu-inner { position: relative; z-index: 2; padding: 40px 24px; margin-top: 100px; }
+        .mobile-menu-inner { position: relative; z-index: 2; padding: 40px 24px; margin-top: 100px; max-width: 100%; box-sizing: border-box; }
         .nav.scrolled .mobile-menu-inner { margin-top: 80px; }
-        .mobile-links { display: flex; flex-direction: column; gap: 8px; margin-top: 5vh; }
+        .mobile-links { display: flex; flex-direction: column; gap: 8px; margin-top: 5vh; max-width: 100%; }
         .mobile-links a {
           font-family: var(--f-display);
           font-weight: 800;
-          font-size: clamp(22px, 5.5vw, 42px);
+          font-size: clamp(20px, 6vw, 38px);
           color: #fff;
           display: flex;
           justify-content: space-between;
           align-items: center;
+          gap: 12px;
           padding: 10px 0;
           border-bottom: 1px solid rgba(255,255,255,0.08);
           opacity: 0;
@@ -723,6 +725,8 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
           text-decoration: none;
           white-space: nowrap;
           overflow: hidden;
+          max-width: 100%;
+          min-width: 0;
         }
         .mobile-menu.open .mobile-links a {
           opacity: 1;
@@ -731,7 +735,8 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
         }
         
         /* 3D wave text effect */
-        .ml-word { display: flex; flex-wrap: wrap; }
+        .ml-word { display: flex; flex-wrap: wrap; min-width: 0; overflow: hidden; }
+        .mobile-links a .arrow { flex: 0 0 auto; }
         .ml-char-wrap { position: relative; display: inline-block; transform-style: preserve-3d; transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); transform-origin: 50% 50% -0.4em; }
         .ml-char-front { display: inline-block; transform: translateZ(0.4em); }
         .ml-char-back { position: absolute; left: 0; top: 0; transform: rotateX(90deg) translateZ(0.4em); color: var(--c-coral, #E8927C); opacity: 0; transition: opacity 0.1s 0.2s; }

@@ -1508,6 +1508,15 @@ function CocktailExperience() {
   const pourDoseRef = useRef(0); // ml nalane w bieżącym laniu (rośnie podczas trzymania)
   const gaugeApiRef = useRef<{ set: (frac: number, color?: string) => void; show: (b: boolean) => void } | null>(null);
 
+  // Body attr — gdy trwa lanie/animacja (nie "build"), chowamy mobilne UI (info, slide) poza sceną
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const active = pouring || stage !== "build";
+    if (active) document.body.dataset.cxPouring = "1";
+    else delete document.body.dataset.cxPouring;
+  }, [pouring, stage]);
+  useEffect(() => () => { if (typeof document !== "undefined") delete document.body.dataset.cxPouring; }, []);
+
   const mixedColor = useMemo(
     () => mixColorsWeighted(poured), [poured],
   );
@@ -3661,8 +3670,9 @@ function AccordionPanel({
               </div>
             )}
 
-            {/* Rozwijane listy w jednej linii (mobile): kategoria obok mocy */}
+            {/* Rozwijane listy w jednej linii (mobile): [←] kategoria | moc */}
             <div className="cx-drop-row">
+              <button className="cx-drop-back" onClick={closeCat} aria-label="Categorie">←</button>
               <div className={`cx-drop cx-drop-cat ${catDropOpen ? "is-open" : ""}`}>
                 <button className="cx-drop-trigger" onClick={() => { setCatDropOpen((v) => !v); setStrDropOpen(false); }}>
                   <span className="cx-drop-cur"><span className="cx-drop-emoji">{curCatEmoji}</span> {curCatLabel}</span>
@@ -5050,27 +5060,38 @@ function CocktailStyles() {
 
         /* cx-col na mobile = display:contents → dzieci (FAB, slide, panel) pozycjonują się względem viewportu, nie kolumny */
         .cx-col { display:contents; }
-        /* FAB widoczne TYLKO w sekcji kreatora — płynny wjazd transition (bez snappy keyframe) */
+        /* FAB widoczne TYLKO w sekcji kreatora — płynny wjazd + lekka perspektywa 3D (jak na ścianie) */
         .cx-col-left .cx-fab, .cx-col-right .cx-fab { position:fixed; top:36%; opacity:0; visibility:hidden; pointer-events:none;
           transition:transform .8s cubic-bezier(.16,1,.3,1), opacity .55s ease, visibility .55s; }
-        .cx-col-left .cx-fab { left:20px; transform:translateY(-50%) translateX(-130px); }
-        .cx-col-right .cx-fab { right:20px; transform:translateY(-50%) translateX(130px); }
-        body[data-cx-section="creator"] .cx-col-left .cx-fab,
-        body[data-cx-section="creator"] .cx-col-right .cx-fab { opacity:1; visibility:visible; pointer-events:auto; transform:translateY(-50%) translateX(0); }
+        .cx-col-left .cx-fab { left:20px; transform:perspective(420px) rotateY(18deg) translateZ(-12px) translateY(-50%) translateX(-130px); }
+        .cx-col-right .cx-fab { right:20px; transform:perspective(420px) rotateY(-18deg) translateZ(-12px) translateY(-50%) translateX(130px); }
+        body[data-cx-section="creator"] .cx-col-left .cx-fab { opacity:1; visibility:visible; pointer-events:auto; transform:perspective(420px) rotateY(18deg) translateY(-50%) translateX(0); }
+        body[data-cx-section="creator"] .cx-col-right .cx-fab { opacity:1; visibility:visible; pointer-events:auto; transform:perspective(420px) rotateY(-18deg) translateY(-50%) translateX(0); }
         .cx-col.is-pouring { opacity:1; }
-        /* Podczas lania/animacji FAB odjeżdżają w bok (lewy w lewo, prawy w prawo) */
-        .cx-col-left.is-pouring .cx-fab { transform:translateY(-50%) translateX(-160px) !important; opacity:0; pointer-events:none; }
-        .cx-col-right.is-pouring .cx-fab { transform:translateY(-50%) translateX(160px) !important; opacity:0; pointer-events:none; }
+        /* Podczas lania/animacji (lub wyjścia z sekcji) FAB odjeżdżają w bok i znikają */
+        .cx-col-left.is-pouring .cx-fab { transform:perspective(420px) rotateY(18deg) translateY(-50%) translateX(-180px) !important; opacity:0; pointer-events:none; }
+        .cx-col-right.is-pouring .cx-fab { transform:perspective(420px) rotateY(-18deg) translateY(-50%) translateX(180px) !important; opacity:0; pointer-events:none; }
+        /* Gdy NIE jesteśmy w sekcji kreatora — twardo schowane (np. scroll w górę/dół do innych sekcji) */
+        body:not([data-cx-section="creator"]) .cx-col-left .cx-fab,
+        body:not([data-cx-section="creator"]) .cx-col-right .cx-fab { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
+        /* podczas lania/animacji szklanki FAB też znikają (nawet jeśli is-pouring nie złapie) */
+        body[data-cx-pouring] .cx-col-left .cx-fab,
+        body[data-cx-pouring] .cx-col-right .cx-fab { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
         /* slide-to-shake widoczny tylko w sekcji kreatora */
         .cx-slide-wrap { opacity:0; visibility:hidden; transition:opacity .3s, visibility .3s; }
         body[data-cx-section="creator"] .cx-slide-wrap { opacity:1; visibility:visible; }
+        /* podczas lania / animacji szklanki — suwak shake znika razem z FAB */
+        .cx-col-right.is-pouring .cx-slide-wrap { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
+        body[data-cx-pouring] .cx-slide-wrap { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
+        body:not([data-cx-section="creator"]) .cx-slide-wrap { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
         /* info button tylko w sekcji kreatora */
         .cx-minfo { opacity:0; visibility:hidden; transition:opacity .3s, visibility .3s; }
         body[data-cx-section="creator"] .cx-minfo { opacity:1; visibility:visible; }
+        body[data-cx-pouring] .cx-minfo { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
 
         /* SHAKE — suwak wycentrowany na dole */
         .cx-shake-desktop { display:none; }
-        .cx-slide-wrap { display:block; position:fixed; left:50%; bottom:calc(96px + env(safe-area-inset-bottom));
+        .cx-slide-wrap { display:block; position:fixed; left:50%; bottom:calc(72px + env(safe-area-inset-bottom));
           transform:translateX(-50%); width:min(70vw,290px); z-index:41; pointer-events:auto; }
         .cx-slide { position:relative; width:100%; height:60px; border-radius:999px; overflow:hidden;
           background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.16); display:flex; align-items:center;
@@ -5127,8 +5148,7 @@ function CocktailStyles() {
         /* Kategorie w drawer — więcej space między nimi */
         .cx-cats .cx-cat { margin-bottom:8px; }
 
-        /* karuzela butelek na mobile — 2 widoczne, z przestrzenią */
-        .cx-car-scroll > .cx-bcard { flex:0 0 calc((100% - 16px) / 2); min-width:unset; height:200px; }
+        /* karuzela butelek na mobile — 2 widoczne, wycentrowane (patrz cx-drop-row sekcja) */
         .cx-drawer { padding:20px 16px calc(20px + env(safe-area-inset-bottom)); border-radius:1.4rem 1.4rem 0 0; }
         .cx-drawer-title { font-size:14px; }
         .cx-drawer-hint { font-size:10px; margin-top:12px; }
@@ -5137,10 +5157,18 @@ function CocktailStyles() {
         .cx-drawer-tab { padding:6px 10px; font-size:10px; }
 
         /* Rozwijane listy na mobile zamiast przewijanych pigułek */
-        .cx-drop-row { display:flex; gap:8px; margin-bottom:8px; align-items:flex-start; }
+        .cx-drop-row { display:flex; gap:8px; margin-bottom:10px; align-items:center; }
         .cx-drop-row .cx-drop { flex:1 1 0; min-width:0; }
+        .cx-drop-back { flex:0 0 auto; width:42px; height:42px; border-radius:12px; display:grid; place-items:center;
+          background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); color:var(--cx-accent,#E8927C);
+          font-size:20px; cursor:pointer; }
         .cx-drop { display:block; position:relative; max-width:100%; margin:0 0 8px; z-index:5; }
         .cx-drop-row .cx-drop { margin:0; }
+        /* desktopowy nagłówek szuflady (back+tytuł+strzałki) ukryty na mobile — zastąpiony rzędem dropdownów */
+        .cx-drawer-head { display:none; }
+        /* butelki: wycentrowane, większe (2 obok siebie wg makiety) */
+        .cx-car-scroll { justify-content:flex-start; }
+        .cx-car-scroll > .cx-bcard { flex:0 0 calc((100% - 14px) / 2); min-width:unset; height:230px; scroll-snap-align:center; }
         .cx-drop + .cx-drop { margin-top:0; }
         .cx-drop-trigger { display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%;
           padding:11px 14px; border-radius:14px; cursor:pointer; color:#fff;
