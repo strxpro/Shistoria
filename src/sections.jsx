@@ -187,17 +187,19 @@ function Attrazioni({ t }) {
   const filtered = cat === "all" ? places : places.filter((p) => p.category === cat);
   const listRef = useRefE(null);
 
-  // Mobile: gdy scrollujesz listę, automatycznie zaznacz na mapie kartę najbliżej górnej krawędzi.
+  // Mobile: gdy scrollujesz listę, automatycznie zaznacz na mapie kartę najbliżej krawędzi pod mapą.
   useEffectE(() => {
     if (typeof window === "undefined" || window.innerWidth >= 1024) return;
     const onScroll = () => {
       const cards = listRef.current ? listRef.current.querySelectorAll("[data-atr-idx]") : [];
       const vh = window.innerHeight;
+      // mapa zajmuje górę ekranu (~64px + ~50vh); karty oceniamy względem punktu tuż pod mapą
+      const trigger = vh * 0.66;
       let best = null, bestDist = Infinity;
       cards.forEach((el) => {
         const r = el.getBoundingClientRect();
-        const dist = Math.abs(r.top - vh * 0.55);
-        if (r.bottom > vh * 0.42 && r.top < vh * 0.95 && dist < bestDist) { bestDist = dist; best = parseInt(el.dataset.atrIdx); }
+        const dist = Math.abs(r.top - trigger);
+        if (r.bottom > trigger - 60 && r.top < vh && dist < bestDist) { bestDist = dist; best = parseInt(el.dataset.atrIdx); }
       });
       if (best !== null && !Number.isNaN(best)) setSelected(best);
     };
@@ -271,10 +273,11 @@ function Attrazioni({ t }) {
         .atr-split { display: grid; grid-template-columns: 1fr; gap: 32px; }
         @media (min-width: 1024px) { .atr-split { grid-template-columns: 1.2fr 1fr; gap: 48px; align-items: start; } }
         .atr-map { position: sticky; top: 100px; }
-        /* Mobile: mapa przyklejona na górze, lista przewija się POD nią */
+        /* Mobile: mapa przyklejona na górze (z tłem), kategorie i lista przewijają się POD nią */
         @media (max-width: 1023px) {
-          .atr-map { position: sticky; top: 72px; z-index: 5; margin-bottom: 16px; }
-          .atr-map-bg { aspect-ratio: 16/10; box-shadow: 0 16px 40px rgba(26,61,82,0.18); }
+          .atr-cats { position: relative; z-index: 1; margin-bottom: 16px; padding-bottom: 16px; }
+          .atr-map { position: sticky; top: 64px; z-index: 10; margin-bottom: 16px; padding: 8px 0; background: var(--c-bg); }
+          .atr-map-bg { aspect-ratio: 16/10; box-shadow: 0 16px 40px rgba(26,61,82,0.18); background: #D8ECF3; }
           .atr-list { position: relative; z-index: 4; }
         }
         .atr-map-bg { position: relative; aspect-ratio: 4/3; border-radius: 20px; overflow: hidden; background: #D8ECF3; box-shadow: 0 24px 80px rgba(26,61,82,0.12); }
