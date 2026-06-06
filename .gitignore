@@ -8,3 +8,21 @@ build
 .DS_Store
 tsconfig.tsbuildinfo
 *.tsbuildinfo
+
+# Debug / inspection scripts and scratch files
+inspect*.cjs
+inspect*.js
+debug*.cjs
+debug*.js
+check_nodes.cjs
+revert.cjs
+diff.txt
+temp.gltf
+S'Historia.html
+
+# Local upload/screenshot scratch
+uploads/
+screenshots/
+
+# Backup model files
+public/*.backup.glb
