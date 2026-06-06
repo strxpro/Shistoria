@@ -194,6 +194,26 @@ function Attrazioni({ t }) {
   ];
   const [cat, setCat] = useStateE("all");
   const filtered = cat === "all" ? places : places.filter((p) => p.category === cat);
+  const listRef = useRefE(null);
+
+  // Mobile: gdy scrollujesz listę, automatycznie zaznacz na mapie kartę najbliżej górnej krawędzi.
+  useEffectE(() => {
+    if (typeof window === "undefined" || window.innerWidth >= 1024) return;
+    const onScroll = () => {
+      const cards = listRef.current ? listRef.current.querySelectorAll("[data-atr-idx]") : [];
+      const vh = window.innerHeight;
+      let best = null, bestDist = Infinity;
+      cards.forEach((el) => {
+        const r = el.getBoundingClientRect();
+        const dist = Math.abs(r.top - vh * 0.55);
+        if (r.bottom > vh * 0.42 && r.top < vh * 0.95 && dist < bestDist) { bestDist = dist; best = parseInt(el.dataset.atrIdx); }
+      });
+      if (best !== null && !Number.isNaN(best)) setSelected(best);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener("scroll", onScroll);
+  }, [filtered.length]);
 
   return (
     <section className="attrazioni" id="attrazioni">
@@ -249,12 +269,13 @@ function Attrazioni({ t }) {
           </div>
 
           {/* List */}
-          <div className="atr-list">
+          <div className="atr-list" ref={listRef}>
             {filtered.map((p, i) => {
               const realIdx = places.indexOf(p);
               return (
                 <button
                   key={realIdx}
+                  data-atr-idx={realIdx}
                   className={`atr-card ${selected === realIdx ? "active" : ""}`}
                   onClick={() => setSelected(realIdx)}
                 >
@@ -288,6 +309,12 @@ function Attrazioni({ t }) {
         .atr-split { display: grid; grid-template-columns: 1fr; gap: 32px; }
         @media (min-width: 1024px) { .atr-split { grid-template-columns: 1.2fr 1fr; gap: 48px; align-items: start; } }
         .atr-map { position: sticky; top: 100px; }
+        /* Mobile: mapa przyklejona na górze, lista przewija się POD nią */
+        @media (max-width: 1023px) {
+          .atr-map { position: sticky; top: 72px; z-index: 5; margin-bottom: 16px; }
+          .atr-map-bg { aspect-ratio: 16/10; box-shadow: 0 16px 40px rgba(26,61,82,0.18); }
+          .atr-list { position: relative; z-index: 4; }
+        }
         .atr-map-bg { position: relative; aspect-ratio: 4/3; border-radius: 20px; overflow: hidden; background: #D8ECF3; box-shadow: 0 24px 80px rgba(26,61,82,0.12); }
         .atr-map-svg { width: 100%; height: 100%; display: block; }
         .atr-pin { position: absolute; transform: translate(-50%, -100%); width: 32px; height: 32px; border-radius: 50%; background: var(--c-sky); color: #fff; font-family: var(--f-display); font-weight: 800; font-size: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(26,61,82,0.3); transition: all 0.3s; border: 2px solid #fff; }
