@@ -1336,28 +1336,30 @@ function Scene({
       if (!drag.current.active) return;
       const dx = e.clientX - drag.current.lastX;
       drag.current.lastX = e.clientX;
-      const d = dx * 0.012;
+      const d = dx * 0.01;
       drag.current.spinY += d;       // obrót podążający 1:1 za ruchem
       drag.current.vel = d;          // prędkość → bezwładność po puszczeniu
       drag.current.idle = 0;
-      const sh = handles.current.shaker?.root;
-      if (sh) { sh.rotation.y = drag.current.spinY; } // BEZPOŚREDNIO (bez lerpu = nie zamiera)
+      // SZEJKER stoi w miejscu — obraca się POKÓJ/TŁO (jak w poprzednim modelu).
+      const room = roomRef.current;
+      if (room) { room.rotation.y = drag.current.spinY; }
       invalidate();
     };
     const up = () => {
       if (!drag.current.active) return;
       drag.current.active = false;
       gl.domElement.style.cursor = drag.current.follow ? "grab" : "auto";
-      const isMob = typeof window !== "undefined" && window.innerWidth < 768;
-      const sh = handles.current.shaker?.root;
-      // Na mobile (brak ciągłego follow za kursorem) animujemy powrót do spoczynku GSAP-em,
-      // bo frameloop="demand" nie renderuje sam po puszczeniu palca.
-      if (isMob && sh) {
-        gsap.killTweensOf(sh.rotation);
-        gsap.killTweensOf(sh.position);
-        gsap.to(sh.rotation, { x: 0, y: 0, z: deg(CONFIG.shakerRestTilt), duration: 0.7, ease: "power3.out", onUpdate: invalidate });
-        gsap.to(sh.position, { x: CONFIG.shakerRest.x, y: CONFIG.shakerRest.y, z: CONFIG.shakerRest.z, duration: 0.7, ease: "power3.out", onUpdate: invalidate });
-        drag.current.spinY = 0;
+      const room = roomRef.current;
+      // Po puszczeniu: bezwładność tła + miękki powrót do 0 (snap), napędzane GSAP-em
+      // (frameloop="demand" nie renderuje sam po puszczeniu palca).
+      if (room) {
+        gsap.killTweensOf(room.rotation);
+        const target = drag.current.spinY + drag.current.vel * 8; // lekka bezwładność
+        gsap.to(room.rotation, { y: target, duration: 0.3, ease: "power2.out", onUpdate: invalidate,
+          onComplete: () => {
+            gsap.to(room.rotation, { y: 0, duration: 1.1, ease: "elastic.out(1, 0.7)", onUpdate: invalidate });
+            drag.current.spinY = 0;
+          } });
       }
       drag.current.idle = 0;
       invalidate();
@@ -1375,25 +1377,29 @@ function Scene({
   useFrame((_, dt) => {
     camera.lookAt(cameraTarget);
 
-    // subtelny parallax pokoju (mysz/żyroskop) — wygładzony
+    // subtelny parallax pokoju (mysz/żyroskop) — wygładzony; WYŁĄCZONY podczas chwytu
+    // (wtedy obrotem pokoju steruje drag).
     const room = roomRef.current;
-    if (room) {
+    if (room && !drag.current.active) {
       const ty = tilt.current.x * 0.07;   // obrót wokół Y wg X
       const tx = -tilt.current.y * 0.04;  // delikatny przechył wg Y
-      room.rotation.y += (ty - room.rotation.y) * 0.06;
+      // tylko gdy nie trwa tween powrotu (spinY≈0 i brak aktywnego dragu)
+      if (Math.abs(drag.current.spinY) < 0.001) {
+        room.rotation.y += (ty - room.rotation.y) * 0.06;
+      }
       room.rotation.x += (tx - room.rotation.x) * 0.06;
     }
     const sh = handles.current.shaker?.root;
 
     if (sh && drag.current.follow) {
       if (drag.current.active) {
-        // podczas chwytu: płynny obrót wyłącznie wokół osi Y
-        sh.rotation.y += (drag.current.spinY - sh.rotation.y) * 0.16;
+        // podczas chwytu SZEJKER stoi w miejscu (rusza się tło). Trzymamy go w spoczynku.
         sh.rotation.x += (0 - sh.rotation.x) * 0.16;
-        sh.rotation.z += (0 - sh.rotation.z) * 0.16;
-        sh.position.x += (CONFIG.shakerRest.x - sh.position.x) * 0.1;
-        sh.position.y += (CONFIG.shakerRest.y - sh.position.y) * 0.1;
-        sh.position.z += (CONFIG.shakerRest.z - sh.position.z) * 0.1;
+        sh.rotation.y += (0 - sh.rotation.y) * 0.16;
+        sh.rotation.z += (deg(CONFIG.shakerRestTilt) - sh.rotation.z) * 0.16;
+        sh.position.x += (CONFIG.shakerRest.x - sh.position.x) * 0.12;
+        sh.position.y += (CONFIG.shakerRest.y - sh.position.y) * 0.12;
+        sh.position.z += (CONFIG.shakerRest.z - sh.position.z) * 0.12;
         invalidate();
       } else {
         // magnetyczny follow: w punkcie zerowym wyrównany, przy ruchu myszy

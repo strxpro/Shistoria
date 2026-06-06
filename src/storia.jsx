@@ -209,18 +209,37 @@ function StoriaArc({ data }) {
   useEffectS(() => {
     const sec = sectionRef.current;
     if (!sec) return;
+    let snapTimer = null;
     const onScroll = () => {
       const rect = sec.getBoundingClientRect();
       const total = sec.offsetHeight - window.innerHeight;
       if (total <= 0) return;
       const p = Math.min(1, Math.max(0, -rect.top / total));
       setProgress(p);
+
+      // MAGNETYCZNY SNAP: po zatrzymaniu scrolla dosuń do najbliższej daty (lekki snap).
+      if (snapTimer) clearTimeout(snapTimer);
+      // nie snapuj w fazie rozszerzania ostatniego zdjęcia (p > 0.84)
+      if (p < 0.82 && p > 0.02) {
+        snapTimer = setTimeout(() => {
+          const nLocal = data.length;
+          const travel = p / 0.84;
+          const idx = Math.round(travel * (nLocal - 1));
+          const targetTravel = idx / (nLocal - 1);
+          const targetP = targetTravel * 0.84;
+          const top0 = sec.offsetTop;
+          const targetScroll = top0 + targetP * total;
+          if (Math.abs(window.scrollY - targetScroll) > 4) {
+            window.scrollTo({ top: targetScroll, behavior: "smooth" });
+          }
+        }, 110);
+      }
     };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
-    return () => { window.removeEventListener("scroll", onScroll); window.removeEventListener("resize", onScroll); };
-  }, []);
+    return () => { window.removeEventListener("scroll", onScroll); window.removeEventListener("resize", onScroll); if (snapTimer) clearTimeout(snapTimer); };
+  }, [data.length]);
 
   const n = data.length;
   // przewijanie obraca koło 0..0.84; ostatnia faza 0.84..1 = rozszerzenie zdjęcia
