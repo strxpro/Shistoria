@@ -128,7 +128,7 @@ function modelForId(id: string): ModelDef {
     return {
       url: CAN_URL, metalCork: true, metalBody: true, noStream: true, fit: 0.82,
       glass: ["Cylinder.002", "Cylinder", "Cylinder.001", "Can", "puszka", "Puszka", "Body", "body"],
-      label: [],  // puszka ma baked tekstury — nie nadpisujemy etykiety
+      label: [],  // kolor + etykieta nakładane proceduralnie na korpus (patrz traverse metalBody)
       liquid: ["liquid", "liguid", "Liquid", "LIQUID", "Liquid.001"],
       cork: ["zawleczka", "Zawleczka", "dziura", "Tab", "Ring", "Armature"],
     };
@@ -704,6 +704,41 @@ function makeLabelTexture(name: string, color: string, tag: string): THREE.Canva
   t.colorSpace = THREE.SRGBColorSpace;
   t.flipY = false; // tekstury z GLB wymagają flipY=false
   _labelTexCache.set(key, t);
+  return t;
+}
+
+// Owijka puszki — pełnokolorowa tekstura korpusu (kolor napoju + nazwa pionowo).
+const _canTexCache = new Map<string, THREE.CanvasTexture>();
+function makeCanTexture(name: string, color: string): THREE.CanvasTexture {
+  const key = `${name}|${color}`;
+  const cached = _canTexCache.get(key);
+  if (cached) return cached;
+  const c = document.createElement("canvas");
+  c.width = 1024; c.height = 512;
+  const ctx = c.getContext("2d")!;
+  // tło = kolor napoju z pionowym gradientem (połysk aluminium)
+  const g = ctx.createLinearGradient(0, 0, 0, 512);
+  const col = new THREE.Color(color);
+  const light = col.clone().lerp(new THREE.Color("#ffffff"), 0.35).getStyle();
+  const dark = col.clone().lerp(new THREE.Color("#000000"), 0.35).getStyle();
+  g.addColorStop(0, light); g.addColorStop(0.5, color); g.addColorStop(1, dark);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 1024, 512);
+  // pasy akcentu góra/dół
+  ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.fillRect(0, 70, 1024, 10); ctx.fillRect(0, 432, 1024, 10);
+  // nazwa — wyśrodkowana, duża, biała z obwódką (powtórzona 2x wokół puszki)
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  const draw = (cx: number) => {
+    ctx.font = "800 72px Georgia, serif";
+    ctx.lineWidth = 8; ctx.strokeStyle = "rgba(0,0,0,0.45)";
+    ctx.fillStyle = "#ffffff";
+    const up = name.toUpperCase();
+    ctx.strokeText(up, cx, 256); ctx.fillText(up, cx, 256);
+  };
+  draw(256); draw(768);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.flipY = false;
+  _canTexCache.set(key, t);
   return t;
 }
 const BarRoom = React.forwardRef<THREE.Group>(function BarRoom(_props, ref) {
@@ -1926,8 +1961,8 @@ function CocktailExperience() {
       const approach = ScrollTrigger.create({
         trigger: rootRef.current,
         start: "top bottom",
-        end: "top top",
-        scrub: reduce ? 0.6 : true,
+        end: isMobileCx ? "top center" : "top top",
+        scrub: reduce ? 0.6 : (isMobileCx ? 0.8 : true),
         invalidateOnRefresh: true,
         onUpdate: (self) => {
           if (phase === "hold" || phase === "exit") return; // pin już steruje sceną
@@ -2202,6 +2237,13 @@ function MiniBottleModel({ id, name, color, hovered, playing, sustaining }: { id
       if (!mat || Array.isArray(mesh.material) || !(mat as any).isMeshStandardMaterial) return;
       // Ciecz → kolor trunku; szkło → przezroczyste; etykieta bez tekstury → proceduralna.
       if (inList(mesh.name, model.liquid)) { mesh.material = liquidMat; liquidMeshRef.current = mesh; }
+      else if (model.metalBody && inList(mesh.name, model.glass)) {
+        // PUSZKA: korpus dostaje pełnokolorową owijkę (kolor napoju + nazwa)
+        labelFound = true;
+        mesh.material = new THREE.MeshStandardMaterial({
+          color: "#ffffff", map: makeCanTexture(name, color), roughness: 0.32, metalness: 0.5,
+        });
+      }
       else if (!model.metalBody && inList(mesh.name, model.glass)) {
         glassRef.current = mesh;
         mesh.material = glassMat; // widać kolorową ciecz przez szkło
@@ -2494,6 +2536,12 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
         const t = (mat as unknown as Record<string, THREE.Texture | null>)[k]; if (t) { t.flipY = false; t.needsUpdate = true; }
       });
       if (inList(mesh.name, model.liquid)) mesh.material = liquidMat;
+      else if (model.metalBody && inList(mesh.name, model.glass)) {
+        // PUSZKA: korpus z kolorową owijką (kolor napoju + nazwa)
+        mesh.material = new THREE.MeshStandardMaterial({
+          color: "#ffffff", map: makeCanTexture(ingById(id)?.name ?? id, color), roughness: 0.32, metalness: 0.5,
+        });
+      }
       else if (!model.metalBody && inList(mesh.name, model.glass)) {
         glassRef.current = mesh;
         mesh.material = glassMat; // przezroczyste szkło — widać kolor cieczy
@@ -3592,24 +3640,6 @@ function AccordionPanel({
               ))}
             </div>
 
-            {/* Rozwijana lista kategorii (mobile) */}
-            <div className={`cx-drop cx-drop-cat ${catDropOpen ? "is-open" : ""}`}>
-              <button className="cx-drop-trigger" onClick={() => { setCatDropOpen((v) => !v); setStrDropOpen(false); }}>
-                <span className="cx-drop-cur"><span className="cx-drop-emoji">{curCatEmoji}</span> {curCatLabel}</span>
-                <span className="cx-drop-caret">▾</span>
-              </button>
-              <div className="cx-drop-list">
-                <button className={`cx-drop-opt ${isAll ? "active" : ""}`} onClick={() => { setActive("__all__"); setStrengthFilter("all"); onOpenChange?.(true); setCatDropOpen(false); }}>
-                  <span className="cx-drop-emoji">✦</span> Tutti <span className="cx-drop-cnt">{groups.reduce((s, g) => s + g.items.length, 0)}</span>
-                </button>
-                {groups.map((g) => (
-                  <button key={g.group} className={`cx-drop-opt ${active === g.group ? "active" : ""}`} onClick={() => { setActive(g.group); setStrengthFilter("all"); onOpenChange?.(true); setCatDropOpen(false); }}>
-                    <span className="cx-drop-emoji">{g.emoji}</span> {g.group} <span className="cx-drop-cnt">{g.items.length}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* Strength filter row (desktop pills) */}
             {side === "right" && (
               <div className="cx-drawer-strength-filters">
@@ -3631,23 +3661,43 @@ function AccordionPanel({
               </div>
             )}
 
-            {/* Rozwijana lista mocy (mobile) — tylko po prawej (alkohole) */}
-            {side === "right" && (
-              <div className={`cx-drop cx-drop-str ${strDropOpen ? "is-open" : ""}`}>
-                <button className="cx-drop-trigger" onClick={() => { setStrDropOpen((v) => !v); setCatDropOpen(false); }}>
-                  <span className="cx-drop-cur"><span className="cx-drop-dot" style={{ background: curStrength.c }} /> {curStrength.label}</span>
+            {/* Rozwijane listy w jednej linii (mobile): kategoria obok mocy */}
+            <div className="cx-drop-row">
+              <div className={`cx-drop cx-drop-cat ${catDropOpen ? "is-open" : ""}`}>
+                <button className="cx-drop-trigger" onClick={() => { setCatDropOpen((v) => !v); setStrDropOpen(false); }}>
+                  <span className="cx-drop-cur"><span className="cx-drop-emoji">{curCatEmoji}</span> {curCatLabel}</span>
                   <span className="cx-drop-caret">▾</span>
                 </button>
                 <div className="cx-drop-list">
-                  {STRENGTH_OPTS.map((o) => (
-                    <button key={o.id} className={`cx-drop-opt ${strengthFilter === o.id ? "active" : ""}`} onClick={() => { setStrengthFilter(o.id); setStrDropOpen(false); }}>
-                      <span className="cx-drop-dot" style={{ background: o.c }} /> {o.label}
-                      <span className="cx-drop-cnt">{rawItems.filter((i) => o.test(i.abv ?? 0)).length}</span>
+                  <button className={`cx-drop-opt ${isAll ? "active" : ""}`} onClick={() => { setActive("__all__"); setStrengthFilter("all"); onOpenChange?.(true); setCatDropOpen(false); }}>
+                    <span className="cx-drop-emoji">✦</span> Tutti <span className="cx-drop-cnt">{groups.reduce((s, g) => s + g.items.length, 0)}</span>
+                  </button>
+                  {groups.map((g) => (
+                    <button key={g.group} className={`cx-drop-opt ${active === g.group ? "active" : ""}`} onClick={() => { setActive(g.group); setStrengthFilter("all"); onOpenChange?.(true); setCatDropOpen(false); }}>
+                      <span className="cx-drop-emoji">{g.emoji}</span> {g.group} <span className="cx-drop-cnt">{g.items.length}</span>
                     </button>
                   ))}
                 </div>
               </div>
-            )}
+
+              {/* Rozwijana lista mocy (mobile) — tylko po prawej (alkohole) */}
+              {side === "right" && (
+                <div className={`cx-drop cx-drop-str ${strDropOpen ? "is-open" : ""}`}>
+                  <button className="cx-drop-trigger" onClick={() => { setStrDropOpen((v) => !v); setCatDropOpen(false); }}>
+                    <span className="cx-drop-cur"><span className="cx-drop-dot" style={{ background: curStrength.c }} /> {curStrength.label}</span>
+                    <span className="cx-drop-caret">▾</span>
+                  </button>
+                  <div className="cx-drop-list">
+                    {STRENGTH_OPTS.map((o) => (
+                      <button key={o.id} className={`cx-drop-opt ${strengthFilter === o.id ? "active" : ""}`} onClick={() => { setStrengthFilter(o.id); setStrDropOpen(false); }}>
+                        <span className="cx-drop-dot" style={{ background: o.c }} /> {o.label}
+                        <span className="cx-drop-cnt">{rawItems.filter((i) => o.test(i.abv ?? 0)).length}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="cx-drawer-head">
               <button className="cx-back" onClick={closeCat}>
                 <span className="cx-back-ico">←</span> Categorie
@@ -4630,6 +4680,7 @@ function CocktailStyles() {
 
       /* Rozwijane listy (kategorie / moc) — domyślnie ukryte (desktop używa pigułek) */
       .cx-drop { display:none; }
+      .cx-drop-row { display:none; }
 
       /* Boks butelki — SOLIDNY (bez glass), z modelem 3D w środku */
       .cx-bcard { position:relative; display:flex; flex-direction:column; align-items:center; gap:6px; padding:16px 10px 14px; cursor:pointer;
@@ -5086,7 +5137,10 @@ function CocktailStyles() {
         .cx-drawer-tab { padding:6px 10px; font-size:10px; }
 
         /* Rozwijane listy na mobile zamiast przewijanych pigułek */
+        .cx-drop-row { display:flex; gap:8px; margin-bottom:8px; align-items:flex-start; }
+        .cx-drop-row .cx-drop { flex:1 1 0; min-width:0; }
         .cx-drop { display:block; position:relative; max-width:100%; margin:0 0 8px; z-index:5; }
+        .cx-drop-row .cx-drop { margin:0; }
         .cx-drop + .cx-drop { margin-top:0; }
         .cx-drop-trigger { display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%;
           padding:11px 14px; border-radius:14px; cursor:pointer; color:#fff;

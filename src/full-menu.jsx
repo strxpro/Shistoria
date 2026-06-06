@@ -15,6 +15,7 @@ function FullMenu() {
   const [dishPopout, setDishPopout] = useStateM(null);
   const [pillVisible, setPillVisible] = useStateM(false);
   const navRef = useRefM(null);
+  const footerRef = useRefM(null);
   const lastScrollY = useRefM(0);
 
   // Scroll into category on click
@@ -55,7 +56,13 @@ function FullMenu() {
         if (navRef.current && sectionRef.current) {
           const navRect = navRef.current.getBoundingClientRect();
           const secRect = sectionRef.current.getBoundingClientRect();
-          const fillsScreen = navRect.bottom < 60 && secRect.top < -40 && secRect.bottom > window.innerHeight * 0.9;
+          // pasek kategorii wyjechał górą i sekcja wciąż wypełnia ekran
+          let fillsScreen = navRect.bottom < 60 && secRect.top < -40 && secRect.bottom > window.innerHeight * 0.9;
+          // gdy stopka (po ostatnim daniu) wchodzi w widok — pill całkowicie znika
+          if (footerRef.current) {
+            const fRect = footerRef.current.getBoundingClientRect();
+            if (fRect.top < window.innerHeight) fillsScreen = false;
+          }
           setPillVisible(fillsScreen);
         } else {
           setPillVisible(false);
@@ -213,7 +220,7 @@ function FullMenu() {
               </div>
             ))}
 
-            <div className="fmenu-footer">
+            <div className="fmenu-footer" ref={footerRef}>
               <p className="serif-quote fmenu-footer-quote">
                 "Cuciniamo solo quello che troveremmo a tavola da nonna."
               </p>

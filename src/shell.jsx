@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Footer } from "./sections";
 import gsap from "gsap";
 
@@ -324,6 +325,24 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
   const [navVisible, setNavVisible] = useState(true);
   const [navDark, setNavDark] = useState(false);
   const logoRef = useRef(null);
+  const [logoBox, setLogoBox] = useState(null);
+
+  // Śledź pozycję logo → portal blend layer.
+  // mix-blend-mode:difference z BIAŁĄ sylwetką = per-piksel: ciemne tło→biały, jasne tło→czarny.
+  useEffect(() => {
+    const update = () => {
+      if (!logoRef.current) return;
+      const img = logoRef.current.querySelector(".nav-logo-img");
+      if (!img) return;
+      const r = img.getBoundingClientRect();
+      if (r.width > 0) setLogoBox({ top: r.top, left: r.left, width: r.width, height: r.height });
+    };
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    const raf = requestAnimationFrame(update);
+    return () => { window.removeEventListener("scroll", update); window.removeEventListener("resize", update); cancelAnimationFrame(raf); };
+  }, [scrolled, navVisible, mobileOpen]);
 
   useEffect(() => {
     let lastY = window.scrollY;
@@ -463,7 +482,7 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
       <div className={`mobile-menu ${mobileOpen ? "open" : ""}`}>
         <div className="mobile-header-mirror">
           <a href="#top" className="nav-logo duplicate-white-logo" onClick={(e) => { e.preventDefault(); setMobileOpen(false); onSelectSection("top"); }}>
-            <img src="/logo.png" alt="S'Historia" className="nav-logo-img" style={{filter:"brightness(0) invert(1)"}} />
+            <img src="/logo.png" alt="S'Historia" className="nav-logo-img" style={{filter:"brightness(0) invert(1)", opacity:1}} />
           </a>
           {/* Language selector in mobile menu */}
           <div className="mobile-lang">
@@ -483,6 +502,14 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
           </div>
         </div>
       </div>
+
+      {/* Blend overlay logo — biała sylwetka renderowana do body; mix-blend-mode:difference
+          daje per-piksel: pod ciemnym tłem→biały, pod jasnym→czarny (automatycznie, lokalnie). */}
+      {logoBox && navVisible && !mobileOpen && typeof document !== "undefined" && createPortal(
+        <img src="/logo.png" alt="" aria-hidden="true" className="nav-logo-blend"
+          style={{ position: "fixed", top: logoBox.top, left: logoBox.left, width: logoBox.width, height: logoBox.height }} />,
+        document.body,
+      )}
 
       <style>{`
         /* Desktop base styles */
@@ -505,10 +532,11 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
         .nav.hidden .nav-inner { transform: translateY(-100%); }
         
         .nav-logo { font-family: var(--f-display); font-weight: 800; font-size: 28px; color: var(--c-deep); letter-spacing: -0.04em; text-decoration: none; position: relative; display:flex; align-items:center; }
-        /* Logo: czysty czarny na jasnym tle, czysty biały na ciemnym (auto wg sekcji pod spodem) */
-        .nav-logo-img { height:80px; width:auto; object-fit:contain; clip-path:inset(12% 0% 12% 0%); transform:scale(1.6);
-          filter:brightness(0) saturate(0); transition:filter 0.45s ease; }
-        .nav.nav-dark .nav-logo-img { filter:brightness(0) saturate(0) invert(1); }
+        /* Oryginał niewidoczny (placeholder pozycji + klik). Blend overlay rysuje widoczne logo. */
+        .nav-logo-img { height:80px; width:auto; object-fit:contain; clip-path:inset(12% 0% 12% 0%); transform:scale(1.6); opacity:0; }
+        /* Biała sylwetka + difference = per-piksel auto-invert wg tła pod spodem (czarny/biały). */
+        .nav-logo-blend { object-fit:contain; clip-path:inset(12% 0% 12% 0%); transform:scale(1.6); pointer-events:none; z-index:1001;
+          filter:brightness(0) invert(1); mix-blend-mode:difference; }
         .nav-logo-coords { position:absolute; bottom:-10px; left:0; font-family:var(--f-body,"Inter",sans-serif); font-weight:500; font-size:8px; letter-spacing:0.2em; color:var(--c-mute,rgba(14,34,48,0.45)); white-space:nowrap; }
         .nav-logo-sub { position: absolute; bottom: -8px; left: 0; font-family: var(--f-body); font-weight: 600; font-size: 8px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--c-deep); opacity: 0.6; }
         
@@ -525,7 +553,8 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
           body[data-cx-drawer="open"] .nav { transform: none !important; }
           .nav-inner { justify-content: center; padding: 0 16px; }
           .nav-logo { color: var(--c-deep); transition: color 0.3s; font-size: 24px; }
-          .nav-logo-img { height:56px; clip-path:inset(10% 0% 10% 0%); transform:scale(1.5); }
+          .nav-logo-img { height:56px; clip-path:inset(10% 0% 10% 0%); transform:scale(1.5); opacity:0; }
+          .nav-logo-blend { clip-path:inset(10% 0% 10% 0%) !important; transform:scale(1.5) !important; }
           .nav-logo-sub { color: var(--c-deep); }
           .nav-left { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); justify-content: center; }
           .nav-right { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); gap: 10px; }
@@ -572,9 +601,9 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
             height: 52px;
             position: fixed;
             bottom: calc(24px + env(safe-area-inset-bottom));
-            right: 50%;
+            right: 20px;
             left: auto;
-            transform: translateX(50%);
+            transform: none;
             z-index: 2100;
             background: var(--c-deep);
             border: 1px solid rgba(255,255,255,0.1);
@@ -585,8 +614,8 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
             pointer-events: auto;
           }
           .hamburger-mobile.open {
-            right: 50%;
-            transform: translateX(50%);
+            right: 20px;
+            transform: none;
             background: rgba(255, 255, 255, 0.15);
             border-color: rgba(255, 255, 255, 0.25);
             box-shadow: none;
@@ -620,6 +649,9 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
           clip-path: ellipse(120% 0% at 50% 100%);
           transition: clip-path 0.8s cubic-bezier(0.77, 0, 0.175, 1);
           pointer-events: none;
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
+          overscroll-behavior: contain;
         }
         .mobile-menu.open {
           clip-path: ellipse(120% 120% at 50% 100%);
