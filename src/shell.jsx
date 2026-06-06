@@ -597,8 +597,8 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            width: 52px;
-            height: 52px;
+            width: 60px;
+            height: 60px;
             position: fixed;
             bottom: calc(24px + env(safe-area-inset-bottom));
             right: calc(50% - 90px);
@@ -621,8 +621,8 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
             box-shadow: none;
             z-index: 1900;
           }
-          /* W sekcji kreatora hamburger przesuwa się w prawo żeby nie blokował slide-to-shake */
-          body[data-cx-drawer="open"] .hamburger-mobile { right: 16px; transform:none; }
+          /* Gdy otwarta szuflada butelek — hamburger płynnie na samą górę po prawej */
+          body[data-cx-drawer="open"] .hamburger-mobile { right: 16px; top: calc(16px + env(safe-area-inset-top)); bottom: auto; transform:none; }
           body[data-cx-section="creator"] .hamburger-mobile:not(.open) { right: 16px; transform:none; }
           /* Podczas wjazdu/wyjazdu sekcji kreatora (neon pop) — hamburger znika */
           body[data-cx-scrolling] .hamburger-mobile { opacity: 0; visibility: hidden; pointer-events: none; }
@@ -632,14 +632,14 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
         /* Nav CTA przesuwa się kolorystycznie w stronę różu tylko w sekcji Tramonti/bar */
         .nav .btn-nav { transition: background .5s var(--ease-out), color .3s; }
         body[data-cx-section="bar"] .nav .btn-nav { background: var(--c-coral, #E8927C); color:#fff; }
-        .hamburger-lines { width: 20px; height: 12px; position: relative; }
+        .hamburger-lines { width: 24px; height: 14px; position: relative; }
         .hamburger-lines::before, .hamburger-lines::after { content: ''; position: absolute; left: 0; width: 100%; height: 2px; background: #fff; border-radius: 2px; transition: all 0.4s cubic-bezier(0.65, 0, 0.35, 1); }
         .hamburger-mobile.ham-dark { background: #fff; }
         .hamburger-mobile.ham-dark .hamburger-lines::before, .hamburger-mobile.ham-dark .hamburger-lines::after { background: var(--c-deep); }
         .hamburger-lines::before { top: 0; }
         .hamburger-lines::after { bottom: 0; }
-        .hamburger-mobile.open .hamburger-lines::before { top: 5px; transform: rotate(45deg); }
-        .hamburger-mobile.open .hamburger-lines::after { bottom: 5px; transform: rotate(-45deg); }
+        .hamburger-mobile.open .hamburger-lines::before { top: 6px; transform: rotate(45deg); }
+        .hamburger-mobile.open .hamburger-lines::after { bottom: 6px; transform: rotate(-45deg); }
         
         .mobile-menu {
           position: fixed;

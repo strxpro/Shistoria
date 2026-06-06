@@ -4582,6 +4582,8 @@ function CocktailStyles() {
         --cx-stroke:rgba(255,255,255,0.10);
         --cx-strength-bg:#161318;
         --cx-accent:#E8927C;
+        /* blokada zaznaczania tekstu / menu kontekstowego przy długim przytrzymaniu (mobile) */
+        -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
       }
       /* delikatny szum na tle */
       .cx-noise { position:absolute; inset:0; z-index:1; pointer-events:none; opacity:0.05; mix-blend-mode:overlay;
@@ -4930,9 +4932,10 @@ function CocktailStyles() {
       /* Canvas */
       .cx-canvas { position:absolute; inset:0; z-index:5; touch-action:pan-y; }
 
-      /* Kinowy overlay nalewania — blur tła + duża butelka na środku */
+      /* Kinowy overlay nalewania — blur tła TYLKO podczas otwierania; potem przezroczyste,
+         żeby było widać szejker pod spodem i strumień wpadał do jego wnętrza. */
       .cx-pour-overlay { position:fixed; inset:0; z-index:80; pointer-events:none;
-        background:rgba(8,6,9,0.30); transition:background .5s ease, backdrop-filter .5s ease;
+        background:transparent; transition:background .5s ease, backdrop-filter .5s ease;
         animation:cxPourIn .3s ease both; }
       .cx-pour-overlay.is-blur { background:rgba(8,6,9,0.46); backdrop-filter:blur(16px) saturate(1.1); -webkit-backdrop-filter:blur(16px) saturate(1.1); }
       @keyframes cxPourIn { from { opacity:0; } to { opacity:1; } }
@@ -5043,6 +5046,12 @@ function CocktailStyles() {
       .cx-comm-head .cx-mini-kicker { color:rgba(255,255,255,0.7); }
       .cx-comm-head h2 { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:clamp(40px,6vw,96px); line-height:0.95; letter-spacing:-0.03em; color:#fff; margin-top:14px; word-break:keep-all; overflow-wrap:normal; white-space:nowrap; }
       .cx-comm-title { perspective:600px; transform-style:preserve-3d; }
+      @media (max-width:768px){
+        .cx-comm-head { flex-direction:column; gap:10px; text-align:center; }
+        .cx-comm-head > div { display:flex; flex-direction:column; align-items:center; width:100%; }
+        .cx-comm-head h2 { white-space:normal; font-size:clamp(30px,8vw,46px); }
+        .cx-comm-count { margin:0 auto; }
+      }
       .cx-char { display:inline-block; will-change:transform,opacity; transform-origin:50% 100%; opacity:0; transition:none; }
 
       /* neonowe strzałki w dół */
@@ -5125,8 +5134,8 @@ function CocktailStyles() {
       @media (max-width:768px){
         .cx-root { border-top-left-radius:1.6rem; border-top-right-radius:1.6rem; overflow-x:visible; }
         .cx-stage { border-top-left-radius:1.6rem; border-top-right-radius:1.6rem; }
-        .cx-title { top:clamp(80px,11vh,120px); padding:0 18px; text-align:right; left:auto; right:0; max-width:62vw; margin-left:auto; }
-        .cx-title h2 { font-size:clamp(18px,5vw,28px); }
+        .cx-title { top:clamp(80px,11vh,120px); padding:0 18px; text-align:center; left:0; right:0; max-width:none; margin:0 auto; }
+        .cx-title h2 { font-size:clamp(20px,5.5vw,30px); }
         .cx-title .cx-mini-kicker { font-size:9px; margin-bottom:6px; }
         .cx-strength { margin-top:8px; padding:5px 10px; font-size:10px; }
 

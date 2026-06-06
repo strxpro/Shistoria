@@ -200,7 +200,9 @@ export default function App() {
       let topPos = id === "top" ? 0 : el.getBoundingClientRect().top + window.scrollY - 60;
       // Cocktail section: scroll into the "hold" phase so shaker is already centered (skip enter animation)
       if (id === "cocktail-rise") {
-        topPos = el.getBoundingClientRect().top + window.scrollY + window.innerHeight * 1.5;
+        const isMobile = window.innerWidth < 768;
+        // .cx-scroll ma 600vh; faza "hold" jest ~w środku. Celujemy w środek holdu.
+        topPos = el.getBoundingClientRect().top + window.scrollY + window.innerHeight * (isMobile ? 2.2 : 1.5);
       }
       if (window.lenis) {
         window.lenis.scrollTo(topPos, { immediate: true });

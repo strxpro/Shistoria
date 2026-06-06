@@ -342,7 +342,7 @@ function FullMenu() {
         .fmenu-row-name { font-family: var(--f-display); font-weight: 700; font-size: 19px; letter-spacing: -0.01em; color: var(--c-deep); display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
         .fmenu-row-star { color: var(--c-coral); font-size: 14px; }
         .fmenu-row-allergen { font-family: var(--f-body); font-size: 11px; font-weight: 400; color: var(--c-mute); letter-spacing: 0.05em; }
-        .fmenu-row-desc { font-family: var(--f-serif); font-style: italic; font-size: 15px; color: var(--c-mute); margin-top: 6px; line-height: 1.4; }
+        .fmenu-row-desc { font-family: var(--f-serif); font-style: italic; font-size: 15px; color: var(--c-mute); margin-top: 6px; line-height: 1.4; overflow-wrap: anywhere; word-break: break-word; }
         .fmenu-row-dots { flex: 1; border-bottom: 1px dotted var(--c-line); transform: translateY(-4px); min-width: 40px; }
         @media (max-width: 640px) { .fmenu-row-dots { display: none; }
           .fmenu-row { grid-template-columns: 52px 1fr auto; gap: 12px; padding: 14px 0; }
@@ -502,7 +502,12 @@ function DrinkStyles({ dark }) {
       .drinks-track { display: flex; gap: 20px; overflow-x: auto; scrollbar-width: none; padding: 12px 0 32px; cursor: grab; user-select: none; scroll-snap-type: x proximity; }
       .drinks-track::-webkit-scrollbar { display: none; }
       .drinks-card { flex: 0 0 300px; min-height: 400px; scroll-snap-align: start; background: ${dark ? "rgba(255,255,255,0.04)" : "#fff"}; border: 1px solid ${dark ? "rgba(255,255,255,0.1)" : "var(--c-line)"}; border-radius: 20px; padding: 24px; display: flex; flex-direction: column; gap: 16px; position: relative; transition: transform 0.4s var(--ease-out), border-color 0.3s; }
-      @media (max-width: 768px) { .drinks-card { flex: 0 0 180px; min-height: 260px; padding: 14px; border-radius: 14px; gap: 10px; } .drinks-card-name { font-size: 15px !important; } .drinks-card-price { font-size: 18px !important; } .drinks-card-glass { height: 80px; } .drinks-card-desc { font-size: 12px !important; } }
+      @media (max-width: 768px) {
+        /* Bar/drinks menu na telefonie: 2 kolumny, widoczne ~4 pozycje, scroll w pionie w sekcji */
+        .drinks-track { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; overflow-x: hidden; overflow-y: auto; max-height: 64vh; padding: 8px 2px 16px; scroll-snap-type: none; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; touch-action: pan-y; }
+        .drinks-card { flex: initial !important; width: auto !important; min-height: 200px !important; padding: 14px; border-radius: 14px; gap: 10px; scroll-snap-align: none; }
+        .drinks-card-name { font-size: 15px !important; } .drinks-card-price { font-size: 18px !important; } .drinks-card-glass { height: 80px; } .drinks-card-desc { font-size: 12px !important; }
+      }
       .drinks-card:hover { transform: translateY(-4px); border-color: var(--c-coral); }
       .drinks-card-num { font-family: var(--f-display); font-weight: 800; font-size: 11px; letter-spacing: 0.1em; color: var(--c-coral); }
       .drinks-card-glass { height: 140px; display: flex; align-items: center; justify-content: center; }
