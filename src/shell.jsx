@@ -322,6 +322,7 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
   ];
 
   const [navVisible, setNavVisible] = useState(true);
+  const [navDark, setNavDark] = useState(false);
 
   useEffect(() => {
     let lastY = window.scrollY;
@@ -343,6 +344,20 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
       if (storia) {
         storiaEnd = storia.offsetTop + storia.offsetHeight;
       }
+
+      // Dynamiczne wykrywanie ciemnego tła pod logo (per-scroll, natychmiastowe)
+      // Sprawdzamy sekcję która znajduje się pod pozycją logo (lewy-górny obszar)
+      const darkIds = ["bar", "cocktail-rise", "cocktail-builder", "ready-drinks", "storia", "contatti"];
+      let isDark = false;
+      for (const id of darkIds) {
+        const el = document.getElementById(id);
+        if (el) {
+          const r = el.getBoundingClientRect();
+          // sekcja zachodzi na obszar logo (top ~40px)
+          if (r.top <= 50 && r.bottom >= 50) { isDark = true; break; }
+        }
+      }
+      setNavDark(isDark);
 
       // Hide navigation on scroll down, show on scroll up (ONLY desktop)
       if (currentY > heroEnd && window.innerWidth > 1023) {
@@ -388,7 +403,7 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
 
 
   return (
-    <nav className={`nav ${scrolled ? "scrolled" : ""} ${!navVisible ? "hidden" : ""} ${["bar", "cocktail-rise", "cocktail-builder", "ready-drinks"].includes(activeSection) ? "nav-dark" : ""}`} style={{ "--scroll-p": scrollProgress, "--center-w": `${centerW}px` }}>
+    <nav className={`nav ${scrolled ? "scrolled" : ""} ${!navVisible ? "hidden" : ""} ${navDark ? "nav-dark" : ""}`} style={{ "--scroll-p": scrollProgress, "--center-w": `${centerW}px` }}>
       <div className="nav-bg"></div>
       <div className="nav-inner">
         <div className="nav-left">
@@ -439,7 +454,7 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
         </div>
       </div>
 
-      <button className={`hamburger-mobile ${mobileOpen ? "open" : ""}`} onClick={() => setMobileOpen(!mobileOpen)}>
+      <button className={`hamburger-mobile ${mobileOpen ? "open" : ""} ${navDark ? "ham-dark" : ""}`} onClick={() => setMobileOpen(!mobileOpen)}>
         <div className="hamburger-lines"></div>
       </button>
 
@@ -582,6 +597,8 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
         }
         .hamburger-lines { width: 20px; height: 12px; position: relative; }
         .hamburger-lines::before, .hamburger-lines::after { content: ''; position: absolute; left: 0; width: 100%; height: 2px; background: #fff; border-radius: 2px; transition: all 0.4s cubic-bezier(0.65, 0, 0.35, 1); }
+        .hamburger-mobile.ham-dark { background: #fff; }
+        .hamburger-mobile.ham-dark .hamburger-lines::before, .hamburger-mobile.ham-dark .hamburger-lines::after { background: var(--c-deep); }
         .hamburger-lines::before { top: 0; }
         .hamburger-lines::after { bottom: 0; }
         .hamburger-mobile.open .hamburger-lines::before { top: 5px; transform: rotate(45deg); }
