@@ -268,10 +268,10 @@ function StoriaArc({ data }) {
               <Placeholder type={prevItem.phType} style={{ width: "100%", height: "100%" }} />
             </div>
             <div className="sarc-photo-grad" />
-            <div className="sarc-expand-cap">
+            <div className="sarc-expand-cap" style={{ opacity: Math.max(0, 1 - ease * 2.5) }}>
               <span className="sarc-photo-year">{lastItem.year}</span>
               <h4 className="sarc-photo-title">{lastItem.title}</h4>
-              <p className="sarc-photo-text" style={{ opacity: Math.max(0, 1 - ease * 2) }}>{lastItem.text}</p>
+              <p className="sarc-photo-text" style={{ opacity: Math.max(0, 1 - ease * 3) }}>{lastItem.text}</p>
             </div>
           </div>
         )}
@@ -306,7 +306,7 @@ function StoriaArc({ data }) {
           <div className="sarc-wheel-marker" />
         </div>
 
-        <div className="sarc-progress"><div className="sarc-progress-bar" style={{ width: `${travelP * 100}%` }} /></div>
+        <div className="sarc-progress" style={{ opacity: Math.max(0, 1 - ease * 2.5) }}><div className="sarc-progress-bar" style={{ width: `${travelP * 100}%` }} /></div>
 
       </div>
 
@@ -350,7 +350,7 @@ function StoriaArc({ data }) {
         .sarc-photo-text { font-family: var(--f-serif); font-style: italic; font-size: 14px; line-height: 1.45; color: rgba(255,255,255,0.92); max-width: 92%; }
         .sarc-photo-more { margin-top: 12px; background: none; border: none; color: #fff; font-family: var(--f-body); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; padding: 0; opacity: 0.85; }
         /* PÓŁKOLE z datami — niżej; kropki NA okręgu, etykiety ułożone stycznie ("na pilo"), zawsze widoczne */
-        .sarc-wheel { position: absolute; left: 50%; top: calc(72vh + 200px); width: 1px; height: 1px; transition: transform .15s ease-out, opacity .15s ease-out; }
+        .sarc-wheel { position: absolute; left: 50%; top: calc(72vh + 280px); width: 1px; height: 1px; transition: transform .15s ease-out, opacity .15s ease-out; }
         .sarc-wheel-ring { position: absolute; left: 50%; top: 50%; width: 520px; height: 520px; margin: -260px 0 0 -260px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.14); }
         .sarc-wheel-marker { position: absolute; left: 50%; top: -260px; width: 16px; height: 16px; border-radius: 50%; background: var(--c-coral, #E8927C); transform: translate(-50%, -50%); box-shadow: 0 0 0 6px rgba(232,146,124,0.22), 0 4px 14px rgba(0,0,0,0.3); z-index: 3; }
         /* tick = kontener obrócony stycznie do okręgu; w środku data + kropka na obwodzie */

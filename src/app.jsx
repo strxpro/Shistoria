@@ -204,9 +204,8 @@ export default function App() {
       // Cocktail section: scroll into the "hold" phase so shaker is already centered (skip enter animation)
       if (id === "cocktail-rise") {
         const isMobile = window.innerWidth < 768;
-        // .cx-scroll ma 600vh; faza "hold" zaczyna się po ~16% (mobile) / 26% (desktop) wysokości.
-        // Celujemy pewnie w środek holdu.
-        topPos = el.getBoundingClientRect().top + window.scrollY + window.innerHeight * (isMobile ? 1.6 : 1.5);
+        // .cx-scroll ma 600vh; hold zaczyna się po ~28% (mobile)/26% (desktop). Celujemy pewnie w hold.
+        topPos = el.getBoundingClientRect().top + window.scrollY + window.innerHeight * (isMobile ? 2.4 : 1.5);
       }
       if (window.lenis) {
         window.lenis.scrollTo(topPos, { immediate: true });
