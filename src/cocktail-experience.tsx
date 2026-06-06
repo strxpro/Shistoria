@@ -68,14 +68,20 @@ import { supabase, getSessionId } from "./lib/supabase";
 /* ──────────────────────────────────────────────────────────────────────────
  * Assets
  * ──────────────────────────────────────────────────────────────────────── */
-const BOTTLE_URL = "/WINOILIKIERY.glb";       // wina + likiery (wino, Etykieta, Liquid, Cylinder)
-const SPIRIT_URL = "/wodkarum.glb";           // wódka/rum/tequila (butelka, Etykieta, LIQUID, zakretka)
-const WHISKYGIN_URL = "/whiskigin.glb";       // whisky + gin (Liquid, LiquidAction)
-const CAN_URL = "/puszka.glb";                // napoje gazowane: puszka (puszka, liguid, zawleczka, dziura)
-const SOK_URL = "/sok.glb";                    // soki: butelka soku
-const GLASS_URL = "/szkloniskieglb.glb";      // szklanka niska (szklanka, liguid[Key 1], lód, shaker, łopatka)
-const GLASS_HIGH_URL = "/szklowysokie.glb";   // szklanka wysoka (ta sama struktura węzłów + animacje)
-const SHAKER_URL = "/shaker-shistoria.glb";
+// Bazowy URL modeli 3D. Domyślnie pliki lokalne z /public; można przełączyć na
+// Supabase Storage (CDN) ustawiając NEXT_PUBLIC_MODELS_URL na adres bucketa "model".
+// Przykład: https://slatelpipxtqveydgslc.supabase.co/storage/v1/object/public/model
+const MODELS_BASE = (process.env.NEXT_PUBLIC_MODELS_URL || "").replace(/\/$/, "");
+const modelUrl = (file: string) => MODELS_BASE ? `${MODELS_BASE}/${file}` : `/${file}`;
+
+const BOTTLE_URL = modelUrl("WINOILIKIERY.glb");       // wina + likiery (wino, Etykieta, Liquid, Cylinder)
+const SPIRIT_URL = modelUrl("wodkarum.glb");           // wódka/rum/tequila (butelka, Etykieta, LIQUID, zakretka)
+const WHISKYGIN_URL = modelUrl("whiskigin.glb");       // whisky + gin (Liquid, LiquidAction)
+const CAN_URL = modelUrl("puszka.glb");                // napoje gazowane: puszka (puszka, liguid, zawleczka, dziura)
+const SOK_URL = modelUrl("sok.glb");                    // soki: butelka soku
+const GLASS_URL = modelUrl("szkloniskieglb.glb");      // szklanka niska (szklanka, liguid[Key 1], lód, shaker, łopatka)
+const GLASS_HIGH_URL = modelUrl("szklowysokie.glb");   // szklanka wysoka (ta sama struktura węzłów + animacje)
+const SHAKER_URL = modelUrl("shaker-shistoria.glb");
 useGLTF.preload(BOTTLE_URL);
 useGLTF.preload(SPIRIT_URL);
 useGLTF.preload(WHISKYGIN_URL);
