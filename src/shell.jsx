@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Footer } from "./sections";
 import gsap from "gsap";
 
@@ -323,6 +324,24 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
 
   const [navVisible, setNavVisible] = useState(true);
   const [navDark, setNavDark] = useState(false);
+  const logoRef = useRef(null);
+  const [logoBox, setLogoBox] = useState(null);
+
+  // Śledź pozycję logo → portal blend layer (mix-blend-mode difference = pixel-perfect auto invert)
+  useEffect(() => {
+    const update = () => {
+      if (!logoRef.current) return;
+      const img = logoRef.current.querySelector(".nav-logo-img");
+      if (!img) return;
+      const r = img.getBoundingClientRect();
+      if (r.width > 0) setLogoBox({ top: r.top, left: r.left, width: r.width, height: r.height });
+    };
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    const raf = requestAnimationFrame(update);
+    return () => { window.removeEventListener("scroll", update); window.removeEventListener("resize", update); cancelAnimationFrame(raf); };
+  }, [scrolled, navVisible, mobileOpen]);
 
   useEffect(() => {
     let lastY = window.scrollY;
@@ -407,7 +426,7 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
       <div className="nav-bg"></div>
       <div className="nav-inner">
         <div className="nav-left">
-          <a href="#top" className="nav-logo" onClick={(e) => { e.preventDefault(); onSelectSection("top"); }}>
+          <a ref={logoRef} href="#top" className="nav-logo" onClick={(e) => { e.preventDefault(); onSelectSection("top"); }}>
             <img src="/logo.png" alt="S'Historia" className="nav-logo-img" />
           </a>
         </div>
@@ -483,6 +502,14 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
         </div>
       </div>
 
+      {/* Blend-mode logo overlay — renderowane do body (root stacking context),
+          mix-blend-mode:difference daje pixel-perfect automatyczny invert wg tła pod spodem */}
+      {logoBox && navVisible && typeof document !== "undefined" && createPortal(
+        <img src="/logo.png" alt="" aria-hidden="true" className="nav-logo-blend"
+          style={{ position: "fixed", top: logoBox.top, left: logoBox.left, width: logoBox.width, height: logoBox.height }} />,
+        document.body,
+      )}
+
       <style>{`
         /* Desktop base styles */
         .nav { position: fixed; top: 0; left: 0; right: 0; height: 100px; z-index: 1000; display: flex; align-items: center; justify-content: center; pointer-events: none; transition: transform 0.6s var(--ease-out), height 0.6s cubic-bezier(0.65, 0, 0.35, 1); }
@@ -504,8 +531,11 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
         .nav.hidden .nav-inner { transform: translateY(-100%); }
         
         .nav-logo { font-family: var(--f-display); font-weight: 800; font-size: 28px; color: var(--c-deep); letter-spacing: -0.04em; text-decoration: none; position: relative; display:flex; align-items:center; }
-        .nav-logo-img { height:80px; width:auto; object-fit:contain; clip-path:inset(12% 0% 12% 0%); transform:scale(1.6); transition:filter .3s ease; }
-        .nav-dark .nav-logo-img { filter:brightness(0) invert(1); }
+        /* Oryginalne logo niewidoczne (placeholder pozycji + klik); blend overlay rysuje widoczne */
+        .nav-logo-img { height:80px; width:auto; object-fit:contain; clip-path:inset(12% 0% 12% 0%); transform:scale(1.6); opacity:0; }
+        /* Blend overlay — biały obraz, difference vs tło = czarny na białym, biały na czarnym (auto, per-piksel) */
+        .nav-logo-blend { object-fit:contain; clip-path:inset(12% 0% 12% 0%); transform:scale(1.6); pointer-events:none; z-index:1001;
+          filter:invert(1); mix-blend-mode:difference; }
         .nav-logo-coords { position:absolute; bottom:-10px; left:0; font-family:var(--f-body,"Inter",sans-serif); font-weight:500; font-size:8px; letter-spacing:0.2em; color:var(--c-mute,rgba(14,34,48,0.45)); white-space:nowrap; }
         .nav-logo-sub { position: absolute; bottom: -8px; left: 0; font-family: var(--f-body); font-weight: 600; font-size: 8px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--c-deep); opacity: 0.6; }
         
@@ -522,8 +552,8 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
           body[data-cx-drawer="open"] .nav { transform: none !important; }
           .nav-inner { justify-content: center; padding: 0 16px; }
           .nav-logo { color: var(--c-deep); transition: color 0.3s; font-size: 24px; }
-          .nav-logo-img { height:56px; clip-path:inset(10% 0% 10% 0%); transform:scale(1.5); transition:filter .3s ease; }
-          .nav-dark .nav-logo-img { filter:brightness(0) invert(1); }
+          .nav-logo-img { height:56px; clip-path:inset(10% 0% 10% 0%); transform:scale(1.5); opacity:0; }
+          .nav-logo-blend { clip-path:inset(10% 0% 10% 0%) !important; transform:scale(1.5) !important; }
           .nav-logo-sub { color: var(--c-deep); }
           .nav-left { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); justify-content: center; }
           .nav-right { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); gap: 10px; }
