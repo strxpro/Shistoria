@@ -228,7 +228,7 @@ function Bar({ t, dark = true }) {
         .bar-head .kicker { display: block; margin-bottom: 24px; }
         /* Solid white heading for the dark bar section */
         .bar.dark-section .bar-head .srt { color: #fff; -webkit-text-stroke: 0; }
-        .bar.dark-section .bar-head .srt .char { -webkit-text-stroke:0; color:#fff !important; background:none !important; opacity:1 !important; }
+        .bar.dark-section .bar-head .srt .char { -webkit-text-stroke:0 !important; color:#fff !important; -webkit-text-fill-color:#fff !important; background:none !important; -webkit-background-clip:border-box !important; background-clip:border-box !important; opacity:1 !important; }
         .bar-intro { font-family: var(--f-serif); font-style: italic; font-size: clamp(20px, 2vw, 28px); line-height: 1.4; margin-top: 32px; color: ${dark ? "#fff" : "var(--c-deep)"}; max-width: 600px; }
         .bar-hours { display: grid; grid-template-columns: 1fr; gap: 48px; padding-top: 80px; margin-top: 80px; border-top: 1px solid ${dark ? "rgba(255,255,255,0.1)" : "var(--c-line)"}; }
         @media (min-width: 768px) { .bar-hours { grid-template-columns: 1fr 1fr; gap: 96px; align-items: center; } }

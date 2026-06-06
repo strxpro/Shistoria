@@ -346,7 +346,7 @@ function FullMenu() {
         .fmenu-row-dots { flex: 1; border-bottom: 1px dotted var(--c-line); transform: translateY(-4px); min-width: 40px; }
         @media (max-width: 640px) { .fmenu-row-dots { display: none; }
           .fmenu-row { grid-template-columns: 52px 1fr auto; gap: 12px; padding: 14px 0; }
-          .fmenu-row.featured { grid-template-columns: 64px 1fr auto; padding: 16px 12px; margin: 4px -12px; }
+          .fmenu-row.featured { grid-template-columns: 64px 1fr auto; padding: 16px 10px; margin: 4px 0; }
           .fmenu-row-thumb { width: 52px; height: 52px; border-radius: 12px; }
           .fmenu-row.featured .fmenu-row-thumb { width: 64px; height: 64px; }
           .fmenu-row-name { font-size: 16px; }

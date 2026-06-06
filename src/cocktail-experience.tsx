@@ -1515,7 +1515,7 @@ function CocktailExperience() {
     if (active) document.body.dataset.cxPouring = "1";
     else delete document.body.dataset.cxPouring;
   }, [pouring, stage]);
-  useEffect(() => () => { if (typeof document !== "undefined") delete document.body.dataset.cxPouring; }, []);
+  useEffect(() => () => { if (typeof document !== "undefined") { delete document.body.dataset.cxPouring; delete document.body.dataset.cxScrolling; } }, []);
 
   const mixedColor = useMemo(
     () => mixColorsWeighted(poured), [poured],
@@ -1915,6 +1915,12 @@ function CocktailExperience() {
           else np = "exit";
           if (np !== phase) {
             phase = np;
+            // body attr — gdy NIE jesteśmy w fazie "hold" (czyli wjazd/wyjazd sekcji),
+            // chowamy mobilne UI (FAB, slide, info) — żeby nie wisiały podczas scrollu/animacji
+            if (typeof document !== "undefined") {
+              if (np === "hold") delete document.body.dataset.cxScrolling;
+              else document.body.dataset.cxScrolling = "1";
+            }
             if (phase === "hold") {
               // Nie pokazuj szejkera jeśli szklanka jest gotowa lub trwa lanie (użytkownik wraca scrollem)
               const glassDone = stageRef.current === "glassReady" || stageRef.current === "pickGlass" || stageRef.current === "shaking" || !!inSceneGlassRef.current;
@@ -2114,6 +2120,12 @@ function CocktailExperience() {
             </>
           ) : null}
         </div>
+
+        {/* MOBILE — pionowy pasek warstw po lewej: każdy nalany składnik = warstwa,
+            rośnie gdy lejesz; klik warstwy → pokazuje nazwę/ml + przycisk usuń. */}
+        {stage === "build" && poured.length > 0 && (
+          <LayerBar poured={poured} totalMl={totalMl} cap={SHAKER_CAP} onRemove={removePour} />
+        )}
 
         {/* Canvas */}
         <div className="cx-canvas">
@@ -3707,6 +3719,11 @@ function AccordionPanel({
                   </div>
                 </div>
               )}
+              {/* Strzałki nawigacji karuzeli butelek (mobile, po prawej) */}
+              <div className="cx-drop-arrows">
+                <button className="cx-drop-arrow" disabled={!canLeft} onClick={() => scrollBy(-1)} aria-label="Precedente">‹</button>
+                <button className="cx-drop-arrow" disabled={!canRight} onClick={() => scrollBy(1)} aria-label="Successivo">›</button>
+              </div>
             </div>
             <div className="cx-drawer-head">
               <button className="cx-back" onClick={closeCat}>
@@ -3754,6 +3771,44 @@ function AccordionPanel({
         </div>,
         document.body,
       )}
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * LayerBar — mobilny pionowy pasek warstw (po lewej). Każdy nalany składnik to
+ * warstwa o wysokości proporcjonalnej do ml. Klik warstwy → label z nazwą/ml +
+ * przycisk usuń. Rośnie podczas lania (od dołu do góry).
+ * ──────────────────────────────────────────────────────────────────────── */
+function LayerBar({ poured, totalMl, cap, onRemove }: {
+  poured: Poured[]; totalMl: number; cap: number; onRemove: (id: string) => void;
+}) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const fillFrac = Math.min(1, totalMl / cap);
+  return (
+    <div className="cx-layerbar" aria-label="Nel bicchiere">
+      <div className="cx-layerbar-track">
+        <div className="cx-layerbar-fill" style={{ height: `${fillFrac * 100}%` }}>
+          {poured.map((p) => {
+            const h = (p.ml / Math.max(1, totalMl)) * 100;
+            return (
+              <button key={p.ing.id} className={`cx-layer ${openId === p.ing.id ? "is-open" : ""}`}
+                style={{ height: `${h}%`, background: p.ing.color }}
+                onClick={() => setOpenId(openId === p.ing.id ? null : p.ing.id)}
+                aria-label={p.ing.name}>
+                {openId === p.ing.id && (
+                  <span className="cx-layer-pop" onClick={(e) => e.stopPropagation()}>
+                    <span className="cx-layer-pop-name">{p.ing.name}</span>
+                    <span className="cx-layer-pop-ml">{Math.round(p.ml)} ml</span>
+                    <span className="cx-layer-pop-x" onClick={() => { onRemove(p.ing.id); setOpenId(null); }}>Rimuovi ×</span>
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <span className="cx-layerbar-total">{totalMl}<em>ml</em></span>
     </div>
   );
 }
@@ -5077,17 +5132,22 @@ function CocktailStyles() {
         /* podczas lania/animacji szklanki FAB też znikają (nawet jeśli is-pouring nie złapie) */
         body[data-cx-pouring] .cx-col-left .cx-fab,
         body[data-cx-pouring] .cx-col-right .cx-fab { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
+        /* podczas wjazdu/wyjazdu sekcji (scroll) FAB znikają */
+        body[data-cx-scrolling] .cx-col-left .cx-fab,
+        body[data-cx-scrolling] .cx-col-right .cx-fab { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
         /* slide-to-shake widoczny tylko w sekcji kreatora */
         .cx-slide-wrap { opacity:0; visibility:hidden; transition:opacity .3s, visibility .3s; }
         body[data-cx-section="creator"] .cx-slide-wrap { opacity:1; visibility:visible; }
         /* podczas lania / animacji szklanki — suwak shake znika razem z FAB */
         .cx-col-right.is-pouring .cx-slide-wrap { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
         body[data-cx-pouring] .cx-slide-wrap { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
+        body[data-cx-scrolling] .cx-slide-wrap { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
         body:not([data-cx-section="creator"]) .cx-slide-wrap { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
         /* info button tylko w sekcji kreatora */
         .cx-minfo { opacity:0; visibility:hidden; transition:opacity .3s, visibility .3s; }
         body[data-cx-section="creator"] .cx-minfo { opacity:1; visibility:visible; }
         body[data-cx-pouring] .cx-minfo { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
+        body[data-cx-scrolling] .cx-minfo { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
 
         /* SHAKE — suwak wycentrowany na dole */
         .cx-shake-desktop { display:none; }
@@ -5162,13 +5222,22 @@ function CocktailStyles() {
         .cx-drop-back { flex:0 0 auto; width:42px; height:42px; border-radius:12px; display:grid; place-items:center;
           background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); color:var(--cx-accent,#E8927C);
           font-size:20px; cursor:pointer; }
+        .cx-drop-arrows { display:none; }
+        .cx-drop-arrow { width:34px; height:42px; border-radius:11px; display:grid; place-items:center;
+          background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); color:#fff; font-size:18px; cursor:pointer; transition:opacity .2s; }
+        .cx-drop-arrow:disabled { opacity:0.25; }
         .cx-drop { display:block; position:relative; max-width:100%; margin:0 0 8px; z-index:5; }
         .cx-drop-row .cx-drop { margin:0; }
         /* desktopowy nagłówek szuflady (back+tytuł+strzałki) ukryty na mobile — zastąpiony rzędem dropdownów */
         .cx-drawer-head { display:none; }
-        /* butelki: wycentrowane, większe (2 obok siebie wg makiety) */
-        .cx-car-scroll { justify-content:flex-start; }
-        .cx-car-scroll > .cx-bcard { flex:0 0 calc((100% - 14px) / 2); min-width:unset; height:230px; scroll-snap-align:center; }
+        /* butelki: 2 kolumny, zawijane, pionowy scroll (ten sam rozmiar dla napojów i alkoholi;
+           gdy jest dużo pozycji — scrollujesz palcem w pionie w tej sekcji) */
+        .cx-car-scroll { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; justify-content:initial;
+          overflow-x:hidden; overflow-y:auto; max-height:42vh; padding:4px 2px 8px; touch-action:pan-y;
+          -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; scroll-snap-type:none; }
+        .cx-car-scroll > .cx-bcard { flex:initial; width:auto; min-width:0; height:200px; scroll-snap-align:none; }
+        /* separatory grup w trybie Tutti zajmują pełną szerokość siatki */
+        .cx-car-scroll > .cx-car-group-sep { grid-column:1 / -1; }
         .cx-drop + .cx-drop { margin-top:0; }
         .cx-drop-trigger { display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%;
           padding:11px 14px; border-radius:14px; cursor:pointer; color:#fff;
@@ -5185,7 +5254,7 @@ function CocktailStyles() {
           max-height:0; opacity:0; visibility:hidden; transform:translateY(-6px);
           transition:max-height .35s cubic-bezier(.2,.85,.2,1), opacity .25s, transform .3s, visibility .35s;
           box-shadow:0 18px 50px rgba(0,0,0,0.55); }
-        .cx-drop.is-open .cx-drop-list { max-height:46vh; opacity:1; visibility:visible; transform:none; }
+        .cx-drop.is-open .cx-drop-list { max-height:240px; opacity:1; visibility:visible; transform:none; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
         .cx-drop-opt { display:flex; align-items:center; gap:10px; width:100%; padding:12px 14px; cursor:pointer;
           color:rgba(255,255,255,0.82); background:none; border:none; border-bottom:1px solid rgba(255,255,255,0.06);
           font-family:var(--f-display,"Syne",serif); font-weight:700; font-size:13px; text-align:left; }
@@ -5193,11 +5262,32 @@ function CocktailStyles() {
         .cx-drop-opt.active { background:rgba(232,146,124,0.16); color:#fff; }
         .cx-drop-cnt { margin-left:auto; font-size:11px; opacity:0.55; }
 
-        /* tabela "nel bicchiere" — nad slide-to-shake, ukryta gdy pusta */
-        .cx-table { width:min(88vw,360px); bottom:calc(92px + env(safe-area-inset-bottom)); padding:10px 12px; border-radius:14px; font-size:12px; }
-        .cx-table.is-hidden { opacity:0 !important; pointer-events:none !important; transform:translateX(-50%) translateY(12px) !important; }
-        .cx-table ul { max-height:20vh; }
-        .cx-table-head { font-size:10px; margin-bottom:8px; padding-bottom:8px; }
+        /* tabela "nel bicchiere" — na mobile zastąpiona pionowym paskiem warstw (LayerBar) */
+        .cx-table { display:none !important; }
+
+        /* LayerBar — pionowy pasek warstw po lewej */
+        .cx-layerbar { position:fixed; left:14px; top:50%; transform:translateY(-50%); z-index:43;
+          display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:auto; }
+        body[data-cx-pouring] .cx-layerbar, body[data-cx-scrolling] .cx-layerbar,
+        body:not([data-cx-section="creator"]) .cx-layerbar { opacity:0; visibility:hidden; pointer-events:none; transition:opacity .3s, visibility .3s; }
+        .cx-layerbar-track { position:relative; width:30px; height:min(46vh,360px); border-radius:16px;
+          background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.16); overflow:visible;
+          box-shadow:inset 0 2px 8px rgba(0,0,0,0.4); }
+        .cx-layerbar-fill { position:absolute; left:0; right:0; bottom:0; display:flex; flex-direction:column-reverse;
+          border-radius:0 0 15px 15px; overflow:visible; transition:height .5s cubic-bezier(.2,.85,.2,1); }
+        .cx-layer { position:relative; width:100%; border:none; cursor:pointer; min-height:8px; transition:height .45s cubic-bezier(.2,.85,.2,1), filter .2s;
+          box-shadow:inset 0 1px 0 rgba(255,255,255,0.22); }
+        .cx-layer:first-child { border-radius:0 0 15px 15px; }
+        .cx-layer:last-child { border-radius:15px 15px 0 0; }
+        .cx-layer.is-open { filter:brightness(1.25); }
+        .cx-layer-pop { position:absolute; left:calc(100% + 10px); top:50%; transform:translateY(-50%);
+          display:flex; flex-direction:column; gap:3px; padding:10px 12px; border-radius:12px; white-space:nowrap;
+          background:#15121a; border:1px solid rgba(255,255,255,0.16); box-shadow:0 12px 36px rgba(0,0,0,0.55); z-index:5; }
+        .cx-layer-pop-name { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:13px; color:#fff; }
+        .cx-layer-pop-ml { font-size:11px; color:rgba(255,255,255,0.55); }
+        .cx-layer-pop-x { margin-top:4px; font-size:11px; font-weight:700; color:#ff6b6b; cursor:pointer; }
+        .cx-layerbar-total { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:13px; color:#fff; }
+        .cx-layerbar-total em { font-style:normal; font-size:9px; opacity:0.6; display:block; text-align:center; }
 
         /* QR/instrukcje chowamy w popout (osobny komponent) */
         .cx-howto { display:none; }
