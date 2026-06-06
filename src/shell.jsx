@@ -624,6 +624,8 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
           /* W sekcji kreatora hamburger przesuwa się w prawo żeby nie blokował slide-to-shake */
           body[data-cx-drawer="open"] .hamburger-mobile { right: 16px; transform:none; }
           body[data-cx-section="creator"] .hamburger-mobile:not(.open) { right: 16px; transform:none; }
+          /* Podczas wjazdu/wyjazdu sekcji kreatora (neon pop) — hamburger znika */
+          body[data-cx-scrolling] .hamburger-mobile { opacity: 0; visibility: hidden; pointer-events: none; }
           /* W sekcji bar (Tramonti) hamburger w kolorze coral — bardziej widoczny */
           body[data-cx-section="bar"] .hamburger-mobile { background: var(--c-coral, #E8927C); }
         }

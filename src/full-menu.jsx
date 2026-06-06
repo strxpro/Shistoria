@@ -354,9 +354,9 @@ function FullMenu() {
         }
         .fmenu-row-price { font-family: var(--f-display); font-weight: 700; font-size: 18px; color: var(--c-sky); white-space: nowrap; letter-spacing: -0.01em; }
         .fmenu-row-note { font-family: var(--f-serif); font-style: italic; font-size: 13px; color: var(--c-mute); margin-left: 4px; font-weight: 400; }
-        .fmenu-footer { margin-top: 64px; padding: 48px; background: var(--c-sand); border-radius: 24px; text-align: center; max-width: 100%; box-sizing: border-box; overflow: hidden; }
-        .fmenu-footer-quote { overflow-wrap: break-word; word-break: break-word; hyphens: auto; max-width: 100%; margin: 0 auto; font-size: clamp(16px, 4vw, 24px); }
-        @media (max-width: 768px) { .fmenu-footer { padding: 28px 18px; margin-top: 40px; border-radius: 16px; } .fmenu-footer-quote { font-size: clamp(14px, 4.2vw, 19px) !important; line-height: 1.4; } }
+        .fmenu-footer { margin-top: 64px; padding: 48px; background: var(--c-sand); border-radius: 24px; text-align: center; width: 100%; max-width: 100%; box-sizing: border-box; overflow: hidden; }
+        .fmenu-footer-quote { overflow-wrap: anywhere; word-break: break-word; hyphens: auto; max-width: 100%; width: 100%; margin: 0 auto; font-size: clamp(16px, 4vw, 24px); white-space: normal; box-sizing: border-box; }
+        @media (max-width: 768px) { .fmenu-footer { padding: 22px 14px; margin-top: 36px; border-radius: 16px; } .fmenu-footer-quote { font-size: clamp(13px, 3.6vw, 17px) !important; line-height: 1.45; letter-spacing: 0; } }
       `}</style>
     </section>
   );

@@ -1909,8 +1909,11 @@ function CocktailExperience() {
         onRefresh: () => api.invalidate(),
         onUpdate: (self) => {
           const p = self.progress;
+          // Na mobile faza "enter" jest minimalna — szejker wjechał już podczas approach,
+          // więc pin od razu pokazuje wyśrodkowany szejker (brak ponownej animacji = brak "przeskoku").
+          const enterEnd = isMobileCx ? 0.02 : CONFIG.enterEnd;
           let np: "enter" | "hold" | "exit";
-          if (p < CONFIG.enterEnd) np = "enter";
+          if (p < enterEnd) np = "enter";
           else if (p < CONFIG.exitStart) np = "hold";
           else np = "exit";
           if (np !== phase) {
@@ -1942,7 +1945,7 @@ function CocktailExperience() {
           const isGlassExiting = phase === "exit" && stageRef.current === "glassReady";
           const isGlassActive = !!inSceneGlassRef.current || stageRef.current === "glassReady" || stageRef.current === "pickGlass";
           api.shakerRoot.visible = !isGlassActive && !isGlassExiting;
-          if (phase === "enter") applyEnter(p / CONFIG.enterEnd);
+          if (phase === "enter") applyEnter(p / (isMobileCx ? 0.02 : CONFIG.enterEnd));
           else if (phase === "exit") applyExit((p - CONFIG.exitStart) / (1 - CONFIG.exitStart));
 
           // Neonowy „pop": pojawia się gdy UI znika (wczesny exit). Scroll w dół → strzałka
@@ -2746,12 +2749,12 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
     s.visible = true;
     neckRef.current.getWorldPosition(_neck);
 
-    // Łuk LANIA (parabola jak przy realnym nalewaniu): strumień wychodzi z szyjki,
-    // wybrzusza się POZIOMO w stronę wlotu i opada do środka — zamiast pętli w górę.
+    // Łuk LANIA: strumień wychodzi z szyjki, łukiem schodzi nad wlot i WPADA pionowo
+    // do środka szejkera (kończy się w głębi — wizualnie "do dna", niewidoczny w środku).
     const dx = target.x - _neck.x; // znak = kierunek lania
     _ctrl.set(
-      _neck.x + dx * 0.55,               // wybrzuszenie ku wlotowi szejkera
-      _neck.y + Math.abs(dx) * 0.18 + 0.15, // delikatny „lob" proporcjonalny do odległości
+      _neck.x + dx * 0.4,                    // mniejsze wybrzuszenie — bardziej pionowy zrzut
+      _neck.y + Math.abs(dx) * 0.10 + 0.08,  // delikatny łuk
       (_neck.z + target.z) * 0.5,
     );
     fullCurve.v0.copy(_neck);
@@ -3535,6 +3538,13 @@ function AccordionPanel({
   }, [active]);
   // sprzątanie atrybutu body przy odmontowaniu
   useEffect(() => () => { if (typeof document !== "undefined") delete document.body.dataset.cxDrawer; }, []);
+  // panel kategorii (bottom sheet z FAB) — blokada scrolla strony
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (mobileOpen) document.body.dataset.cxSheet = "open";
+    else delete document.body.dataset.cxSheet;
+  }, [mobileOpen]);
+  useEffect(() => () => { if (typeof document !== "undefined") delete document.body.dataset.cxSheet; }, []);
   // Escape zamyka drawer
   useEffect(() => {
     if (!active) return;
@@ -4687,6 +4697,8 @@ function CocktailStyles() {
         border-top:1px solid rgba(255,255,255,0.12); box-shadow:0 -30px 80px rgba(0,0,0,0.6);
         animation:cxDrawerUp .5s cubic-bezier(.2,.85,.2,1); }
       @keyframes cxDrawerUp { from { transform:translateY(60px); opacity:0; } to { transform:none; opacity:1; } }
+      /* blokada scrolla strony gdy otwarta szuflada butelek / panel kategorii */
+      body[data-cx-drawer="open"], body[data-cx-sheet="open"] { overflow:hidden !important; touch-action:none; }
       .cx-drawer-head { display:flex; align-items:center; gap:16px; max-width:1240px; width:100%; margin:0 auto; }
       .cx-drawer-title { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:18px; letter-spacing:0.04em; color:#fff; }
       .cx-drawer-title em { font-style:normal; color:rgba(255,255,255,0.4); font-size:14px; }
@@ -5113,8 +5125,9 @@ function CocktailStyles() {
       @media (max-width:768px){
         .cx-root { border-top-left-radius:1.6rem; border-top-right-radius:1.6rem; overflow-x:visible; }
         .cx-stage { border-top-left-radius:1.6rem; border-top-right-radius:1.6rem; }
-        .cx-title { top:clamp(90px,13vh,140px); padding:0 18px; }
-        .cx-title h2 { font-size:clamp(22px,6.5vw,36px); }
+        .cx-title { top:clamp(80px,11vh,120px); padding:0 18px; text-align:right; left:auto; right:0; max-width:62vw; margin-left:auto; }
+        .cx-title h2 { font-size:clamp(18px,5vw,28px); }
+        .cx-title .cx-mini-kicker { font-size:9px; margin-bottom:6px; }
         .cx-strength { margin-top:8px; padding:5px 10px; font-size:10px; }
 
         /* cx-col na mobile = display:contents → dzieci (FAB, slide, panel) pozycjonują się względem viewportu, nie kolumny */
@@ -5223,9 +5236,9 @@ function CocktailStyles() {
         /* Rozwijane listy na mobile zamiast przewijanych pigułek */
         .cx-drop-row { display:flex; gap:8px; margin-bottom:10px; align-items:center; }
         .cx-drop-row .cx-drop { flex:1 1 0; min-width:0; }
-        .cx-drop-back { flex:0 0 auto; width:42px; height:42px; border-radius:12px; display:grid; place-items:center;
+        .cx-drop-back { flex:0 0 auto; width:44px; height:44px; border-radius:14px; display:grid; place-items:center;
           background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); color:var(--cx-accent,#E8927C);
-          font-size:20px; cursor:pointer; }
+          font-size:20px; cursor:pointer; box-sizing:border-box; }
         .cx-drop-arrows { display:none; }
         .cx-drop-arrow { width:34px; height:42px; border-radius:11px; display:grid; place-items:center;
           background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); color:#fff; font-size:18px; cursor:pointer; transition:opacity .2s; }
@@ -5244,12 +5257,12 @@ function CocktailStyles() {
         .cx-car-scroll > .cx-car-group-sep { grid-column:1 / -1; }
         .cx-drop + .cx-drop { margin-top:0; }
         .cx-drop-trigger { display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%;
-          padding:11px 14px; border-radius:14px; cursor:pointer; color:#fff;
+          height:44px; padding:0 14px; border-radius:14px; cursor:pointer; color:#fff; box-sizing:border-box;
           background:linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
           border:1px solid rgba(255,255,255,0.14); font-family:var(--f-display,"Syne",serif); font-weight:800;
           font-size:13px; letter-spacing:0.03em; }
-        .cx-drop-cur { display:flex; align-items:center; gap:9px; }
-        .cx-drop-emoji { font-size:15px; }
+        .cx-drop-cur { display:flex; align-items:center; gap:9px; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+        .cx-drop-emoji { font-size:15px; flex-shrink:0; }
         .cx-drop-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
         .cx-drop-caret { transition:transform .3s; opacity:0.7; font-size:12px; }
         .cx-drop.is-open .cx-drop-caret { transform:rotate(180deg); }
