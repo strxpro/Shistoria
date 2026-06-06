@@ -120,7 +120,7 @@ function Storia({ t, orientation = "horizontal" }) {
         <LightboxMorph pos={lightboxOpen} onClose={() => setLightboxOpen(false)} />
       )}
 
-      {orientation === "horizontal" ? <StoriaHorizontal data={data} /> : <StoriaVertical data={data} />}
+      {orientation === "horizontal" ? <StoriaResponsive data={data} /> : <StoriaVertical data={data} />}
 
       <style>{`
         .storia { background: var(--c-bg); position: relative; padding-top: 96px; }
@@ -185,6 +185,164 @@ function Storia({ t, orientation = "horizontal" }) {
         }
       `}</style>
     </section>
+  );
+}
+
+// ─── Responsive switch: arc timeline on mobile, horizontal pin on desktop ─────
+function StoriaResponsive({ data }) {
+  const [isMobile, setIsMobile] = useStateS(typeof window !== "undefined" && window.innerWidth < 768);
+  useEffectS(() => {
+    const onR = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", onR);
+    return () => window.removeEventListener("resize", onR);
+  }, []);
+  return isMobile ? <StoriaArc data={data} /> : <StoriaHorizontal data={data} />;
+}
+
+// ─── Mobile ARC timeline (daty na łuku, magnetyczne przewijanie, ostatnie zdjęcie pełny ekran) ─
+function StoriaArc({ data }) {
+  const sectionRef = useRefS(null);
+  const [progress, setProgress] = useStateS(0);
+  const [popout, setPopout] = useStateS(null);
+
+  useEffectS(() => {
+    const sec = sectionRef.current;
+    if (!sec) return;
+    const onScroll = () => {
+      const rect = sec.getBoundingClientRect();
+      const total = sec.offsetHeight - window.innerHeight;
+      if (total <= 0) return;
+      const p = Math.min(1, Math.max(0, -rect.top / total));
+      setProgress(p);
+    };
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    return () => { window.removeEventListener("scroll", onScroll); window.removeEventListener("resize", onScroll); };
+  }, []);
+
+  const n = data.length;
+  const travelP = progress < 0.82 ? progress / 0.82 : 1;
+  const exact = travelP * (n - 1);
+  const activeIdx = Math.min(n - 1, Math.round(exact));
+  const active = data[activeIdx];
+  const tailP = progress > 0.82 ? (progress - 0.82) / 0.18 : 0;
+  const lastItem = data[n - 1];
+
+  const bgFor = (ph) => ph === "sea" ? "#0f2f3d" : ph === "food" ? "#2a1f16" : "#241a22";
+  const bg = bgFor(active.phType);
+
+  const ease = tailP < 0.5 ? 4 * tailP * tailP * tailP : 1 - Math.pow(-2 * tailP + 2, 3) / 2;
+  const isExpanding = tailP > 0;
+
+  const R = 150;
+  const SPREAD = 32;
+
+  return (
+    <div ref={sectionRef} className="sarc-wrap" style={{ height: `${n * 42 + 90}vh` }}>
+      <div className="sarc-sticky" style={{ background: bg }}>
+        <div className="sarc-ghost" aria-hidden="true"><span key={active.year}>{active.year}</span></div>
+
+        {!isExpanding && (
+          <div className="sarc-arc">
+            {data.map((item, i) => {
+              const angle = (i - exact) * SPREAD;
+              const rad = (angle - 90) * Math.PI / 180;
+              const x = Math.cos(rad) * R;
+              const y = Math.sin(rad) * R + R;
+              const dist = Math.abs(i - exact);
+              const op = Math.max(0.18, 1 - dist * 0.4);
+              const sc = Math.max(0.7, 1 - dist * 0.12);
+              const isActive = i === activeIdx;
+              return (
+                <button key={i} className={`sarc-date ${isActive ? "active" : ""}`}
+                  style={{ transform: `translate(-50%,-50%) translate(${x}px, ${y}px) rotate(${angle}deg) scale(${sc})`, opacity: op }}
+                  onClick={() => isActive && setPopout(item)}>
+                  {item.year}
+                </button>
+              );
+            })}
+            <div className="sarc-marker" />
+          </div>
+        )}
+
+        {!isExpanding && (
+          <div className="sarc-info" key={activeIdx}>
+            <h4 className="sarc-title">{active.title}</h4>
+            <p className="sarc-text">{active.text}</p>
+            <span className="sarc-tag">— Capitolo {String(activeIdx + 1).padStart(2, "0")} · tocca per aprire</span>
+          </div>
+        )}
+
+        {isExpanding && (
+          <div className="sarc-expand" style={{
+            width: `${60 + ease * 40}vw`, height: `${40 + ease * 60}vh`,
+            borderRadius: `${24 - ease * 24}px`,
+          }}>
+            <Placeholder type={lastItem.phType} style={{ width: "100%", height: "100%" }} />
+            <div className="sarc-expand-cap" style={{ opacity: 1 - ease * 1.5 }}>
+              <span className="sarc-expand-year">{lastItem.year}</span>
+              <h4>{lastItem.title}</h4>
+            </div>
+          </div>
+        )}
+
+        <div className="sarc-progress"><div className="sarc-progress-bar" style={{ width: `${travelP * 100}%` }} /></div>
+      </div>
+
+      {popout && typeof document !== "undefined" && createPortal(
+        <div className="storia-popout-overlay" onClick={() => setPopout(null)}>
+          <div className="storia-popout" onClick={(e) => e.stopPropagation()}>
+            <button className="storia-popout-close" onClick={() => setPopout(null)}>×</button>
+            <div className="storia-popout-img"><Placeholder type={popout.phType} label={`${popout.year}`} style={{width:"100%",height:"100%"}} /></div>
+            <div className="storia-popout-body">
+              <span className="storia-popout-year">{popout.year}</span>
+              <h3>{popout.title}</h3>
+              <p>{popout.text}</p>
+            </div>
+          </div>
+          <style>{`
+            .storia-popout-overlay { position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,0.7); backdrop-filter:blur(10px); display:flex; align-items:center; justify-content:center; padding:24px; animation:storiaFadeIn .3s ease; }
+            @keyframes storiaFadeIn { from { opacity:0; } to { opacity:1; } }
+            .storia-popout { width:94vw; max-height:88vh; overflow-y:auto; border-radius:24px; background:#fff; box-shadow:0 40px 100px rgba(0,0,0,0.3); animation:storiaPop .4s cubic-bezier(.16,1,.3,1); }
+            @keyframes storiaPop { from { transform:scale(0.9) translateY(20px); opacity:0; } to { transform:none; opacity:1; } }
+            .storia-popout-close { position:absolute; top:16px; right:16px; width:40px; height:40px; border-radius:50%; background:rgba(0,0,0,0.06); border:none; font-size:22px; cursor:pointer; display:grid; place-items:center; z-index:2; }
+            .storia-popout-img { width:100%; height:220px; border-radius:24px 24px 0 0; overflow:hidden; }
+            .storia-popout-body { padding:20px; display:flex; flex-direction:column; gap:12px; }
+            .storia-popout-year { font-family:var(--f-display); font-weight:800; font-size:36px; color:var(--c-sky); letter-spacing:-0.03em; }
+            .storia-popout-body h3 { font-family:var(--f-display); font-weight:700; font-size:22px; color:var(--c-deep); }
+            .storia-popout-body p { font-size:15px; line-height:1.6; color:var(--c-mute); }
+          `}</style>
+        </div>,
+        document.body,
+      )}
+
+      <style>{`
+        .sarc-wrap { position: relative; }
+        .sarc-sticky { position: sticky; top: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column;
+          align-items: center; justify-content: center; transition: background .6s ease; }
+        .sarc-ghost { position: absolute; inset: 0; display: flex; align-items: flex-start; justify-content: center; pointer-events: none; padding-top: 4vh; }
+        .sarc-ghost span { font-family: var(--f-display); font-weight: 800; font-size: 42vw; line-height: 0.8; color: rgba(255,255,255,0.05); animation: yearIn .5s ease; }
+        .sarc-arc { position: absolute; top: 14vh; left: 50%; width: 1px; height: 1px; }
+        .sarc-date { position: absolute; left: 0; top: 0; background: none; border: none; cursor: pointer;
+          font-family: var(--f-display); font-weight: 800; font-size: 26px; color: #fff; white-space: nowrap;
+          transition: opacity .35s ease, transform .45s cubic-bezier(.2,.85,.2,1); will-change: transform, opacity; }
+        .sarc-date.active { color: var(--c-sky, #5BB8D4); font-size: 34px; }
+        .sarc-marker { position: absolute; top: 0; left: 50%; width: 12px; height: 12px; border-radius: 50%;
+          background: var(--c-sky, #5BB8D4); transform: translate(-50%, -50%); box-shadow: 0 0 0 6px rgba(91,184,212,0.18); }
+        .sarc-info { position: absolute; top: 52vh; left: 0; right: 0; padding: 0 28px; text-align: center; animation: sarcInfoIn .45s ease; }
+        @keyframes sarcInfoIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+        .sarc-title { font-family: var(--f-display); font-weight: 800; font-size: 26px; color: #fff; margin: 0 0 12px; letter-spacing: -0.01em; }
+        .sarc-text { font-family: var(--f-serif); font-style: italic; font-size: 15px; line-height: 1.5; color: rgba(255,255,255,0.7); margin: 0 auto 16px; max-width: 360px; }
+        .sarc-tag { font-family: var(--f-body); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--c-coral, #E8927C); }
+        .sarc-expand { position: relative; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,0.5); will-change: width, height; }
+        .sarc-expand-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 24px; background: linear-gradient(0deg, rgba(0,0,0,0.7), transparent); color: #fff; }
+        .sarc-expand-year { font-family: var(--f-display); font-weight: 800; font-size: 40px; color: var(--c-sky, #5BB8D4); }
+        .sarc-expand-cap h4 { font-family: var(--f-display); font-weight: 700; font-size: 20px; margin-top: 4px; }
+        .sarc-progress { position: absolute; left: 8vw; right: 8vw; bottom: 6vh; height: 2px; background: rgba(255,255,255,0.12); border-radius: 2px; }
+        .sarc-progress-bar { height: 100%; background: var(--c-sky, #5BB8D4); border-radius: 2px; transition: width .12s ease-out; }
+      `}</style>
+    </div>
   );
 }
 
