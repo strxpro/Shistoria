@@ -1912,6 +1912,10 @@ function CocktailExperience() {
         scrub: reduce ? 0.6 : (isMobileCx ? 0.8 : true),
         invalidateOnRefresh: true,
         onRefresh: () => api.invalidate(),
+        // gdy całkowicie opuścimy sekcję (w dół lub w górę) — wyczyść flagę scrollu,
+        // żeby hamburger/UI wróciły (inaczej zostawały ukryte po fazie exit).
+        onLeave: () => { if (typeof document !== "undefined") delete document.body.dataset.cxScrolling; },
+        onLeaveBack: () => { if (typeof document !== "undefined") delete document.body.dataset.cxScrolling; },
         onUpdate: (self) => {
           const p = self.progress;
           // Na mobile cała animacja wjazdu szejkera dzieje się w przypiętym scrollu (stabilnie,

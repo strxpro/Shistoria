@@ -155,7 +155,10 @@ export default function App() {
 
   // Geo-location language
   useEffectA(() => {
-    if (!localStorage.getItem("shistoria-lang-set")) {
+    // Safari w trybie prywatnym rzuca wyjątek przy dostępie do localStorage — zabezpieczamy całość.
+    const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
+    const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } };
+    if (!lsGet("shistoria-lang-set")) {
       fetch("https://ipapi.co/json/")
         .then(res => res.json())
         .then(data => {
@@ -167,13 +170,13 @@ export default function App() {
           else if (country === "FR") lang = "fr";
           else if (country === "ES") lang = "es";
           setTweak("language", lang);
-          localStorage.setItem("shistoria-lang-set", "true");
+          lsSet("shistoria-lang-set", "true");
         }).catch(e => {
-           const navLang = navigator.language.split("-")[0];
+           const navLang = (navigator.language || "en").split("-")[0];
            if (["it","pl","en","de","fr","es"].includes(navLang)) {
              setTweak("language", navLang);
            }
-           localStorage.setItem("shistoria-lang-set", "true");
+           lsSet("shistoria-lang-set", "true");
         });
     }
   }, []);

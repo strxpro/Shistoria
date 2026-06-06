@@ -31,13 +31,19 @@ export async function uploadDrinkPhoto(file: File, drinkId: string): Promise<str
 
 // Helper: get or create session ID (for likes without login)
 export function getSessionId(): string {
-  if (typeof localStorage === 'undefined') return 'server';
-  let sid = localStorage.getItem('sh-session-id');
-  if (!sid) {
-    sid = crypto.randomUUID();
-    localStorage.setItem('sh-session-id', sid);
+  try {
+    if (typeof localStorage === 'undefined') return 'server';
+    let sid = localStorage.getItem('sh-session-id');
+    if (!sid) {
+      sid = (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : 'sid-' + Date.now().toString(36) + Math.random().toString(36).slice(2);
+      localStorage.setItem('sh-session-id', sid);
+    }
+    return sid;
+  } catch {
+    return 'sid-' + Date.now().toString(36) + Math.random().toString(36).slice(2);
   }
-  return sid;
 }
 
 // ─── Community Drinks API ─────────────────────────────────────────────────────
