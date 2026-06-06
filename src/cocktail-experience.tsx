@@ -1860,7 +1860,7 @@ function CocktailExperience() {
         trigger: scrollRef.current,
         start: "top top",
         end: "bottom bottom",
-        scrub: reduce ? 0.6 : true,
+        scrub: reduce ? 0.6 : (isMobileCx ? 0.8 : true),
         invalidateOnRefresh: true,
         onRefresh: () => api.invalidate(),
         onUpdate: (self) => {
@@ -2447,9 +2447,11 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
 
   // CEL = punkt w przestrzeni overlay gdzie strumień powinien trafiać.
   // Target = górna krawędź wlotu shakera widocznego pod spodem. X=0 = środek ekranu.
-  // Z ujemne = strumień idzie "w głąb" sceny (za shaker w overlay), wizualnie "wchodzi" do niego.
+  // Z mocno ujemne = strumień idzie ZA shaker w overlay (głębiej w scenę), więc wizualnie
+  // wpada do środka otwartego wlotu. Na mobile shaker jest niżej i bliżej → korekta.
   const target = useMemo(() => {
-    return new THREE.Vector3(0, -1.2, -0.8);
+    const isMob = typeof window !== "undefined" && window.innerWidth < 768;
+    return isMob ? new THREE.Vector3(0, -1.55, -1.1) : new THREE.Vector3(0, -1.2, -0.9);
   }, []);
 
   const liquidMat = useMemo(() => new THREE.MeshStandardMaterial({
@@ -3399,6 +3401,8 @@ function AccordionPanel({
   const [canRight, setCanRight] = useState(false);
   const [strengthFilter, setStrengthFilter] = useState<string>("all");
   const [visibleGroup, setVisibleGroup] = useState<string | null>(null);
+  const [catDropOpen, setCatDropOpen] = useState(false);
+  const [strDropOpen, setStrDropOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null!);
   const countOf = (id: string) => Math.round(poured.find((p) => p.ing.id === id)?.ml ?? 0);
   const align = side === "right" ? "right" : "left";
@@ -3415,6 +3419,18 @@ function AccordionPanel({
     if (strengthFilter === "high") return abv > 40;
     return true;
   });
+
+  // Definicje filtra mocy (dla rozwijanej listy na mobile)
+  const STRENGTH_OPTS = [
+    { id: "all", label: "Tutti", c: "var(--cx-accent,#E8927C)", test: (_a: number) => true },
+    { id: "none", label: "Analcolici", c: "#9DC85A", test: (a: number) => a === 0 },
+    { id: "low", label: "Leggeri 1–20%", c: "#F4D03F", test: (a: number) => a > 0 && a <= 20 },
+    { id: "mid", label: "Forti 21–40%", c: "#E8927C", test: (a: number) => a > 20 && a <= 40 },
+    { id: "high", label: "Extreme 40%+", c: "#C8102E", test: (a: number) => a > 40 },
+  ];
+  const curStrength = STRENGTH_OPTS.find((o) => o.id === strengthFilter) ?? STRENGTH_OPTS[0];
+  const curCatLabel = isAll ? "Tutti" : (current?.group ?? "Tutti");
+  const curCatEmoji = isAll ? "✦" : (current?.emoji ?? "✦");
 
   const updateArrows = useCallback(() => {
     const el = scrollRef.current;
@@ -3564,7 +3580,7 @@ function AccordionPanel({
               el.style.transform = "";
               if (dragged > 90) closeCat();
             }}>
-            {/* Category tabs row at top of drawer */}
+            {/* Category tabs row at top of drawer (desktop pills) */}
             <div className="cx-drawer-tabs">
               <button className={`cx-drawer-tab ${isAll && !visibleGroup ? "active" : isAll ? "active-parent" : ""}`} onClick={() => { setActive("__all__"); setStrengthFilter("all"); onOpenChange?.(true); }}>
                 Tutti <span className="cx-drawer-tab-count">{groups.reduce((s, g) => s + g.items.length, 0)}</span>
@@ -3575,7 +3591,26 @@ function AccordionPanel({
                 </button>
               ))}
             </div>
-            {/* Strength filter row */}
+
+            {/* Rozwijana lista kategorii (mobile) */}
+            <div className={`cx-drop cx-drop-cat ${catDropOpen ? "is-open" : ""}`}>
+              <button className="cx-drop-trigger" onClick={() => { setCatDropOpen((v) => !v); setStrDropOpen(false); }}>
+                <span className="cx-drop-cur"><span className="cx-drop-emoji">{curCatEmoji}</span> {curCatLabel}</span>
+                <span className="cx-drop-caret">▾</span>
+              </button>
+              <div className="cx-drop-list">
+                <button className={`cx-drop-opt ${isAll ? "active" : ""}`} onClick={() => { setActive("__all__"); setStrengthFilter("all"); onOpenChange?.(true); setCatDropOpen(false); }}>
+                  <span className="cx-drop-emoji">✦</span> Tutti <span className="cx-drop-cnt">{groups.reduce((s, g) => s + g.items.length, 0)}</span>
+                </button>
+                {groups.map((g) => (
+                  <button key={g.group} className={`cx-drop-opt ${active === g.group ? "active" : ""}`} onClick={() => { setActive(g.group); setStrengthFilter("all"); onOpenChange?.(true); setCatDropOpen(false); }}>
+                    <span className="cx-drop-emoji">{g.emoji}</span> {g.group} <span className="cx-drop-cnt">{g.items.length}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Strength filter row (desktop pills) */}
             {side === "right" && (
               <div className="cx-drawer-strength-filters">
                 <button className={`cx-str-btn ${strengthFilter === "all" ? "active" : ""}`} onClick={() => setStrengthFilter("all")}>
@@ -3593,6 +3628,24 @@ function AccordionPanel({
                 <button className={`cx-str-btn ${strengthFilter === "high" ? "active" : ""}`} onClick={() => setStrengthFilter("high")} style={{"--sf-c":"#C8102E"} as React.CSSProperties}>
                   <span className="cx-str-dot" /> Extreme <em>40%+</em> <span className="cx-str-cnt">{rawItems.filter(i => (i.abv ?? 0) > 40).length}</span>
                 </button>
+              </div>
+            )}
+
+            {/* Rozwijana lista mocy (mobile) — tylko po prawej (alkohole) */}
+            {side === "right" && (
+              <div className={`cx-drop cx-drop-str ${strDropOpen ? "is-open" : ""}`}>
+                <button className="cx-drop-trigger" onClick={() => { setStrDropOpen((v) => !v); setCatDropOpen(false); }}>
+                  <span className="cx-drop-cur"><span className="cx-drop-dot" style={{ background: curStrength.c }} /> {curStrength.label}</span>
+                  <span className="cx-drop-caret">▾</span>
+                </button>
+                <div className="cx-drop-list">
+                  {STRENGTH_OPTS.map((o) => (
+                    <button key={o.id} className={`cx-drop-opt ${strengthFilter === o.id ? "active" : ""}`} onClick={() => { setStrengthFilter(o.id); setStrDropOpen(false); }}>
+                      <span className="cx-drop-dot" style={{ background: o.c }} /> {o.label}
+                      <span className="cx-drop-cnt">{rawItems.filter((i) => o.test(i.abv ?? 0)).length}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
             <div className="cx-drawer-head">
@@ -4575,6 +4628,9 @@ function CocktailStyles() {
       .cx-str-dot { width:8px; height:8px; border-radius:50%; background:var(--sf-c, #aaa); }
       .cx-str-cnt { font-size:10px; opacity:0.6; margin-left:2px; }
 
+      /* Rozwijane listy (kategorie / moc) — domyślnie ukryte (desktop używa pigułek) */
+      .cx-drop { display:none; }
+
       /* Boks butelki — SOLIDNY (bez glass), z modelem 3D w środku */
       .cx-bcard { position:relative; display:flex; flex-direction:column; align-items:center; gap:6px; padding:16px 10px 14px; cursor:pointer;
         border-radius:20px; background:radial-gradient(ellipse at 50% 70%, color-mix(in srgb, var(--bcard-liq, #888) 12%, transparent), transparent 70%), rgba(12,10,14,0.85);
@@ -4943,18 +4999,17 @@ function CocktailStyles() {
 
         /* cx-col na mobile = display:contents → dzieci (FAB, slide, panel) pozycjonują się względem viewportu, nie kolumny */
         .cx-col { display:contents; }
-        /* FAB widoczne TYLKO w sekcji kreatora */
-        .cx-col-left .cx-fab, .cx-col-right .cx-fab { position:fixed; top:36%; opacity:0; visibility:hidden; pointer-events:none; transition:opacity .3s, visibility .3s; }
-        .cx-col-left .cx-fab { left:20px; transform:translateY(-50%); }
-        .cx-col-right .cx-fab { right:20px; transform:translateY(-50%); }
-        body[data-cx-section="creator"] .cx-col-left .cx-fab { opacity:1; visibility:visible; pointer-events:auto; animation:cxFabInLeft .7s cubic-bezier(.2,.85,.2,1) both; }
-        body[data-cx-section="creator"] .cx-col-right .cx-fab { opacity:1; visibility:visible; pointer-events:auto; animation:cxFabInRight .7s cubic-bezier(.2,.85,.2,1) both; }
-        @keyframes cxFabInLeft { from { transform:translateY(-50%) translateX(-120px); opacity:0; } to { transform:translateY(-50%) translateX(0); opacity:1; } }
-        @keyframes cxFabInRight { from { transform:translateY(-50%) translateX(120px); opacity:0; } to { transform:translateY(-50%) translateX(0); opacity:1; } }
+        /* FAB widoczne TYLKO w sekcji kreatora — płynny wjazd transition (bez snappy keyframe) */
+        .cx-col-left .cx-fab, .cx-col-right .cx-fab { position:fixed; top:36%; opacity:0; visibility:hidden; pointer-events:none;
+          transition:transform .8s cubic-bezier(.16,1,.3,1), opacity .55s ease, visibility .55s; }
+        .cx-col-left .cx-fab { left:20px; transform:translateY(-50%) translateX(-130px); }
+        .cx-col-right .cx-fab { right:20px; transform:translateY(-50%) translateX(130px); }
+        body[data-cx-section="creator"] .cx-col-left .cx-fab,
+        body[data-cx-section="creator"] .cx-col-right .cx-fab { opacity:1; visibility:visible; pointer-events:auto; transform:translateY(-50%) translateX(0); }
         .cx-col.is-pouring { opacity:1; }
         /* Podczas lania/animacji FAB odjeżdżają w bok (lewy w lewo, prawy w prawo) */
-        .cx-col-left.is-pouring .cx-fab { transform:translateY(-50%) translateX(-160px) !important; opacity:0; pointer-events:none; transition:transform .5s cubic-bezier(.4,0,.6,1), opacity .4s; animation:none !important; }
-        .cx-col-right.is-pouring .cx-fab { transform:translateY(-50%) translateX(160px) !important; opacity:0; pointer-events:none; transition:transform .5s cubic-bezier(.4,0,.6,1), opacity .4s; animation:none !important; }
+        .cx-col-left.is-pouring .cx-fab { transform:translateY(-50%) translateX(-160px) !important; opacity:0; pointer-events:none; }
+        .cx-col-right.is-pouring .cx-fab { transform:translateY(-50%) translateX(160px) !important; opacity:0; pointer-events:none; }
         /* slide-to-shake widoczny tylko w sekcji kreatora */
         .cx-slide-wrap { opacity:0; visibility:hidden; transition:opacity .3s, visibility .3s; }
         body[data-cx-section="creator"] .cx-slide-wrap { opacity:1; visibility:visible; }
@@ -5026,8 +5081,35 @@ function CocktailStyles() {
         .cx-drawer { padding:20px 16px calc(20px + env(safe-area-inset-bottom)); border-radius:1.4rem 1.4rem 0 0; }
         .cx-drawer-title { font-size:14px; }
         .cx-drawer-hint { font-size:10px; margin-top:12px; }
-        .cx-drawer-tabs { gap:6px; padding-bottom:8px; }
+        .cx-drawer-tabs { display:none; }
+        .cx-drawer-strength-filters { display:none; }
         .cx-drawer-tab { padding:6px 10px; font-size:10px; }
+
+        /* Rozwijane listy na mobile zamiast przewijanych pigułek */
+        .cx-drop { display:block; position:relative; max-width:100%; margin:0 0 8px; z-index:5; }
+        .cx-drop + .cx-drop { margin-top:0; }
+        .cx-drop-trigger { display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%;
+          padding:11px 14px; border-radius:14px; cursor:pointer; color:#fff;
+          background:linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+          border:1px solid rgba(255,255,255,0.14); font-family:var(--f-display,"Syne",serif); font-weight:800;
+          font-size:13px; letter-spacing:0.03em; }
+        .cx-drop-cur { display:flex; align-items:center; gap:9px; }
+        .cx-drop-emoji { font-size:15px; }
+        .cx-drop-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+        .cx-drop-caret { transition:transform .3s; opacity:0.7; font-size:12px; }
+        .cx-drop.is-open .cx-drop-caret { transform:rotate(180deg); }
+        .cx-drop-list { position:absolute; left:0; right:0; top:calc(100% + 6px); z-index:20;
+          background:#16131d; border:1px solid rgba(255,255,255,0.14); border-radius:14px; overflow:hidden auto;
+          max-height:0; opacity:0; visibility:hidden; transform:translateY(-6px);
+          transition:max-height .35s cubic-bezier(.2,.85,.2,1), opacity .25s, transform .3s, visibility .35s;
+          box-shadow:0 18px 50px rgba(0,0,0,0.55); }
+        .cx-drop.is-open .cx-drop-list { max-height:46vh; opacity:1; visibility:visible; transform:none; }
+        .cx-drop-opt { display:flex; align-items:center; gap:10px; width:100%; padding:12px 14px; cursor:pointer;
+          color:rgba(255,255,255,0.82); background:none; border:none; border-bottom:1px solid rgba(255,255,255,0.06);
+          font-family:var(--f-display,"Syne",serif); font-weight:700; font-size:13px; text-align:left; }
+        .cx-drop-opt:last-child { border-bottom:none; }
+        .cx-drop-opt.active { background:rgba(232,146,124,0.16); color:#fff; }
+        .cx-drop-cnt { margin-left:auto; font-size:11px; opacity:0.55; }
 
         /* tabela "nel bicchiere" — nad slide-to-shake, ukryta gdy pusta */
         .cx-table { width:min(88vw,360px); bottom:calc(92px + env(safe-area-inset-bottom)); padding:10px 12px; border-radius:14px; font-size:12px; }
