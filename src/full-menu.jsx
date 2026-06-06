@@ -56,8 +56,9 @@ function FullMenu() {
         if (navRef.current && sectionRef.current) {
           const navRect = navRef.current.getBoundingClientRect();
           const secRect = sectionRef.current.getBoundingClientRect();
-          // pasek kategorii wyjechał górą i sekcja wciąż wypełnia ekran
-          let fillsScreen = navRect.bottom < 60 && secRect.top < -40 && secRect.bottom > window.innerHeight * 0.9;
+          // pasek kategorii wyjechał górą, sekcja menu wciąż wypełnia ekran (góra nad ekranem,
+          // dół poniżej dolnej krawędzi) — czyli realnie JESTEŚMY wewnątrz sekcji menu.
+          let fillsScreen = navRect.bottom < 60 && secRect.top < -40 && secRect.bottom > window.innerHeight;
           // gdy stopka (po ostatnim daniu) wchodzi w widok — pill całkowicie znika
           if (footerRef.current) {
             const fRect = footerRef.current.getBoundingClientRect();
@@ -288,10 +289,11 @@ function FullMenu() {
 
           /* Floating pill — prawy bok, pojawia się gdy pasek wyjedzie z ekranu */
           .fmenu-float-pill { display: flex; align-items: center; gap: 8px; position: fixed; right: 16px; top: 50%;
-            transform: translateY(-50%) translateX(120%); z-index: 60; padding: 12px 16px; border-radius: 999px;
+            transform: translateY(-50%) translateX(calc(100% + 32px)); z-index: 60; padding: 12px 16px; border-radius: 999px;
             background: var(--c-deep); color: #fff; font-size: 12px; font-weight: 700; border: none; cursor: pointer;
-            box-shadow: 0 8px 28px rgba(10,29,42,0.35); transition: transform .4s cubic-bezier(.2,.8,.2,1), padding .35s, gap .35s; max-width: 70vw; }
-          .fmenu-float-pill.is-visible { transform: translateY(-50%) translateX(0); }
+            box-shadow: 0 8px 28px rgba(10,29,42,0.35); transition: transform .4s cubic-bezier(.2,.8,.2,1), opacity .3s, visibility .3s, padding .35s, gap .35s; max-width: 70vw;
+            opacity: 0; visibility: hidden; pointer-events: none; }
+          .fmenu-float-pill.is-visible { transform: translateY(-50%) translateX(0); opacity: 1; visibility: visible; pointer-events: auto; }
           .fmenu-float-pill-icon { font-size: 18px; flex-shrink: 0; }
           .fmenu-float-pill-name { letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; overflow: hidden; transition: max-width .35s cubic-bezier(.2,.8,.2,1), opacity .25s; max-width: 140px; }
           /* Zwinięty (scroll w dół): tylko ikona */
