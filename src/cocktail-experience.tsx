@@ -4740,7 +4740,7 @@ function CocktailStyles() {
       .cx-name-info p { font-size:12px; color:rgba(255,255,255,0.6); margin:0 0 8px; }
 
       /* Canvas */
-      .cx-canvas { position:absolute; inset:0; z-index:5; }
+      .cx-canvas { position:absolute; inset:0; z-index:5; touch-action:pan-y; }
 
       /* Kinowy overlay nalewania — blur tła + duża butelka na środku */
       .cx-pour-overlay { position:fixed; inset:0; z-index:80; pointer-events:none;
