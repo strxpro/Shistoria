@@ -244,7 +244,7 @@ function StoriaArc({ data }) {
   // aktywny obrót: aktywna data na samej górze koła (kąt -90°)
   return (
     <div ref={sectionRef} className="sarc-wrap" style={{ height: `${n * 40 + 90}vh` }}>
-      <div className="sarc-sticky" style={{ background: bg }}>
+      <div className="sarc-sticky" style={{ background: bg, "--sarc-bg": bg }}>
         {/* ZDJĘCIE u góry — odpowiada aktywnej dacie; podczas tail rozszerza się na cały ekran */}
         {!isExpanding ? (
           <div className="sarc-photo" key={active.year}>
@@ -259,50 +259,48 @@ function StoriaArc({ data }) {
           </div>
         ) : (
           <div className="sarc-expand" style={{
-            position: "absolute", left: "50%", top: "50%",
-            transform: "translate(-50%,-50%)",
-            width: `${66 + ease * 34}vw`, height: `${44 + ease * 56}vh`,
-            borderRadius: `${24 - ease * 24}px`,
+            position: "absolute", left: "0", top: "0",
+            width: "100%", height: `${62 + ease * 38}vh`,
+            borderRadius: `0 0 ${24 - ease * 24}px ${24 - ease * 24}px`,
           }}>
-            {/* pod spodem ostatnie zdjęcie, na wierzchu przedostatnie które zanika → "zmiana zdjęcia" */}
             <Placeholder type={lastItem.phType} style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }} />
             <div style={{ position: "absolute", inset: 0, opacity: Math.max(0, 1 - ease * 1.8) }}>
               <Placeholder type={prevItem.phType} style={{ width: "100%", height: "100%" }} />
             </div>
             <div className="sarc-photo-grad" />
-            <div className="sarc-expand-cap" style={{ opacity: Math.max(0, 1 - ease * 1.4) }}>
+            <div className="sarc-expand-cap">
               <span className="sarc-photo-year">{lastItem.year}</span>
               <h4 className="sarc-photo-title">{lastItem.title}</h4>
+              <p className="sarc-photo-text" style={{ opacity: Math.max(0, 1 - ease * 2) }}>{lastItem.text}</p>
             </div>
           </div>
         )}
 
-        {/* KOŁO z datami u dołu */}
-        {!isExpanding && (
-          <div className="sarc-wheel">
-            {data.map((item, i) => {
-              const angle = (i - exact) * SPREAD - 90; // -90 = góra koła
-              const rad = angle * Math.PI / 180;
-              const x = Math.cos(rad) * R;
-              const y = Math.sin(rad) * R;
-              const dist = Math.abs(i - exact);
-              const op = Math.max(0.15, 1 - dist * 0.32);
-              const sc = Math.max(0.6, 1 - dist * 0.14);
-              const isActive = i === activeIdx;
-              return (
-                <button key={i} className={`sarc-date ${isActive ? "active" : ""}`}
-                  style={{ transform: `translate(-50%,-50%) translate(${x}px, ${y}px) rotate(${angle + 90}deg) scale(${sc})`, opacity: op }}
-                  onClick={() => isActive && setPopout(item)}>
-                  {item.year}
-                </button>
-              );
-            })}
-            {/* okrąg-linia */}
-            <div className="sarc-wheel-ring" />
-            {/* znacznik aktywnej (na górze koła) */}
-            <div className="sarc-wheel-marker" />
-          </div>
-        )}
+        {/* PÓŁKOLE z datami u dołu — zjeżdża w dół i znika podczas rozszerzania zdjęcia */}
+        <div className="sarc-wheel" style={{
+          transform: `translateY(${ease * 60}vh)`,
+          opacity: 1 - ease * 1.6,
+        }}>
+          {data.map((item, i) => {
+            const angle = (i - exact) * SPREAD - 90; // -90 = góra koła
+            const rad = angle * Math.PI / 180;
+            const x = Math.cos(rad) * R;
+            const y = Math.sin(rad) * R;
+            const dist = Math.abs(i - exact);
+            const op = Math.max(0.15, 1 - dist * 0.32);
+            const sc = Math.max(0.6, 1 - dist * 0.14);
+            const isActive = i === activeIdx;
+            return (
+              <button key={i} className={`sarc-date ${isActive ? "active" : ""}`}
+                style={{ transform: `translate(-50%,-50%) translate(${x}px, ${y}px) rotate(${angle + 90}deg) scale(${sc})`, opacity: op }}
+                onClick={() => isActive && setPopout(item)}>
+                {item.year}
+              </button>
+            );
+          })}
+          <div className="sarc-wheel-ring" />
+          <div className="sarc-wheel-marker" />
+        </div>
 
         <div className="sarc-progress"><div className="sarc-progress-bar" style={{ width: `${travelP * 100}%` }} /></div>
       </div>
@@ -337,17 +335,17 @@ function StoriaArc({ data }) {
       <style>{`
         .sarc-wrap { position: relative; }
         .sarc-sticky { position: sticky; top: 0; height: 100vh; overflow: hidden; transition: background .6s ease; }
-        /* ZDJĘCIE u góry */
-        .sarc-photo { position: absolute; top: 0; left: 0; right: 0; height: 62vh; overflow: hidden; animation: sarcPhotoIn .5s ease; }
+        /* ZDJĘCIE u góry — większe, z mocnym fade u dołu (tekst na dolnej części) */
+        .sarc-photo { position: absolute; top: 0; left: 0; right: 0; height: 66vh; overflow: hidden; animation: sarcPhotoIn .5s ease; }
         @keyframes sarcPhotoIn { from { opacity: 0; } to { opacity: 1; } }
-        .sarc-photo-grad { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.55) 100%); pointer-events: none; }
-        .sarc-photo-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 24px 24px; color: #fff; }
+        .sarc-photo-grad { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 30%, rgba(0,0,0,0.35) 62%, var(--sarc-bg, #0f2f3d) 100%); pointer-events: none; }
+        .sarc-photo-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 24px 28px; color: #fff; }
         .sarc-photo-year { font-family: var(--f-display); font-weight: 800; font-size: 44px; line-height: 1; color: #fff; letter-spacing: -0.03em; }
         .sarc-photo-title { font-family: var(--f-display); font-weight: 700; font-size: 22px; margin: 6px 0 8px; }
-        .sarc-photo-text { font-family: var(--f-serif); font-style: italic; font-size: 14px; line-height: 1.45; color: rgba(255,255,255,0.85); max-width: 90%; }
+        .sarc-photo-text { font-family: var(--f-serif); font-style: italic; font-size: 14px; line-height: 1.45; color: rgba(255,255,255,0.88); max-width: 92%; }
         .sarc-photo-more { margin-top: 12px; background: none; border: none; color: var(--c-sky, #5BB8D4); font-family: var(--f-body); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; padding: 0; }
-        /* KOŁO z datami u dołu */
-        .sarc-wheel { position: absolute; left: 50%; top: calc(62vh + 120px); width: 1px; height: 1px; }
+        /* PÓŁKOLE z datami — niżej, pod zdjęciem */
+        .sarc-wheel { position: absolute; left: 50%; top: calc(66vh + 150px); width: 1px; height: 1px; transition: transform .15s ease-out, opacity .15s ease-out; }
         .sarc-wheel-ring { position: absolute; left: 50%; top: 50%; width: 480px; height: 480px; margin: -240px 0 0 -240px; border-radius: 50%; border: 1px dashed rgba(255,255,255,0.16); }
         .sarc-wheel-marker { position: absolute; left: 50%; top: -240px; width: 14px; height: 14px; border-radius: 50%; background: var(--c-sky, #5BB8D4); transform: translate(-50%, -50%); box-shadow: 0 0 0 6px rgba(91,184,212,0.18); }
         .sarc-date { position: absolute; left: 0; top: 0; background: none; border: none; cursor: pointer;
@@ -355,7 +353,7 @@ function StoriaArc({ data }) {
           transition: opacity .3s ease, transform .4s cubic-bezier(.2,.85,.2,1); will-change: transform, opacity; }
         .sarc-date.active { color: var(--c-sky, #5BB8D4); font-size: 30px; }
         .sarc-expand { overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,0.5); will-change: width, height; }
-        .sarc-expand-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 24px; color: #fff; }
+        .sarc-expand-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 24px 28px; color: #fff; }
         .sarc-progress { position: absolute; left: 8vw; right: 8vw; bottom: 4vh; height: 2px; background: rgba(255,255,255,0.12); border-radius: 2px; }
         .sarc-progress-bar { height: 100%; background: var(--c-sky, #5BB8D4); border-radius: 2px; transition: width .12s ease-out; }
       `}</style>
