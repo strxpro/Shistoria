@@ -1,5 +1,4 @@
 import React from 'react';
-import { createPortal } from 'react-dom';
 import { Footer } from "./sections";
 import gsap from "gsap";
 
@@ -325,23 +324,6 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
   const [navVisible, setNavVisible] = useState(true);
   const [navDark, setNavDark] = useState(false);
   const logoRef = useRef(null);
-  const [logoBox, setLogoBox] = useState(null);
-
-  // Śledź pozycję logo → portal blend layer (mix-blend-mode difference = pixel-perfect auto invert)
-  useEffect(() => {
-    const update = () => {
-      if (!logoRef.current) return;
-      const img = logoRef.current.querySelector(".nav-logo-img");
-      if (!img) return;
-      const r = img.getBoundingClientRect();
-      if (r.width > 0) setLogoBox({ top: r.top, left: r.left, width: r.width, height: r.height });
-    };
-    update();
-    window.addEventListener("scroll", update, { passive: true });
-    window.addEventListener("resize", update);
-    const raf = requestAnimationFrame(update);
-    return () => { window.removeEventListener("scroll", update); window.removeEventListener("resize", update); cancelAnimationFrame(raf); };
-  }, [scrolled, navVisible, mobileOpen]);
 
   useEffect(() => {
     let lastY = window.scrollY;
@@ -502,14 +484,6 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
         </div>
       </div>
 
-      {/* Blend-mode logo overlay — renderowane do body (root stacking context),
-          mix-blend-mode:difference daje pixel-perfect automatyczny invert wg tła pod spodem */}
-      {logoBox && navVisible && typeof document !== "undefined" && createPortal(
-        <img src="/logo.png" alt="" aria-hidden="true" className="nav-logo-blend"
-          style={{ position: "fixed", top: logoBox.top, left: logoBox.left, width: logoBox.width, height: logoBox.height }} />,
-        document.body,
-      )}
-
       <style>{`
         /* Desktop base styles */
         .nav { position: fixed; top: 0; left: 0; right: 0; height: 100px; z-index: 1000; display: flex; align-items: center; justify-content: center; pointer-events: none; transition: transform 0.6s var(--ease-out), height 0.6s cubic-bezier(0.65, 0, 0.35, 1); }
@@ -531,11 +505,10 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
         .nav.hidden .nav-inner { transform: translateY(-100%); }
         
         .nav-logo { font-family: var(--f-display); font-weight: 800; font-size: 28px; color: var(--c-deep); letter-spacing: -0.04em; text-decoration: none; position: relative; display:flex; align-items:center; }
-        /* Oryginalne logo niewidoczne (placeholder pozycji + klik); blend overlay rysuje widoczne */
-        .nav-logo-img { height:80px; width:auto; object-fit:contain; clip-path:inset(12% 0% 12% 0%); transform:scale(1.6); opacity:0; }
-        /* Blend overlay — biały obraz, difference vs tło = czarny na białym, biały na czarnym (auto, per-piksel) */
-        .nav-logo-blend { object-fit:contain; clip-path:inset(12% 0% 12% 0%); transform:scale(1.6); pointer-events:none; z-index:1001;
-          filter:invert(1); mix-blend-mode:difference; }
+        /* Logo: czysty czarny na jasnym tle, czysty biały na ciemnym (auto wg sekcji pod spodem) */
+        .nav-logo-img { height:80px; width:auto; object-fit:contain; clip-path:inset(12% 0% 12% 0%); transform:scale(1.6);
+          filter:brightness(0) saturate(0); transition:filter 0.45s ease; }
+        .nav.nav-dark .nav-logo-img { filter:brightness(0) saturate(0) invert(1); }
         .nav-logo-coords { position:absolute; bottom:-10px; left:0; font-family:var(--f-body,"Inter",sans-serif); font-weight:500; font-size:8px; letter-spacing:0.2em; color:var(--c-mute,rgba(14,34,48,0.45)); white-space:nowrap; }
         .nav-logo-sub { position: absolute; bottom: -8px; left: 0; font-family: var(--f-body); font-weight: 600; font-size: 8px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--c-deep); opacity: 0.6; }
         
@@ -552,8 +525,7 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
           body[data-cx-drawer="open"] .nav { transform: none !important; }
           .nav-inner { justify-content: center; padding: 0 16px; }
           .nav-logo { color: var(--c-deep); transition: color 0.3s; font-size: 24px; }
-          .nav-logo-img { height:56px; clip-path:inset(10% 0% 10% 0%); transform:scale(1.5); opacity:0; }
-          .nav-logo-blend { clip-path:inset(10% 0% 10% 0%) !important; transform:scale(1.5) !important; }
+          .nav-logo-img { height:56px; clip-path:inset(10% 0% 10% 0%); transform:scale(1.5); }
           .nav-logo-sub { color: var(--c-deep); }
           .nav-left { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); justify-content: center; }
           .nav-right { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); gap: 10px; }
@@ -600,9 +572,9 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
             height: 52px;
             position: fixed;
             bottom: calc(24px + env(safe-area-inset-bottom));
-            right: calc(50% - 60px);
+            right: 50%;
             left: auto;
-            transform: none;
+            transform: translateX(50%);
             z-index: 2100;
             background: var(--c-deep);
             border: 1px solid rgba(255,255,255,0.1);
@@ -620,11 +592,14 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
             box-shadow: none;
           }
           /* W sekcji kreatora hamburger przesuwa się w prawo żeby nie blokował slide-to-shake */
-          body[data-cx-drawer="open"] .hamburger-mobile { right: 16px; }
-          body[data-cx-section="creator"] .hamburger-mobile { right: 16px; }
+          body[data-cx-drawer="open"] .hamburger-mobile { right: 16px; transform:none; }
+          body[data-cx-section="creator"] .hamburger-mobile:not(.open) { right: 16px; transform:none; }
           /* W sekcji bar (Tramonti) hamburger w kolorze coral — bardziej widoczny */
           body[data-cx-section="bar"] .hamburger-mobile { background: var(--c-coral, #E8927C); }
         }
+        /* Nav CTA przesuwa się kolorystycznie w stronę różu tylko w sekcji Tramonti/bar */
+        .nav .btn-nav { transition: background .5s var(--ease-out), color .3s; }
+        body[data-cx-section="bar"] .nav .btn-nav { background: var(--c-coral, #E8927C); color:#fff; }
         .hamburger-lines { width: 20px; height: 12px; position: relative; }
         .hamburger-lines::before, .hamburger-lines::after { content: ''; position: absolute; left: 0; width: 100%; height: 2px; background: #fff; border-radius: 2px; transition: all 0.4s cubic-bezier(0.65, 0, 0.35, 1); }
         .hamburger-mobile.ham-dark { background: #fff; }
@@ -677,8 +652,19 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
           opacity: 0.6;
         }
         .mobile-lang { display:flex; gap:6px; align-items:center; }
-        .mobile-lang-btn { width:32px; height:32px; border-radius:50%; border:2px solid transparent; padding:0; cursor:pointer; overflow:hidden; opacity:0.5; transition:all .3s; background:none; }
-        .mobile-lang-btn.active { border-color:var(--c-coral,#E8927C); opacity:1; }
+        .mobile-lang-btn { width:32px; height:32px; border-radius:50%; border:2px solid transparent; padding:0; cursor:pointer; overflow:hidden; opacity:0.5; transition:all .3s; background:none;
+          transform:scale(0); }
+        .mobile-menu.open .mobile-lang-btn { animation:mlFlagIn .5s cubic-bezier(.2,1.3,.4,1) both; }
+        .mobile-menu.open .mobile-lang-btn:nth-child(1){ animation-delay:.30s; }
+        .mobile-menu.open .mobile-lang-btn:nth-child(2){ animation-delay:.37s; }
+        .mobile-menu.open .mobile-lang-btn:nth-child(3){ animation-delay:.44s; }
+        .mobile-menu.open .mobile-lang-btn:nth-child(4){ animation-delay:.51s; }
+        .mobile-menu.open .mobile-lang-btn:nth-child(5){ animation-delay:.58s; }
+        .mobile-menu.open .mobile-lang-btn:nth-child(6){ animation-delay:.65s; }
+        @keyframes mlFlagIn { from { transform:scale(0) translateY(8px); opacity:0; } to { transform:scale(1) translateY(0); opacity:0.5; } }
+        .mobile-lang-btn.active { border-color:var(--c-coral,#E8927C); opacity:1; transform:scale(1); }
+        .mobile-menu.open .mobile-lang-btn.active { animation-name:mlFlagInActive; }
+        @keyframes mlFlagInActive { from { transform:scale(0) translateY(8px); opacity:0; } to { transform:scale(1) translateY(0); opacity:1; } }
         .mobile-lang-btn:hover { opacity:1; }
         .mobile-lang-flag { width:100%; height:100%; object-fit:cover; border-radius:50%; }
         /* Highlight Cocktail Maker link in mobile menu */

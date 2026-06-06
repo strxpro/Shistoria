@@ -50,12 +50,15 @@ function FullMenu() {
       // Mobile: floating pill pojawia się gdy pasek kategorii wyjedzie z viewportu (góra < 0)
       if (window.innerWidth < 1024) {
         const currentY = window.scrollY;
-        // pokaż pill gdy pasek nav jest powyżej ekranu ORAZ sekcja menu jeszcze widoczna
+        // pokaż pill TYLKO gdy sekcja menu naprawdę wypełnia ekran (pasek kategorii wyjechał górą,
+        // a koniec sekcji jest jeszcze poniżej dolnej krawędzi ekranu). Inaczej całkowicie ukryj.
         if (navRef.current && sectionRef.current) {
           const navRect = navRef.current.getBoundingClientRect();
           const secRect = sectionRef.current.getBoundingClientRect();
-          // pill widoczny TYLKO gdy: pasek wyjechał z ekranu ORAZ sekcja menu wciąż wypełnia ekran
-          setPillVisible(navRect.bottom < 70 && secRect.bottom > window.innerHeight * 0.6 && secRect.top < 0);
+          const fillsScreen = navRect.bottom < 60 && secRect.top < -40 && secRect.bottom > window.innerHeight * 0.9;
+          setPillVisible(fillsScreen);
+        } else {
+          setPillVisible(false);
         }
         // zwiń przy scroll w dół, rozwiń przy scroll w górę
         if (currentY > lastScrollY.current + 20) setNavCollapsed(true);
@@ -211,7 +214,7 @@ function FullMenu() {
             ))}
 
             <div className="fmenu-footer">
-              <p className="serif-quote" style={{ fontSize: "clamp(16px, 4vw, 24px)" }}>
+              <p className="serif-quote fmenu-footer-quote">
                 "Cuciniamo solo quello che troveremmo a tavola da nonna."
               </p>
               <span className="kicker">— La famiglia</span>
@@ -342,9 +345,9 @@ function FullMenu() {
         }
         .fmenu-row-price { font-family: var(--f-display); font-weight: 700; font-size: 18px; color: var(--c-sky); white-space: nowrap; letter-spacing: -0.01em; }
         .fmenu-row-note { font-family: var(--f-serif); font-style: italic; font-size: 13px; color: var(--c-mute); margin-left: 4px; font-weight: 400; }
-        .fmenu-footer { margin-top: 64px; padding: 48px; background: var(--c-sand); border-radius: 24px; text-align: center; max-width: 100%; box-sizing: border-box; }
-        .fmenu-footer .serif-quote { overflow-wrap: break-word; word-break: normal; max-width: 100%; margin: 0 auto; }
-        @media (max-width: 768px) { .fmenu-footer { padding: 24px 16px; margin-top: 40px; border-radius: 16px; } .fmenu-footer .serif-quote { font-size: clamp(15px,4.5vw,20px) !important; line-height: 1.35; } }
+        .fmenu-footer { margin-top: 64px; padding: 48px; background: var(--c-sand); border-radius: 24px; text-align: center; max-width: 100%; box-sizing: border-box; overflow: hidden; }
+        .fmenu-footer-quote { overflow-wrap: break-word; word-break: break-word; hyphens: auto; max-width: 100%; margin: 0 auto; font-size: clamp(16px, 4vw, 24px); }
+        @media (max-width: 768px) { .fmenu-footer { padding: 28px 18px; margin-top: 40px; border-radius: 16px; } .fmenu-footer-quote { font-size: clamp(14px, 4.2vw, 19px) !important; line-height: 1.4; } }
       `}</style>
     </section>
   );

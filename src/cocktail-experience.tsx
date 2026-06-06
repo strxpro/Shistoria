@@ -1733,6 +1733,7 @@ function CocktailExperience() {
       const api = sceneApiRef.current;
       if (!api) return;
       const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const isMobileCx = window.innerWidth < 768;
 
       gsap.set(api.bottle.position, { x: CONFIG.bottleDock.x, y: CONFIG.bottleDock.y, z: CONFIG.bottleDock.z });
       api.bottle.scale.setScalar(CONFIG.bottleDock.s);
@@ -1772,7 +1773,9 @@ function CocktailExperience() {
       };
 
       // ile fly-inu wykonujemy JESZCZE przed pinem (podczas wjazdu sekcji od dołu)
-      const K_APPROACH = 0.6;
+      // Na mobile kończymy CAŁY wlot zanim sekcja zostanie przypięta → szejker jest
+      // już wycentrowany gdy sekcja wypełni ekran (brak efektu "podwójnej animacji").
+      const K_APPROACH = isMobileCx ? 1 : 0.6;
 
       const applyEnter = (e: number) => {
         const k = lerp(K_APPROACH, 1, easeOutCubic(clamp01(e)));
@@ -4941,7 +4944,7 @@ function CocktailStyles() {
         /* cx-col na mobile = display:contents → dzieci (FAB, slide, panel) pozycjonują się względem viewportu, nie kolumny */
         .cx-col { display:contents; }
         /* FAB widoczne TYLKO w sekcji kreatora */
-        .cx-col-left .cx-fab, .cx-col-right .cx-fab { position:fixed; top:42%; opacity:0; visibility:hidden; pointer-events:none; transition:opacity .3s, visibility .3s; }
+        .cx-col-left .cx-fab, .cx-col-right .cx-fab { position:fixed; top:36%; opacity:0; visibility:hidden; pointer-events:none; transition:opacity .3s, visibility .3s; }
         .cx-col-left .cx-fab { left:20px; transform:translateY(-50%); }
         .cx-col-right .cx-fab { right:20px; transform:translateY(-50%); }
         body[data-cx-section="creator"] .cx-col-left .cx-fab { opacity:1; visibility:visible; pointer-events:auto; animation:cxFabInLeft .7s cubic-bezier(.2,.85,.2,1) both; }
@@ -4961,7 +4964,7 @@ function CocktailStyles() {
 
         /* SHAKE — suwak wycentrowany na dole */
         .cx-shake-desktop { display:none; }
-        .cx-slide-wrap { display:block; position:fixed; left:50%; bottom:calc(64px + env(safe-area-inset-bottom));
+        .cx-slide-wrap { display:block; position:fixed; left:50%; bottom:calc(96px + env(safe-area-inset-bottom));
           transform:translateX(-50%); width:min(70vw,290px); z-index:41; pointer-events:auto; }
         .cx-slide { position:relative; width:100%; height:60px; border-radius:999px; overflow:hidden;
           background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.16); display:flex; align-items:center;
@@ -5036,7 +5039,7 @@ function CocktailStyles() {
         .cx-howto { display:none; }
 
         /* mobilne koło "i" — lewy dół, nad slide-to-shake */
-        .cx-minfo { display:block; position:fixed; left:16px; bottom:calc(80px + env(safe-area-inset-bottom)); top:auto; right:auto; transform:none; z-index:42; }
+        .cx-minfo { display:block; position:fixed; left:16px; bottom:calc(116px + env(safe-area-inset-bottom)); top:auto; right:auto; transform:none; z-index:42; }
         .cx-minfo-fab { display:grid; place-items:center; width:40px; height:40px; border-radius:50%; cursor:pointer;
           background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); color:#fff;
           box-shadow:0 6px 18px rgba(0,0,0,0.35); transition:transform .3s, background .3s; }

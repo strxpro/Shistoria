@@ -494,4 +494,4 @@ body[data-cursor-zobacz="true"] .cursor-text {
 }
 .dark-section .srt .char { -webkit-text-stroke: 1px rgba(255, 255, 255, 0.99) !important; background: linear-gradient(90deg, rgba(255, 255, 255, 0.99) 0%, rgba(255, 255, 255, 0.99) var(--fill, 0%), transparent var(--fill, 0%)) !important; background-clip: text !important; -webkit-background-clip: text !important; }
 /* Bar section: solid white heading, no outline/stroke */
-.bar.dark-section .bar-head .srt .char { -webkit-text-stroke: 0 !important; color: #fff !important; background: none !important; -webkit-background-clip: unset !important; background-clip: unset !important; opacity: 1 !important; }
+.bar.dark-section .bar-head .srt .char { -webkit-text-stroke: 0 !important; color: #fff !important; -webkit-text-fill-color: #fff !important; background: none !important; -webkit-background-clip: border-box !important; background-clip: border-box !important; opacity: 1 !important; }
