@@ -1995,6 +1995,10 @@ function CocktailExperience() {
         invalidateOnRefresh: true,
         onUpdate: (self) => {
           if (phase === "hold" || phase === "exit") return; // pin już steruje sceną
+          // podczas wjazdu sekcji (approach) FAB/UI mają być schowane — ustaw flagę
+          if (typeof document !== "undefined" && self.progress > 0 && self.progress < 1) {
+            document.body.dataset.cxScrolling = "1";
+          }
           // Approach: częściowy wlot (do K_APPROACH). Pinned "enter" dokańcza płynnie.
           const k = self.progress * K_APPROACH;
           flyInPose(k);
