@@ -1,5 +1,6 @@
 import React from 'react';
 import { SplitReveal, Placeholder, TextClipReveal } from "./shell";
+import AttrazioniMap from "./components/AttrazioniMap";
 
 // Eventi, SocialFeed, Attrazioni, Recensioni, Contatti, Footer
 const { useState: useStateE, useEffect: useEffectE, useRef: useRefE } = React;
@@ -175,16 +176,6 @@ function SocialFeed({ t }) {
 function Attrazioni({ t }) {
   const places = window.ATTRAZIONI_DATA;
   const [selected, setSelected] = useStateE(0);
-  // Positions on the mock map (% coords approximating north-Sardinia geography)
-  const positions = [
-    { x: 38, y: 62 }, // Rena Majore (center-ish)
-    { x: 22, y: 38 }, // Capo Testa (NW)
-    { x: 26, y: 52 }, // Valle Luna
-    { x: 30, y: 30 }, // Santa Teresa
-    { x: 48, y: 70 }, // Spiaggia del Morto
-    { x: 75, y: 18 }, // La Maddalena (NE)
-    { x: 52, y: 80 }, // Baia Saraceno
-  ];
   const cats = [
     { id: "all", label: "Tutto" },
     { id: "Spiagge", label: "🏖 Spiagge" },
@@ -231,40 +222,11 @@ function Attrazioni({ t }) {
         </div>
 
         <div className="atr-split">
-          {/* Map */}
+          {/* Map — prawdziwa mapa Leaflet/OpenStreetMap z pinezkami w kolorystyce strony */}
           <div className="atr-map">
             <div className="atr-map-bg">
-              <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="atr-map-svg">
-                {/* Sea base */}
-                <rect width="100" height="100" fill="#D8ECF3" />
-                {/* Sardinia coastline blob */}
-                <path d="M 18,20 Q 28,12 42,16 Q 56,12 68,22 Q 74,32 70,48 Q 76,58 68,70 Q 60,82 44,84 Q 30,86 24,76 Q 12,68 16,52 Q 10,40 18,20 Z" fill="#F2EAD8" stroke="#C9B89C" strokeWidth="0.3" />
-                {/* La Maddalena island */}
-                <ellipse cx="78" cy="20" rx="6" ry="4" fill="#F2EAD8" stroke="#C9B89C" strokeWidth="0.3" transform="rotate(-15 78 20)" />
-                <circle cx="85" cy="14" r="2.5" fill="#F2EAD8" />
-                {/* Roads */}
-                <path d="M 30,40 Q 45,55 60,55 Q 50,72 38,62" fill="none" stroke="#FFFFFF" strokeWidth="0.4" strokeDasharray="0.5 0.5" />
-                {/* Compass */}
-                <g transform="translate(8,8)">
-                  <text x="0" y="0" fontSize="3" fill="#1A3D52" fontFamily="var(--f-display)" fontWeight="800">N</text>
-                  <line x1="1.2" y1="-2" x2="1.2" y2="3" stroke="#1A3D52" strokeWidth="0.3" />
-                </g>
-              </svg>
-              {/* Pins */}
-              {places.map((p, i) => (
-                <button
-                  key={i}
-                  onClick={() => setSelected(i)}
-                  className={`atr-pin ${selected === i ? "active" : ""} ${i === 0 ? "home" : ""}`}
-                  style={{ left: `${positions[i].x}%`, top: `${positions[i].y}%` }}
-                  aria-label={p.name}
-                >
-                  <span className="atr-pin-num">{i === 0 ? "★" : i}</span>
-                  {selected === i && <span className="atr-pin-pulse" />}
-                </button>
-              ))}
+              <AttrazioniMap places={places} selected={selected} onSelect={setSelected} />
               <div className="atr-map-label">Sardegna · Costa Nord</div>
-              <div className="atr-map-credit">Map illustration · placeholder</div>
             </div>
           </div>
 
@@ -316,13 +278,23 @@ function Attrazioni({ t }) {
           .atr-list { position: relative; z-index: 4; }
         }
         .atr-map-bg { position: relative; aspect-ratio: 4/3; border-radius: 20px; overflow: hidden; background: #D8ECF3; box-shadow: 0 24px 80px rgba(26,61,82,0.12); }
+        /* Leaflet map */
+        .atr-leaf { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; background: #D8ECF3; }
+        .atr-leaf .leaflet-control-attribution { font-size: 9px; background: rgba(255,255,255,0.7); }
+        .atr-leaf-pin-wrap { background: none !important; border: none !important; }
+        .atr-leaf-pin { position: relative; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: var(--pin-bg, #5BB8D4); border: 2px solid #fff; box-shadow: 0 4px 14px rgba(26,61,82,0.4); display: flex; align-items: center; justify-content: center; transition: transform .25s; }
+        .atr-leaf-pin span { transform: rotate(45deg); color: #fff; font-family: var(--f-display); font-weight: 800; font-size: 12px; }
+        .atr-leaf-pin.is-active { box-shadow: 0 6px 22px rgba(232,146,124,0.6); animation: atrPinPop .4s cubic-bezier(.2,1.3,.4,1); }
+        @keyframes atrPinPop { from { transform: rotate(-45deg) scale(0.6); } to { transform: rotate(-45deg) scale(1); } }
+        .atr-leaf-tip { background: var(--c-deep, #1A3D52); color: #fff; border: none; border-radius: 8px; font-family: var(--f-body); font-size: 11px; font-weight: 600; padding: 4px 10px; box-shadow: 0 6px 20px rgba(0,0,0,0.25); }
+        .atr-leaf-tip::before { border-top-color: var(--c-deep, #1A3D52); }
         .atr-map-svg { width: 100%; height: 100%; display: block; }
         .atr-pin { position: absolute; transform: translate(-50%, -100%); width: 32px; height: 32px; border-radius: 50%; background: var(--c-sky); color: #fff; font-family: var(--f-display); font-weight: 800; font-size: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(26,61,82,0.3); transition: all 0.3s; border: 2px solid #fff; }
         .atr-pin:hover, .atr-pin.active { background: var(--c-coral); transform: translate(-50%, -100%) scale(1.2); z-index: 2; }
         .atr-pin.home { background: var(--c-deep); width: 40px; height: 40px; font-size: 14px; }
         .atr-pin-pulse { position: absolute; inset: -10px; border-radius: 50%; border: 2px solid var(--c-coral); animation: pulse 1.5s ease-out infinite; }
         @keyframes pulse { 0% { transform: scale(0.8); opacity: 1; } 100% { transform: scale(1.8); opacity: 0; } }
-        .atr-map-label { position: absolute; left: 16px; bottom: 16px; padding: 8px 14px; background: rgba(255,255,255,0.92); border-radius: 999px; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--c-deep); font-weight: 500; }
+        .atr-map-label { position: absolute; left: 16px; bottom: 16px; z-index: 2; padding: 8px 14px; background: rgba(255,255,255,0.92); border-radius: 999px; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--c-deep); font-weight: 500; pointer-events: none; }
         .atr-map-credit { position: absolute; right: 16px; bottom: 16px; font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: rgba(26,61,82,0.5); }
         .atr-list { display: flex; flex-direction: column; gap: 12px; }
         .atr-card { display: flex; gap: 16px; align-items: flex-start; padding: 20px; background: #fff; border: 1px solid var(--c-line); border-radius: 16px; text-align: left; transition: all 0.3s; cursor: pointer; }

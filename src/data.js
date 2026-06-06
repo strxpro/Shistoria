@@ -343,13 +343,13 @@ window.EVENTI_DATA = [
 ];
 
 window.ATTRAZIONI_DATA = [
-  { name: "Spiaggia di Rena Majore", dist: "0,1 km", category: "Spiagge", icon: "🏖", desc: "La nostra spiaggia. Sabbia bianca, ginepri, pini." },
-  { name: "Capo Testa", dist: "12 km", category: "Natura", icon: "🌿", desc: "Formazioni granitiche modellate dal vento. Faro storico." },
-  { name: "Valle della Luna", dist: "15 km", category: "Natura", icon: "🌿", desc: "Valle di rocce, leggendaria meta hippie degli anni '70." },
-  { name: "Santa Teresa Gallura", dist: "11 km", category: "Cultura", icon: "🏛", desc: "Borgo storico e porto per la Corsica." },
-  { name: "Spiaggia del Morto", dist: "8 km", category: "Spiagge", icon: "🏖", desc: "Cala nascosta, accessibile solo a piedi." },
-  { name: "La Maddalena", dist: "35 km", category: "Escursioni", icon: "🛥", desc: "Arcipelago paradiso. Escursioni in barca giornaliere." },
-  { name: "Baia Saraceno", dist: "5 km", category: "Spiagge", icon: "🏖", desc: "Acqua trasparente, fondali bassi. Perfetta con bambini." },
+  { name: "Spiaggia di Rena Majore", dist: "0,1 km", category: "Spiagge", icon: "🏖", desc: "La nostra spiaggia. Sabbia bianca, ginepri, pini.", lat: 40.9889, lng: 9.0972 },
+  { name: "Capo Testa", dist: "12 km", category: "Natura", icon: "🌿", desc: "Formazioni granitiche modellate dal vento. Faro storico.", lat: 41.2436, lng: 9.1430 },
+  { name: "Valle della Luna", dist: "15 km", category: "Natura", icon: "🌿", desc: "Valle di rocce, leggendaria meta hippie degli anni '70.", lat: 41.2360, lng: 9.1500 },
+  { name: "Santa Teresa Gallura", dist: "11 km", category: "Cultura", icon: "🏛", desc: "Borgo storico e porto per la Corsica.", lat: 41.2403, lng: 9.1880 },
+  { name: "Spiaggia del Morto", dist: "8 km", category: "Spiagge", icon: "🏖", desc: "Cala nascosta, accessibile solo a piedi.", lat: 41.2450, lng: 9.1650 },
+  { name: "La Maddalena", dist: "35 km", category: "Escursioni", icon: "🛥", desc: "Arcipelago paradiso. Escursioni in barca giornaliere.", lat: 41.2130, lng: 9.4060 },
+  { name: "Baia Saraceno", dist: "5 km", category: "Spiagge", icon: "🏖", desc: "Acqua trasparente, fondali bassi. Perfetta con bambini.", lat: 41.1790, lng: 9.3880 },
 ];
 
 window.MENU_DATA = [
