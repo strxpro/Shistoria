@@ -1,5 +1,7 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Footer } from "./sections";
+import gsap from "gsap";
 
 // Shared components: Cursor, Preloader, Navigation, Footer, SplitReveal, Marquee
 const { useState, useEffect, useRef, useLayoutEffect, useCallback, useMemo } = React;
@@ -103,77 +105,173 @@ function CustomCursor({ enabled }) {
 
 // ─── Preloader ─────────────────────────────────────────────────────────────────
 function Preloader({ onDone, t }) {
-  const [percent, setPercent] = useState(0);
-  const [exiting, setExiting] = useState(false);
+  const rootRef = useRef(null);
   const [hidden, setHidden] = useState(false);
 
   useEffect(() => {
     document.body.dataset.locked = "true";
-    let p = 0;
-    const interval = setInterval(() => {
-      p += Math.max(1, Math.floor((100 - p) * 0.08));
-      if (p >= 100) {
-        p = 100;
-        clearInterval(interval);
-        setPercent(100);
-        setTimeout(() => setExiting(true), 400);
-        setTimeout(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    const chars = root.querySelectorAll(".pre-char");
+    const subChars = root.querySelectorAll(".pre-sub-char");
+
+    // Wait for scene ready (or cap)
+    let ready = typeof window !== "undefined" && window.__cxSceneReady === true;
+    const onReady = () => { ready = true; };
+    if (typeof window !== "undefined") window.addEventListener("cx-scene-ready", onReady, { once: true });
+    const cap = setTimeout(() => { ready = true; }, 6000);
+
+    // --- ENTER: letters appear one by one from RIGHT side (dramatic slide + fade) ---
+    const enterTl = gsap.timeline();
+    enterTl.set(chars, { opacity: 0, x: 80, rotateY: 40 });
+    enterTl.set(subChars, { opacity: 0, y: 30 });
+    // Stagger from last to first (right to left visual appearance)
+    enterTl.to(chars, {
+      opacity: 1, x: 0, rotateY: 0, duration: 0.9, stagger: { each: 0.07, from: "end" }, ease: "power3.out",
+    }, 0.4);
+    // Sub text "ristorante" enters from below, letter by letter
+    enterTl.to(subChars, {
+      opacity: 1, y: 0, duration: 0.6, stagger: { each: 0.04, from: "end" }, ease: "power2.out",
+    }, 1.2);
+
+    // --- FILL: wave fills letters from bottom to top (simulated via gradient mask) ---
+    // We animate a CSS variable --fill that controls the fill height
+    let fillProgress = 0;
+    const fillObj = { v: 0 };
+
+    const checkAndFill = () => {
+      const ceil = ready ? 100 : 90;
+      fillProgress += Math.max(0.5, (ceil - fillProgress) * 0.04);
+      if (fillProgress > ceil) fillProgress = ceil;
+      fillObj.v = fillProgress / 100;
+      // Update CSS variable for fill animation on each char
+      chars.forEach((ch, i) => {
+        const offset = i * 0.04; // wave offset per character
+        const local = Math.max(0, Math.min(1, (fillObj.v - offset) * 1.3));
+        ch.style.setProperty("--fill-h", `${local * 100}%`);
+      });
+      if (ready && fillProgress >= 100) {
+        clearInterval(fillInterval);
+        doExit();
+      }
+    };
+    const fillInterval = setInterval(checkAndFill, 50);
+
+    // --- EXIT: letters fly out to left quickly, then fade white bg ---
+    const doExit = () => {
+      const exitTl = gsap.timeline({
+        onComplete: () => {
           setHidden(true);
           document.body.dataset.locked = "false";
           onDone && onDone();
-        }, 1400);
-      } else {
-        setPercent(p);
-      }
-    }, 60);
-    return () => { clearInterval(interval); document.body.dataset.locked = "false"; };
+        },
+      });
+      // Sub chars fade out fast
+      exitTl.to(subChars, { opacity: 0, x: -20, duration: 0.3, stagger: 0.02, ease: "power2.in" }, 0);
+      // Main chars fly out to left, faster stagger
+      exitTl.to(chars, { x: -60, opacity: 0, duration: 0.4, stagger: 0.03, ease: "power3.in" }, 0.15);
+      // White bg fades to transparent
+      exitTl.to(root, { opacity: 0, duration: 0.5, ease: "power2.inOut" }, 0.5);
+    };
+
+    return () => {
+      clearInterval(fillInterval);
+      clearTimeout(cap);
+      enterTl.kill();
+      if (typeof window !== "undefined") window.removeEventListener("cx-scene-ready", onReady);
+      document.body.dataset.locked = "false";
+    };
   }, []);
 
   if (hidden) return null;
 
-  const letters = "S'HISTORIA".split("");
-  return (
-    <div className="preloader" style={{ pointerEvents: exiting ? "none" : "auto" }}>
-      {/* Curtain panels for exit */}
-      <div className="curtain curtain-top" style={{ transform: exiting ? "scaleY(0)" : "scaleY(1)" }} />
-      <div className="curtain curtain-bot" style={{ transform: exiting ? "scaleY(0)" : "scaleY(1)" }} />
+  const title = "S'HISTORIA";
+  const sub = "RISTORANTE";
 
-      {/* Content (inside curtains only — fades out under curtain) */}
-      <div className="preloader-inner" style={{ opacity: exiting ? 0 : 1 }}>
-        <div className="pre-title">
-          {letters.map((c, i) => (
-            <span key={i} style={{ animationDelay: `${0.1 + i * 0.06}s` }}>
-              {c === " " ? "\u00A0" : c}
-            </span>
-          ))}
-        </div>
-        <div className="pre-line" />
-        <div className="pre-sub">{t("preloader.tagline")}</div>
-        <div className="pre-percent">
-          <span>{percent.toString().padStart(3, "0")}</span>
-          <span className="pre-percent-sign">%</span>
-        </div>
-        <div className="pre-corner-tl">S'H · Loading the story</div>
-        <div className="pre-corner-br">Rena Majore — 40.92°N · 8.91°E</div>
+  return (
+    <div ref={rootRef} className="pre-root">
+      {/* Main title — outlined letters that fill with wave */}
+      <div className="pre-main">
+        {title.split("").map((ch, i) => (
+          <span key={i} className="pre-char" style={{ "--fill-h": "0%" }}>
+            <span className="pre-char-outline">{ch === " " ? "\u00A0" : ch}</span>
+            <span className="pre-char-fill">{ch === " " ? "\u00A0" : ch}</span>
+          </span>
+        ))}
+      </div>
+      {/* Sub text — smaller, different font */}
+      <div className="pre-sub-row">
+        {sub.split("").map((ch, i) => (
+          <span key={i} className="pre-sub-char">{ch === " " ? "\u00A0" : ch}</span>
+        ))}
       </div>
 
       <style>{`
-        .preloader { position: fixed; inset: 0; z-index: 9000; background: #050a10; color: #fff; overflow: hidden; }
-        .curtain { position: absolute; left: 0; right: 0; height: 51%; background: #050a10; transform-origin: top center; transition: transform 0.9s var(--ease-curtain); z-index: 2; }
-        .curtain-top { top: 0; }
-        .curtain-bot { bottom: 0; transform-origin: bottom center; }
-        .preloader-inner { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 1; transition: opacity 0.5s; }
-        .pre-title { font-family: var(--f-display); font-weight: 800; font-size: clamp(48px, 10vw, 160px); letter-spacing: -0.04em; line-height: 1; display: flex; }
-        .pre-title span { display: inline-block; opacity: 0; transform: translateY(60%); animation: preIn 0.9s var(--ease-out) forwards; }
-        @keyframes preIn { to { opacity: 1; transform: translateY(0); } }
-        .pre-line { width: 240px; height: 1px; background: var(--c-sky); margin: 32px 0 20px; transform: scaleX(0); transform-origin: left center; animation: preLine 1s 0.8s var(--ease-out) forwards; }
-        @keyframes preLine { to { transform: scaleX(1); } }
-        .pre-sub { font-family: var(--f-serif); font-style: italic; font-size: 18px; color: rgba(255,255,255,0.7); opacity: 0; animation: fadeIn 0.8s 1.2s forwards; }
-        @keyframes fadeIn { to { opacity: 1; } }
-        .pre-percent { position: absolute; right: 32px; bottom: 32px; font-family: var(--f-display); font-weight: 800; font-size: 56px; letter-spacing: -0.04em; display: flex; align-items: baseline; gap: 4px; color: #fff; }
-        .pre-percent-sign { font-size: 16px; color: rgba(255,255,255,0.5); }
-        .pre-corner-tl { position: absolute; left: 32px; top: 32px; font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase; color: rgba(255,255,255,0.5); }
-        .pre-corner-br { position: absolute; left: 32px; bottom: 32px; font-size: 10px; letter-spacing: 0.25em; text-transform: uppercase; color: rgba(255,255,255,0.5); }
+        .pre-root {
+          position: fixed; inset: 0; z-index: 9000;
+          background: #fff;
+          display: flex; flex-direction: column;
+          align-items: center; justify-content: center;
+          gap: 16px;
+          pointer-events: auto;
+        }
+        .pre-main {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-wrap: wrap;
+        }
+        .pre-char {
+          position: relative;
+          display: inline-block;
+          font-family: var(--f-display, "Syne", serif);
+          font-weight: 800;
+          font-size: clamp(32px, 9vw, 110px);
+          line-height: 1.1;
+          letter-spacing: -0.03em;
+          opacity: 0;
+        }
+        .pre-char-outline {
+          display: block;
+          color: transparent;
+          -webkit-text-stroke: 1.5px var(--c-deep, #1A3D52);
+        }
+        .pre-char-fill {
+          position: absolute;
+          top: 0; left: 0; right: 0; bottom: 0;
+          display: block;
+          color: var(--c-deep, #1A3D52);
+          -webkit-text-stroke: 0;
+          clip-path: inset(calc(100% - var(--fill-h)) 0 0 0);
+          transition: clip-path 0.12s ease-out;
+        }
+        .pre-sub-row {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-top: 4px;
+        }
+        .pre-sub-char {
+          display: inline-block;
+          font-family: var(--f-serif, "Instrument Serif", serif);
+          font-style: italic;
+          font-weight: 400;
+          font-size: clamp(12px, 2.5vw, 20px);
+          letter-spacing: 0.3em;
+          color: var(--c-mute, rgba(14, 34, 48, 0.5));
+          opacity: 0;
+        }
+        @media (max-width: 480px) {
+          .pre-char { font-size: clamp(24px, 8vw, 32px); letter-spacing: -0.04em; }
+          .pre-char-outline { -webkit-text-stroke-width: 1px; }
+          .pre-sub-char { font-size: 10px; letter-spacing: 0.15em; }
+          .pre-root { gap: 8px; padding: 0 12px; }
+          .pre-main { flex-wrap: nowrap; }
+        }
+        @media (max-width: 380px) {
+          .pre-char { font-size: 22px; }
+        }
       `}</style>
     </div>
   );
@@ -193,7 +291,7 @@ function MobileLink({ l, i, onSelectSection, setMobileOpen }) {
   };
   
   return (
-    <a href={`#${l.id}`} onClick={handleClick} className={clicked ? "clicked" : ""} style={{ "--item-idx": i }}>
+    <a href={`#${l.id}`} onClick={handleClick} className={`${clicked ? "clicked" : ""} ${l.highlight ? "nav-highlight" : ""}`} style={{ "--item-idx": i }}>
       <span className="ml-word">
         {l.label.split("").map((char, ci) => (
           <span className="ml-char-wrap" key={ci} style={{ transitionDelay: `${ci * 0.03}s` }}>
@@ -225,6 +323,26 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
   ];
 
   const [navVisible, setNavVisible] = useState(true);
+  const [navDark, setNavDark] = useState(false);
+  const logoRef = useRef(null);
+  const [logoBox, setLogoBox] = useState(null);
+
+  // Śledź pozycję logo → portal blend layer.
+  // mix-blend-mode:difference z BIAŁĄ sylwetką = per-piksel: ciemne tło→biały, jasne tło→czarny.
+  useEffect(() => {
+    const update = () => {
+      if (!logoRef.current) return;
+      const img = logoRef.current.querySelector(".nav-logo-img");
+      if (!img) return;
+      const r = img.getBoundingClientRect();
+      if (r.width > 0) setLogoBox({ top: r.top, left: r.left, width: r.width, height: r.height });
+    };
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    const raf = requestAnimationFrame(update);
+    return () => { window.removeEventListener("scroll", update); window.removeEventListener("resize", update); cancelAnimationFrame(raf); };
+  }, [scrolled, navVisible, mobileOpen]);
 
   useEffect(() => {
     let lastY = window.scrollY;
@@ -247,8 +365,22 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
         storiaEnd = storia.offsetTop + storia.offsetHeight;
       }
 
-      // Hide navigation on scroll down, show on scroll up, ANYWHERE after hero
-      if (currentY > heroEnd) {
+      // Dynamiczne wykrywanie ciemnego tła pod logo (per-scroll, natychmiastowe)
+      // Sprawdzamy sekcję która znajduje się pod pozycją logo (lewy-górny obszar)
+      const darkIds = ["bar", "cocktail-rise", "cocktail-builder", "ready-drinks", "storia", "contatti"];
+      let isDark = false;
+      for (const id of darkIds) {
+        const el = document.getElementById(id);
+        if (el) {
+          const r = el.getBoundingClientRect();
+          // sekcja zachodzi na obszar logo (top ~40px)
+          if (r.top <= 50 && r.bottom >= 50) { isDark = true; break; }
+        }
+      }
+      setNavDark(isDark);
+
+      // Hide navigation on scroll down, show on scroll up (ONLY desktop)
+      if (currentY > heroEnd && window.innerWidth > 1023) {
         if (currentY > lastY && !mobileOpen) {
           setNavVisible(false);
         } else {
@@ -270,24 +402,33 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
     }
   }, [locale]); // recalculate if language changes width
 
+  // Set body attribute when in cocktail creator section (hamburger shifts right)
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (["cocktail-rise", "cocktail-builder"].includes(activeSection)) document.body.dataset.cxSection = "creator";
+    else if (activeSection === "bar") document.body.dataset.cxSection = "bar";
+    else delete document.body.dataset.cxSection;
+  }, [activeSection]);
+
   const links = [
     { id: "storia", label: t("nav.storia") },
     { id: "ristorante", label: t("nav.ristorante") },
     { id: "menu", label: "Menu" },
+    { id: "desserts", label: "Dolci" },
     { id: "bar", label: t("nav.bar") },
+    { id: "cocktail-rise", label: "Cocktail Maker", highlight: true },
     { id: "eventi", label: t("nav.eventi") },
     { id: "contatti", label: t("nav.contatti") },
   ];
 
 
   return (
-    <nav className={`nav ${scrolled ? "scrolled" : ""} ${!navVisible ? "hidden" : ""}`} style={{ "--scroll-p": scrollProgress, "--center-w": `${centerW}px` }}>
+    <nav className={`nav ${scrolled ? "scrolled" : ""} ${!navVisible ? "hidden" : ""} ${navDark ? "nav-dark" : ""}`} style={{ "--scroll-p": scrollProgress, "--center-w": `${centerW}px` }}>
       <div className="nav-bg"></div>
       <div className="nav-inner">
         <div className="nav-left">
-          <a href="#top" className="nav-logo" onClick={(e) => { e.preventDefault(); onSelectSection("top"); }}>
-            S'Historia
-            <span className="nav-logo-sub">est. 1980</span>
+          <a ref={logoRef} href="#top" className="nav-logo" onClick={(e) => { e.preventDefault(); onSelectSection("top"); }}>
+            <img src="/logo.png" alt="S'Historia" className="nav-logo-img" />
           </a>
         </div>
 
@@ -297,7 +438,7 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
               <a
                 key={l.id}
                 href={`#${l.id}`}
-                className={activeSection === l.id ? "active" : ""}
+                className={`${activeSection === l.id ? "active" : ""} ${l.highlight ? "nav-highlight" : ""}`}
                 onClick={(e) => { e.preventDefault(); onSelectSection(l.id); }}
               >
                 {l.label}
@@ -333,7 +474,7 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
         </div>
       </div>
 
-      <button className={`hamburger-mobile ${mobileOpen ? "open" : ""}`} onClick={() => setMobileOpen(!mobileOpen)}>
+      <button className={`hamburger-mobile ${mobileOpen ? "open" : ""} ${navDark ? "ham-dark" : ""}`} onClick={() => setMobileOpen(!mobileOpen)}>
         <div className="hamburger-lines"></div>
       </button>
 
@@ -341,9 +482,17 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
       <div className={`mobile-menu ${mobileOpen ? "open" : ""}`}>
         <div className="mobile-header-mirror">
           <a href="#top" className="nav-logo duplicate-white-logo" onClick={(e) => { e.preventDefault(); setMobileOpen(false); onSelectSection("top"); }}>
-            S'Historia
-            <span className="nav-logo-sub">est. 1980</span>
+            <img src="/logo.png" alt="S'Historia" className="nav-logo-img" style={{filter:"brightness(0) invert(1)", opacity:1}} />
           </a>
+          {/* Language selector in mobile menu */}
+          <div className="mobile-lang">
+            {langs.map((l) => (
+              <button key={l.code} className={`mobile-lang-btn ${l.code === locale ? "active" : ""}`}
+                onClick={() => { setLocale(l.code); }}>
+                <img src={l.flag} alt={l.code} className="mobile-lang-flag" />
+              </button>
+            ))}
+          </div>
         </div>
         <div className="mobile-menu-inner">
           <div className="mobile-links">
@@ -354,6 +503,14 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
         </div>
       </div>
 
+      {/* Blend overlay logo — biała sylwetka renderowana do body; mix-blend-mode:difference
+          daje per-piksel: pod ciemnym tłem→biały, pod jasnym→czarny (automatycznie, lokalnie). */}
+      {logoBox && navVisible && !mobileOpen && typeof document !== "undefined" && createPortal(
+        <img src="/logo.png" alt="" aria-hidden="true" className="nav-logo-blend"
+          style={{ position: "fixed", top: logoBox.top, left: logoBox.left, width: logoBox.width, height: logoBox.height }} />,
+        document.body,
+      )}
+
       <style>{`
         /* Desktop base styles */
         .nav { position: fixed; top: 0; left: 0; right: 0; height: 100px; z-index: 1000; display: flex; align-items: center; justify-content: center; pointer-events: none; transition: transform 0.6s var(--ease-out), height 0.6s cubic-bezier(0.65, 0, 0.35, 1); }
@@ -361,7 +518,7 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
         .nav.hidden { transform: translateY(-120%); }
         /* schowaj header gdy otwarty jest dolny drawer butelek (mobile) */
         body[data-cx-drawer="open"] .nav { transform: translateY(-120%); }
-        body[data-cx-drawer="open"] .hamburger-mobile { opacity: 0; pointer-events: none; }
+        body[data-cx-drawer="open"] .hamburger-mobile { opacity: 1; pointer-events: auto; }
         
         .nav-bg { position: absolute; top: 0; left: 50%; transform: translateX(-50%); height: 100%; width: calc(var(--center-w) + var(--scroll-p) * (100vw - var(--center-w))); background: rgba(255,255,255, calc(1 - var(--scroll-p) * 0.35)); border-radius: 0 0 calc((1 - var(--scroll-p)) * 24px) calc((1 - var(--scroll-p)) * 24px); border-bottom: calc(var(--scroll-p) * 1px) solid rgba(255,255,255,0.5); z-index: -1; backdrop-filter: blur(calc(var(--scroll-p) * 20px)); -webkit-backdrop-filter: blur(calc(var(--scroll-p) * 20px)); transition: transform 0.4s var(--ease-out); transform-origin: top center; }
         .nav.hidden .nav-bg { transform: translate(-50%, -100%); }
@@ -374,7 +531,13 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
         .nav-inner { position: relative; width: 100%; max-width: var(--max-w); padding: 0 40px; display: flex; justify-content: space-between; align-items: center; pointer-events: auto; transition: transform 0.4s var(--ease-out); }
         .nav.hidden .nav-inner { transform: translateY(-100%); }
         
-        .nav-logo { font-family: var(--f-display); font-weight: 800; font-size: 28px; color: var(--c-deep); letter-spacing: -0.04em; text-decoration: none; position: relative; }
+        .nav-logo { font-family: var(--f-display); font-weight: 800; font-size: 28px; color: var(--c-deep); letter-spacing: -0.04em; text-decoration: none; position: relative; display:flex; align-items:center; }
+        /* Oryginał niewidoczny (placeholder pozycji + klik). Blend overlay rysuje widoczne logo. */
+        .nav-logo-img { height:80px; width:auto; object-fit:contain; clip-path:inset(12% 0% 12% 0%); transform:scale(1.6); opacity:0; }
+        /* Biała sylwetka + difference = per-piksel auto-invert wg tła pod spodem (czarny/biały). */
+        .nav-logo-blend { object-fit:contain; clip-path:inset(12% 0% 12% 0%); transform:scale(1.6); pointer-events:none; z-index:1001;
+          filter:brightness(0) invert(1); mix-blend-mode:difference; }
+        .nav-logo-coords { position:absolute; bottom:-10px; left:0; font-family:var(--f-body,"Inter",sans-serif); font-weight:500; font-size:8px; letter-spacing:0.2em; color:var(--c-mute,rgba(14,34,48,0.45)); white-space:nowrap; }
         .nav-logo-sub { position: absolute; bottom: -8px; left: 0; font-family: var(--f-body); font-weight: 600; font-size: 8px; letter-spacing: 0.25em; text-transform: uppercase; color: var(--c-deep); opacity: 0.6; }
         
         .nav-left { flex: 1; display: flex; justify-content: flex-start; transform: translate(calc((1 - var(--scroll-p)) * -40px), 0); transition: transform 0.1s linear; z-index: 2; }
@@ -384,8 +547,14 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
 
         @media (max-width: 1023px) {
           .nav-bg { display: none !important; }
-          .nav-inner { justify-content: center; padding: 0 20px; }
+          .nav { height: 72px; }
+          .nav.scrolled { height: 72px; }
+          .nav.hidden { transform: none !important; }
+          body[data-cx-drawer="open"] .nav { transform: none !important; }
+          .nav-inner { justify-content: center; padding: 0 16px; }
           .nav-logo { color: var(--c-deep); transition: color 0.3s; font-size: 24px; }
+          .nav-logo-img { height:56px; clip-path:inset(10% 0% 10% 0%); transform:scale(1.5); opacity:0; }
+          .nav-logo-blend { clip-path:inset(10% 0% 10% 0%) !important; transform:scale(1.5) !important; }
           .nav-logo-sub { color: var(--c-deep); }
           .nav-left { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); justify-content: center; }
           .nav-right { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); gap: 10px; }
@@ -401,6 +570,8 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
         .nav-links a::after { content: ''; position: absolute; left: 0; right: 0; bottom: -2px; height: 1px; background: var(--c-sky); transform: scaleX(0); transform-origin: left; transition: transform 0.4s var(--ease-out); }
         .nav-links a:hover::after, .nav-links a.active::after { transform: scaleX(1); }
         .nav-links a:hover { color: var(--c-sky); }
+        .nav-links a.nav-highlight { color: var(--c-coral); font-weight: 600; }
+        .nav-links a.nav-highlight::after { background: var(--c-coral); }
         
         /* Lang */
         .lang { position: relative; font-family: var(--f-body); font-size: 13px; font-weight: 500; letter-spacing: 0.05em; }
@@ -429,8 +600,8 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
             width: 52px;
             height: 52px;
             position: fixed;
-            bottom: calc(20px + env(safe-area-inset-bottom));
-            right: 20px;
+            bottom: calc(24px + env(safe-area-inset-bottom));
+            right: calc(50% - 90px);
             left: auto;
             transform: none;
             z-index: 2100;
@@ -443,13 +614,28 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
             pointer-events: auto;
           }
           .hamburger-mobile.open {
-            background: rgba(255, 255, 255, 0.15);
-            border-color: rgba(255, 255, 255, 0.25);
+            right: calc(50% - 90px);
+            transform: none;
+            background: var(--c-deep);
+            border-color: rgba(255, 255, 255, 0.12);
             box-shadow: none;
+            z-index: 1900;
           }
+          /* W sekcji kreatora hamburger przesuwa się w prawo żeby nie blokował slide-to-shake */
+          body[data-cx-drawer="open"] .hamburger-mobile { right: 16px; transform:none; }
+          body[data-cx-section="creator"] .hamburger-mobile:not(.open) { right: 16px; transform:none; }
+          /* Podczas wjazdu/wyjazdu sekcji kreatora (neon pop) — hamburger znika */
+          body[data-cx-scrolling] .hamburger-mobile { opacity: 0; visibility: hidden; pointer-events: none; }
+          /* W sekcji bar (Tramonti) hamburger w kolorze coral — bardziej widoczny */
+          body[data-cx-section="bar"] .hamburger-mobile { background: var(--c-coral, #E8927C); }
         }
+        /* Nav CTA przesuwa się kolorystycznie w stronę różu tylko w sekcji Tramonti/bar */
+        .nav .btn-nav { transition: background .5s var(--ease-out), color .3s; }
+        body[data-cx-section="bar"] .nav .btn-nav { background: var(--c-coral, #E8927C); color:#fff; }
         .hamburger-lines { width: 20px; height: 12px; position: relative; }
         .hamburger-lines::before, .hamburger-lines::after { content: ''; position: absolute; left: 0; width: 100%; height: 2px; background: #fff; border-radius: 2px; transition: all 0.4s cubic-bezier(0.65, 0, 0.35, 1); }
+        .hamburger-mobile.ham-dark { background: #fff; }
+        .hamburger-mobile.ham-dark .hamburger-lines::before, .hamburger-mobile.ham-dark .hamburger-lines::after { background: var(--c-deep); }
         .hamburger-lines::before { top: 0; }
         .hamburger-lines::after { bottom: 0; }
         .hamburger-mobile.open .hamburger-lines::before { top: 5px; transform: rotate(45deg); }
@@ -466,6 +652,9 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
           clip-path: ellipse(120% 0% at 50% 100%);
           transition: clip-path 0.8s cubic-bezier(0.77, 0, 0.175, 1);
           pointer-events: none;
+          overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
+          overscroll-behavior: contain;
         }
         .mobile-menu.open {
           clip-path: ellipse(120% 120% at 50% 100%);
@@ -480,11 +669,13 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
           height: 100px;
           display: flex;
           align-items: center;
-          justify-content: center;
+          justify-content: space-between;
+          padding: 0 24px;
           pointer-events: none;
           transition: height 0.6s cubic-bezier(0.65, 0, 0.35, 1);
           z-index: 10;
         }
+        .mobile-header-mirror > * { pointer-events: auto; }
         .nav.scrolled .mobile-header-mirror {
           height: 80px;
         }
@@ -495,19 +686,38 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
           color: #fff !important;
           opacity: 0.6;
         }
+        .mobile-lang { display:flex; gap:6px; align-items:center; }
+        .mobile-lang-btn { width:32px; height:32px; border-radius:50%; border:2px solid transparent; padding:0; cursor:pointer; overflow:hidden; opacity:0.5; transition:all .3s; background:none;
+          transform:scale(0); }
+        .mobile-menu.open .mobile-lang-btn { animation:mlFlagIn .5s cubic-bezier(.2,1.3,.4,1) both; }
+        .mobile-menu.open .mobile-lang-btn:nth-child(1){ animation-delay:.30s; }
+        .mobile-menu.open .mobile-lang-btn:nth-child(2){ animation-delay:.37s; }
+        .mobile-menu.open .mobile-lang-btn:nth-child(3){ animation-delay:.44s; }
+        .mobile-menu.open .mobile-lang-btn:nth-child(4){ animation-delay:.51s; }
+        .mobile-menu.open .mobile-lang-btn:nth-child(5){ animation-delay:.58s; }
+        .mobile-menu.open .mobile-lang-btn:nth-child(6){ animation-delay:.65s; }
+        @keyframes mlFlagIn { from { transform:scale(0) translateY(8px); opacity:0; } to { transform:scale(1) translateY(0); opacity:0.5; } }
+        .mobile-lang-btn.active { border-color:var(--c-coral,#E8927C); opacity:1; transform:scale(1); }
+        .mobile-menu.open .mobile-lang-btn.active { animation-name:mlFlagInActive; }
+        @keyframes mlFlagInActive { from { transform:scale(0) translateY(8px); opacity:0; } to { transform:scale(1) translateY(0); opacity:1; } }
+        .mobile-lang-btn:hover { opacity:1; }
+        .mobile-lang-flag { width:100%; height:100%; object-fit:cover; border-radius:50%; }
+        /* Highlight Cocktail Maker link in mobile menu */
+        .mobile-links a.nav-highlight { color:var(--c-coral,#E8927C) !important; }
         
-        .mobile-menu-inner { position: relative; z-index: 2; padding: 40px; margin-top: 100px; }
+        .mobile-menu-inner { position: relative; z-index: 2; padding: 40px 24px; margin-top: 100px; max-width: 100%; box-sizing: border-box; }
         .nav.scrolled .mobile-menu-inner { margin-top: 80px; }
-        .mobile-links { display: flex; flex-direction: column; gap: 8px; margin-top: 5vh; }
+        .mobile-links { display: flex; flex-direction: column; gap: 8px; margin-top: 5vh; max-width: 100%; }
         .mobile-links a {
           font-family: var(--f-display);
           font-weight: 800;
-          font-size: clamp(28px, 6.5vw, 50px);
+          font-size: clamp(20px, 6vw, 38px);
           color: #fff;
           display: flex;
           justify-content: space-between;
-          align-items: baseline;
-          padding: 12px 0;
+          align-items: center;
+          gap: 12px;
+          padding: 10px 0;
           border-bottom: 1px solid rgba(255,255,255,0.08);
           opacity: 0;
           transform: translateY(30px);
@@ -516,6 +726,9 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
           perspective: 1000px;
           text-decoration: none;
           white-space: nowrap;
+          overflow: hidden;
+          max-width: 100%;
+          min-width: 0;
         }
         .mobile-menu.open .mobile-links a {
           opacity: 1;
@@ -524,7 +737,8 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
         }
         
         /* 3D wave text effect */
-        .ml-word { display: flex; flex-wrap: wrap; }
+        .ml-word { display: flex; flex-wrap: wrap; min-width: 0; overflow: hidden; }
+        .mobile-links a .arrow { flex: 0 0 auto; }
         .ml-char-wrap { position: relative; display: inline-block; transform-style: preserve-3d; transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); transform-origin: 50% 50% -0.4em; }
         .ml-char-front { display: inline-block; transform: translateZ(0.4em); }
         .ml-char-back { position: absolute; left: 0; top: 0; transform: rotateX(90deg) translateZ(0.4em); color: var(--c-coral, #E8927C); opacity: 0; transition: opacity 0.1s 0.2s; }
@@ -694,41 +908,41 @@ function Marquee({ items, separator = "✦" }) {
   useEffect(() => {
     let rafId;
     let isHovered = false;
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartPos = 0;
 
     const track = trackRef.current;
     if (!track) return;
 
     const onEnter = () => { isHovered = true; };
     const onLeave = () => { isHovered = false; };
+    // Touch/drag support: grab marquee and throw it
+    const onTouchStart = (e) => { isDragging = true; dragStartX = e.touches[0].clientX; dragStartPos = pos.current; };
+    const onTouchMove = (e) => { if (!isDragging) return; const dx = e.touches[0].clientX - dragStartX; pos.current = dragStartPos - dx * 0.02; };
+    const onTouchEnd = () => { isDragging = false; };
+
     track.parentElement.addEventListener("mouseenter", onEnter);
     track.parentElement.addEventListener("mouseleave", onLeave);
+    track.parentElement.addEventListener("touchstart", onTouchStart, { passive: true });
+    track.parentElement.addEventListener("touchmove", onTouchMove, { passive: true });
+    track.parentElement.addEventListener("touchend", onTouchEnd);
 
     const tick = () => {
       const scrollY = window.scrollY;
       const scrollDelta = scrollY - lastScrollY.current;
       lastScrollY.current = scrollY;
 
-      // Very slow and delicate base speed, just like before
       const baseSpeed = 0.3;
-      // Gentle and symmetrical scroll influence
       const scrollInfluence = scrollDelta * 0.05;
-      let targetSpeed = isHovered ? 0 : baseSpeed + scrollInfluence;
+      let targetSpeed = (isHovered || isDragging) ? 0 : baseSpeed + scrollInfluence;
       
-      // Cap the target speed strictly so it never goes "too fast" in either direction
       targetSpeed = Math.max(-1.2, Math.min(1.5, targetSpeed));
-      
-      // Gentle, consistent interpolation for "delicately smooth" direction changes
       speed.current += (targetSpeed - speed.current) * 0.05;
-
-      // Delicate translation multiplier
       pos.current += speed.current * 0.015; 
 
-      // Reset seamlessly in both directions. 1 set is exactly 25% of the total width.
-      if (pos.current >= 25) {
-        pos.current -= 25;
-      } else if (pos.current < 0) {
-        pos.current += 25;
-      }
+      if (pos.current >= 25) pos.current -= 25;
+      else if (pos.current < 0) pos.current += 25;
 
       track.style.transform = `translate3d(-${pos.current}%, 0, 0)`;
       rafId = requestAnimationFrame(tick);
@@ -741,6 +955,9 @@ function Marquee({ items, separator = "✦" }) {
       cancelAnimationFrame(rafId);
       track.parentElement.removeEventListener("mouseenter", onEnter);
       track.parentElement.removeEventListener("mouseleave", onLeave);
+      track.parentElement.removeEventListener("touchstart", onTouchStart);
+      track.parentElement.removeEventListener("touchmove", onTouchMove);
+      track.parentElement.removeEventListener("touchend", onTouchEnd);
     };
   }, []);
 

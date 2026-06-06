@@ -78,7 +78,7 @@ function Ristorante({ t }) {
             </ScrollReveal>
             <div className="rist-meta">
               <div><span>20</span><label>posti</label></div>
-              <div><span>40+</span><label>anni</label></div>
+              <div><span>30+</span><label>anni</label></div>
               <div><span>1</span><label>famiglia</label></div>
             </div>
           </div>
@@ -226,12 +226,10 @@ function Bar({ t, dark = true }) {
         .bar-light { background: linear-gradient(180deg, #FFFFFF 0%, #F0E5D4 100%); }
         .bar-head { max-width: 720px; margin-bottom: 64px; }
         .bar-head .kicker { display: block; margin-bottom: 24px; }
-        /* Let the global .dark-section .srt rule (white outline → white
-           scroll-fill) drive the heading. We only force the section's text
-           colour to white as a safety net; the per-char gradient still
-           animates. */
-        .bar.dark-section .bar-head .srt { color: #fff; }
-        .bar-intro { font-family: var(--f-serif); font-style: italic; font-size: clamp(20px, 2vw, 28px); line-height: 1.4; margin-top: 32px; color: ${dark ? "rgba(255,255,255,0.75)" : "var(--c-deep)"}; max-width: 600px; }
+        /* Solid white heading for the dark bar section */
+        .bar.dark-section .bar-head .srt { color: #fff; -webkit-text-stroke: 0; }
+        .bar.dark-section .bar-head .srt .char { -webkit-text-stroke:0 !important; color:#fff !important; -webkit-text-fill-color:#fff !important; background:none !important; -webkit-background-clip:border-box !important; background-clip:border-box !important; opacity:1 !important; }
+        .bar-intro { font-family: var(--f-serif); font-style: italic; font-size: clamp(20px, 2vw, 28px); line-height: 1.4; margin-top: 32px; color: ${dark ? "#fff" : "var(--c-deep)"}; max-width: 600px; }
         .bar-hours { display: grid; grid-template-columns: 1fr; gap: 48px; padding-top: 80px; margin-top: 80px; border-top: 1px solid ${dark ? "rgba(255,255,255,0.1)" : "var(--c-line)"}; }
         @media (min-width: 768px) { .bar-hours { grid-template-columns: 1fr 1fr; gap: 96px; align-items: center; } }
         .bar-hours-title { font-family: var(--f-display); font-weight: 800; font-size: 40px; margin-top: 12px; letter-spacing: -0.02em; }

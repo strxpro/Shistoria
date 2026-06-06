@@ -7,7 +7,7 @@ window.I18N = {
     nav: { storia: "Storia", bar: "Bar", ristorante: "Ristorante", eventi: "Eventi", contatti: "Contatti", cta: "Prenota Tavolo" },
     preloader: { tagline: "Rena Majore · Sardegna" },
     hero: {
-      since: "Since 1980",
+      since: "Since 1996",
       title: "S'HISTORIA",
       sub: "Rena Majore · Sardegna",
       cta: "Scopri la nostra storia",
@@ -16,8 +16,8 @@ window.I18N = {
     storia: {
       eyebrow: "Una famiglia, una storia",
       quote: "Una famiglia,\nuna storia,\nun sapore.",
-      heading: "Quarant'anni\nsul mare",
-      intro: "Dal 1980, la famiglia S'Historia coltiva un'idea semplice: cucinare con il cuore, davanti al mare di Rena Majore. Ogni anno aggiungiamo un capitolo.",
+      heading: "Trent'anni\nsul mare",
+      intro: "Dal 1996, la famiglia S'Historia coltiva un'idea semplice: cucinare con il cuore, davanti al mare di Rena Majore. Ogni anno aggiungiamo un capitolo.",
       orientationHorizontal: "Scorri lateralmente per attraversare i decenni",
       orientationVertical: "Scorri verso il basso per attraversare i decenni",
     },
@@ -83,12 +83,12 @@ window.I18N = {
     scopri: "ZOBACZ",
     nav: { storia: "Historia", bar: "Bar", ristorante: "Restauracja", eventi: "Wydarzenia", contatti: "Kontakt", cta: "Zarezerwuj stolik" },
     preloader: { tagline: "Rena Majore · Sardynia" },
-    hero: { since: "Od 1980", title: "S'HISTORIA", sub: "Rena Majore · Sardynia", cta: "Poznaj naszą historię", scroll: "Przewiń" },
+    hero: { since: "Od 1996", title: "S'HISTORIA", sub: "Rena Majore · Sardynia", cta: "Poznaj naszą historię", scroll: "Przewiń" },
     storia: {
       eyebrow: "Rodzina, historia",
       quote: "Jedna rodzina,\njedna historia,\njeden smak.",
-      heading: "Czterdzieści lat\nnad morzem",
-      intro: "Od 1980 roku rodzina S'Historia pielęgnuje prostą ideę: gotować sercem, nad morzem w Rena Majore. Każdy rok dopisuje nowy rozdział.",
+      heading: "Trzydzieści lat\nnad morzem",
+      intro: "Od 1996 roku rodzina S'Historia pielęgnuje prostą ideę: gotować sercem, nad morzem w Rena Majore. Każdy rok dopisuje nowy rozdział.",
       orientationHorizontal: "Przewijaj w bok, aby poznać dekady",
       orientationVertical: "Przewijaj w dół, aby poznać dekady",
     },
@@ -128,12 +128,12 @@ window.I18N = {
     scopri: "DISCOVER",
     nav: { storia: "Story", bar: "Bar", ristorante: "Restaurant", eventi: "Events", contatti: "Contact", cta: "Book a table" },
     preloader: { tagline: "Rena Majore · Sardinia" },
-    hero: { since: "Since 1980", title: "S'HISTORIA", sub: "Rena Majore · Sardinia", cta: "Discover our story", scroll: "Scroll" },
+    hero: { since: "Since 1996", title: "S'HISTORIA", sub: "Rena Majore · Sardinia", cta: "Discover our story", scroll: "Scroll" },
     storia: {
       eyebrow: "A family, a story",
       quote: "One family,\none story,\none taste.",
-      heading: "Forty years\nby the sea",
-      intro: "Since 1980, the S'Historia family has kept one simple idea: cook with the heart, by the sea of Rena Majore. Every year writes a new chapter.",
+      heading: "Thirty years\nby the sea",
+      intro: "Since 1996, the S'Historia family has kept one simple idea: cook with the heart, by the sea of Rena Majore. Every year writes a new chapter.",
       orientationHorizontal: "Scroll sideways to travel the decades",
       orientationVertical: "Scroll down to travel the decades",
     },
@@ -171,12 +171,12 @@ window.I18N = {
     scopri: "ENTDECKEN",
     nav: { storia: "Geschichte", bar: "Bar", ristorante: "Restaurant", eventi: "Events", contatti: "Kontakt", cta: "Tisch reservieren" },
     preloader: { tagline: "Rena Majore · Sardinien" },
-    hero: { since: "Seit 1980", title: "S'HISTORIA", sub: "Rena Majore · Sardinien", cta: "Entdecke unsere Geschichte", scroll: "Scrollen" },
+    hero: { since: "Seit 1996", title: "S'HISTORIA", sub: "Rena Majore · Sardinien", cta: "Entdecke unsere Geschichte", scroll: "Scrollen" },
     storia: {
       eyebrow: "Eine Familie, eine Geschichte",
       quote: "Eine Familie,\neine Geschichte,\nein Geschmack.",
-      heading: "Vierzig Jahre\nam Meer",
-      intro: "Seit 1980 pflegt die Familie S'Historia eine einfache Idee: Kochen mit Herz, am Meer von Rena Majore. Jedes Jahr schreibt ein neues Kapitel.",
+      heading: "Dreißig Jahre\nam Meer",
+      intro: "Seit 1996 pflegt die Familie S'Historia eine einfache Idee: Kochen mit Herz, am Meer von Rena Majore. Jedes Jahr schreibt ein neues Kapitel.",
       orientationHorizontal: "Seitlich scrollen, um die Jahrzehnte zu bereisen",
       orientationVertical: "Nach unten scrollen, um die Jahrzehnte zu bereisen",
     },
@@ -214,12 +214,12 @@ window.I18N = {
     scopri: "DÉCOUVRIR",
     nav: { storia: "Histoire", bar: "Bar", ristorante: "Restaurant", eventi: "Événements", contatti: "Contact", cta: "Réserver" },
     preloader: { tagline: "Rena Majore · Sardaigne" },
-    hero: { since: "Depuis 1980", title: "S'HISTORIA", sub: "Rena Majore · Sardaigne", cta: "Découvrez notre histoire", scroll: "Défiler" },
+    hero: { since: "Depuis 1996", title: "S'HISTORIA", sub: "Rena Majore · Sardaigne", cta: "Découvrez notre histoire", scroll: "Défiler" },
     storia: {
       eyebrow: "Une famille, une histoire",
       quote: "Une famille,\nune histoire,\nun goût.",
-      heading: "Quarante ans\nau bord de la mer",
-      intro: "Depuis 1980, la famille S'Historia cultive une idée simple : cuisiner avec le cœur, face à la mer de Rena Majore. Chaque année écrit un nouveau chapitre.",
+      heading: "Trente ans\nau bord de la mer",
+      intro: "Depuis 1996, la famille S'Historia cultive une idée simple : cuisiner avec le cœur, face à la mer de Rena Majore. Chaque année écrit un nouveau chapitre.",
       orientationHorizontal: "Faites défiler latéralement pour parcourir les décennies",
       orientationVertical: "Faites défiler vers le bas pour parcourir les décennies",
     },
@@ -257,12 +257,12 @@ window.I18N = {
     scopri: "DESCUBRE",
     nav: { storia: "Historia", bar: "Bar", ristorante: "Restaurante", eventi: "Eventos", contatti: "Contacto", cta: "Reservar" },
     preloader: { tagline: "Rena Majore · Cerdeña" },
-    hero: { since: "Desde 1980", title: "S'HISTORIA", sub: "Rena Majore · Cerdeña", cta: "Descubre nuestra historia", scroll: "Desplazar" },
+    hero: { since: "Desde 1996", title: "S'HISTORIA", sub: "Rena Majore · Cerdeña", cta: "Descubre nuestra historia", scroll: "Desplazar" },
     storia: {
       eyebrow: "Una familia, una historia",
       quote: "Una familia,\nuna historia,\nun sabor.",
-      heading: "Cuarenta años\njunto al mar",
-      intro: "Desde 1980, la familia S'Historia mantiene una idea simple: cocinar con el corazón, frente al mar de Rena Majore. Cada año escribe un nuevo capítulo.",
+      heading: "Treinta años\njunto al mar",
+      intro: "Desde 1996, la familia S'Historia mantiene una idea simple: cocinar con el corazón, frente al mar de Rena Majore. Cada año escribe un nuevo capítulo.",
       orientationHorizontal: "Desplázate lateralmente para viajar por las décadas",
       orientationVertical: "Desplázate hacia abajo para viajar por las décadas",
     },
@@ -320,14 +320,14 @@ window.makeT = function(locale) {
 
 // Story timeline data
 window.STORIA_DATA = [
-  { year: 1980, title: "Il sogno di Nonna Maria", text: "Una piccola trattoria di famiglia apre in fondo alla strada. Otto tavoli, una griglia, un'idea.", phType: "rock" },
-  { year: 1985, title: "La griglia sulla spiaggia", text: "I primi pesci grigliati direttamente sulla sabbia. Diventa un rito d'estate.", phType: "sea" },
-  { year: 1990, title: "Nasce il Bar", text: "Si aggiunge il bar dei liquori locali: mirto, filu 'e ferru, vermouth di erbe.", phType: "food" },
-  { year: 1995, title: "La terrazza sul mare", text: "Si amplia la terrazza affacciata sul mare. Tramonti come prima portata.", phType: "sea" },
-  { year: 2000, title: "Le prime note dal vivo", text: "Inizia la stagione dei concerti acustici sotto il pergolato.", phType: "rock" },
-  { year: 2005, title: "Premio regionale", text: "Riconoscimento per la cucina sarda tradizionale dal Comune di Gallura.", phType: "food" },
-  { year: 2010, title: "Nuova generazione", text: "I figli entrano in cucina. La nonna passa il testimone, ma controlla sempre il sale.", phType: "rock" },
-  { year: 2015, title: "Un nuovo volto", text: "Restauro completo della sala in stile mediterraneo. Calce, legno, lino.", phType: "food" },
+  { year: 1996, title: "Il sogno di Nonna Maria", text: "Una piccola trattoria di famiglia apre in fondo alla strada. Otto tavoli, una griglia, un'idea.", phType: "rock" },
+  { year: 1999, title: "La griglia sulla spiaggia", text: "I primi pesci grigliati direttamente sulla sabbia. Diventa un rito d'estate.", phType: "sea" },
+  { year: 2002, title: "Nasce il Bar", text: "Si aggiunge il bar dei liquori locali: mirto, filu 'e ferru, vermouth di erbe.", phType: "food" },
+  { year: 2005, title: "La terrazza sul mare", text: "Si amplia la terrazza affacciata sul mare. Tramonti come prima portata.", phType: "sea" },
+  { year: 2008, title: "Le prime note dal vivo", text: "Inizia la stagione dei concerti acustici sotto il pergolato.", phType: "rock" },
+  { year: 2011, title: "Premio regionale", text: "Riconoscimento per la cucina sarda tradizionale dal Comune di Gallura.", phType: "food" },
+  { year: 2014, title: "Nuova generazione", text: "I figli entrano in cucina. La nonna passa il testimone, ma controlla sempre il sale.", phType: "rock" },
+  { year: 2017, title: "Un nuovo volto", text: "Restauro completo della sala in stile mediterraneo. Calce, legno, lino.", phType: "food" },
   { year: 2020, title: "Resilienza", text: "Pandemia. Inventiamo il delivery con le ricette di famiglia. La storia non si ferma.", phType: "rock" },
   { year: 2023, title: "Menu degustazione", text: "Un percorso di otto portate per raccontare la Sardegna in una sera.", phType: "food" },
   { year: 2026, title: "La storia continua...", text: "Ogni stagione aggiunge un capitolo. Il prossimo lo scriviamo insieme.", phType: "sea" },
@@ -383,3 +383,27 @@ window.INGREDIENTS = [
   "Olio EVO di Gallura", "Cannonau", "Mirto rosso", "Pecorino sardo", "Fregula",
   "Bottarga di Cabras", "Pane carasau", "Miele di corbezzolo", "Pomodori di Zeddiani",
 ];
+
+// ─── Currency helper ──────────────────────────────────────────────────────
+// Przelicza EUR na lokalną walutę (zaokrąglone)
+window.CURRENCY_RATES = {
+  it: { symbol: "\u20ac", rate: 1 },
+  en: { symbol: "\u00a3", rate: 0.86 },   // GBP
+  pl: { symbol: "z\u0142", rate: 4.32 },  // PLN
+  de: { symbol: "\u20ac", rate: 1 },
+  fr: { symbol: "\u20ac", rate: 1 },
+  es: { symbol: "\u20ac", rate: 1 },
+};
+
+// convertPrice("18,00 €") → "78 zł" (dla polskiego)
+window.convertPrice = function(priceStr, lang) {
+  if (!lang || lang === "it") return priceStr;
+  const cur = window.CURRENCY_RATES[lang];
+  if (!cur || cur.rate === 1) return priceStr;
+  const match = priceStr.match(/([\d.,]+)/);
+  if (!match) return priceStr;
+  const eur = parseFloat(match[1].replace(",", "."));
+  const converted = Math.round(eur * cur.rate);
+  // Zawsze EUR + obok ~przelicznik
+  return priceStr + " \u2248" + converted + cur.symbol;
+};

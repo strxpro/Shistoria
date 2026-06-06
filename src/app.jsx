@@ -4,7 +4,7 @@ import "./data";
 import "./menu-data";
 import { motion, useScroll, useTransform } from "framer-motion";
 import { CocktailExperience } from "./cocktail-experience";
-import { FullMenu } from "./full-menu";
+import { FullMenu, DessertSection } from "./full-menu";
 import { Hero } from "./hero";
 import { Ristorante, Bar } from "./ristorante-bar";
 import { Eventi, SocialFeed, Attrazioni, Recensioni, Contatti, Footer } from "./sections";
@@ -21,13 +21,17 @@ const { useState: useStateA, useEffect: useEffectA, useRef: useRefA } = React;
 // `z` controls stacking so each card cleanly covers the one before it.
 function RiseCard({ children, z = 2, distance = 240, peek = null, peekBg = "linear-gradient(180deg, #BFE6F5 0%, #FFFFFF 100%)", peekColor = "var(--c-deep)", bg = "transparent", riseTo = "start center", id = null }) {
   const ref = useRefA(null);
+  const [isMobile, setIsMobile] = useStateA(false);
+  useEffectA(() => { setIsMobile(window.innerWidth < 768); }, []);
   const { scrollYProgress } = useScroll({
     target: ref,
     offset: ["start end", riseTo],
   });
-  // Whole card rises from `distance`px below to its resting place.
-  const transform = useTransform(scrollYProgress, (p) => p >= 0.99 ? "none" : `translateY(${distance * (1 - p)}px)`);
-  // Peek header: rises up first, lingers on screen, then tucks under the card.
+  // On mobile: no transform at all (sticky needs it). On desktop: rise animation.
+  const transform = useTransform(scrollYProgress, (p) => {
+    if (isMobile) return "none";
+    return p >= 0.99 ? "none" : `translateY(${distance * (1 - p)}px)`;
+  });
   const peekY = useTransform(scrollYProgress, [0, 0.5, 0.95], [80, 0, 70]);
   const peekOpacity = useTransform(scrollYProgress, [0, 0.1, 0.82, 0.98], [0, 1, 1, 0]);
 
@@ -35,7 +39,7 @@ function RiseCard({ children, z = 2, distance = 240, peek = null, peekBg = "line
   // fixed full-screen background images from earlier sections (e.g. Storia).
   return (
     <div ref={ref} id={id} style={{ position: "relative", zIndex: z, background: bg }}>
-      {peek && (
+      {peek && !isMobile && (
         <motion.div
           aria-hidden="true"
           style={{
@@ -54,9 +58,13 @@ function RiseCard({ children, z = 2, distance = 240, peek = null, peekBg = "line
           }}>{peek}</div>
         </motion.div>
       )}
-      <motion.div style={{ transform }}>
-        {children}
-      </motion.div>
+      {isMobile ? (
+        <div>{children}</div>
+      ) : (
+        <motion.div style={{ transform }}>
+          {children}
+        </motion.div>
+      )}
     </div>
   );
 }
@@ -173,7 +181,7 @@ export default function App() {
   // Section observer for nav highlight
   useEffectA(() => {
     if (!preloadDone) return;
-    const ids = ["top", "storia", "ristorante", "menu", "bar", "cocktail-builder", "eventi", "attrazioni", "social", "recensioni", "contatti"];
+    const ids = ["top", "storia", "ristorante", "menu", "desserts", "bar", "cocktail-rise", "cocktail-builder", "eventi", "attrazioni", "social", "recensioni", "contatti"];
     const io = new IntersectionObserver((entries) => {
       entries.forEach((e) => {
         if (e.isIntersecting) setActiveSection(e.target.id);
@@ -189,11 +197,15 @@ export default function App() {
   const onSelectSection = (id) => {
     const el = id === "top" ? document.body : document.getElementById(id);
     if (el) {
+      let topPos = id === "top" ? 0 : el.getBoundingClientRect().top + window.scrollY - 60;
+      // Cocktail section: scroll into the "hold" phase so shaker is already centered (skip enter animation)
+      if (id === "cocktail-rise") {
+        topPos = el.getBoundingClientRect().top + window.scrollY + window.innerHeight * 1.5;
+      }
       if (window.lenis) {
-        window.lenis.scrollTo(el, { offset: -60, duration: 1.2 });
+        window.lenis.scrollTo(topPos, { immediate: true });
       } else {
-        const topPos = el.getBoundingClientRect().top + window.scrollY;
-        window.scrollTo({ top: id === "top" ? 0 : topPos - 60, behavior: "smooth" });
+        window.scrollTo({ top: topPos, behavior: "instant" });
       }
     }
   };
@@ -227,6 +239,7 @@ export default function App() {
         <Storia t={tr} orientation={t.storiaOrientation} />
         <Ristorante t={tr} />
         <FullMenu />
+        <DessertSection />
         <RiseCard id="bar-rise" z={2} peek="Bar" bg="var(--c-bg)" riseTo="start start">
           <Bar t={tr} dark={t.barDark} />
         </RiseCard>

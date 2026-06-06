@@ -200,6 +200,16 @@ function StoriaHorizontal({ data }) {
     const track = trackRef.current;
     if (!sec || !track) return;
 
+    let touchOffset = 0; // extra offset from touch swipe (px)
+    let touchStart = 0;
+    let touching = false;
+
+    const isMobile = window.innerWidth < 768;
+    // Mobile: card width = 82vw + 20px gap
+    const cardW = isMobile ? window.innerWidth * 0.82 + 20 : 468;
+    const sidePad = isMobile ? window.innerWidth * 0.09 : window.innerWidth / 2 - 210;
+    const maxX = sidePad + (data.length - 1) * cardW + (isMobile ? window.innerWidth * 0.41 : 210) - window.innerWidth / 2;
+
     const onScroll = () => {
       const rect = sec.getBoundingClientRect();
       const vh = window.innerHeight;
@@ -209,23 +219,46 @@ function StoriaHorizontal({ data }) {
       setProgress(p);
       
       const travelP = p < 0.78 ? p / 0.78 : 1;
-      const sidePad = window.innerWidth / 2 - 210;
-      // Fixed maxX logic ensuring center alignment of the last card:
-      // cardWidth = 420px, card spacing = 48px.
-      const maxX = sidePad + (data.length - 1) * 468 + 210 - window.innerWidth / 2;
-      track.style.transform = `translate3d(-${travelP * Math.max(0, maxX)}px, 0, 0)`;
+      const baseX = travelP * Math.max(0, maxX);
+      // Combine scroll-driven position with touch offset
+      const finalX = Math.max(0, Math.min(maxX, baseX + touchOffset));
+      track.style.transform = `translate3d(-${finalX}px, 0, 0)`;
     };
+
+    // Touch swipe: horizontal drag adds to position
+    const onTouchStart = (e) => { touching = true; touchStart = e.touches[0].clientX; };
+    const onTouchMove = (e) => {
+      if (!touching) return;
+      const dx = touchStart - e.touches[0].clientX;
+      touchOffset += dx * 0.4; // damped
+      touchOffset = Math.max(-100, Math.min(maxX * 0.3, touchOffset));
+      touchStart = e.touches[0].clientX;
+      onScroll();
+    };
+    const onTouchEnd = () => { touching = false; /* slowly decay touchOffset */ const decay = setInterval(() => { touchOffset *= 0.9; if (Math.abs(touchOffset) < 1) { touchOffset = 0; clearInterval(decay); } onScroll(); }, 30); };
+
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
+    if (track) {
+      track.addEventListener("touchstart", onTouchStart, { passive: true });
+      track.addEventListener("touchmove", onTouchMove, { passive: true });
+      track.addEventListener("touchend", onTouchEnd);
+    }
     return () => {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
+      if (track) {
+        track.removeEventListener("touchstart", onTouchStart);
+        track.removeEventListener("touchmove", onTouchMove);
+        track.removeEventListener("touchend", onTouchEnd);
+      }
     };
   }, []);
 
   // section height = enough for horizontal travel + tail for last-card fill
-  const totalScrollH = `${data.length * 60 + 80}vh`;
+  const isMobileView = typeof window !== "undefined" && window.innerWidth < 768;
+  const totalScrollH = `${data.length * (isMobileView ? 45 : 60) + 80}vh`;
   // Active year for big background (uses remapped travel progress so it doesn't jump past)
   const travelP = progress < 0.78 ? progress / 0.78 : 1;
   const activeIdx = Math.min(data.length - 1, Math.round(travelP * (data.length - 1)));
@@ -266,6 +299,14 @@ function StoriaHorizontal({ data }) {
         .hpin-wrap { position: relative; }
         .hpin-sticky { position: sticky; top: 0; height: 100vh; overflow: hidden; display: flex; flex-direction: column; padding: 100px 0 40px; }
         .hpin-track { display: flex; gap: 48px; flex: 1; align-items: center; will-change: transform; position: relative; z-index: 2; }
+        @media (max-width: 768px) {
+          .hpin-sticky { padding: 80px 0 30px; }
+          .hpin-track { gap: 20px; }
+          .storia-card { flex: 0 0 82vw !important; height: 480px !important; }
+          .hpin-bg-year-text { font-size: clamp(80px, 25vw, 160px) !important; }
+          .storia-card-year { font-size: 36px !important; }
+          .hpin-progress { top: 48px; left: 5vw; right: 5vw; }
+        }
         .hpin-progress { position: absolute; left: 8vw; right: 8vw; top: 60px; z-index: 10; }
         .hpin-progress::before { content: ''; display: block; height: 1px; background: var(--c-line); }
         .hpin-progress-bar { position: absolute; left: 0; top: 0; height: 1px; background: var(--c-sky); transition: width 0.1s ease-out; }
@@ -279,6 +320,7 @@ function StoriaHorizontal({ data }) {
 }
 
 function StoriaCard({ item, index, progress, total, isLast }) {
+  const [popout, setPopout] = useStateS(false);
   const travelP = progress < 0.78 ? progress / 0.78 : 1;
   const tailP = progress > 0.78 ? (progress - 0.78) / 0.22 : 0; // 0..1 in tail phase
 
@@ -404,7 +446,9 @@ function StoriaCard({ item, index, progress, total, isLast }) {
   const portalContainer = typeof document !== "undefined" ? document.querySelector(".hpin-sticky") : null;
 
   return (
-    <article className={`storia-card ${distance < 0.5 ? "active" : ""} ${isLast && lastFill > 0.5 ? "filling" : ""}`} style={style}>
+    <>
+    <article className={`storia-card ${distance < 0.5 ? "active" : ""} ${isLast && lastFill > 0.5 ? "filling" : ""}`} style={style}
+      onClick={() => { if (!isExpanding) setPopout(true); }}>
       {isExpanding ? (
         <>
           {/* Spacer inside the card to maintain height while the real photo is portalled */}
@@ -429,8 +473,12 @@ function StoriaCard({ item, index, progress, total, isLast }) {
         <div className="storia-card-tag">— Capitolo {String(index + 1).padStart(2, "0")}</div>
       </div>
       <style>{`
-        .storia-card { flex: 0 0 420px; height: 580px; background: #fff; border-radius: 24px; padding: 24px; box-shadow: 0 12px 48px rgba(26,61,82,0.08); display: flex; flex-direction: column; gap: 20px; transition: transform 0.6s var(--ease-out), box-shadow 0.6s, flex-basis 0.8s var(--ease-out), height 0.8s var(--ease-out); transform: translateY(40px) scale(0.95); opacity: 0.55; position: relative; z-index: 2; }
+        .storia-card { flex: 0 0 420px; height: 580px; background: #fff; border-radius: 24px; padding: 24px; box-shadow: 0 12px 48px rgba(26,61,82,0.08); display: flex; flex-direction: column; gap: 20px; transition: transform 0.6s var(--ease-out), box-shadow 0.6s, flex-basis 0.8s var(--ease-out), height 0.8s var(--ease-out); transform: translateY(40px) scale(0.95); opacity: 0.55; position: relative; z-index: 2; cursor: pointer; }
         .storia-card.active { transform: translateY(0) scale(1); opacity: 1; box-shadow: 0 28px 80px rgba(26,61,82,0.18); }
+        @media (max-width: 768px) {
+          .storia-card { opacity: 1 !important; transform: none !important; box-shadow: 0 16px 48px rgba(26,61,82,0.12); }
+          .storia-card-img { filter: none !important; }
+        }
         .storia-card.filling { box-shadow: 0 32px 120px rgba(26,61,82,0.25); }
         .storia-card-img-wrap { position: relative; flex: 1; min-height: 320px; border-radius: 16px; overflow: hidden; }
         .storia-card-img { width: 100%; height: 100%; transition: transform 1.2s var(--ease-out), filter 0.6s; filter: saturate(0.7) brightness(0.95); }
@@ -444,6 +492,41 @@ function StoriaCard({ item, index, progress, total, isLast }) {
         .storia-card-tag { margin-top: auto; font-family: var(--f-serif); font-style: italic; font-size: 13px; color: var(--c-coral); }
       `}</style>
     </article>
+    {/* Pop-out overlay on click */}
+    {popout && typeof document !== "undefined" && createPortal(
+      <div className="storia-popout-overlay" onClick={() => setPopout(false)}>
+        <div className="storia-popout" onClick={(e) => e.stopPropagation()}>
+          <button className="storia-popout-close" onClick={() => setPopout(false)}>×</button>
+          <div className="storia-popout-img">
+            <Placeholder type={item.phType} label={`${item.year}`} style={{width:"100%",height:"100%"}} />
+          </div>
+          <div className="storia-popout-body">
+            <span className="storia-popout-year">{item.year}</span>
+            <h3>{item.title}</h3>
+            <p>{item.text}</p>
+            <span className="storia-popout-tag">— Capitolo {String(index + 1).padStart(2, "0")}</span>
+          </div>
+        </div>
+        <style>{`
+          .storia-popout-overlay { position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,0.7); backdrop-filter:blur(10px);
+            display:flex; align-items:center; justify-content:center; padding:24px; animation:storiaFadeIn .3s ease; }
+          @keyframes storiaFadeIn { from { opacity:0; } to { opacity:1; } }
+          .storia-popout { width:min(600px,92vw); max-height:88vh; overflow-y:auto; border-radius:24px; background:#fff; box-shadow:0 40px 100px rgba(0,0,0,0.3); animation:storiaPop .4s cubic-bezier(.16,1,.3,1); }
+          @keyframes storiaPop { from { transform:scale(0.9) translateY(20px); opacity:0; } to { transform:none; opacity:1; } }
+          .storia-popout-close { position:absolute; top:16px; right:16px; width:40px; height:40px; border-radius:50%; background:rgba(0,0,0,0.06); border:none; font-size:22px; cursor:pointer; display:grid; place-items:center; z-index:2; }
+          .storia-popout-img { width:100%; height:300px; border-radius:24px 24px 0 0; overflow:hidden; }
+          .storia-popout-body { padding:28px; display:flex; flex-direction:column; gap:12px; }
+          .storia-popout-year { font-family:var(--f-display); font-weight:800; font-size:48px; color:var(--c-sky); letter-spacing:-0.03em; }
+          .storia-popout-body h3 { font-family:var(--f-display); font-weight:700; font-size:24px; color:var(--c-deep); }
+          .storia-popout-body p { font-size:15px; line-height:1.6; color:var(--c-mute); }
+          .storia-popout-tag { font-family:var(--f-serif); font-style:italic; font-size:13px; color:var(--c-coral); margin-top:8px; }
+          @media (max-width:768px) { .storia-popout { width:94vw; } .storia-popout-img { height:220px; }
+            .storia-popout-body { padding:20px; } .storia-popout-year { font-size:36px; } }
+        `}</style>
+      </div>,
+      document.body,
+    )}
+    </>
   );
 }
 

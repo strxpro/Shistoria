@@ -63,6 +63,8 @@ import { useGSAP } from "@gsap/react";
 
 gsap.registerPlugin(ScrollTrigger);
 
+import { supabase, getSessionId } from "./lib/supabase";
+
 /* ──────────────────────────────────────────────────────────────────────────
  * Assets
  * ──────────────────────────────────────────────────────────────────────── */
@@ -70,6 +72,7 @@ const BOTTLE_URL = "/WINOILIKIERY.glb";       // wina + likiery (wino, Etykieta,
 const SPIRIT_URL = "/wodkarum.glb";           // wódka/rum/tequila (butelka, Etykieta, LIQUID, zakretka)
 const WHISKYGIN_URL = "/whiskigin.glb";       // whisky + gin (Liquid, LiquidAction)
 const CAN_URL = "/puszka.glb";                // napoje gazowane: puszka (puszka, liguid, zawleczka, dziura)
+const SOK_URL = "/sok.glb";                    // soki: butelka soku
 const GLASS_URL = "/szkloniskieglb.glb";      // szklanka niska (szklanka, liguid[Key 1], lód, shaker, łopatka)
 const GLASS_HIGH_URL = "/szklowysokie.glb";   // szklanka wysoka (ta sama struktura węzłów + animacje)
 const SHAKER_URL = "/shaker-shistoria.glb";
@@ -77,6 +80,7 @@ useGLTF.preload(BOTTLE_URL);
 useGLTF.preload(SPIRIT_URL);
 useGLTF.preload(WHISKYGIN_URL);
 useGLTF.preload(CAN_URL);
+useGLTF.preload(SOK_URL);
 useGLTF.preload(GLASS_URL);
 useGLTF.preload(GLASS_HIGH_URL);
 useGLTF.preload(SHAKER_URL);
@@ -88,7 +92,10 @@ const GLASS_FPS = 24;
 const gf = (frame: number) => frame / GLASS_FPS;
 const GLASS_RANGES: Record<string, { withIce: { start: number; end: number }; noIce: { start: number; end: number } }> = {
   "/szkloniskieglb.glb": { withIce: { start: gf(1), end: gf(126) }, noIce: { start: gf(150), end: gf(230) } },
-  "/szklowysokie.glb":   { withIce: { start: gf(1), end: gf(126) }, noIce: { start: gf(150), end: gf(230) } },
+  // Uwaga: szklowysokie.glb ma TYLKO jedną animację cieczy (morph 51–76) i osobną
+  // anim_no_ice ruszającą wyłącznie kostki lodu. „Bez lodu" reużywa zatem zakresu
+  // nalewania cieczy, a same kostki/łopatka są chowane (poniżej, wg withIce).
+  "/szklowysokie.glb":   { withIce: { start: gf(1), end: gf(126) }, noIce: { start: gf(1), end: gf(100) } },
 };
 const rangeFor = (url: string) => GLASS_RANGES[url] ?? GLASS_RANGES["/szkloniskieglb.glb"];
 
@@ -99,20 +106,31 @@ const rangeFor = (url: string) => GLASS_RANGES[url] ?? GLASS_RANGES["/szkloniski
  *  - napoje gazowane (cola/soda…) → puszka.glb
  */
 type ModelDef = { url: string; metalCork: boolean; metalBody?: boolean; noStream?: boolean; corkSnap?: boolean; manualCork?: boolean; fit: number; glass: string[]; label: string[]; liquid: string[]; cork: string[] };
-const CAN_IDS = ["tonica", "soda", "cola", "ginger", "lemonsoda"];
+const CAN_IDS = ["tonica", "soda", "cola", "coca-cola", "coca-zero", "fanta", "sprite", "ginger", "lemonsoda", "redbull", "bitter", "san-pellegrino", "the-pesca", "the-limone", "crodino", "aranciata-amara"];
+const SOK_IDS = ["limone", "arancia", "pompelmo", "cranberry", "ananas", "pesca", "passion", "cocco"];
 function modelForId(id: string): ModelDef {
-  const whiskygin = ["gin", "gin-mare", "whisky", "bourbon"].includes(id);
-  const spirit = ["rum", "rum-bianco", "rum-cocco", "vodka", "vodka-citr", "tequila", "mezcal"].includes(id);
+  const whiskygin = ["gin", "gin-mare", "gin-botanist", "gin-botanist-cask", "gin-tanqueray", "gin-tanqueray-00", "gin-pink", "gin-oyster", "gin-oyster-citrus", "gin-provence", "gin-luz", "gin-sapling", "gin-pervas", "gin-emporia", "gin-genesi", "gin-acrobatico", "gin-palma", "gin-palma-dest", "gin-tropical", "gin-mediterraneo", "gin-bus", "whisky", "whisky-high-comm", "whisky-oro-pilla", "whisky-bushmills", "whisky-glen-grant", "whisky-teachers", "whisky-bankhall", "whisky-crabbie", "whisky-port-charl", "bourbon", "whisky-scotch", "woodford", "jameson", "jack-daniels", "jack-fire", "jack-apple", "jack-honey", "gentleman-jack", "bruichladdich", "bruichladdich-18", "octomore-161", "octomore-162", "fujimi", "euyu"].includes(id);
+  const spirit = ["rum", "rum-bianco", "rum-cocco", "rum-don-papa", "rum-kraken", "rum-matusalem", "rum-santa-teresa", "rum-black-tears", "rum-pellerossa", "rum-pampero", "rum-arcane", "rum-torquoise", "rum-anacaona", "rum-yellow-snake", "rum-pasador-pas", "rum-pasador-xo", "rum-bocatheva", "vodka", "vodka-citr", "vodka-sapling", "vodka-sapling-rasp", "vodka-beluga", "vodka-beluga-rosa", "vodka-eiko", "tequila", "tequila-reposada", "tequila-dobel", "tequila-espolon", "tequila-1800", "tequila-1800-rep", "tequila-1800-ane", "tequila-1800-crist", "mezcal"].includes(id);
   const can = CAN_IDS.includes(id);
+  const sok = SOK_IDS.includes(id);
+  if (sok) {
+    // sok.glb: butelka soku — generujemy etykietę proceduralną + liquid z kolorem
+    return {
+      url: SOK_URL, metalCork: true, metalBody: false, noStream: true, fit: 0.82,
+      glass: ["butelka", "Butelka", "Bottle", "Cylinder", "Cylinder.001", "Cylinder.002", "Glass", "glass", "Body"],
+      label: ["etykieta", "Etykieta", "Label"],
+      liquid: ["liquid", "liguid", "Liquid", "LIQUID", "juice", "Juice", "sok", "Sok"],
+      cork: ["zakretka", "Zakretka", "cap", "Cap", "korek", "Korek", "Cylinder.003"],
+    };
+  }
   if (can) {
-    // puszka.glb: puszka (korpus aluminium), liguid (ciecz), zawleczka (otwieracz), dziura (otwór)
-    // Etykieta nakładana na KORPUS puszki (grafika napoju owija korpus) — do testu mapowania.
+    // puszka.glb: Cylinder.002 (korpus aluminium z baked teksturą), liquid, zawleczka
     return {
       url: CAN_URL, metalCork: true, metalBody: true, noStream: true, fit: 0.82,
-      glass: ["Can"],
-      label: ["puszka", "Puszka", "etykieta", "Etykieta", "Label", "Plane"],
-      liquid: ["liguid", "liquid", "Liquid", "LIQUID"],
-      cork: ["zawleczka", "Zawleczka", "dziura", "Tab", "Ring"],
+      glass: ["Cylinder.002", "Cylinder", "Cylinder.001", "Can", "puszka", "Puszka", "Body", "body"],
+      label: [],  // kolor + etykieta nakładane proceduralnie na korpus (patrz traverse metalBody)
+      liquid: ["liquid", "liguid", "Liquid", "LIQUID", "Liquid.001"],
+      cork: ["zawleczka", "Zawleczka", "dziura", "Tab", "Ring", "Armature"],
     };
   }
   if (whiskygin) {
@@ -136,9 +154,9 @@ function modelForId(id: string): ModelDef {
   // i otwieramy ręcznie (manualCork), bo natywna animacja jest niepoprawna.
   return {
     url: BOTTLE_URL, metalCork: false, corkSnap: true, manualCork: true, fit: 0.82,
-    glass: ["wino", "Wino", "glass", "Glass"],
+    glass: ["butelka", "wino", "Wino", "glass", "Glass", "Wino_2", "wino_2"],
     label: ["Etykieta", "etykieta", "Label"],
-    liquid: ["Liquid", "liquid", "LIQUID"],
+    liquid: ["Liquid", "liquid", "LIQUID", "Wino_1", "wino_1"],
     cork: ["Cylinder", "cork", "Cork", "korek", "Korek"],
   };
 }
@@ -186,7 +204,7 @@ const CONFIG = {
   shakerHeight: 4.2,
 
   // Butelka 3D — podgląd przy hover po prawej; nalewa nad wlotem szejkera.
-  bottleDock: { x: 2.7, y: 0.4, z: 0.8, s: 0.4 },
+  bottleDock: { x: 2.7, y: -0.2, z: 0.8, s: 0.4 },
   bottleHoverLift: 0.32,
   bottlePourScale: 0.46,
   bottleOverShaker: { x: 0.35, y: 2.0, z: 0.15 }, // tuż nad wlotem szejkera
@@ -203,13 +221,16 @@ const CONFIG = {
   camTargetRest: { x: 0, y: -0.35, z: 0 },
   camTargetTop: { x: 0, y: 1.1, z: 0 },
 
-  streamTop: 0.05,
-  streamHeight: 1.7,
+  streamTop: 0.6,
+  streamHeight: 2.6,
 
   scrollLength: "+=600%",
   enterEnd: 0.26,
   exitStart: 0.58,
 } as const;
+
+// Pozycja Y gotowej szklanki (animacja nalewania) — wycentrowana w kadrze.
+const GLASS_POUR_Y = -1.6;
 
 /* ──────────────────────────────────────────────────────────────────────────
  * Dane składników (lewo = mixery/napoje, prawo = alkohole).
@@ -219,14 +240,25 @@ type Ingredient = { id: string; name: string; color: string; ml: number; isReal?
 
 const MIXERS: { group: string; emoji: string; items: Ingredient[] }[] = [
   {
-    group: "Bollicine",
-    emoji: "🫧",
+    group: "Bibite",
+    emoji: "🥤",
     items: [
-      { id: "tonica", name: "Acqua tonica", color: "#E0EDF0", ml: 60 },
+      { id: "coca-cola", name: "Coca Cola", color: "#3D1C02", ml: 60 },
+      { id: "coca-zero", name: "Coca Cola Zero", color: "#1A0E05", ml: 60 },
+      { id: "fanta", name: "Fanta", color: "#FF8C00", ml: 60 },
+      { id: "sprite", name: "Sprite", color: "#E0F5E0", ml: 60 },
+      { id: "the-pesca", name: "The Pesca", color: "#FFB060", ml: 60 },
+      { id: "the-limone", name: "The Limone", color: "#F0E860", ml: 60 },
+      { id: "crodino", name: "Crodino", color: "#E8A030", ml: 60 },
+      { id: "ginger", name: "Ginger Beer", color: "#D4A84B", ml: 60 },
+      { id: "redbull", name: "Red Bull", color: "#F0E060", ml: 60 },
+      { id: "tonica", name: "Acqua Tonica", color: "#E0EDF0", ml: 60 },
+      { id: "tonica-prem", name: "Tonica Premium", color: "#D8E8F0", ml: 60 },
       { id: "soda", name: "Soda", color: "#F0F4F5", ml: 60 },
-      { id: "cola", name: "Cola", color: "#3D1C02", ml: 60 },
-      { id: "ginger", name: "Ginger beer", color: "#D4A84B", ml: 60 },
-      { id: "lemonsoda", name: "Lemonsoda", color: "#F5E16D", ml: 60 },
+      { id: "lemonsoda", name: "Lemon Soda", color: "#F5E16D", ml: 60 },
+      { id: "aranciata-amara", name: "Aranciata Amara", color: "#F08030", ml: 60 },
+      { id: "bitter", name: "Bitter", color: "#C8102E", ml: 60 },
+      { id: "san-pellegrino", name: "Cocktail S.Pellegrino", color: "#F0A040", ml: 60 },
     ],
   },
   {
@@ -238,81 +270,196 @@ const MIXERS: { group: string; emoji: string; items: Ingredient[] }[] = [
       { id: "pompelmo", name: "Pompelmo", color: "#FF6B6B", ml: 30 },
       { id: "cranberry", name: "Cranberry", color: "#C41E3A", ml: 30 },
       { id: "ananas", name: "Ananas", color: "#FFD24A", ml: 30 },
+      { id: "pesca", name: "Pesca", color: "#FFB366", ml: 30 },
+      { id: "passion", name: "Passion fruit", color: "#E8A030", ml: 20 },
+      { id: "cocco", name: "Cocco", color: "#F4ECDA", ml: 30 },
     ],
   },
   {
     group: "Sciroppi",
     emoji: "🍯",
     items: [
-      { id: "sciroppo", name: "Zucchero", color: "#EAD9B0", ml: 15 },
+      { id: "sciroppo", name: "Zucchero di canna", color: "#C9A87D", ml: 15 },
       { id: "granatina", name: "Granatina", color: "#C0264A", ml: 15 },
-      { id: "menta-s", name: "Menta", color: "#3FB68B", ml: 15 },
+      { id: "menta-s", name: "Sciroppo menta", color: "#3FB68B", ml: 15 },
       { id: "vaniglia", name: "Vaniglia", color: "#E6D6A8", ml: 15 },
+      { id: "sciroppo-cocco", name: "Sciroppo cocco", color: "#F4ECDA", ml: 15 },
+    ],
+  },
+  {
+    group: "Aromi",
+    emoji: "🌿",
+    items: [
+      { id: "menta", name: "Menta fresca", color: "#5B9C68", ml: 5 },
+      { id: "lime", name: "Lime", color: "#9DC85A", ml: 20 },
+      { id: "basilico", name: "Basilico", color: "#4A7C53", ml: 5 },
+      { id: "rosmarino", name: "Rosmarino", color: "#3D6B4A", ml: 5 },
+      { id: "sale", name: "Sale", color: "#F0F0F0", ml: 2 },
     ],
   },
 ];
 
 const ALCOHOLS: { group: string; emoji: string; items: Ingredient[] }[] = [
   {
-    group: "Vini",
-    emoji: "🍷",
-    items: [
-      { id: "prosecco", name: "Prosecco", color: "#F3E5B0", ml: 60, isReal: true, abv: 11 },
-      { id: "vermouth-r", name: "Vermouth rosso", color: "#8E2F3A", ml: 45, isReal: true, abv: 16 },
-      { id: "vermouth-d", name: "Vermouth dry", color: "#EFE7C8", ml: 45, isReal: true, abv: 18 },
-      { id: "spumante", name: "Spumante", color: "#F7EFC8", ml: 60, isReal: true, abv: 12 },
-    ],
-  },
-  {
-    group: "Liquori",
-    emoji: "🍸",
-    items: [
-      { id: "aperol", name: "Aperol", color: "#F4612B", ml: 30, isReal: true, abv: 11 },
-      { id: "amaretto", name: "Amaretto", color: "#A45A1E", ml: 30, isReal: true, abv: 28 },
-      { id: "limoncello", name: "Limoncello", color: "#F4D03F", ml: 30, isReal: true, abv: 30 },
-      { id: "cointreau", name: "Cointreau", color: "#E79A2B", ml: 30, isReal: true, abv: 40 },
-      { id: "campari", name: "Campari", color: "#C8102E", ml: 30, isReal: true, abv: 25 },
-    ],
-  },
-  {
-    group: "Whisky",
-    emoji: "🥃",
-    items: [
-      { id: "whisky", name: "Whisky scozzese", color: "#B5651D", ml: 45, isReal: true, abv: 43 },
-      { id: "bourbon", name: "Bourbon", color: "#A0521C", ml: 45, isReal: true, abv: 45 },
-    ],
-  },
-  {
-    group: "Rum",
-    emoji: "🏝️",
-    items: [
-      { id: "rum", name: "Rum ambrato", color: "#C9742E", ml: 45, isReal: true, abv: 40 },
-      { id: "rum-bianco", name: "Rum bianco", color: "#F2EAD8", ml: 45, isReal: true, abv: 38 },
-      { id: "rum-cocco", name: "Rum cocco", color: "#FBF3E2", ml: 45, isReal: true, abv: 21 },
-    ],
-  },
-  {
     group: "Gin",
     emoji: "🌿",
     items: [
-      { id: "gin", name: "Gin London Dry", color: "#D6EFE8", ml: 45, isReal: true, abv: 44 },
-      { id: "gin-mare", name: "Gin Mare", color: "#CDE9DE", ml: 45, isReal: true, abv: 42 },
+      { id: "gin", name: "Bombay", color: "#FFFFFF", ml: 45, isReal: true, abv: 40 },
+      { id: "gin-botanist", name: "The Botanist", color: "#FFFFFF", ml: 45, isReal: true, abv: 46 },
+      { id: "gin-botanist-cask", name: "Botanist Cask", color: "#D4AF37", ml: 45, isReal: true, abv: 47 },
+      { id: "gin-tanqueray", name: "Tanqueray", color: "#FFFFFF", ml: 45, isReal: true, abv: 43 },
+      { id: "gin-tanqueray-00", name: "Tanqueray 00", color: "#FFFFFF", ml: 45, isReal: true, abv: 0 },
+      { id: "gin-pink", name: "Pink Pepper", color: "#FFFFFF", ml: 45, isReal: true, abv: 44 },
+      { id: "gin-provence", name: "Gigi E Provence", color: "#FFFFFF", ml: 45, isReal: true, abv: 43 },
+      { id: "gin-luz", name: "Luz Limone", color: "#FFFACD", ml: 45, isReal: true, abv: 43 },
+      { id: "gin-sapling", name: "Sapling Gin", color: "#FFFFFF", ml: 45, isReal: true, abv: 40 },
+      { id: "gin-pervas", name: "Seri Pervas", color: "#FFFFFF", ml: 45, isReal: true, abv: 42 },
+      { id: "gin-emporia", name: "Emporia", color: "#FFFFFF", ml: 45, isReal: true, abv: 41 },
+      { id: "gin-genesi", name: "Genesi", color: "#FFFFFF", ml: 45, isReal: true, abv: 43 },
+      { id: "gin-oyster", name: "Oyster Adriatic", color: "#FFFFFF", ml: 45, isReal: true, abv: 42 },
+      { id: "gin-oyster-citrus", name: "Oyster Citrus", color: "#FFFFE0", ml: 45, isReal: true, abv: 42 },
+      { id: "gin-acrobatico", name: "L'Acrobatico", color: "#FFFFFF", ml: 45, isReal: true, abv: 43 },
+      { id: "gin-palma", name: "Palma Citrus", color: "#FFFFFF", ml: 45, isReal: true, abv: 40 },
+      { id: "gin-palma-dest", name: "Palma Destilado", color: "#FFFFFF", ml: 45, isReal: true, abv: 44 },
+      { id: "gin-tropical", name: "Tropical", color: "#FFEFD5", ml: 45, isReal: true, abv: 40 },
+      { id: "gin-mediterraneo", name: "Mediterraneo", color: "#FFFFFF", ml: 45, isReal: true, abv: 42 },
+      { id: "gin-bus", name: "Bus Spancer", color: "#FFFFFF", ml: 45, isReal: true, abv: 41 },
     ],
   },
   {
     group: "Vodka",
     emoji: "❄️",
     items: [
-      { id: "vodka", name: "Vodka liscia", color: "#E8EEF0", ml: 45, isReal: true, abv: 40 },
-      { id: "vodka-citr", name: "Vodka agli agrumi", color: "#EEF3D9", ml: 45, isReal: true, abv: 38 },
+      { id: "vodka-sapling", name: "Sapling", color: "#FFFFFF", ml: 45, isReal: true, abv: 40 },
+      { id: "vodka-sapling-rasp", name: "Sapling Raspberry", color: "#D64161", ml: 45, isReal: true, abv: 37 },
+      { id: "vodka", name: "Paderewsky", color: "#FFFFFF", ml: 45, isReal: true, abv: 40 },
+      { id: "vodka-eiko", name: "Eiko", color: "#FFFFFF", ml: 45, isReal: true, abv: 40 },
+      { id: "vodka-beluga", name: "Beluga", color: "#FFFFFF", ml: 45, isReal: true, abv: 40 },
+      { id: "vodka-beluga-rosa", name: "Beluga Rosa E Lime", color: "#FFB6C1", ml: 45, isReal: true, abv: 40 },
     ],
   },
   {
     group: "Tequila",
     emoji: "🌵",
     items: [
-      { id: "tequila", name: "Tequila blanco", color: "#F0E2B6", ml: 45, isReal: true, abv: 38 },
-      { id: "mezcal", name: "Mezcal", color: "#E8D9A8", ml: 45, isReal: true, abv: 40 },
+      { id: "tequila", name: "Jose Cuervo", color: "#FFFFFF", ml: 45, isReal: true, abv: 38 },
+      { id: "tequila-reposada", name: "Jose Cuervo Repos.", color: "#DAA520", ml: 45, isReal: true, abv: 38 },
+      { id: "tequila-dobel", name: "Dobel", color: "#FFFFFF", ml: 45, isReal: true, abv: 40 },
+      { id: "tequila-espolon", name: "Espolon", color: "#FFFFFF", ml: 45, isReal: true, abv: 40 },
+      { id: "tequila-1800", name: "1800", color: "#FFFFFF", ml: 45, isReal: true, abv: 40 },
+      { id: "tequila-1800-rep", name: "1800 Reposado", color: "#CD853F", ml: 45, isReal: true, abv: 40 },
+      { id: "tequila-1800-ane", name: "1800 Anejo", color: "#8B4513", ml: 45, isReal: true, abv: 40 },
+      { id: "tequila-1800-crist", name: "1800 Cristallino", color: "#FFFFFF", ml: 45, isReal: true, abv: 40 },
+      { id: "mezcal", name: "Mezcal Marca Negra", color: "#FFFFFF", ml: 45, isReal: true, abv: 43 },
+    ],
+  },
+  {
+    group: "Whisky",
+    emoji: "🥃",
+    items: [
+      { id: "whisky-high-comm", name: "High Commissioner", color: "#C67100", ml: 45, isReal: true, abv: 40 },
+      { id: "whisky-oro-pilla", name: "Oro Pilla", color: "#B85D19", ml: 45, isReal: true, abv: 40 },
+      { id: "whisky-bushmills", name: "Bushmills", color: "#D4AF37", ml: 45, isReal: true, abv: 40 },
+      { id: "whisky-glen-grant", name: "Glen Grant", color: "#E5C158", ml: 45, isReal: true, abv: 40 },
+      { id: "whisky-teachers", name: "Teacher's", color: "#8B4513", ml: 45, isReal: true, abv: 40 },
+      { id: "jameson", name: "Jameson", color: "#CD7F32", ml: 45, isReal: true, abv: 40 },
+      { id: "whisky-bankhall", name: "Bankhall", color: "#C05E20", ml: 45, isReal: true, abv: 40 },
+      { id: "whisky-crabbie", name: "John Crabbie", color: "#DAA520", ml: 45, isReal: true, abv: 40 },
+      { id: "bruichladdich", name: "Bruichladdich", color: "#E1C699", ml: 45, isReal: true, abv: 50 },
+      { id: "bruichladdich-18", name: "Bruichladdich 18", color: "#CC7722", ml: 45, isReal: true, abv: 50 },
+      { id: "whisky-port-charl", name: "Port Charlotte", color: "#D4A017", ml: 45, isReal: true, abv: 50 },
+      { id: "woodford", name: "Woodford Reserve", color: "#8B3A0F", ml: 45, isReal: true, abv: 45 },
+      { id: "jack-daniels", name: "Jack Daniel's", color: "#8B4513", ml: 45, isReal: true, abv: 40 },
+      { id: "jack-fire", name: "Jack Fire", color: "#A03010", ml: 45, isReal: true, abv: 35 },
+      { id: "jack-apple", name: "Jack Apple", color: "#C49A00", ml: 45, isReal: true, abv: 35 },
+      { id: "jack-honey", name: "Jack Honey", color: "#D4AF37", ml: 45, isReal: true, abv: 35 },
+      { id: "gentleman-jack", name: "Gentleman Jack", color: "#A0522D", ml: 45, isReal: true, abv: 40 },
+      { id: "octomore-161", name: "Octomore 16.1", color: "#EEDC82", ml: 45, isReal: true, abv: 59 },
+      { id: "octomore-162", name: "Octomore 16.2", color: "#E4CD05", ml: 45, isReal: true, abv: 61 },
+      { id: "fujimi", name: "Fujimi", color: "#CC7722", ml: 45, isReal: true, abv: 40 },
+      { id: "euyu", name: "Euyu", color: "#C68E17", ml: 45, isReal: true, abv: 40 },
+    ],
+  },
+  {
+    group: "Rum",
+    emoji: "🏝️",
+    items: [
+      { id: "rum-bianco", name: "Rum bianco", color: "#FFFFFF", ml: 45, isReal: true, abv: 38 },
+      { id: "rum", name: "Brugal", color: "#8B4513", ml: 45, isReal: true, abv: 40 },
+      { id: "rum-black-tears", name: "Black Tears", color: "#2A1508", ml: 45, isReal: true, abv: 40 },
+      { id: "rum-pellerossa", name: "Pellerossa", color: "#DAA520", ml: 45, isReal: true, abv: 38 },
+      { id: "rum-don-papa", name: "Don Papa", color: "#8B3A0F", ml: 45, isReal: true, abv: 40 },
+      { id: "rum-matusalem", name: "Matusalem 23", color: "#5C2E0B", ml: 45, isReal: true, abv: 40 },
+      { id: "rum-santa-teresa", name: "Santa Teresa", color: "#7A3803", ml: 45, isReal: true, abv: 40 },
+      { id: "rum-kraken", name: "Kraken", color: "#1A0B02", ml: 45, isReal: true, abv: 47 },
+      { id: "rum-pampero", name: "Pampero Anniv.", color: "#4A2000", ml: 45, isReal: true, abv: 40 },
+      { id: "rum-arcane", name: "Arcane", color: "#A0522D", ml: 45, isReal: true, abv: 40 },
+      { id: "rum-torquoise", name: "Torquoise Bay", color: "#CD7F32", ml: 45, isReal: true, abv: 40 },
+      { id: "rum-anacaona", name: "Anacaona", color: "#B87333", ml: 45, isReal: true, abv: 40 },
+      { id: "rum-yellow-snake", name: "Yellow Snake", color: "#DAA520", ml: 45, isReal: true, abv: 40 },
+      { id: "rum-pasador-pas", name: "El Pasador Pasión", color: "#8B4513", ml: 45, isReal: true, abv: 40 },
+      { id: "rum-pasador-xo", name: "El Pasador XO", color: "#5C2E0B", ml: 45, isReal: true, abv: 40 },
+      { id: "rum-bocatheva", name: "Bocathéva", color: "#C67100", ml: 45, isReal: true, abv: 45 },
+      { id: "rum-cocco", name: "Rum cocco", color: "#FFFFFF", ml: 45, isReal: true, abv: 21 },
+    ],
+  },
+  {
+    group: "Liquori",
+    emoji: "🍸",
+    items: [
+      { id: "aperol", name: "Aperol", color: "#FF5500", ml: 30, isReal: true, abv: 11 },
+      { id: "campari", name: "Campari", color: "#CC0000", ml: 30, isReal: true, abv: 25 },
+      { id: "cointreau", name: "Triple Sec", color: "#FFFFFF", ml: 30, isReal: true, abv: 40 },
+      { id: "limoncello", name: "Limoncello", color: "#FFEA00", ml: 30, isReal: true, abv: 30 },
+      { id: "prosecco", name: "Prosecco", color: "#F3E5AB", ml: 60, isReal: true, abv: 11 },
+      { id: "vermouth-r", name: "Vermouth rosso", color: "#4A0E1A", ml: 45, isReal: true, abv: 16 },
+    ],
+  },
+  {
+    group: "Amari",
+    emoji: "🍂",
+    items: [
+      { id: "amaro-del-capo", name: "Amaro Del Capo", color: "#2E1202", ml: 30, isReal: true, abv: 35 },
+      { id: "averna", name: "Averna", color: "#1F0901", ml: 30, isReal: true, abv: 29 },
+      { id: "baileys", name: "Baileys", color: "#D1B28C", ml: 30, isReal: true, abv: 17 },
+      { id: "branca-menta", name: "Branca Menta", color: "#1A1108", ml: 30, isReal: true, abv: 28 },
+      { id: "cynar", name: "Cynar", color: "#261408", ml: 30, isReal: true, abv: 16 },
+      { id: "fernet", name: "Fernet Branca", color: "#110803", ml: 30, isReal: true, abv: 39 },
+      { id: "filuferru", name: "Filuferru", color: "#FFFFFF", ml: 30, isReal: true, abv: 40 },
+      { id: "ramazzotti", name: "Ramazzotti", color: "#220D04", ml: 30, isReal: true, abv: 30 },
+      { id: "liq-pistacchio", name: "Liquore Pistacchio", color: "#93C572", ml: 30, isReal: true, abv: 17 },
+      { id: "liq-limone", name: "Liquore Limone", color: "#FFE600", ml: 30, isReal: true, abv: 25 },
+      { id: "jagermeister", name: "Jägermeister", color: "#1A0A02", ml: 30, isReal: true, abv: 35 },
+      { id: "liquirizia", name: "Liquirizia", color: "#0A0A0A", ml: 30, isReal: true, abv: 25 },
+      { id: "mirto", name: "Mirto", color: "#4B0028", ml: 30, isReal: true, abv: 30 },
+      { id: "mirto-bianco", name: "Mirto Bianco", color: "#F5F5DC", ml: 30, isReal: true, abv: 28 },
+      { id: "montenegro", name: "Montenegro", color: "#8B4513", ml: 30, isReal: true, abv: 23 },
+      { id: "sambuca", name: "Sambuca", color: "#FFFFFF", ml: 30, isReal: true, abv: 38 },
+      { id: "amaro-lucano", name: "Amaro Lucano", color: "#241005", ml: 30, isReal: true, abv: 28 },
+      { id: "liq-frutti-rossi", name: "Liquore Frutti Rossi", color: "#8B0000", ml: 30, isReal: true, abv: 20 },
+      { id: "liq-mango", name: "Liquore Mango", color: "#FFB347", ml: 30, isReal: true, abv: 20 },
+    ],
+  },
+  {
+    group: "Grappe",
+    emoji: "🍇",
+    items: [
+      { id: "grappa-fragolino", name: "Nonino Fragolino", color: "#FFFFFF", ml: 30, isReal: true, abv: 38 },
+      { id: "grappa-bianca", name: "Nonino Bianca", color: "#FFFFFF", ml: 30, isReal: true, abv: 41 },
+      { id: "grappa-malvisano", name: "Nonino Malvisano", color: "#FFFFFF", ml: 30, isReal: true, abv: 41 },
+      { id: "grappa-gioiello", name: "Nonino Gioiello", color: "#FFFFFF", ml: 30, isReal: true, abv: 38 },
+      { id: "grappa-williams", name: "Nonino Williams", color: "#FFFFFF", ml: 30, isReal: true, abv: 43 },
+      { id: "grappa-vendemmia", name: "Vendemmia Riserva", color: "#CD853F", ml: 30, isReal: true, abv: 41 },
+      { id: "grappa-prosecco", name: "Prosecco Riserva", color: "#D4AF37", ml: 30, isReal: true, abv: 41 },
+      { id: "grappa-ginepro", name: "Ginepro", color: "#FFFFFF", ml: 30, isReal: true, abv: 43 },
+      { id: "grappa-anfora", name: "Anfora", color: "#FFFFFF", ml: 30, isReal: true, abv: 43 },
+      { id: "grappa-barricata", name: "Nonino Barricata", color: "#B87333", ml: 30, isReal: true, abv: 41 },
+      { id: "grappa-riserva", name: "Nonino Riserva 5", color: "#8B4513", ml: 30, isReal: true, abv: 43 },
+      { id: "grappa-riserva-8", name: "Nonino Riserva 8", color: "#6B3E11", ml: 30, isReal: true, abv: 43 },
+      { id: "grappa-gewurz", name: "Giare Gewürztraminer", color: "#D4A017", ml: 30, isReal: true, abv: 41 },
+      { id: "grappa-amarone", name: "Giare Amarone", color: "#8B4513", ml: 30, isReal: true, abv: 41 },
+      { id: "grappa-18lune", name: "18 Lune Whiskey", color: "#CD7F32", ml: 30, isReal: true, abv: 41 },
+      { id: "grappa-18lune-rum", name: "18 Lune Rum", color: "#A0522D", ml: 30, isReal: true, abv: 41 },
     ],
   },
 ];
@@ -415,9 +562,9 @@ function strengthOf(poured: { ing: Ingredient; ml: number }[]) {
  * EXTREME → wpada w głęboką czerwień. Wyraźniejszy, ale wciąż stonowany. */
 function strengthBg(v: number, extreme = false): string {
   const cool = new THREE.Color("#14121a");
-  const warm = new THREE.Color("#3a1d12");
-  const out = cool.clone().lerp(warm, clamp01(v));
-  if (extreme) out.lerp(new THREE.Color("#3a0d0d"), 0.6);
+  const warm = new THREE.Color("#241815");
+  const out = cool.clone().lerp(warm, clamp01(v * 0.6));
+  if (extreme) out.lerp(new THREE.Color("#2a1010"), 0.35);
   return `#${out.getHexString()}`;
 }
 
@@ -559,6 +706,41 @@ function makeLabelTexture(name: string, color: string, tag: string): THREE.Canva
   _labelTexCache.set(key, t);
   return t;
 }
+
+// Owijka puszki — pełnokolorowa tekstura korpusu (kolor napoju + nazwa pionowo).
+const _canTexCache = new Map<string, THREE.CanvasTexture>();
+function makeCanTexture(name: string, color: string): THREE.CanvasTexture {
+  const key = `${name}|${color}`;
+  const cached = _canTexCache.get(key);
+  if (cached) return cached;
+  const c = document.createElement("canvas");
+  c.width = 1024; c.height = 512;
+  const ctx = c.getContext("2d")!;
+  // tło = kolor napoju z pionowym gradientem (połysk aluminium)
+  const g = ctx.createLinearGradient(0, 0, 0, 512);
+  const col = new THREE.Color(color);
+  const light = col.clone().lerp(new THREE.Color("#ffffff"), 0.35).getStyle();
+  const dark = col.clone().lerp(new THREE.Color("#000000"), 0.35).getStyle();
+  g.addColorStop(0, light); g.addColorStop(0.5, color); g.addColorStop(1, dark);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, 1024, 512);
+  // pasy akcentu góra/dół
+  ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.fillRect(0, 70, 1024, 10); ctx.fillRect(0, 432, 1024, 10);
+  // nazwa — wyśrodkowana, duża, biała z obwódką (powtórzona 2x wokół puszki)
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  const draw = (cx: number) => {
+    ctx.font = "800 72px Georgia, serif";
+    ctx.lineWidth = 8; ctx.strokeStyle = "rgba(0,0,0,0.45)";
+    ctx.fillStyle = "#ffffff";
+    const up = name.toUpperCase();
+    ctx.strokeText(up, cx, 256); ctx.fillText(up, cx, 256);
+  };
+  draw(256); draw(768);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.flipY = false;
+  _canTexCache.set(key, t);
+  return t;
+}
 const BarRoom = React.forwardRef<THREE.Group>(function BarRoom(_props, ref) {
   const floorTex = useMemo(() => makeFloorTexture(), []);
   const wallTex = useMemo(() => makeWallTexture(), []);
@@ -682,9 +864,9 @@ function Bottle({
     [clip], // eslint-disable-line react-hooks/exhaustive-deps
   );
   const glassMat = useMemo(
-    () => new THREE.MeshPhysicalMaterial({
-      color: "#ffffff", roughness: 0.05, metalness: 0, transmission: 0.92,
-      transparent: true, opacity: 0.5, ior: 1.45, thickness: 0.4, envMapIntensity: 1.1,
+    () => new THREE.MeshStandardMaterial({
+      color: "#b8d8e8", roughness: 0.08, metalness: 0.05,
+      transparent: true, opacity: 0.5, depthWrite: false, side: THREE.FrontSide,
     }),
     [],
   );
@@ -822,9 +1004,9 @@ function Glass({
   const liquidRef = useRef<THREE.Mesh>(null!);
 
   const glassMat = useMemo(
-    () => new THREE.MeshPhysicalMaterial({
-      color: "#ffffff", roughness: 0.03, metalness: 0, transmission: 0.95,
-      transparent: true, opacity: 0.42, ior: 1.5, thickness: 0.5, envMapIntensity: 1.2,
+    () => new THREE.MeshStandardMaterial({
+      color: "#b8d8e8", roughness: 0.06, metalness: 0.05,
+      transparent: true, opacity: 0.45, depthWrite: false, side: THREE.FrontSide,
     }),
     [],
   );
@@ -886,7 +1068,7 @@ function Stream({
   return (
     <group ref={groupRef} position={[0, CONFIG.streamTop, 0]} scale={[1, 0, 1]}>
       <mesh position={[0, -CONFIG.streamHeight / 2, 0]}>
-        <cylinderGeometry args={[0.028, 0.05, CONFIG.streamHeight, 12, 1, true]} />
+        <cylinderGeometry args={[0.015, 0.03, CONFIG.streamHeight, 8, 1, true]} />
         <meshStandardMaterial
           ref={matRef} color={initialColor} transparent opacity={0.85} roughness={0.1}
           emissive={new THREE.Color(initialColor)} emissiveIntensity={0.12} side={THREE.DoubleSide}
@@ -900,8 +1082,9 @@ function Stream({
  * InSceneGlassPour — model szklanki + animacja nalewania NA GŁÓWNEJ SCENIE
  * (w miejscu szejkera). Nie rusza kamery sceny; scrubuje wspólny mixer.
  * ──────────────────────────────────────────────────────────────────────── */
-function InSceneGlassPour({ url, withIce, color, onReveal, onDone }: {
+function InSceneGlassPour({ url, withIce, color, onReveal, onDone, onModelReady }: {
   url: string; withIce: boolean; color: string; onReveal: () => void; onDone: () => void;
+  onModelReady?: (root: THREE.Group | null) => void;
 }) {
   const { scene, animations } = useGLTF(url) as unknown as GLTF;
   const rootRef = useRef<THREE.Group>(null!);
@@ -909,11 +1092,21 @@ function InSceneGlassPour({ url, withIce, color, onReveal, onDone }: {
   const cloned = useMemo(() => scene.clone(true), [scene]);
   const { actions, mixer } = useAnimations(animations, rootRef);
   const liquidMesh = useMemo(() => cloned.getObjectByName("liguid") as THREE.Mesh | null, [cloned]);
+  const onModelReadyRef = useRef(onModelReady);
+  onModelReadyRef.current = onModelReady; // stabilne — bez re-runów efektu
+  const colorRefLocal = useRef(color);
+  colorRefLocal.current = color; // kolor startowy bez wrzucania do deps (zmiany łapie osobny efekt)
 
+  // Setup IDEMPOTENTNY (deps tylko [cloned]) — inaczej każdy re-render (np. klawiatura)
+  // ponownie skalował już przeskalowaną szklankę → „rosła/malała".
   useLayoutEffect(() => {
     const root = rootRef.current;
     if (!root) return;
+    cloned.scale.setScalar(1); cloned.position.set(0, 0, 0); cloned.rotation.set(0, 0, 0); // reset
+    const toRemove: THREE.Object3D[] = [];
     cloned.traverse((o) => {
+      // ukryj wbudowany shaker w modelu szklanki (mamy własny w głównej scenie)
+      if (/shaker/i.test(o.name)) { toRemove.push(o); return; }
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
       mesh.castShadow = true; mesh.receiveShadow = true;
@@ -925,24 +1118,29 @@ function InSceneGlassPour({ url, withIce, color, onReveal, onDone }: {
         if (mesh.name === "szklanka") { mat.transparent = true; mat.depthWrite = false; mat.opacity = Math.min(mat.opacity ?? 1, 0.4); }
       }
     });
+    // Ukryj wbudowany shaker (visible=false, NIE usuwaj — nie psuje animacji/bounding box)
+    toRemove.forEach((o) => { o.visible = false; });
     if (liquidMesh && liquidMesh.material) {
       const lm = (liquidMesh.material as THREE.MeshStandardMaterial).clone();
       lm.transparent = false; lm.side = THREE.DoubleSide;
-      lm.color.set(color); lm.emissive = new THREE.Color(color); lm.emissiveIntensity = 0.3;
+      lm.color.set(colorRefLocal.current); lm.emissive = new THREE.Color(colorRefLocal.current); lm.emissiveIntensity = 0.3;
       liquidMesh.material = lm;
     }
-    // skala + wyśrodkowanie na szklance, ustaw w miejscu szejkera (środek sceny)
-    const fullBox = new THREE.Box3().setFromObject(cloned);
-    const fullSize = new THREE.Vector3(); fullBox.getSize(fullSize);
-    const s = CONFIG.shakerHeight / (fullSize.y || 1);
+    cloned.updateMatrixWorld(true);
+    const glassObj0 = cloned.getObjectByName("szklanka") ?? cloned;
+    const gSize = new THREE.Vector3(); new THREE.Box3().setFromObject(glassObj0).getSize(gSize);
+    const s = 1.8 / (Math.max(gSize.x, gSize.y, gSize.z) || 1); // powiększona szklanka — dobrze widoczna na ekranie
     cloned.scale.setScalar(s);
-    const glassObj = cloned.getObjectByName("szklanka") ?? cloned;
-    const gBox = new THREE.Box3().setFromObject(glassObj);
-    const gCenter = new THREE.Vector3(); gBox.getCenter(gCenter);
-    cloned.position.sub(gCenter);
-    root.position.set(CONFIG.shakerRest.x, CONFIG.shakerRest.y + 0.2, CONFIG.shakerRest.z);
+    cloned.updateMatrixWorld(true);
+    const gCenter = new THREE.Vector3(); new THREE.Box3().setFromObject(glassObj0).getCenter(gCenter);
+    cloned.position.sub(gCenter); // origin = ŚRODEK szklanki → spin wokół własnej osi
+    root.position.set(CONFIG.shakerRest.x, GLASS_POUR_Y, CONFIG.shakerRest.z);
+    root.rotation.set(0, 0, 0);
+    onModelReadyRef.current?.(root);
     invalidate();
-  }, [cloned, liquidMesh, color, invalidate]);
+    return () => onModelReadyRef.current?.(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cloned, invalidate]);
 
   useEffect(() => {
     if (!liquidMesh) return;
@@ -950,6 +1148,16 @@ function InSceneGlassPour({ url, withIce, color, onReveal, onDone }: {
     lm.color.set(color); lm.emissive.set(color); lm.needsUpdate = true;
     invalidate();
   }, [liquidMesh, color, invalidate]);
+
+  // „Bez lodu" → schowaj kostki lodu i łopatkę (Ice Cube*, Ice Scoop). Dzięki temu
+  // wysoka szklanka, która ma jedną wspólną animację cieczy, wygląda poprawnie w
+  // obu trybach (z lodem / bez), jak niska szklanka.
+  useEffect(() => {
+    cloned.traverse((o) => {
+      if (/ice|scoop/i.test(o.name)) o.visible = withIce;
+    });
+    invalidate();
+  }, [withIce, cloned, invalidate]);
 
   useEffect(() => {
     const list = Object.values(actions).filter(Boolean) as THREE.AnimationAction[];
@@ -970,7 +1178,7 @@ function InSceneGlassPour({ url, withIce, color, onReveal, onDone }: {
     onReveal();
     const scrub = { t: start };
     const tween = gsap.to(scrub, {
-      t: end, duration: (end - start) * 1.1, ease: "power1.inOut",
+      t: end, duration: Math.max(3.5, end - start), ease: "power2.inOut", // wolniejsza, bardziej kinowa
       onUpdate: () => setTime(scrub.t),
       onComplete: onDone,
     });
@@ -978,7 +1186,14 @@ function InSceneGlassPour({ url, withIce, color, onReveal, onDone }: {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [withIce, url]);
 
-  return <group ref={rootRef}><primitive object={cloned} /></group>;
+  // Delikatne, miękkie doświetlenie szklanki (jak w reszcie sceny — bez ostrych świateł).
+  return (
+    <group ref={rootRef}>
+      <primitive object={cloned} />
+      <directionalLight position={[2, 4, 3]} intensity={0.4} />
+      <directionalLight position={[-2, 3, 2]} intensity={0.2} color="#bfe6ff" />
+    </group>
+  );
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -992,7 +1207,7 @@ function Scene({
 }: {
   initialColor: string;
   onReady: (api: SceneApi) => void;
-  glassPour: { open: boolean; url: string; withIce: boolean; color: string; onReveal: () => void; onDone: () => void } | null;
+  glassPour: { open: boolean; url: string; withIce: boolean; color: string; onReveal: () => void; onDone: () => void; onModelReady?: (root: THREE.Group | null) => void } | null;
 }) {
   const { camera, gl, invalidate, pointer } = useThree();
 
@@ -1084,9 +1299,10 @@ function Scene({
       getShakerMouthNDC: () => {
         const sh = handles.current.shaker;
         if (!sh) return null;
-        // wlot szejkera = świat: pozycja roota + ~połowa wysokości szejkera w górę
+        // wlot szejkera = świat: środek szejkera (ciecz wpada do środka)
         const box = new THREE.Box3().setFromObject(sh.root);
-        const mouth = new THREE.Vector3((box.min.x + box.max.x) / 2, box.max.y - 0.15, (box.min.z + box.max.z) / 2);
+        const midY = box.min.y + (box.max.y - box.min.y) * 0.7;
+        const mouth = new THREE.Vector3((box.min.x + box.max.x) / 2, midY, (box.min.z + box.max.z) / 2);
         mouth.project(camera as THREE.PerspectiveCamera); // → NDC (-1..1)
         return { x: mouth.x, y: mouth.y };
       },
@@ -1207,9 +1423,9 @@ function Scene({
 
   return (
     <>
-      <ambientLight intensity={0.55} />
-      <directionalLight position={[4, 9, 6]} intensity={2.6} castShadow shadow-mapSize={[1024, 1024]} />
-      <directionalLight position={[-6, 4, -4]} intensity={0.6} color="#8fd0ff" />
+      <ambientLight intensity={0.6} />
+      <directionalLight position={[4, 9, 6]} intensity={1.45} castShadow shadow-mapSize={[1024, 1024]} />
+      <directionalLight position={[-6, 4, -4]} intensity={0.4} color="#8fd0ff" />
       <Suspense fallback={null}>
         <BarRoom ref={roomRef} />
         <FloorPuddle ref={puddleRef} />
@@ -1226,9 +1442,13 @@ function Scene({
         {glassPour && glassPour.open && (
           <InSceneGlassPour
             url={glassPour.url} withIce={glassPour.withIce} color={glassPour.color}
-            onReveal={glassPour.onReveal} onDone={glassPour.onDone}
+            onReveal={glassPour.onReveal} onDone={glassPour.onDone} onModelReady={glassPour.onModelReady}
           />
         )}
+      </Suspense>
+      {/* Environment (HDR z sieci) w OSOBNYM Suspense — nie blokuje montażu modeli/onReady,
+          gdy sieć jest wolna. Reflekty dojdą gdy się załadują. */}
+      <Suspense fallback={null}>
         <Environment preset="city" />
       </Suspense>
       <ContactShadows position={[0, -3.48, 0]} opacity={0.55} scale={14} blur={2.2} far={6} color="#000" />
@@ -1241,7 +1461,8 @@ function Scene({
  * ──────────────────────────────────────────────────────────────────────── */
 type Poured = { ing: Ingredient; ml: number };
 type Stage = "build" | "shaking" | "pickGlass" | "glassReady";
-type PourReq = { id: string; color: string; side: "left" | "right"; key: number; ox: number; oy: number; tx: number; ty: number };
+type PourReq = { id: string; color: string; side: "left" | "right"; key: number; ox: number; oy: number; tx: number; ty: number; mode: "hold" | "tap" };
+const POUR_RATE = 35; // ml/s
 
 /* czy składnik należy do alkoholi (prawa kolumna) — decyduje o stronie nalewania */
 function isAlcoholId(id: string): boolean {
@@ -1260,8 +1481,12 @@ function CocktailExperience() {
   const grainRef = useRef<HTMLDivElement>(null!);
   const stepsRef = useRef<HTMLDivElement>(null!);
   const communityRef = useRef<HTMLElement>(null!);
+  const popWrapRef = useRef<HTMLDivElement>(null!);   // neonowy „pop" przy scrollu (strzałka + nazwa sekcji)
+  const popArrowRef = useRef<HTMLSpanElement>(null!);
+  const popLabelRef = useRef<HTMLSpanElement>(null!);
 
   const sceneApiRef = useRef<SceneApi | null>(null);
+  const inSceneGlassRef = useRef<THREE.Group | null>(null); // root modelu szklanki (in-scene) — do wyjścia scrollem
   const [sceneReady, setSceneReady] = useState(false);
   const [inView, setInView] = useState(false); // mount Canvas tylko gdy sekcja blisko viewportu
 
@@ -1271,7 +1496,7 @@ function CocktailExperience() {
   const [pourReq, setPourReq] = useState<PourReq | null>(null);
   const [openSide, setOpenSide] = useState<"left" | "right" | null>(null);
   const [chosenGlass, setChosenGlass] = useState<GlassDef | null>(null);
-  const [withIce, setWithIce] = useState(false);
+  const [withIce, setWithIce] = useState(true);
   const [glassPourOpen, setGlassPourOpen] = useState(false);
   const [glassFilled, setGlassFilled] = useState(false); // szklanka zostaje napełniona na środku
   const [claimed, setClaimed] = useState(false);
@@ -1280,6 +1505,17 @@ function CocktailExperience() {
   const [customerName, setCustomerName] = useState("");
   const busyRef = useRef(false);
   const pourKey = useRef(0);
+  const pourDoseRef = useRef(0); // ml nalane w bieżącym laniu (rośnie podczas trzymania)
+  const gaugeApiRef = useRef<{ set: (frac: number, color?: string) => void; show: (b: boolean) => void } | null>(null);
+
+  // Body attr — gdy trwa lanie/animacja (nie "build"), chowamy mobilne UI (info, slide) poza sceną
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const active = pouring || stage !== "build";
+    if (active) document.body.dataset.cxPouring = "1";
+    else delete document.body.dataset.cxPouring;
+  }, [pouring, stage]);
+  useEffect(() => () => { if (typeof document !== "undefined") { delete document.body.dataset.cxPouring; delete document.body.dataset.cxScrolling; } }, []);
 
   const mixedColor = useMemo(
     () => mixColorsWeighted(poured), [poured],
@@ -1304,17 +1540,31 @@ function CocktailExperience() {
     }
   }, [mixedColor, strength.v, strength.extreme]);
 
-  const onSceneReady = useCallback((api: SceneApi) => { sceneApiRef.current = api; setSceneReady(true); }, []);
+  const onSceneReady = useCallback((api: SceneApi) => {
+    sceneApiRef.current = api;
+    setSceneReady(true);
+    // sygnał dla preloadera: ciężka scena 3D gotowa (może domykać kurtynę)
+    if (typeof window !== "undefined") {
+      (window as unknown as { __cxSceneReady?: boolean }).__cxSceneReady = true;
+      window.dispatchEvent(new Event("cx-scene-ready"));
+    }
+  }, []);
 
-  // LAZY: montuj ciężki Canvas dopiero gdy sekcja zbliża się do viewportu (rootMargin 600px)
+  // WARM-MOUNT: buduj ciężką scenę 3D OD RAZU (już podczas preloadera), żeby kreator
+  // był gotowy zanim użytkownik dojedzie scrollem — bez zacięcia „przy wejściu".
+  // IntersectionObserver zostaje jako fallback gdyby idle nie zdążył.
   useEffect(() => {
     const el = rootRef.current;
     if (!el || inView) return;
+    const w = window as unknown as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
+    const idleId = w.requestIdleCallback
+      ? w.requestIdleCallback(() => setInView(true), { timeout: 1200 })
+      : (setTimeout(() => setInView(true), 300) as unknown as number);
     const io = new IntersectionObserver((entries) => {
       if (entries.some((e) => e.isIntersecting)) { setInView(true); io.disconnect(); }
-    }, { rootMargin: "600px 0px 600px 0px" });
+    }, { rootMargin: "1200px 0px 1200px 0px" });
     io.observe(el);
-    return () => io.disconnect();
+    return () => { io.disconnect(); if (w.cancelIdleCallback) w.cancelIdleCallback(idleId); else clearTimeout(idleId); };
   }, [inView]);
 
   const SHAKER_CAP = 360; // ml — pojemność wizualna shakera
@@ -1347,51 +1597,84 @@ function CocktailExperience() {
   /* klik składnika → kinowa animacja: butelka rośnie na środku, tło blur,
      dolne menu chowa się, korek wystrzeliwuje, potem butelka kurczy się i
      przesuwa na swoją stronę szejkera, przechyla i leje strumień do środka. */
-  const pourIngredient = useCallback((ing: Ingredient, origin?: { x: number; y: number }) => {
+  const pourIngredient = useCallback((ing: Ingredient, origin?: { x: number; y: number }, mode: "hold" | "tap" = "hold") => {
     const api = sceneApiRef.current;
     if (!api || busyRef.current || stageRef.current !== "build") return;
-
     const prevMl = poured.reduce((s, p) => s + p.ml, 0);
-    const fillTarget = Math.min(0.92, 0.18 + (prevMl + ing.ml) / SHAKER_CAP);
-    const nextColor = mixColorsWeighted([...poured, { ing, ml: ing.ml }]);
+    if (prevMl >= SHAKER_CAP) return; // szejker pełny
 
     busyRef.current = true;
     setPouring(true);
-    setOpenSide(null); // schowaj dolny drawer kategorii
-    api.setShakerColor(nextColor);
+    setOpenSide(null); // schowaj dolny drawer kategorii (menu z butelkami chowa się)
     api.setStreamColor(ing.color);
 
-    // overlay sam wykona pełną animację; my tu sterujemy napełnianiem szejkera
-    // (dolewamy w fazie wylewania overlaya — ~1.05s) i finalizujemy stan.
     pourKey.current += 1;
     const side: "left" | "right" = isAlcoholId(ing.id) ? "right" : "left";
     const ox = origin?.x ?? window.innerWidth / 2;
     const oy = origin?.y ?? window.innerHeight / 2;
     // wlot szejkera w NDC (ten sam prostokąt ekranu co overlay) → idealna kalibracja celu
     const mouth = api.getShakerMouthNDC?.() ?? { x: 0, y: -0.35 };
-    setPourReq({ id: ing.id, color: ing.color, side, key: pourKey.current, ox, oy, tx: mouth.x, ty: mouth.y });
-
-    // strumień w SCENIE napełnia szejker w fazie wylewania overlaya (zgranie z head/tail)
-    gsap.delayedCall(2.6, () => {
-      api.setStreamColor(nextColor);
-      gsap.to(api.shakerFill, { v: fillTarget, duration: 0.7, ease: "power1.out", onUpdate: api.invalidate });
-      // lekki "odrzut" szejkera przy trafieniu strumienia
-      gsap.fromTo(api.shakerRoot.position, { y: api.shakerRoot.position.y + 0.06 },
-        { y: api.shakerRoot.position.y, duration: 0.45, ease: "elastic.out(1,0.4)", onUpdate: api.invalidate });
-    });
+    pourDoseRef.current = 0;
+    setPourReq({ id: ing.id, color: ing.color, side, key: pourKey.current, ox, oy, tx: mouth.x, ty: mouth.y, mode });
+    // Napełnianie szejkera prowadzi efekt [pourReq] — reaguje na 'cx-pour-begin'/'cx-pour-release'.
   }, [poured]);
 
-  /* overlay zakończył animację → dopisz dawkę i zwolnij blokadę */
+  /* Napełnianie szejkera: startuje gdy strumień dociera ('cx-pour-begin'),
+     trwa dopóki trzyma (hold) albo do pełna; jednorazowo (tap) leje 1 dawkę.
+     'cx-pour-release' = użytkownik puścił LUB osiągnięto pojemność. */
+  useEffect(() => {
+    if (!pourReq) return;
+    const api = sceneApiRef.current;
+    const ing = ingById(pourReq.id);
+    if (!api || !ing) return;
+    const prevMl = poured.reduce((s, p) => s + p.ml, 0);
+    const remaining = Math.max(0, SHAKER_CAP - prevMl);
+    const proxy = { ml: prevMl };
+    let tw: gsap.core.Tween | null = null;
+    pourDoseRef.current = 0;
+
+    const onBegin = () => {
+      gaugeApiRef.current?.show(true);
+      const targetMl = prevMl + (pourReq.mode === "tap" ? Math.min(ing.ml, remaining) : remaining);
+      const dur = Math.max(0.25, (targetMl - prevMl) / POUR_RATE);
+      tw = gsap.to(proxy, {
+        ml: targetMl, duration: dur, ease: pourReq.mode === "tap" ? "power1.out" : "none",
+        onUpdate: () => {
+          pourDoseRef.current = proxy.ml - prevMl;
+          api.shakerFill.v = Math.min(0.92, 0.18 + (proxy.ml / SHAKER_CAP) * 0.74);
+          const col = mixColorsWeighted([...poured, { ing, ml: pourDoseRef.current }]);
+          api.setShakerColor(col); api.setStreamColor(col);
+          // miarka: segment bieżącego trunku rośnie w JEGO kolorze (nie zmieszanym)
+          gaugeApiRef.current?.set(pourDoseRef.current, ing.color);
+          api.invalidate();
+        },
+        onComplete: () => { window.dispatchEvent(new Event("cx-pour-release")); }, // dawka/pełne → stop
+      });
+    };
+    const onRelease = () => { if (tw) { tw.kill(); tw = null; } };
+
+    window.addEventListener("cx-pour-begin", onBegin);
+    window.addEventListener("cx-pour-release", onRelease);
+    return () => {
+      window.removeEventListener("cx-pour-begin", onBegin);
+      window.removeEventListener("cx-pour-release", onRelease);
+      if (tw) tw.kill();
+    };
+  }, [pourReq, poured]);
+
+  /* overlay zakończył animację → dopisz nalaną dawkę i zwolnij blokadę */
   const onPourDone = useCallback(() => {
     setPourReq((req) => {
       if (req) {
         const ing = ingById(req.id);
-        if (ing) setPoured((prev) => addMlPure(prev, ing, ing.ml));
+        if (ing && pourDoseRef.current > 0.5) setPoured((prev) => addMlPure(prev, ing, pourDoseRef.current));
       }
       return null;
     });
+    pourDoseRef.current = 0;
     busyRef.current = false;
     setPouring(false);
+    gaugeApiRef.current?.show(false);
     sceneApiRef.current?.invalidate();
   }, []);
 
@@ -1402,6 +1685,10 @@ function CocktailExperience() {
     busyRef.current = true;
     setStage("shaking");
 
+    // Zablokuj scroll strony podczas animacji shake
+    if (typeof window !== "undefined" && (window as any).lenis) (window as any).lenis.stop();
+    document.body.style.overflow = "hidden";
+
     const top = api.shakerTop;
     top.visible = true;
     const restY = api.topRestY;
@@ -1411,7 +1698,12 @@ function CocktailExperience() {
 
     const tl = gsap.timeline({
       onUpdate: api.invalidate,
-      onComplete: () => { busyRef.current = false; setStage("pickGlass"); api.invalidate(); },
+      onComplete: () => {
+        busyRef.current = false; setStage("pickGlass"); api.invalidate();
+        // Odblokuj scroll po zakończeniu animacji
+        if (typeof window !== "undefined" && (window as any).lenis) (window as any).lenis.start();
+        document.body.style.overflow = "";
+      },
     });
     tl.to(top.position, { y: restY, duration: 0.3, ease: "power4.in" }, 0)
       .to(api.shakerRoot.position, { y: CONFIG.shakerRest.y - 0.14, duration: 0.08, ease: "power2.out" }, 0.3)
@@ -1466,6 +1758,10 @@ function CocktailExperience() {
     const api = sceneApiRef.current;
     setPoured([]); setChosenGlass(null); setDrinkName(""); setCustomerName(""); setStage("build");
     setGlassPourOpen(false); setGlassFilled(false); setClaimed(false); setConfetti(0);
+    inSceneGlassRef.current = null;
+    // Safety: odblokuj scroll (mógł zostać zablokowany przez doShake)
+    if (typeof window !== "undefined" && (window as any).lenis) (window as any).lenis.start();
+    document.body.style.overflow = "";
     if (api) {
       api.shakerRoot.visible = true; api.shakerTop.visible = false; api.glassRoot.visible = false;
       gsap.set(api.shakerRoot.position, { x: CONFIG.shakerRest.x, y: CONFIG.shakerRest.y, z: 0 });
@@ -1481,6 +1777,7 @@ function CocktailExperience() {
       const api = sceneApiRef.current;
       if (!api) return;
       const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      const isMobileCx = window.innerWidth < 768;
 
       gsap.set(api.bottle.position, { x: CONFIG.bottleDock.x, y: CONFIG.bottleDock.y, z: CONFIG.bottleDock.z });
       api.bottle.scale.setScalar(CONFIG.bottleDock.s);
@@ -1520,7 +1817,9 @@ function CocktailExperience() {
       };
 
       // ile fly-inu wykonujemy JESZCZE przed pinem (podczas wjazdu sekcji od dołu)
-      const K_APPROACH = 0.6;
+      // Na mobile kończymy CAŁY wlot zanim sekcja zostanie przypięta → szejker jest
+      // już wycentrowany gdy sekcja wypełni ekran (brak efektu "podwójnej animacji").
+      const K_APPROACH = isMobileCx ? 1 : 0.6;
 
       const applyEnter = (e: number) => {
         const k = lerp(K_APPROACH, 1, easeOutCubic(clamp01(e)));
@@ -1540,10 +1839,22 @@ function CocktailExperience() {
         dom(tableRef, { yPercent: 150 * easeInCubic(clamp01(e / 0.25)), opacity: 1 - smooth(clamp01(e / 0.2)) });
 
         if (st === "glassReady") {
-          const t = e;
-          api.glassRoot.rotation.y = Math.PI * 2.5 * t;
-          api.glassRoot.rotation.z = deg(15) * smooth(clamp01(t * 1.4));
-          api.glassRoot.position.x = lerp(-0.2, -9, easeInCubic(t));
+          // Szklanka kręci się i wyjeżdża w LEWO przy scrollu w dół.
+          // Przy scrollu w górę (scrub wstecz) wraca naturalnie z lewej.
+          api.shakerRoot.visible = false; // shaker NIE pojawia się podczas wyjścia szklanki
+          const g = inSceneGlassRef.current;
+          if (g) {
+            const t = easeInCubic(e);
+            // Ukryj łopatkę/lód podczas wylotu — obraca się tylko szklanka z cieczą
+            g.traverse((o: THREE.Object3D) => {
+              if (/ice|scoop/i.test(o.name)) o.visible = e < 0.05;
+            });
+            g.rotation.y = -Math.PI * 2.5 * e;              // obrót w prawo
+            g.rotation.z = deg(-10) * smooth(clamp01(e * 1.4));
+            g.position.x = lerp(CONFIG.shakerRest.x, -11, t);  // wylot w lewo
+            g.position.y = GLASS_POUR_Y - 0.2 * smooth(e);
+          }
+          dom(grainRef, { opacity: 0.16 * clamp01((e - 0.7) / 0.2) });
           return;
         }
         if (st === "shaking" || st === "pickGlass") {
@@ -1593,19 +1904,30 @@ function CocktailExperience() {
         trigger: scrollRef.current,
         start: "top top",
         end: "bottom bottom",
-        scrub: reduce ? 0.6 : true,
+        scrub: reduce ? 0.6 : (isMobileCx ? 0.8 : true),
         invalidateOnRefresh: true,
         onRefresh: () => api.invalidate(),
         onUpdate: (self) => {
           const p = self.progress;
+          // Na mobile faza "enter" jest minimalna — szejker wjechał już podczas approach,
+          // więc pin od razu pokazuje wyśrodkowany szejker (brak ponownej animacji = brak "przeskoku").
+          const enterEnd = isMobileCx ? 0.02 : CONFIG.enterEnd;
           let np: "enter" | "hold" | "exit";
-          if (p < CONFIG.enterEnd) np = "enter";
+          if (p < enterEnd) np = "enter";
           else if (p < CONFIG.exitStart) np = "hold";
           else np = "exit";
           if (np !== phase) {
             phase = np;
+            // body attr — gdy NIE jesteśmy w fazie "hold" (czyli wjazd/wyjazd sekcji),
+            // chowamy mobilne UI (FAB, slide, info) — żeby nie wisiały podczas scrollu/animacji
+            if (typeof document !== "undefined") {
+              if (np === "hold") delete document.body.dataset.cxScrolling;
+              else document.body.dataset.cxScrolling = "1";
+            }
             if (phase === "hold") {
-              api.shakerRoot.visible = true;
+              // Nie pokazuj szejkera jeśli szklanka jest gotowa lub trwa lanie (użytkownik wraca scrollem)
+              const glassDone = stageRef.current === "glassReady" || stageRef.current === "pickGlass" || stageRef.current === "shaking" || !!inSceneGlassRef.current;
+              api.shakerRoot.visible = stageRef.current === "build" && !glassDone;
               api.shakerRoot.scale.setScalar(1);
               api.shakerRoot.rotation.set(0, 0, deg(CONFIG.shakerRestTilt));
               api.shakerRoot.position.set(CONFIG.shakerRest.x, CONFIG.shakerRest.y, CONFIG.shakerRest.z);
@@ -1619,9 +1941,35 @@ function CocktailExperience() {
               setFollow(true);
             } else setFollow(false);
           }
-          api.shakerRoot.visible = true;
-          if (phase === "enter") applyEnter(p / CONFIG.enterEnd);
+          // shaker widoczny tylko gdy NIE pokazujemy modelu szklanki (lanie/gotowa) i nie jesteśmy w exit glassReady
+          const isGlassExiting = phase === "exit" && stageRef.current === "glassReady";
+          const isGlassActive = !!inSceneGlassRef.current || stageRef.current === "glassReady" || stageRef.current === "pickGlass";
+          api.shakerRoot.visible = !isGlassActive && !isGlassExiting;
+          if (phase === "enter") applyEnter(p / (isMobileCx ? 0.02 : CONFIG.enterEnd));
           else if (phase === "exit") applyExit((p - CONFIG.exitStart) / (1 - CONFIG.exitStart));
+
+          // Neonowy „pop": pojawia się gdy UI znika (wczesny exit). Scroll w dół → strzałka
+          // w dół; scroll w górę → strzałka obraca się do góry, napis wtapia się w ścianę.
+          const pop = popWrapRef.current;
+          if (pop) {
+            const e = phase === "exit" ? (p - CONFIG.exitStart) / (1 - CONFIG.exitStart) : 0;
+            const o = smooth(clamp01((e - 0.04) / 0.18));
+            pop.style.opacity = String(o);
+            pop.style.transform = `translate(-50%, -50%) scale(${0.86 + o * 0.14})`;
+            if (popArrowRef.current) popArrowRef.current.style.transform = `rotate(${self.direction < 0 ? 180 : 0}deg)`;
+            if (popLabelRef.current) {
+              const newText = self.direction < 0 ? getScrollPopLabelUp() : getScrollPopLabel();
+              if (popLabelRef.current.textContent !== newText) {
+                popLabelRef.current.setAttribute("data-morphing", "");
+                setTimeout(() => {
+                  if (popLabelRef.current) {
+                    popLabelRef.current.textContent = newText;
+                    popLabelRef.current.removeAttribute("data-morphing");
+                  }
+                }, 300);
+              }
+            }
+          }
           api.invalidate();
         },
       });
@@ -1631,13 +1979,16 @@ function CocktailExperience() {
       const approach = ScrollTrigger.create({
         trigger: rootRef.current,
         start: "top bottom",
-        end: "top top",
-        scrub: reduce ? 0.6 : true,
+        end: isMobileCx ? "top center" : "top top",
+        scrub: reduce ? 0.6 : (isMobileCx ? 0.8 : true),
         invalidateOnRefresh: true,
         onUpdate: (self) => {
           if (phase === "hold" || phase === "exit") return; // pin już steruje sceną
-          flyInPose(self.progress * K_APPROACH);
-          dom(titleRef, { opacity: clamp01(self.progress * 1.4), y: lerp(60, 30, self.progress) });
+          // Na mobile: szejker dojeżdża do centrum WCZEŚNIEJ (eased) i pozostaje wyśrodkowany,
+          // więc gdy sekcja wypełni ekran szejker jest już na środku — bez efektu "przeskoku".
+          const k = isMobileCx ? easeOutCubic(clamp01(self.progress * 1.35)) * K_APPROACH : self.progress * K_APPROACH;
+          flyInPose(k);
+          dom(titleRef, { opacity: clamp01(self.progress * (isMobileCx ? 2.2 : 1.4)), y: lerp(60, 30, self.progress) });
           api.invalidate();
         },
       });
@@ -1675,11 +2026,17 @@ function CocktailExperience() {
           {/* tekstura szumu na tle */}
           <div className="cx-noise" aria-hidden="true" />
 
+          {/* Neonowy „pop" na ścianie — pojawia się gdy UI znika podczas scrollu */}
+          <div ref={popWrapRef} className="cx-scrollpop" aria-hidden="true">
+            <span ref={popLabelRef} className="cx-scrollpop-label">{getScrollPopLabel()}</span>
+            <span ref={popArrowRef} className="cx-scrollpop-arrow">↓</span>
+          </div>
+
         {/* Wyśrodkowany tytuł + miernik mocy (moc pojawia się dopiero po wlaniu) */}
         <div ref={titleRef} className="cx-title">
           <span className="cx-mini-kicker">Laboratorio · 05</span>
           <h2>Crea il tuo <em>cocktail</em></h2>
-          <p className="cx-title-sub">Mescola, scopri, assaggia — il tuo drink della casa.</p>
+          
           {poured.length > 0 && (
             <div className={`cx-strength ${strength.extreme ? "is-extreme" : ""}`} aria-label={`Forza: ${strength.label}`}>
               <span className="cx-strength-dot" style={{ background: strength.extreme ? "#ff2d2d" : mixedColor }} />
@@ -1696,7 +2053,7 @@ function CocktailExperience() {
         </div>
 
         {/* LEWO — mixery + kroki */}
-        <div ref={leftPanelRef} className={`cx-col cx-col-left ${pouring ? "is-pouring" : ""}`}>
+        <div ref={leftPanelRef} className={`cx-col cx-col-left ${pouring || stage !== "build" ? "is-pouring" : ""}`}>
           <AccordionPanel side="left" kicker="Mixer" sub="& soft" groups={MIXERS}
             poured={poured} onPour={pourIngredient} onHoldAdd={holdAdd} disabled={stage !== "build"}
             isOpen={openSide === "left"} onOpenChange={(o) => setOpenSide(o ? "left" : null)} />
@@ -1731,7 +2088,10 @@ function CocktailExperience() {
         </div>
 
         {/* PRAWO — alkohole + SHAKE */}
-        <div ref={rightPanelRef} className={`cx-col cx-col-right ${pouring ? "is-pouring" : ""}`}>
+        <div ref={rightPanelRef} className={`cx-col cx-col-right ${pouring || stage !== "build" ? "is-pouring" : ""}`}>
+          {poured.length > 0 && stage === "build" && (
+            <button className="cx-reset-top" onClick={reset}>↺ Zacznij od nowa</button>
+          )}
           <AccordionPanel side="right" kicker="Spirits" sub="& alcolici" groups={ALCOHOLS}
             poured={poured} onPour={pourIngredient} onHoldAdd={holdAdd} onHoverReal={onHoverReal} disabled={stage !== "build"}
             isOpen={openSide === "right"} onOpenChange={(o) => setOpenSide(o ? "right" : null)} />
@@ -1742,7 +2102,7 @@ function CocktailExperience() {
         </div>
 
         {/* DÓŁ-ŚRODEK — prezent → formularz (pokazuje się po nalaniu) */}
-        <div ref={tableRef} className={`cx-table ${stage !== "glassReady" && poured.length === 0 ? "is-hidden" : ""} ${stage === "glassReady" && !claimed ? "is-gift" : ""}`}>
+        <div ref={tableRef} className={`cx-table ${(glassPourOpen && !glassFilled) || (stage !== "glassReady" && poured.length === 0) ? "is-hidden" : ""} ${stage === "glassReady" && !claimed ? "is-gift" : ""}`}>
           {stage === "glassReady" ? (
             claimed ? (
               <NameCard color={mixedColor} drinkName={drinkName} setDrinkName={setDrinkName}
@@ -1767,6 +2127,12 @@ function CocktailExperience() {
           ) : null}
         </div>
 
+        {/* MOBILE — pionowy pasek warstw po lewej: każdy nalany składnik = warstwa,
+            rośnie gdy lejesz; klik warstwy → pokazuje nazwę/ml + przycisk usuń. */}
+        {stage === "build" && poured.length > 0 && (
+          <LayerBar poured={poured} totalMl={totalMl} cap={SHAKER_CAP} onRemove={removePour} />
+        )}
+
         {/* Canvas */}
         <div className="cx-canvas">
           {inView && (
@@ -1777,6 +2143,7 @@ function CocktailExperience() {
                 glassPour={(glassPourOpen || glassFilled) ? {
                   open: true, url: chosenGlass?.url ?? GLASS_URL, withIce, color: mixedColor,
                   onReveal: () => { /* in-scene: brak blura do zdjęcia */ }, onDone: onGlassPourDone,
+                  onModelReady: (g) => { inSceneGlassRef.current = g; },
                 } : null} />
             </Canvas>
           )}
@@ -1797,6 +2164,14 @@ function CocktailExperience() {
       {/* kinowa animacja nalewania — fullscreen overlay z blur tłem */}
       <PourOverlay req={pourReq} onDone={onPourDone} />
 
+      {/* miarka napełnienia szejkera (obok) — segmenty w kolorach trunków, tylko podczas lania */}
+      <PourGauge onReady={(api) => { gaugeApiRef.current = api; }} cap={SHAKER_CAP}
+        segments={poured.map((p) => ({ color: p.ing.color, ml: p.ml }))}
+        side={pourReq?.side} />
+
+      {/* kółko VERSA podążające za myszą (timer 2s → trzymanie = lanie) */}
+      <HoldRing />
+
       {/* animacja nalewania do szklanki gra TERAZ na głównej scenie (in-scene) */}
 
       {/* konfetti przy odbiorze drinka */}
@@ -1816,7 +2191,7 @@ function CocktailExperience() {
  * MiniBottle3D — prawdziwy model GLB w kafelku menu (mała scena R3F).
  * frameloop="demand": renderuje tylko gdy hover (obraca się), więc wydajne.
  * ──────────────────────────────────────────────────────────────────────── */
-function MiniBottleModel({ id, name, color, hovered, playing }: { id: string; name: string; color: string; hovered: boolean; playing: boolean }) {
+function MiniBottleModel({ id, name, color, hovered, playing, sustaining }: { id: string; name: string; color: string; hovered: boolean; playing: boolean; sustaining?: boolean }) {
   const model = useMemo(() => modelForId(id), [id]);
   const { scene, animations } = useGLTF(model.url) as unknown as GLTF;
   const groupRef = useRef<THREE.Group>(null!);   // zewnętrzna — unoszenie/obrót przy hover
@@ -1826,7 +2201,7 @@ function MiniBottleModel({ id, name, color, hovered, playing }: { id: string; na
   const corkRef = useRef<THREE.Object3D | null>(null);   // korek — do dosadzenia + ręcznego otwarcia
   const glassRef = useRef<THREE.Object3D | null>(null);  // szkło — do wyrównania korka
   const corkBaseY = useRef(0);                            // bazowa pozycja korka (po snap)
-  const { invalidate } = useThree();
+  const { invalidate, pointer } = useThree();
   const playingRef = useRef(false);
   // snapshot pozy spoczynkowej animowanych węzłów (do przywrócenia po animacji)
   const restRef = useRef<{ obj: THREE.Object3D; p: THREE.Vector3; q: THREE.Quaternion; s: THREE.Vector3 }[]>([]);
@@ -1835,46 +2210,141 @@ function MiniBottleModel({ id, name, color, hovered, playing }: { id: string; na
   const cloned = useMemo(() => scene.clone(true), [scene]);
   const { actions, mixer } = useAnimations(animations, innerRef);
 
-  const liquidMat = useMemo(() => new THREE.MeshStandardMaterial({
-    color: new THREE.Color(color), roughness: 0.2, metalness: 0,
-    transparent: false, side: THREE.DoubleSide,
-    emissive: new THREE.Color(color), emissiveIntensity: 0.3,
-  }), [color]);
-  const glassMat = useMemo(() => new THREE.MeshPhysicalMaterial({
-    color: "#ffffff", roughness: 0.06, metalness: 0, transmission: 0.92,
-    transparent: true, opacity: 0.3, ior: 1.45, thickness: 0.2, envMapIntensity: 1.0,
-    depthWrite: false, // KLUCZOWE: nie zasłaniaj cieczy w środku
+  const liquidMat = useMemo(() => {
+    const col = new THREE.Color(color);
+    const isTransparent = color.toUpperCase() === "#FFFFFF" || color.toUpperCase() === "#FFF";
+    if (isTransparent) {
+      // Przezroczyste alkohole (gin, vodka, tequila blanco) — delikatna poświata, NIE świecąca biała kula
+      return new THREE.MeshStandardMaterial({
+        color: "#d8e8f0",
+        roughness: 0.05,
+        metalness: 0.02,
+        transparent: true,
+        opacity: 0.25,
+        side: THREE.DoubleSide,
+        emissive: new THREE.Color("#a0b8c8"),
+        emissiveIntensity: 0.05,
+      });
+    }
+    // Dla jasnych kolorów (cocco, pesca itp.) — niższy emissive żeby nie świeciły na biało
+    // Dla ciemnych (cola, campari) — wyższy emissive żeby kolor był wyraźny
+    const lum = col.getHSL({ h: 0, s: 0, l: 0 }).l;
+    const emIntensity = lum > 0.75 ? 0.8 : lum > 0.5 ? 1.5 : 3.0;
+    col.offsetHSL(0, 0.4, lum < 0.2 ? 0.12 : 0.05); // ciemne kolory jaśniejsze żeby nie ginęły
+    return new THREE.MeshStandardMaterial({
+      color: col,
+      roughness: 0.08,
+      metalness: 0,
+      transparent: false,
+      side: THREE.DoubleSide,
+      emissive: col,
+      emissiveIntensity: emIntensity,
+    });
+  }, [color]);
+
+  // szkło butelki — przezroczyste, nie przysłania koloru cieczy
+  const glassMat = useMemo(() => new THREE.MeshStandardMaterial({
+    color: "#e0eef8", roughness: 0.12, metalness: 0.05,
+    transparent: true, opacity: 0.22, depthWrite: false, side: THREE.BackSide,
   }), []);
-  const corkMat = useMemo(() => new THREE.MeshStandardMaterial({ color: model.metalCork ? "#c9ccce" : "#7a5230", roughness: model.metalCork ? 0.25 : 0.85, metalness: model.metalCork ? 0.9 : 0 }), [model.metalCork]);
 
   // dopasuj materiały po nazwie węzła + zapisz pozę spoczynkową; wycentruj/przeskaluj
   useLayoutEffect(() => {
     const inner = innerRef.current;
     if (!inner) return;
     const inList = (name: string, cands: string[]) => cands.some((c) => c.toLowerCase() === name.toLowerCase());
+    let labelFound = false;
     cloned.traverse((o) => {
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
       mesh.castShadow = true;
+      // Napraw flipY na wszystkich teksturach z GLB
+      const mat = mesh.material as THREE.MeshStandardMaterial;
+      // Skip arrays of materials and non-standard materials
+      if (!mat || Array.isArray(mesh.material) || !(mat as any).isMeshStandardMaterial) return;
+      // Ciecz → kolor trunku; szkło → przezroczyste; etykieta bez tekstury → proceduralna.
       if (inList(mesh.name, model.liquid)) { mesh.material = liquidMat; liquidMeshRef.current = mesh; }
-      else if (inList(mesh.name, model.glass)) { if (!model.metalBody) mesh.material = glassMat; glassRef.current = mesh; }
-      else if (inList(mesh.name, model.cork)) { mesh.material = corkMat; corkRef.current = mesh; }
-      else if (inList(mesh.name, model.label)) {
-        // świeży, NIEmetaliczny materiał etykiety — żeby grafika była dobrze widoczna
-        // (na metalicznej puszce sama mapa na starym materiale ginie).
-        const tex = makeLabelTexture(name, color, labelFor(id));
+      else if (model.metalBody && inList(mesh.name, model.glass)) {
+        // PUSZKA: korpus dostaje pełnokolorową owijkę (kolor napoju + nazwa)
+        labelFound = true;
         mesh.material = new THREE.MeshStandardMaterial({
-          map: tex, roughness: 0.5, metalness: 0.0, emissive: new THREE.Color("#1a1410"), emissiveMap: tex, emissiveIntensity: 0.35,
+          color: "#ffffff", map: makeCanTexture(name, color), roughness: 0.32, metalness: 0.5,
         });
-        (mesh.material as THREE.MeshStandardMaterial).needsUpdate = true;
+      }
+      else if (!model.metalBody && inList(mesh.name, model.glass)) {
+        glassRef.current = mesh;
+        mesh.material = glassMat; // widać kolorową ciecz przez szkło
+      }
+      else if (inList(mesh.name, model.cork)) corkRef.current = mesh;
+      else if (inList(mesh.name, model.label)) {
+        // etykieta → proceduralna z nazwą + kolorem (zawsze nadpisuj, DoubleSide żeby widoczna niezależnie od orientacji mesha)
+        labelFound = true;
+        const lm = new THREE.MeshStandardMaterial({
+          color: "#ffffff",
+          map: makeLabelTexture(name, color, labelFor(id)),
+          roughness: 0.6,
+          metalness: 0,
+          side: THREE.DoubleSide,
+        });
+        mesh.material = lm;
       }
     });
+    // Fallback: jeśli model nie ma mesha z nazwą etykiety, stwórz płaszczyzną-etykietę
+    if (!labelFound && model.label.length > 0) {
+      const labelGeo = new THREE.PlaneGeometry(0.7, 0.9);
+      const labelMat = new THREE.MeshStandardMaterial({
+        color: "#ffffff", map: makeLabelTexture(name, color, labelFor(id)),
+        roughness: 0.6, metalness: 0, transparent: true, side: THREE.DoubleSide,
+      });
+      const labelMesh = new THREE.Mesh(labelGeo, labelMat);
+      labelMesh.name = "__fallback_label__";
+      cloned.add(labelMesh);
+      // Pozycję ustawimy PO normalizacji (poniżej)
+    }
+    // Fallback liquid: jeśli nie znaleziono cieczy po nazwie, szukaj po nazwie zawierającej słowa kluczowe
+    if (!liquidMeshRef.current) {
+      cloned.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (!mesh.isMesh || liquidMeshRef.current) return;
+        const mat = mesh.material as THREE.MeshStandardMaterial;
+        if (!mat || !(mat as any).isMeshStandardMaterial) return;
+        if (mat === glassMat || mesh === glassRef.current || mesh === corkRef.current) return;
+        if (mat.map && labelFound) return;
+        const n = mesh.name.toLowerCase();
+        if (n.includes("liquid") || n.includes("liguid") || n.includes("juice") || n.includes("sok") || n.includes("wino")) {
+          mesh.material = liquidMat; liquidMeshRef.current = mesh;
+        }
+      });
+    }
+    // Fallback liquid 2: nadal null? Koloruj pierwszy "wewnętrzny" mesh (mały, wewnątrz butelki)
+    if (!liquidMeshRef.current) {
+      cloned.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (!mesh.isMesh || liquidMeshRef.current) return;
+        if (mesh === glassRef.current || mesh === corkRef.current) return;
+        const mat = mesh.material as THREE.MeshStandardMaterial;
+        if (!mat || !(mat as any).isMeshStandardMaterial) return;
+        if (mat.map) return; // ma teksturę → prawdopodobnie etykieta/korpus
+        // To jest mesh bez tekstury, nie szkło, nie korek → prawdopodobnie ciecz
+        mesh.material = liquidMat; liquidMeshRef.current = mesh;
+      });
+    }
     // 1) poza zamknięta (klatka 0) 2) dosadź unoszący się korek 3) DOPIERO normalizuj,
     //    żeby bounding box NIE zawierał korka w powietrzu (inaczej butelka byłaby za mała).
     applyClosedPose(actions, mixer);
     if (model.corkSnap) snapCork(glassRef.current, corkRef.current);
-    normalize(inner, 2.85 * model.fit); // centruje i skaluje całą sklonowaną scenę (duża butelka w karcie)
+    normalize(inner, 3.4 * model.fit); // centruje i skaluje całą sklonowaną scenę (duża butelka w karcie)
     if (corkRef.current) corkBaseY.current = corkRef.current.position.y;
+
+    // Pozycjonuj fallback label PO normalizacji — na froncie butelki, wycentrowana
+    const fallbackLabel = cloned.getObjectByName("__fallback_label__") as THREE.Mesh | null;
+    if (fallbackLabel) {
+      // Umieść na środku butelki (y=0), lekko z przodu (z = bounding box front)
+      const box = new THREE.Box3().setFromObject(cloned);
+      const frontZ = box.max.z + 0.01; // tuż przed frontem modelu
+      fallbackLabel.position.set(0, 0, frontZ);
+      fallbackLabel.scale.setScalar(0.8);
+    }
 
     // owiń ciecz w pivot u DOLNEJ krawędzi, żeby kołysał się głównie wierzch (powierzchnia),
     // a dno zostawało nieruchome — naturalne, delikatne falowanie u góry.
@@ -1895,7 +2365,7 @@ function MiniBottleModel({ id, name, color, hovered, playing }: { id: string; na
       restRef.current.push({ obj: o, p: o.position.clone(), q: o.quaternion.clone(), s: o.scale.clone() });
     });
     invalidate();
-  }, [cloned, glassMat, corkMat, liquidMat, model, actions, mixer, invalidate]);
+  }, [cloned, liquidMat, model, actions, mixer, invalidate]);
 
   // odtwarzanie natywnych animacji Blendera przy nalewaniu (klik)
   useEffect(() => {
@@ -1934,57 +2404,91 @@ function MiniBottleModel({ id, name, color, hovered, playing }: { id: string; na
   // hover: unoszenie + wolny obrót; podczas animacji obrót wstrzymany.
   // Mixer aktualizuje się w useAnimations; tu podtrzymujemy pętlę "demand".
   const sloshRef = useRef(0);
+  // Accumulated negative rotation for idle mode (mysz w prawo → butelka w lewo)
+  const idleRotRef = useRef(0);
   useFrame((_, dt) => {
     const root = groupRef.current;
     if (!root) return;
+
+    // Sustain: przechył butelki szyjką w dół (lanie ciągłe)
+    if (sustaining) {
+      const targetTilt = deg(145); // przechył jak pour tilt
+      root.rotation.z += (targetTilt - root.rotation.z) * 0.06;
+      root.position.y += (0.2 - root.position.y) * 0.08; // lekkie uniesienie
+      invalidate();
+      return;
+    }
+
     const targetY = hovered ? 0.15 : 0;
     root.position.y += (targetY - root.position.y) * 0.12;
-    // bardzo subtelne kołysanie cieczy w MIEJSCU (pivot w środku) — ledwo widoczne, tylko u góry
+    // Przywróć z przechyłu lania do normalnej pozycji
+    root.rotation.z += (0 - root.rotation.z) * 0.1;
+
+    // subtelne kołysanie cieczy — WYŁĄCZONE (użytkownik nie chce fal)
     const piv = sloshPivotRef.current;
     if (piv) {
-      sloshRef.current += dt;
-      const amp = hovered ? 0.022 : 0.012;
-      piv.rotation.z = Math.sin(sloshRef.current * 1.5) * amp;
-      piv.rotation.x = Math.cos(sloshRef.current * 1.1) * amp * 0.5;
+      piv.rotation.z = 0;
+      piv.rotation.x = 0;
     }
     if (playingRef.current) {
       invalidate(); // podtrzymuj klatki dopóki animacja gra
     } else if (hovered) {
       root.rotation.y += dt * 1.6; invalidate();
     } else {
-      root.rotation.y += (0 - (root.rotation.y % (Math.PI * 2))) * 0.05;
+      // Delikatny obrót w reakcji na mysz — ograniczony do ±30° żeby etykieta
+      // zawsze była skierowana przodem do użytkownika (nigdy plecami).
+      const targetRot = -pointer.x * deg(5); // minimal idle — etykieta zawsze przodem
+      idleRotRef.current += (targetRot - idleRotRef.current) * 0.06;
+      root.rotation.y = idleRotRef.current;
       invalidate(); // podtrzymuj kołysanie cieczy także w spoczynku
     }
   });
 
-  // aktualizacja koloru cieczy bez przebudowy
-  useEffect(() => { liquidMat.color.set(color); liquidMat.emissive.set(color); invalidate(); }, [color, liquidMat, invalidate]);
+  // Gdy kolor się zmienia — nowy liquidMat jest tworzony przez useMemo.
+  // Trzeba go ponownie przypiśać do meshy (useLayoutEffect nie odpływa przy zmianie color).
+  useEffect(() => {
+    liquidMat.color.set(color);
+    liquidMat.emissive.set(color);
+    liquidMat.needsUpdate = true;
+    // Przypisz nową wersję materiału do meshu cieczy (jeśli jest już zmontowany)
+    if (liquidMeshRef.current) {
+      liquidMeshRef.current.material = liquidMat;
+    }
+    // Także pivot-slosh jeśli ciecz jest w pivot
+    if (sloshPivotRef.current) {
+      sloshPivotRef.current.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (m.isMesh) m.material = liquidMat;
+      });
+    }
+    invalidate();
+  }, [color, liquidMat, invalidate]);
 
   return (
     <group ref={groupRef}>
-      {/* obrót o 180° w Y → etykieta (przód) zwrócona do kamery, nie plecami */}
-      <group ref={innerRef} rotation={[0, Math.PI, 0]}>
+      {/* inner group — sklonowana scena */}
+      <group ref={innerRef}>
         <primitive object={cloned} />
       </group>
     </group>
   );
 }
 
-function MiniBottle3D({ id, name, color, hovered, playing }: { id: string; name: string; color: string; hovered: boolean; playing: boolean }) {
+function MiniBottle3D({ id, name, color, hovered, playing, sustaining }: { id: string; name: string; color: string; hovered: boolean; playing: boolean; sustaining?: boolean }) {
   return (
     <Canvas
       className="cx-mini-canvas"
       frameloop="demand"
-      dpr={[1, 1.8]}
+      dpr={[1, 1.5]}
       gl={{ antialias: true, alpha: true, powerPreference: "low-power" }}
-      camera={{ position: [0, 0, 4.4], fov: 32 }}
+      camera={{ position: [0, 0, 4.8], fov: 34 }}
     >
-      <ambientLight intensity={0.7} />
-      <directionalLight position={[3, 5, 4]} intensity={2.2} />
-      <directionalLight position={[-4, 2, -3]} intensity={0.5} color="#8fd0ff" />
+      <ambientLight intensity={1.4} />
+      <directionalLight position={[2, 4, 5]} intensity={1.6} />
+      <directionalLight position={[-3, 2, -2]} intensity={0.7} color="#a0d4f0" />
+      <directionalLight position={[0, -2, 3]} intensity={0.4} color="#f0d0a0" />
       <Suspense fallback={null}>
-        <MiniBottleModel id={id} name={name} color={color} hovered={hovered} playing={playing} />
-        <Environment preset="city" />
+        <MiniBottleModel id={id} name={name} color={color} hovered={hovered} playing={playing} sustaining={sustaining} />
       </Suspense>
     </Canvas>
   );
@@ -2005,31 +2509,42 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
   const corkRef = useRef<THREE.Object3D | null>(null);
   const glassRef = useRef<THREE.Object3D | null>(null);
   const pouringRef = useRef(false);
-  const { invalidate, viewport, camera } = useThree();
+  const { invalidate, viewport, camera, pointer } = useThree();
 
   const cloned = useMemo(() => scene.clone(true), [scene]);
   const { actions, mixer } = useAnimations(animations, inner);
 
-  // CEL = wlot szejkera przeniesiony z głównej sceny przez NDC (tx,ty) → świat overlaya.
-  // Oba canvasy pokrywają ten sam ekran, więc po od-rzutowaniu strumień/butelka trafiają idealnie.
+  // CEL = punkt w przestrzeni overlay gdzie strumień powinien trafiać = OTWÓR wlotu szejkera.
+  // Kamera overlay = kamera sceny (CONFIG.camPos), więc współrzędne pokrywają się z realnym
+  // szejkerem widocznym pod spodem. Szejker spoczywa w shakerRest, wlot ~górna krawędź.
   const target = useMemo(() => {
-    const v = new THREE.Vector3(tx, ty, 0.5);
-    v.unproject(camera as THREE.PerspectiveCamera);
-    const camPos = (camera as THREE.PerspectiveCamera).position;
-    const dir = v.sub(camPos).normalize();
-    const t = -camPos.z / dir.z; // przecięcie z płaszczyzną z=0 (tam leje butelka)
-    return camPos.clone().addScaledVector(dir, t);
-  }, [tx, ty, camera]);
+    const r = CONFIG.shakerRest;
+    // wlot szejkera: trochę powyżej środka modelu (mouth), lekko z przodu
+    return new THREE.Vector3(r.x, r.y + 1.7, r.z + 0.1);
+  }, []);
 
   const liquidMat = useMemo(() => new THREE.MeshStandardMaterial({
     color: new THREE.Color(color), roughness: 0.2, metalness: 0, transparent: false, side: THREE.DoubleSide,
     emissive: new THREE.Color(color), emissiveIntensity: 0.3,
   }), [color]);
-  const glassMat = useMemo(() => new THREE.MeshPhysicalMaterial({
-    color: "#ffffff", roughness: 0.06, metalness: 0, transmission: 0.92, transparent: true, opacity: 0.3, ior: 1.45, thickness: 0.2, envMapIntensity: 1.0, depthWrite: false,
+  const glassMat = useMemo(() => new THREE.MeshStandardMaterial({
+    color: "#b8d8e8", roughness: 0.1, metalness: 0.05, transparent: true, opacity: 0.5, depthWrite: false, side: THREE.FrontSide,
   }), []);
   const corkMat = useMemo(() => new THREE.MeshStandardMaterial({ color: model.metalCork ? "#c9ccce" : "#7a5230", roughness: model.metalCork ? 0.25 : 0.85, metalness: model.metalCork ? 0.9 : 0 }), [model.metalCork]);
-  const streamMat = useMemo(() => new THREE.MeshStandardMaterial({ color: new THREE.Color(color), transparent: true, opacity: 0.92, roughness: 0.1, emissive: new THREE.Color(color), emissiveIntensity: 0.18, side: THREE.DoubleSide }), [color]);
+  const streamMat = useMemo(() => {
+    const isTransp = color.toUpperCase() === "#FFFFFF" || color.toUpperCase() === "#FFF";
+    const streamColor = isTransp ? "#c8dce8" : color;
+    return new THREE.MeshStandardMaterial({
+      color: new THREE.Color(streamColor),
+      transparent: true,
+      opacity: isTransp ? 0.55 : 0.88,
+      roughness: 0.05,
+      emissive: new THREE.Color(streamColor),
+      emissiveIntensity: isTransp ? 0.05 : 0.25,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+  }, [color]);
 
   const NORM_H = 2.6; // wysokość znormalizowanej butelki
 
@@ -2041,14 +2556,33 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
       mesh.castShadow = true;
+      const mat = mesh.material as THREE.MeshStandardMaterial;
+      // Skip arrays of materials and non-standard materials
+      if (!mat || Array.isArray(mesh.material) || !(mat as any).isMeshStandardMaterial) return;
+      (["map", "normalMap", "roughnessMap", "metalnessMap"] as const).forEach((k) => {
+        const t = (mat as unknown as Record<string, THREE.Texture | null>)[k]; if (t) { t.flipY = false; t.needsUpdate = true; }
+      });
       if (inList(mesh.name, model.liquid)) mesh.material = liquidMat;
-      else if (inList(mesh.name, model.glass)) { if (!model.metalBody) mesh.material = glassMat; glassRef.current = mesh; }
-      else if (inList(mesh.name, model.cork)) { mesh.material = corkMat; corkRef.current = mesh; }
-      else if (inList(mesh.name, model.label)) {
+      else if (model.metalBody && inList(mesh.name, model.glass)) {
+        // PUSZKA: korpus z kolorową owijką (kolor napoju + nazwa)
         mesh.material = new THREE.MeshStandardMaterial({
-          map: makeLabelTexture(ingById(id)?.name ?? "", color, labelFor(id)),
-          roughness: 0.55, metalness: 0.0,
+          color: "#ffffff", map: makeCanTexture(ingById(id)?.name ?? id, color), roughness: 0.32, metalness: 0.5,
         });
+      }
+      else if (!model.metalBody && inList(mesh.name, model.glass)) {
+        glassRef.current = mesh;
+        mesh.material = glassMat; // przezroczyste szkło — widać kolor cieczy
+      }
+      else if (inList(mesh.name, model.cork)) corkRef.current = mesh;
+      else if (inList(mesh.name, model.label)) {
+        const lm = new THREE.MeshStandardMaterial({
+          color: "#ffffff",
+          map: makeLabelTexture(ingById(id)?.name ?? id, color, labelFor(id)),
+          roughness: 0.6,
+          metalness: 0,
+          side: THREE.DoubleSide,
+        });
+        mesh.material = lm;
       }
     });
     // poza zamknięta + dosadzenie korka PRZED normalizacją (inaczej unoszący się
@@ -2067,35 +2601,40 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
     if (corkRef.current) corkRef.current.visible = true;
     const corkStartY = corkRef.current ? corkRef.current.position.y : 0;
 
-    // korek: tylko akcja korka (resztę sterujemy GSAP-em, by nie kolidowały)
-    const corkActions = Object.entries(actions)
-      .filter(([n]) => model.cork.some((c) => n.toLowerCase().includes(c.toLowerCase())))
-      .map(([, a]) => a)
-      .filter(Boolean) as THREE.AnimationAction[];
-    const playList = corkActions.length ? corkActions : (Object.values(actions).filter(Boolean) as THREE.AnimationAction[]);
+    // Odtwarzamy WSZYSTKIE dostępne animacje (np. odkręcanie korka, opróżnianie cieczy - key 1)
+    const playList = Object.values(actions).filter(Boolean) as THREE.AnimationAction[];
 
-    // pozycja startowa = świat odpowiadający klikniętemu boksowi
-    const startX = (ox / window.innerWidth - 0.5) * viewport.width;
-    const startY = -(oy / window.innerHeight - 0.5) * viewport.height;
+    // pozycja startowa = środek ekranu (butelka pojawia się tam od razu, bez przeskoku z kafelka)
+    const startX = 0;
+    const startY = 0;
+    const isMob = typeof window !== "undefined" && window.innerWidth < 768;
 
-    // pozycja "obok szejkera": szyjka MA BYĆ tuż nad wlotem szejkera (target).
-    // korpus stoi z boku targetu, nieco wyżej; szyjka pochylona ku środkowi nad wlotem.
-    const offX = 1.2;                    // przesunięcie korpusu w bok od wlotu
-    const bodyX = target.x + (side === "right" ? offX : -offX);
-    const bodyY = target.y + 1.5;        // korpus nad wlotem (krótki, trafny łuk)
-    const tilt = side === "right" ? deg(122) : deg(-122);
-    const sPour = 0.9;
+    // pozycja "obok szejkera": butelka niżej — cała widoczna, dopasowana do mobile
+    const offX = isMob ? 0.7 : 1.0;
+    const bodyX = side === "right" ? offX : -offX;
+    const bodyY = isMob ? 1.4 : 1.7;       // nad wlotem szejkera (target ~y0.35) — szyjka leje w dół
+    const bodyZ = CONFIG.shakerRest.z;      // ta sama głębia co szejker → strumień trafia do otworu
+    const tilt = side === "right" ? deg(isMob ? 145 : 140) : deg(isMob ? -145 : -140);
+    const sPour = isMob ? 0.5 : 0.6;
 
     gsap.set(o.position, { x: startX, y: startY, z: 0 });
-    gsap.set(o.scale, { x: 0.22, y: 0.22, z: 0.22 });
+    gsap.set(o.scale, { x: 0.01, y: 0.01, z: 0.01 });
     gsap.set(o.rotation, { x: 0, y: deg(-20), z: 0 });
     headRef.current.v = 0; tailRef.current.v = 0;
 
     const tl = gsap.timeline({ onUpdate: invalidate, onComplete: () => { invalidate(); onDone(); } });
 
-    // 1) wychodzi z boksu → rośnie na samym środku (blur tła aktywny)
-    tl.to(o.position, { x: 0, y: 0.25, duration: 0.6, ease: "power3.out" }, 0)
-      .to(o.scale, { x: 1.55, y: 1.55, z: 1.55, duration: 0.6, ease: "back.out(1.25)" }, 0);
+    // Solidna obsługa puszczenia: jeśli 'cx-pour-release' przyjdzie ZANIM dojdziemy do
+    // punktu pauzy (np. krótki tap / wczesne puszczenie), zapamiętujemy flagę i nie pauzujemy.
+    let released = false;
+    const onReleaseEvt = () => { released = true; pouringRef.current = false; if (tl.paused()) tl.resume(); };
+    window.addEventListener('cx-pour-release', onReleaseEvt);
+    const safety = setTimeout(onReleaseEvt, 30000);
+
+    // 1) wychodzi z boksu → rośnie na środku (rozmiar dopasowany do viewport)
+    const growScale = isMob ? 1.0 : 1.45;
+    tl.to(o.position, { x: 0, y: isMob ? 0.1 : 0.2, duration: 0.6, ease: "power3.out" }, 0)
+      .to(o.scale, { x: growScale, y: growScale, z: growScale, duration: 0.6, ease: "back.out(1.1)" }, 0);
     if (!model.noStream) {
       tl.to(o.rotation, { y: deg(18), duration: 0.85, ease: "power2.out" }, 0);
     }
@@ -2130,72 +2669,149 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
       // (przód do nas) i przechył wierzchem ku kamerze, żeby było widać otwór.
       const canTilt = side === "right" ? deg(70) : deg(-70);
       tl.to(o.scale, { x: sPour, y: sPour, z: sPour, duration: 0.55, ease: "power2.inOut" }, 1.6)
-        .to(o.position, { x: bodyX, y: bodyY, duration: 0.6, ease: "power1.inOut" }, 1.6)
+        .to(o.position, { x: bodyX, y: bodyY, z: bodyZ, duration: 0.6, ease: "power1.inOut" }, 1.6)
         .to(o.rotation, { x: deg(20), y: 0, z: canTilt, duration: 0.55, ease: "power1.inOut" }, 1.7);
-      // lanie z otworu puszki (head wybiega, trzyma pełny strumień, ogon dogania)
-      tl.call(() => { pouringRef.current = true; }, [], 2.45)
+      // lanie z otworu puszki — strumień TRWA do cx-pour-release
+      tl.call(() => { pouringRef.current = true; window.dispatchEvent(new Event('cx-pour-begin')); }, [], 2.45)
         .to(headRef.current, { v: 1, duration: 0.45, ease: "power2.out" }, 2.45)
-        .to(tailRef.current, { v: 1, duration: 0.5, ease: "power2.in" }, 3.5)
-        .call(() => { pouringRef.current = false; }, [], 4.1);
+        .call(() => { if (!released) tl.pause(); }, [], 3.1);
+      tl.to(tailRef.current, { v: 1, duration: 0.5, ease: "power2.in" }, ">")
+        .call(() => { pouringRef.current = false; }, [], ">");
       // prostuje się i znika
-      tl.to(o.rotation, { x: 0, z: 0, duration: 0.4, ease: "power1.inOut" }, 4.1)
-        .to(o.scale, { x: 0.34, y: 0.34, z: 0.34, duration: 0.4, ease: "power2.in" }, 4.2)
-        .to(o.position, { y: 2.0, duration: 0.4, ease: "power2.in" }, 4.2);
+      tl.to(o.rotation, { x: 0, z: 0, duration: 0.4, ease: "power1.inOut" }, ">")
+        .to(o.scale, { x: 0.34, y: 0.34, z: 0.34, duration: 0.4, ease: "power2.in" }, ">0.1")
+        .to(o.position, { y: 2.0, duration: 0.4, ease: "power2.in" }, "<");
+
     } else {
       // 3) BUTELKA: kurczy się i lukiem schodzi WYŻEJ obok szejkera, przechyla szyjką ku środkowi
       tl.to(o.scale, { x: sPour, y: sPour, z: sPour, duration: 0.6, ease: "power2.inOut" }, 1.6)
         // łuk: najpierw w bok i w górę, potem opada do pozycji nalewania (kuliste podejście)
-        .to(o.position, { x: bodyX * 0.7, y: bodyY + 0.5, duration: 0.35, ease: "power2.out" }, 1.6)
-        .to(o.position, { x: bodyX, y: bodyY, duration: 0.4, ease: "power1.inOut" }, 1.95)
+        .to(o.position, { x: bodyX * 0.7, y: bodyY + 0.5, z: bodyZ, duration: 0.35, ease: "power2.out" }, 1.6)
+        .to(o.position, { x: bodyX, y: bodyY, z: bodyZ, duration: 0.4, ease: "power1.inOut" }, 1.95)
         .to(o.rotation, { y: 0, z: tilt, duration: 0.6, ease: "power1.inOut" }, 1.7);
 
-      // 4) lanie: head (czoło) szybko wybiega do wlotu, TRZYMA pełny strumień, potem ogon dogania
-      tl.call(() => { pouringRef.current = true; }, [], 2.5)
-        .to(headRef.current, { v: 1, duration: 0.45, ease: "power2.out" }, 2.5)   // czoło → wlot
-        .to(tailRef.current, { v: 1, duration: 0.5, ease: "power2.in" }, 3.55)    // ogon dogania (po przerwie = pełny strumień)
-        .call(() => { pouringRef.current = false; }, [], 4.15);
+      // 4) lanie: head (czoło) szybko wybiega do wlotu, STRUMIEŃ TRWA do cx-pour-release
+      tl.call(() => { pouringRef.current = true; window.dispatchEvent(new Event('cx-pour-begin')); }, [], 2.5)
+        .to(headRef.current, { v: 1, duration: 0.45, ease: "power2.out" }, 2.5)   // czoło → wlot (pełny strumień)
+        // Ogon NIE dogania automatycznie — czekamy na cx-pour-release (puszczenie LUB pełny szejker)
+        .call(() => { if (!released) tl.pause(); }, [], 3.1);
+
+      // Ogon dogania po wznowieniu (resume)
+      tl.to(tailRef.current, { v: 1, duration: 0.5, ease: "power2.in" }, ">")
+        .call(() => { pouringRef.current = false; }, [], ">");
 
       // 5) prostuje się i znika w górę (DOM zrobi fade overlaya)
-      tl.to(o.rotation, { z: 0, duration: 0.4, ease: "power1.inOut" }, 4.15)
-        .to(o.scale, { x: 0.4, y: 0.4, z: 0.4, duration: 0.4, ease: "power2.in" }, 4.25)
-        .to(o.position, { y: 2.0, duration: 0.4, ease: "power2.in" }, 4.25);
+      tl.to(o.rotation, { z: 0, duration: 0.4, ease: "power1.inOut" }, ">")
+        .to(o.scale, { x: 0.4, y: 0.4, z: 0.4, duration: 0.4, ease: "power2.in" }, ">0.1")
+        .to(o.position, { y: 2.0, duration: 0.4, ease: "power2.in" }, "<");
     }
 
-    return () => { tl.kill(); playList.forEach((a) => a.stop()); };
+    return () => {
+      tl.kill();
+      clearTimeout(safety);
+      window.removeEventListener('cx-pour-release', onReleaseEvt);
+      playList.forEach((a) => a.stop());
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actions]);
 
-  // STRUMIEŃ jako łuk (parabola) szyjka→wlot szejkera, animowany jak prawdziwe lanie:
-  // head (czoło) rośnie od szyjki do wlotu, potem tail (ogon) dogania od szyjki → ciecz "wlatuje".
+  // STRUMIEŃ jako łuk Beziera szyjka→wlot szejkera, animowany jak prawdziwe lanie.
+  // Bardziej kuliste, zakrzywione; zwęża się ku wlotowi; dokładniejszy target.
   const headRef = useRef({ v: 0 }); // 0..1 czoło strumienia
   const tailRef = useRef({ v: 0 }); // 0..1 ogon strumienia (lag za head)
   const _neck = useMemo(() => new THREE.Vector3(), []);
-  const _mid = useMemo(() => new THREE.Vector3(), []);
   const _ctrl = useMemo(() => new THREE.Vector3(), []);
   const fullCurve = useMemo(() => new THREE.QuadraticBezierCurve3(new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()), []);
-  const _pts = useMemo(() => Array.from({ length: 17 }, () => new THREE.Vector3()), []);
+  const N_STREAM_PTS = 24;
+  const _pts = useMemo(() => Array.from({ length: N_STREAM_PTS + 1 }, () => new THREE.Vector3()), []);
   useFrame(() => {
     invalidate();
+    
+    // Ruch butelki w przeciwną stronę niż myszka podczas lania
+    if (pouringRef.current && outer.current) {
+      const offX = 1.2;
+      let targetPosX = target.x - pointer.x * 1.5;
+      targetPosX = THREE.MathUtils.clamp(targetPosX, target.x - offX, target.x + offX);
+      outer.current.position.x = THREE.MathUtils.lerp(outer.current.position.x, targetPosX, 0.08);
+    }
+    // Gdy wraca na miejsce po puszczeniu (pouringRef = false), GSAP z powrotem zajmie się osią X i Y,
+    // ale my też możemy płynnie wracać do oryginału:
+    if (!pouringRef.current && outer.current && tailRef.current.v > 0 && tailRef.current.v < 1) {
+      const offX = 1.2;
+      const bodyX = target.x + (side === "right" ? offX : -offX);
+      outer.current.position.x = THREE.MathUtils.lerp(outer.current.position.x, bodyX, 0.1);
+    }
+
     const s = streamRef.current;
     if (!s) return;
     const head = headRef.current.v, tail = tailRef.current.v;
-    if (!pouringRef.current || head - tail <= 0.005 || !neckRef.current) { s.visible = false; return; }
+    if (head - tail <= 0.005 || !neckRef.current) { s.visible = false; return; }
     s.visible = true;
     neckRef.current.getWorldPosition(_neck);
-    // pełny, STAŁY łuk szyjka→wlot; END = dokładnie target (wlot szejkera)
-    _mid.copy(_neck).add(target).multiplyScalar(0.5);
-    _ctrl.copy(_mid);
-    _ctrl.y += Math.min(0.45, Math.abs(_neck.y - target.y) * 0.12); // delikatne wybrzuszenie
-    fullCurve.v0.copy(_neck); fullCurve.v1.copy(_ctrl); fullCurve.v2.copy(target);
-    // widoczny odcinek od tail do head — próbkujemy podkrzywą
+
+    // Łuk LANIA: strumień wychodzi z szyjki, łukiem schodzi nad wlot i WPADA pionowo
+    // do środka szejkera (kończy się w głębi — wizualnie "do dna", niewidoczny w środku).
+    const dx = target.x - _neck.x; // znak = kierunek lania
+    _ctrl.set(
+      _neck.x + dx * 0.4,                    // mniejsze wybrzuszenie — bardziej pionowy zrzut
+      _neck.y + Math.abs(dx) * 0.10 + 0.08,  // delikatny łuk
+      (_neck.z + target.z) * 0.5,
+    );
+    fullCurve.v0.copy(_neck);
+    fullCurve.v1.copy(_ctrl);
+    fullCurve.v2.copy(target);
+
+    // Próbkuj widoczny odcinek
     const n = _pts.length - 1;
     for (let i = 0; i <= n; i++) {
       const t = tail + (head - tail) * (i / n);
       fullCurve.getPoint(t, _pts[i]);
     }
-    const sub = new THREE.CatmullRomCurve3(_pts);
+    const sub = new THREE.CatmullRomCurve3(_pts, false, "catmullrom", 0.5);
+
+    // Zwężający się strumień 3D: grubszy u góry (szyjka) → cieńszy na dole (wlot)
+    const segCount = 24;
+    const radialSegs = 10;
+    const positions: number[] = [];
+    const normals: number[] = [];
+    const uvArr: number[] = [];
+    const indices: number[] = [];
+    const segPts = sub.getPoints(segCount);
+    for (let si = 0; si <= segCount; si++) {
+      const taper = si / segCount;
+      const radius = lerp(0.065, 0.025, smooth(taper));
+      const pt = segPts[si];
+      const next = segPts[Math.min(si + 1, segCount)];
+      const prev = segPts[Math.max(si - 1, 0)];
+      const tang = new THREE.Vector3().subVectors(next, prev).normalize();
+      const up = Math.abs(tang.y) > 0.99 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+      const biN = new THREE.Vector3().crossVectors(tang, up).normalize();
+      const n2 = new THREE.Vector3().crossVectors(biN, tang).normalize();
+      for (let ri = 0; ri <= radialSegs; ri++) {
+        const angle = (ri / radialSegs) * Math.PI * 2;
+        const cos = Math.cos(angle), sin = Math.sin(angle);
+        const nx = biN.x * cos + n2.x * sin;
+        const ny = biN.y * cos + n2.y * sin;
+        const nz = biN.z * cos + n2.z * sin;
+        positions.push(pt.x + nx * radius, pt.y + ny * radius, pt.z + nz * radius);
+        normals.push(nx, ny, nz);
+        uvArr.push(ri / radialSegs, taper);
+      }
+    }
+    for (let si = 0; si < segCount; si++) {
+      for (let ri = 0; ri < radialSegs; ri++) {
+        const a = si * (radialSegs + 1) + ri;
+        const b = a + radialSegs + 1;
+        indices.push(a, b, a + 1, b, b + 1, a + 1);
+      }
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
+    geo.setAttribute("uv", new THREE.Float32BufferAttribute(uvArr, 2));
+    geo.setIndex(indices);
     if (s.geometry) s.geometry.dispose();
-    s.geometry = new THREE.TubeGeometry(sub, 20, 0.055, 8, false);
+    s.geometry = geo;
   });
 
   return (
@@ -2207,7 +2823,7 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
           <object3D ref={neckRef} position={[0, NORM_H / 2, 0]} />
         </group>
       </group>
-      <mesh ref={streamRef} material={streamMat} visible={false}>
+      <mesh ref={streamRef} material={streamMat} visible={false} renderOrder={-1}>
         <bufferGeometry />
       </mesh>
     </group>
@@ -2226,7 +2842,7 @@ function PourOverlay({ req, onDone }: { req: PourReq | null; onDone: () => void 
         frameloop="always"
         dpr={[1, 2]}
         gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
-        camera={{ position: [0, 0, 8], fov: 34 }}
+        camera={{ position: [CONFIG.camPos.x, CONFIG.camPos.y, CONFIG.camPos.z], fov: 36 }}
       >
         <ambientLight intensity={0.8} />
         <directionalLight position={[4, 6, 5]} intensity={2.6} castShadow />
@@ -2236,6 +2852,122 @@ function PourOverlay({ req, onDone }: { req: PourReq | null; onDone: () => void 
           <Environment preset="city" />
         </Suspense>
       </Canvas>
+    </div>,
+    document.body,
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * PourGauge — pionowa miarka 3D po LEWEJ: dwie kreski = pełna wysokość szejkera,
+ * wypełnienie pokazuje ile już nalano. Widoczna tylko podczas lania (opacity).
+ * Sterowana imperatywnie (set/show) — bez re-renderów React (60fps friendly).
+ * ──────────────────────────────────────────────────────────────────────── */
+function PourGauge({ onReady, segments, cap, side }: {
+  onReady: (api: { set: (liveMl: number, color?: string) => void; show: (b: boolean) => void }) => void;
+  segments: { color: string; ml: number }[]; cap: number; side?: "left" | "right";
+}) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const liveRef = useRef<HTMLDivElement>(null);
+  const pctRef = useRef<HTMLSpanElement>(null);
+  const committedFracRef = useRef(0);
+  const committedMl = segments.reduce((s, x) => s + x.ml, 0);
+  committedFracRef.current = clamp01(committedMl / cap);
+  useEffect(() => {
+    onReady({
+      set: (liveMl, color) => {
+        const lf = clamp01(liveMl / cap);
+        const cf = committedFracRef.current;
+        if (liveRef.current) {
+          liveRef.current.style.bottom = `${cf * 100}%`;
+          liveRef.current.style.height = `${lf * 100}%`;
+          liveRef.current.style.opacity = lf > 0.001 ? "1" : "0";
+          if (color) liveRef.current.style.background = color;
+        }
+        if (pctRef.current) pctRef.current.textContent = `${Math.round(Math.min(1, cf + lf) * 100)}%`;
+      },
+      show: (b) => { if (wrapRef.current) wrapRef.current.style.opacity = b ? "1" : "0"; },
+    });
+  }, [onReady]);
+  if (typeof document === "undefined") return null;
+  // side="right" → miarka po prawej (gdy leje z lewego panelu); domyślnie po lewej
+  const gaugeClass = `cx-gauge ${side === "left" ? "cx-gauge-right" : ""}`;
+  return createPortal(
+    <div ref={wrapRef} className={gaugeClass} aria-hidden="true">
+      <span className="cx-gauge-cap">MAX</span>
+      <div className="cx-gauge-tube">
+        <div className="cx-gauge-stack">
+          {segments.map((seg, i) => (
+            <div key={i} className="cx-gauge-seg" style={{ height: `${clamp01(seg.ml / cap) * 100}%`, background: seg.color }} />
+          ))}
+        </div>
+        <div ref={liveRef} className="cx-gauge-live" />
+      </div>
+      <span ref={pctRef} className="cx-gauge-pct">0%</span>
+    </div>,
+    document.body,
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * HoldRing — kółko „VERSA" PODĄŻAJĄCE ZA MYSZĄ. Na starcie pierścień-timer (2s,
+ * eased). Po odpaleniu lania zostaje widoczne pod kursorem i powoli się powiększa,
+ * dopóki trzymasz LPM. Sterowane eventami z BottleCard (bez re-renderów React).
+ * ──────────────────────────────────────────────────────────────────────── */
+function HoldRing() {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const arcRef = useRef<SVGCircleElement>(null);
+  const st = useRef({ shown: false, x: 0, y: 0, scale: 0.8, mode: "arm" as "arm" | "pour", raf: 0 });
+  const R = 46, CIRC = 2 * Math.PI * R;
+  const label = getPourLabel();
+
+  const apply = useCallback(() => {
+    const w = wrapRef.current;
+    if (w) w.style.transform = `translate(${st.current.x}px, ${st.current.y}px) translate(-50%, -50%) scale(${st.current.scale})`;
+  }, []);
+  const setArc = useCallback((p: number) => {
+    const e = 1 - Math.pow(1 - clamp01(p), 3); // szybko → wolno
+    if (arcRef.current) arcRef.current.style.strokeDashoffset = String(CIRC * (1 - e));
+  }, [CIRC]);
+
+  useEffect(() => {
+    const onMove = (e: PointerEvent) => { st.current.x = e.clientX; st.current.y = e.clientY; if (st.current.shown) apply(); };
+    // rAF tylko podczas lania (tryb pour) — żeby nie kręcić pętli bez przerwy.
+    const grow = () => {
+      if (!(st.current.shown && st.current.mode === "pour")) { st.current.raf = 0; return; }
+      st.current.scale = Math.min(1.28, st.current.scale + 0.0018); apply();
+      st.current.raf = requestAnimationFrame(grow);
+    };
+    const startGrow = () => { if (!st.current.raf) st.current.raf = requestAnimationFrame(grow); };
+    const onStart = (ev: Event) => { const d = (ev as CustomEvent).detail; if (d && typeof d.x === "number") { st.current.x = d.x; st.current.y = d.y; } st.current.shown = true; st.current.mode = "arm"; st.current.scale = 0.6; setArc(0); if (wrapRef.current) { wrapRef.current.dataset.mode = "arm"; wrapRef.current.style.opacity = "1"; } apply(); };
+    const onProgress = (ev: Event) => { const p = (ev as CustomEvent).detail?.p ?? 0; setArc(p); st.current.scale = 0.66 + (1 - Math.pow(1 - clamp01(p), 3)) * 0.34; apply(); };
+    const onFire = () => { st.current.mode = "pour"; setArc(1); if (wrapRef.current) wrapRef.current.dataset.mode = "pour"; startGrow(); };
+    const onEnd = () => { st.current.shown = false; st.current.mode = "arm"; if (st.current.raf) { cancelAnimationFrame(st.current.raf); st.current.raf = 0; } if (wrapRef.current) wrapRef.current.style.opacity = "0"; };
+    window.addEventListener("pointermove", onMove, { passive: true });
+    window.addEventListener("cx-hold-start", onStart);
+    window.addEventListener("cx-hold-progress", onProgress);
+    window.addEventListener("cx-hold-fire", onFire);
+    window.addEventListener("cx-hold-end", onEnd);
+    return () => {
+      if (st.current.raf) cancelAnimationFrame(st.current.raf);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("cx-hold-start", onStart);
+      window.removeEventListener("cx-hold-progress", onProgress);
+      window.removeEventListener("cx-hold-fire", onFire);
+      window.removeEventListener("cx-hold-end", onEnd);
+    };
+  }, [apply, setArc]);
+
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div ref={wrapRef} className="cx-holdring" data-mode="arm" aria-hidden="true">
+      <svg width="124" height="124" viewBox="0 0 124 124">
+        <circle cx="62" cy="62" r="34" fill="#E0341F" />
+        <circle cx="62" cy="62" r="34" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" />
+        <circle className="cx-holdring-track" cx="62" cy="62" r={R} fill="none" stroke="rgba(8,5,10,0.5)" strokeWidth="7" />
+        <circle ref={arcRef} cx="62" cy="62" r={R} fill="none" stroke="#ffffff" strokeWidth="7" strokeLinecap="round"
+          strokeDasharray={CIRC} strokeDashoffset={CIRC} transform="rotate(-90 62 62)" />
+        <text x="62" y="64" textAnchor="middle" dominantBaseline="middle" fill="#ffffff" fontSize="15" fontWeight="800" letterSpacing="0.06em" fontFamily="Syne, sans-serif">{label}</text>
+      </svg>
     </div>,
     document.body,
   );
@@ -2261,7 +2993,9 @@ function GlassPourModel({ url, withIce, color, opacity, onReveal, onDone }: {
   useLayoutEffect(() => {
     const root = rootRef.current;
     if (!root) return;
+    const partsToRemove: THREE.Object3D[] = [];
     cloned.traverse((o) => {
+      if (/shaker/i.test(o.name)) { partsToRemove.push(o); return; }
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
       mesh.castShadow = true; mesh.receiveShadow = true;
@@ -2274,6 +3008,7 @@ function GlassPourModel({ url, withIce, color, opacity, onReveal, onDone }: {
         if (mesh.name === "szklanka") { mat.transparent = true; mat.depthWrite = false; mat.opacity = Math.min(mat.opacity ?? 1, 0.4); }
       }
     });
+    partsToRemove.forEach((o) => { o.visible = false; });
     if (liquidMesh && liquidMesh.material) {
       const lm = (liquidMesh.material as THREE.MeshStandardMaterial).clone();
       lm.transparent = false; lm.side = THREE.DoubleSide;
@@ -2437,17 +3172,21 @@ function RowBottle({ color, ml, real, shape = "wine" }: { color: string; ml: num
 
 /* losowa, ale deterministyczna etykieta (test renderowania per butelka) */
 const LABELS = ["Riserva '21", "Gran Cru", "Selezione", "Vintage '19", "Premium", "DOC", "Annata Oro", "Edizione"];
+const JUICE_LABELS = ["Succo Fresco", "100% Naturale", "Premium", "Frutta Fresca", "Biologico", "Puro", "Fatto in Casa", "Artigianale"];
 function labelFor(id: string): string {
+  const isJuice = SOK_IDS.includes(id);
+  const labels = isJuice ? JUICE_LABELS : LABELS;
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
-  return LABELS[h % LABELS.length];
+  return labels[h % labels.length];
 }
 
 /* dobór kształtu butelki wg id/kategorii */
 function shapeFor(ing: Ingredient): "wine" | "spirit" | "can" | "round" {
-  if (["tonica", "soda", "cola", "ginger", "lemonsoda"].includes(ing.id)) return "can";
-  if (["amaretto", "limoncello", "campari", "aperol", "cointreau"].includes(ing.id)) return "round";
+  if (["tonica", "soda", "coca-cola", "coca-zero", "fanta", "sprite", "ginger", "lemonsoda", "redbull", "bitter", "san-pellegrino", "the-pesca", "the-limone", "crodino", "aranciata-amara"].includes(ing.id)) return "can";
+  if (/^(liq-|amaro|averna|baileys|branca|cynar|fernet|ramazzotti|jagermeister|liquirizia|mirto|montenegro|sambuca|limoncello|campari|aperol|cointreau)/.test(ing.id)) return "round";
   if (ing.ml >= 60 || /vermouth|prosecco|spumante/.test(ing.id)) return "wine";
+  if (/^(grappa|grappa-)/.test(ing.id)) return "wine";
   return "spirit";
 }
 
@@ -2456,64 +3195,135 @@ function shapeFor(ing: Ingredient): "wine" | "spirit" | "can" | "round" {
  * Hover: butelka się unosi i obraca; klik: nalewanie.
  * ──────────────────────────────────────────────────────────────────────── */
 /* ──────────────────────────────────────────────────────────────────────────
- * PushCursor — czerwone kółko z napisem "PUSH" podążające za kursorem/palcem,
- * widoczne gdy trzymasz butelkę (ciągłe nalewanie). Sterowane prostym store'em.
+ * LazyBottle3D — renderuje model 3D TYLKO gdy karta jest widoczna w viewport.
+ * Gdy wychodzi z widoku — odmontowuje Canvas (zwalnia kontekst WebGL).
+ * Limit aktywnych kontekstów GPU = ~8-16, więc bez lazy → crash.
+ * Fallback: SVG RowBottle (natychmiastowy).
  * ──────────────────────────────────────────────────────────────────────── */
-const pushCursor = {
-  el: null as HTMLDivElement | null,
-  on: false,
-  ensure() {
-    if (this.el || typeof document === "undefined") return;
-    const d = document.createElement("div");
-    d.className = "cx-push-cursor";
-    d.textContent = "PUSH";
-    document.body.appendChild(d);
-    this.el = d;
-    const move = (e: PointerEvent) => {
-      if (!this.el || !this.on) return;
-      this.el.style.transform = `translate(${e.clientX}px, ${e.clientY}px) translate(-50%,-50%)`;
-    };
-    window.addEventListener("pointermove", move, { passive: true });
-  },
-  show(x: number, y: number) {
-    this.ensure();
-    if (!this.el) return;
-    this.on = true;
-    this.el.style.transform = `translate(${x}px, ${y}px) translate(-50%,-50%)`;
-    this.el.classList.add("is-on");
-  },
-  hide() {
-    this.on = false;
-    if (this.el) this.el.classList.remove("is-on");
-  },
-};
+function LazyBottle3D({ id, name, color, shape, ml, real }: { id: string; name: string; color: string; shape: "wine" | "spirit" | "can" | "round"; ml: number; real: boolean }) {
+  const ref = useRef<HTMLDivElement>(null!);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => { setVisible(entries[0]?.isIntersecting ?? false); },
+      { rootMargin: "100px 0px 100px 0px", threshold: 0.1 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} style={{ width: "100%", height: "100%", position: "relative" }}>
+      {visible ? (
+        <MiniBottle3D id={id} name={name} color={color} hovered={false} playing={false} sustaining={false} />
+      ) : (
+        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.4 }}>
+          <RowBottle color={color} ml={ml} real={real} shape={shape} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * HoldTimer — circular progress indicator (2 seconds) around bottle card.
+ * When user holds for 2s, triggers pouring. Shows thick ring timer.
+ * ──────────────────────────────────────────────────────────────────────── */
+const HOLD_DURATION = 2000; // ms
+
+/* Wielojęzyczny napis nalewania (wg window.currentLanguage) */
+function getPourLabel(): string {
+  const L: Record<string, string> = {
+    it: "VERSA", pl: "LEJ", en: "POUR", de: "GIESS", fr: "VERSE", es: "VIERTE",
+  };
+  const lang = (typeof window !== "undefined" && (window as unknown as { currentLanguage?: string }).currentLanguage) || "it";
+  return L[lang] ?? "POUR";
+}
+
+/* Nazwa sekcji poniżej (do neonowego „pop" przy scrollu) — wielojęzyczna */
+function getScrollPopLabel(): string {
+  const L: Record<string, string> = {
+    it: "La Community", pl: "Społeczność", en: "Community", de: "Community", fr: "Communauté", es: "Comunidad",
+  };
+  const lang = (typeof window !== "undefined" && (window as unknown as { currentLanguage?: string }).currentLanguage) || "it";
+  return L[lang] ?? "Community";
+}
+
+/* Tekst przy scrollu W GÓRĘ — wraca do kreatora */
+function getScrollPopLabelUp(): string {
+  const L: Record<string, string> = {
+    it: "Crea Cocktail", pl: "Kreator drinków", en: "Drink Creator", de: "Drink-Creator", fr: "Créateur de cocktails", es: "Creador de cócteles",
+  };
+  const lang = (typeof window !== "undefined" && (window as unknown as { currentLanguage?: string }).currentLanguage) || "it";
+  return L[lang] ?? "Crea Cocktail";
+}
+
+function HoldTimerRing({ progress, active, x, y }: { progress: number; active: boolean; x: number; y: number }) {
+  if (!active) return null;
+  const r = 46;                 // promień łuku postępu
+  const circ = 2 * Math.PI * r;
+  // easing: szybko na początku, zwalnia przed końcem (easeOutCubic)
+  const eased = 1 - Math.pow(1 - clamp01(progress), 3);
+  const offset = circ * (1 - eased);
+  const label = getPourLabel();
+  return (
+    <div className="cx-hold-ring" style={{ position: 'absolute', left: x, top: y, transform: `translate(-50%, -50%) scale(${0.82 + eased * 0.22})`, zIndex: 10, pointerEvents: 'none' }}>
+      <svg width="124" height="124" viewBox="0 0 124 124">
+        {/* PEŁNE czerwone kółko z białym napisem */}
+        <circle cx="62" cy="62" r="34" fill="#E0341F" />
+        <circle cx="62" cy="62" r="34" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="1.5" />
+        {/* tor — pierścień z MINI ODSTĘPEM od kółka */}
+        <circle cx="62" cy="62" r={r} fill="none" stroke="rgba(8,5,10,0.5)" strokeWidth="7" />
+        {/* łuk postępu (eased) */}
+        <circle cx="62" cy="62" r={r} fill="none" stroke="#ffffff" strokeWidth="7"
+          strokeDasharray={circ} strokeDashoffset={offset}
+          strokeLinecap="round" style={{ transition: 'stroke-dashoffset 0.05s linear', transform: 'rotate(-90deg)', transformOrigin: '50% 50%' }} />
+        {/* biały napis na środku */}
+        <text x="62" y="64" textAnchor="middle" dominantBaseline="middle"
+          fill="#ffffff" fontSize="15" fontWeight="800" letterSpacing="0.06em"
+          fontFamily="Syne, sans-serif">{label}</text>
+      </svg>
+    </div>
+  );
+}
 
 /* ──────────────────────────────────────────────────────────────────────────
  * BottleCard — kafelek z butelką 3D.
  * ──────────────────────────────────────────────────────────────────────── */
 function BottleCard({
-  ing, count, disabled, onPour, onHoldAdd, onHoverReal,
+  ing, count, disabled, onPour, onStop, onHoldAdd, onHoverReal,
 }: {
   ing: Ingredient; count: number; disabled?: boolean;
-  onPour: (i: Ingredient, origin?: { x: number; y: number }) => void;
+  onPour: (i: Ingredient, origin?: { x: number; y: number }, mode?: "hold" | "tap") => void;
+  onStop?: () => void;
   onHoldAdd?: (i: Ingredient) => void;
   onHoverReal?: (i: Ingredient | null) => void;
 }) {
   const [hovered, setHovered] = useState(false);
   const [playing, setPlaying] = useState(false);
+  // sustaining = butelka leje podczas trzymania (nie auto-reset)
+  const [sustaining, setSustaining] = useState(false);
+  const [holdProgress, setHoldProgress] = useState(0);
+  const [holdActive, setHoldActive] = useState(false);
+  const [holdPos, setHoldPos] = useState({ x: 0, y: 0 });
   const btnRef = useRef<HTMLButtonElement>(null!);
-  const holdRef = useRef<{ timer: number | null; held: boolean; start: number }>({ timer: null, held: false, start: 0 });
+  const holdRef = useRef<{ raf: number | null; startTime: number; fired: boolean; cx: number; cy: number }>({ raf: null, startTime: 0, fired: false, cx: 0, cy: 0 });
   const playTimerRef = useRef<number | null>(null);
 
   // odpal natywną animację butelki (korek/butelka/ciecz) i auto-reset po jej czasie
   const playAnim = (sustain = false) => {
     if (playTimerRef.current) { clearTimeout(playTimerRef.current); playTimerRef.current = null; }
+    setSustaining(sustain);
     setPlaying(true);
-    if (!sustain) playTimerRef.current = window.setTimeout(() => setPlaying(false), 1500);
+    if (!sustain) playTimerRef.current = window.setTimeout(() => { setPlaying(false); setSustaining(false); }, 1500);
   };
   const stopAnim = () => {
     if (playTimerRef.current) { clearTimeout(playTimerRef.current); playTimerRef.current = null; }
     setPlaying(false);
+    setSustaining(false);
   };
   useEffect(() => () => { if (playTimerRef.current) clearTimeout(playTimerRef.current); }, []);
 
@@ -2523,53 +3333,120 @@ function BottleCard({
     e.currentTarget.style.setProperty("--my", `${((e.clientY - r.top) / r.height) * 100}%`);
   };
 
+  const cancelHold = () => {
+    if (holdRef.current.raf) { cancelAnimationFrame(holdRef.current.raf); holdRef.current.raf = null; }
+    setHoldActive(false);
+    setHoldProgress(0);
+    if (!holdRef.current.fired) window.dispatchEvent(new Event("cx-hold-end")); // schowaj kółko (gdy nie odpalono lania)
+  };
+
   const startHold = (clientX?: number, clientY?: number) => {
     if (disabled) return;
-    holdRef.current.held = false;
-    holdRef.current.start = Date.now();
-    // po 280ms przejdź w tryb ciągłego nalewania (+5ml co 100ms)
-    holdRef.current.timer = window.setTimeout(function tick() {
-      if (!holdRef.current.held && clientX !== undefined) pushCursor.show(clientX, clientY ?? 0);
-      holdRef.current.held = true;
-      playAnim(true); // animacja trzyma się dopóki lejemy (każdy składnik ma model 3D)
-      onHoldAdd?.(ing);
-      holdRef.current.timer = window.setTimeout(tick, 100);
-    }, 280);
+    holdRef.current.startTime = Date.now();
+    holdRef.current.fired = false;
+    
+    // Oblicz pozycję wewnątrz kafelka (bounding box)
+    const rect = btnRef.current?.getBoundingClientRect();
+    const bx = rect ? clientX! - rect.left : 0;
+    const by = rect ? clientY! - rect.top : 0;
+    
+    setHoldPos({ x: bx, y: by });
+    setHoldActive(true);
+    setHoldProgress(0);
+    // pokaż kółko VERSA w punkcie dotknięcia (ważne na telefonie — brak pointermove)
+    window.dispatchEvent(new CustomEvent("cx-hold-start", { detail: { x: clientX, y: clientY } }));
+
+    const tick = () => {
+      const elapsed = Date.now() - holdRef.current.startTime;
+      const p = Math.min(1, elapsed / HOLD_DURATION);
+      setHoldProgress(p);
+      window.dispatchEvent(new CustomEvent("cx-hold-progress", { detail: { p } }));
+      if (p >= 1 && !holdRef.current.fired) {
+        // 2 sekundy — odpal lanie NATYCHMIAST
+        holdRef.current.fired = true;
+        setHoldActive(false);
+        setHoldProgress(0);
+        window.dispatchEvent(new Event("cx-hold-fire")); // kółko zostaje pod myszą i rośnie
+        const r = btnRef.current?.getBoundingClientRect();
+        const origin = r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : undefined;
+        onPour(ing, origin, "hold"); // lanie trwa dopóki trzymasz
+        // menu z butelkami się chowa → karta się odmontuje, więc puszczenie łapiemy
+        // na poziomie window (inaczej nie wykrylibyśmy końca trzymania).
+        const release = () => {
+          window.removeEventListener("pointerup", release);
+          window.removeEventListener("pointercancel", release);
+          window.dispatchEvent(new Event("cx-pour-release"));
+          window.dispatchEvent(new Event("cx-hold-end")); // schowaj kółko
+        };
+        window.addEventListener("pointerup", release);
+        window.addEventListener("pointercancel", release);
+        return;
+      }
+      if (p < 1) holdRef.current.raf = requestAnimationFrame(tick);
+    };
+    holdRef.current.raf = requestAnimationFrame(tick);
   };
+
   const endHold = () => {
-    if (holdRef.current.timer) { clearTimeout(holdRef.current.timer); holdRef.current.timer = null; }
-    // krótkie kliknięcie (bez trybu hold) → kinowy overlay startujący z tego boksu
-    if (!holdRef.current.held && !disabled && Date.now() - holdRef.current.start < 280) {
+    const elapsed = Date.now() - holdRef.current.startTime;
+    const wasFired = holdRef.current.fired;
+    holdRef.current.fired = false;
+    cancelHold();
+    stopAnim();
+    if (wasFired) {
+      // Puszczono po przekroczeniu 2s — zatrzymaj lanie (bottle wraca na miejsce)
+      window.dispatchEvent(new Event('cx-pour-release'));
+    } else if (elapsed < 300 && !disabled) {
+      // Krótki tap — JEDNORAZOWA animacja wlewania (jedna dawka)
       const r = btnRef.current?.getBoundingClientRect();
       const origin = r ? { x: r.left + r.width / 2, y: r.top + r.height / 2 } : undefined;
-      onPour(ing, origin); // overlay przejmuje animację korka/nalewania
-    } else if (holdRef.current.held) {
-      stopAnim(); // koniec przytrzymania → butelka wraca do pozy spoczynkowej
+      onPour(ing, origin, "tap");
     }
-    pushCursor.hide();
-    holdRef.current.held = false;
   };
 
   return (
-    <button
-      ref={btnRef}
-      className={`cx-bcard ${count > 0 ? "active" : ""} ${ing.isReal ? "real" : ""}`}
-      onPointerDown={(e) => startHold(e.clientX, e.clientY)}
-      onPointerUp={endHold}
-      onPointerLeave={() => { if (holdRef.current.timer) { clearTimeout(holdRef.current.timer); holdRef.current.timer = null; } if (holdRef.current.held) stopAnim(); pushCursor.hide(); holdRef.current.held = false; setHovered(false); if (ing.isReal) onHoverReal?.(null); }}
-      onMouseMove={onMove}
-      onMouseEnter={() => { setHovered(true); if (ing.isReal) onHoverReal?.(ing); }}
-    >
-      <span className="cx-bcard-glow" aria-hidden="true" />
-      {count > 0 && <span className="cx-bcard-count">{count}</span>}
-      {ing.isReal && <span className="cx-bcard-tag">{labelFor(ing.id)}</span>}
-      <span className="cx-bcard-art">
-        <MiniBottle3D id={ing.id} name={ing.name} color={ing.color} hovered={hovered} playing={playing} />
-      </span>
-      <span className="cx-bcard-name">{ing.name}</span>
-      <span className="cx-bcard-ml">{ing.ml} ml</span>
-      <span className="cx-bcard-add">+</span>
-    </button>
+    <>
+      <button
+        ref={btnRef}
+        className={`cx-bcard ${count > 0 ? "active" : ""} ${ing.isReal ? "real" : ""} ${sustaining ? "is-pouring-sustain" : ""}`}
+        style={{"--bcard-strength": (ing.abv ?? 0) > 40 ? "#C8102E" : (ing.abv ?? 0) > 15 ? "#E8927C" : (ing.abv ?? 0) > 5 ? "#F4D03F" : "#9DC85A", "--bcard-liq": ing.color} as React.CSSProperties}
+        onPointerDown={(e) => {
+          e.currentTarget.setPointerCapture(e.pointerId);
+          startHold(e.clientX, e.clientY);
+        }}
+        onPointerUp={(e) => {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+          endHold();
+        }}
+        onPointerMove={(e) => {
+          onMove(e as unknown as React.MouseEvent<HTMLButtonElement>);
+          if (holdActive) {
+            const rect = e.currentTarget.getBoundingClientRect();
+            // constrain to bounding box
+            const bx = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+            const by = Math.max(0, Math.min(e.clientY - rect.top, rect.height));
+            setHoldPos({ x: bx, y: by });
+          }
+        }}
+        onPointerCancel={(e) => {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+          cancelHold(); stopAnim(); setHovered(false); if (ing.isReal) onHoverReal?.(null);
+        }}
+        onMouseEnter={() => { setHovered(true); if (ing.isReal) onHoverReal?.(ing); }}
+        onMouseLeave={() => { if (!holdActive) { setHovered(false); if (ing.isReal) onHoverReal?.(null); } }}
+      >
+        {/* kółko VERSA jest teraz globalne (podąża za myszą) — patrz <HoldRing/> */}
+        <span className="cx-bcard-glow" aria-hidden="true" />
+        {count > 0 && <span className="cx-bcard-count">{count}</span>}
+        {ing.isReal && <span className="cx-bcard-tag">{labelFor(ing.id)}</span>}
+        <span className="cx-bcard-art">
+          <LazyBottle3D id={ing.id} name={ing.name} color={ing.color} shape={shapeFor(ing)} ml={ing.ml} real={!!ing.isReal} />
+        </span>
+        <span className="cx-bcard-name">{ing.name}</span>
+        <span className="cx-bcard-ml">{ing.ml} ml</span>
+        <span className="cx-bcard-add">+</span>
+      </button>
+    </>
   );
 }
 
@@ -2586,7 +3463,7 @@ function AccordionPanel({
   sub?: string;
   groups: { group: string; emoji: string; items: Ingredient[] }[];
   poured: Poured[];
-  onPour: (i: Ingredient, origin?: { x: number; y: number }) => void;
+  onPour: (i: Ingredient, origin?: { x: number; y: number }, mode?: "hold" | "tap") => void;
   onHoldAdd?: (i: Ingredient) => void;
   onHoverReal?: (i: Ingredient | null) => void;
   disabled?: boolean;
@@ -2598,11 +3475,38 @@ function AccordionPanel({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(false);
+  const [strengthFilter, setStrengthFilter] = useState<string>("all");
+  const [visibleGroup, setVisibleGroup] = useState<string | null>(null);
+  const [catDropOpen, setCatDropOpen] = useState(false);
+  const [strDropOpen, setStrDropOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null!);
   const countOf = (id: string) => Math.round(poured.find((p) => p.ing.id === id)?.ml ?? 0);
   const align = side === "right" ? "right" : "left";
   const current = groups.find((g) => g.group === active) ?? null;
-  const items = current?.items ?? [];
+  // "Wszystkie" mode: show all items from all groups
+  const isAll = active === "__all__";
+  const rawItems = isAll ? groups.flatMap((g) => g.items) : (current?.items ?? []);
+  // Apply strength filter
+  const items = strengthFilter === "all" ? rawItems : rawItems.filter((i) => {
+    const abv = i.abv ?? 0;
+    if (strengthFilter === "none") return abv === 0;
+    if (strengthFilter === "low") return abv > 0 && abv <= 20;
+    if (strengthFilter === "mid") return abv > 20 && abv <= 40;
+    if (strengthFilter === "high") return abv > 40;
+    return true;
+  });
+
+  // Definicje filtra mocy (dla rozwijanej listy na mobile)
+  const STRENGTH_OPTS = [
+    { id: "all", label: "Tutti", c: "var(--cx-accent,#E8927C)", test: (_a: number) => true },
+    { id: "none", label: "Analcolici", c: "#9DC85A", test: (a: number) => a === 0 },
+    { id: "low", label: "Leggeri 1–20%", c: "#F4D03F", test: (a: number) => a > 0 && a <= 20 },
+    { id: "mid", label: "Forti 21–40%", c: "#E8927C", test: (a: number) => a > 20 && a <= 40 },
+    { id: "high", label: "Extreme 40%+", c: "#C8102E", test: (a: number) => a > 40 },
+  ];
+  const curStrength = STRENGTH_OPTS.find((o) => o.id === strengthFilter) ?? STRENGTH_OPTS[0];
+  const curCatLabel = isAll ? "Tutti" : (current?.group ?? "Tutti");
+  const curCatEmoji = isAll ? "✦" : (current?.emoji ?? "✦");
 
   const updateArrows = useCallback(() => {
     const el = scrollRef.current;
@@ -2625,8 +3529,22 @@ function AccordionPanel({
     if (typeof document !== "undefined") delete document.body.dataset.cxDrawer; };
   // jeśli druga strona przejęła drawer — zamknij tę kategorię
   useEffect(() => { if (isOpen === false && active) setActive(null); }, [isOpen, active]);
+  // SYNC atrybutu body z faktycznym stanem szuflady — inaczej zamknięcie przez nalewanie
+  // (setOpenSide(null)) zostawiało data-cx-drawer="open" i nav (header) zostawał ukryty.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (active) document.body.dataset.cxDrawer = "open";
+    else delete document.body.dataset.cxDrawer;
+  }, [active]);
   // sprzątanie atrybutu body przy odmontowaniu
   useEffect(() => () => { if (typeof document !== "undefined") delete document.body.dataset.cxDrawer; }, []);
+  // panel kategorii (bottom sheet z FAB) — blokada scrolla strony
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (mobileOpen) document.body.dataset.cxSheet = "open";
+    else delete document.body.dataset.cxSheet;
+  }, [mobileOpen]);
+  useEffect(() => () => { if (typeof document !== "undefined") delete document.body.dataset.cxSheet; }, []);
   // Escape zamyka drawer
   useEffect(() => {
     if (!active) return;
@@ -2635,6 +3553,27 @@ function AccordionPanel({
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active]);
+
+  // Scroll-based tab highlight w trybie "Tutti": podświetlaj zakładkę odpowiadającą widocznej grupie
+  useEffect(() => {
+    if (!isAll) { setVisibleGroup(null); return; }
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = () => {
+      const seps = el.querySelectorAll<HTMLElement>(".cx-car-group-sep");
+      const scrollL = el.scrollLeft;
+      const viewW = el.clientWidth;
+      let best: string | null = null;
+      seps.forEach((sep) => {
+        const off = sep.offsetLeft - scrollL;
+        if (off < viewW * 0.5) best = sep.dataset.group ?? null;
+      });
+      setVisibleGroup(best);
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [isAll]);
 
   return (
     <div className={`cx-menu cx-menu-${side} ${disabled ? "is-disabled" : ""} ${collapsed ? "is-collapsed" : ""} ${mobileOpen ? "is-mopen" : ""}`} data-align={align}>
@@ -2647,10 +3586,24 @@ function AccordionPanel({
       {/* przyciemnienie pod panelem (mobile) */}
       <div className="cx-menu-scrim" onClick={() => setMobileOpen(false)} aria-hidden="true" />
 
-      <div className="cx-menu-panel">
-        {/* okrągła strzałka chowająca panel — patrzy w stronę z której wyjechał */}
+      <div className="cx-menu-panel"
+        onTouchStart={(e) => { (e.currentTarget as any)._sy = e.touches[0].clientY; (e.currentTarget as any)._st = e.currentTarget.scrollTop; }}
+        onTouchMove={(e) => {
+          const el = e.currentTarget as any;
+          const dy = e.touches[0].clientY - el._sy;
+          // tylko gdy panel jest na górze (scrollTop 0) i ciągniemy w dół
+          if (el._st <= 0 && dy > 0) { el.style.transform = `translateY(${dy}px)`; }
+        }}
+        onTouchEnd={(e) => {
+          const el = e.currentTarget as any;
+          const m = /translateY\(([0-9.]+)px\)/.exec(el.style.transform || "");
+          const dragged = m ? parseFloat(m[1]) : 0;
+          el.style.transform = "";
+          if (dragged > 90) setMobileOpen(false); // swipe-down zamyka
+        }}>
+        {/* przycisk zamykający bottom drawer */}
         <button className="cx-menu-tuck" onClick={() => setMobileOpen(false)} aria-label="Chiudi">
-          <span className="cx-menu-tuck-ico">{side === "left" ? "←" : "→"}</span>
+          <span className="cx-menu-tuck-ico">×</span>
         </button>
 
         <div className="cx-menu-head">
@@ -2664,8 +3617,17 @@ function AccordionPanel({
           </button>
         </div>
 
-        {!collapsed && !current && (
+        {!collapsed && !current && !isAll && (
           <div className="cx-cats">
+            {/* "Tutti" button */}
+            <button key="__all__" className="cx-cat" onClick={() => openCat("__all__")} style={{ "--cat-c": "var(--cx-accent,#E8927C)" } as React.CSSProperties}>
+              <span className="cx-cat-emoji">✦</span>
+              <span className="cx-cat-txt">
+                <strong>Tutti</strong>
+                <em>{groups.reduce((s, g) => s + g.items.length, 0)} opzioni</em>
+              </span>
+              <span className="cx-cat-arrow">→</span>
+            </button>
             {groups.map((g) => {
               const used = g.items.reduce((s, it) => s + countOf(it.id), 0);
               return (
@@ -2684,15 +3646,104 @@ function AccordionPanel({
         )}
       </div>
 
-      {!collapsed && current && typeof document !== "undefined" && createPortal(
+      {!collapsed && (current || isAll) && typeof document !== "undefined" && createPortal(
         <div className="cx-drawer-wrap" data-side={side}>
           <div className="cx-drawer-backdrop" onClick={closeCat} aria-hidden="true" />
-          <div className="cx-drawer" role="dialog" aria-label={current.group}>
+          <div className="cx-drawer" role="dialog" aria-label={isAll ? "Tutti" : current!.group}
+            onTouchStart={(e) => { (e.currentTarget as any)._sy = e.touches[0].clientY; }}
+            onTouchMove={(e) => {
+              const el = e.currentTarget as any;
+              const dy = e.touches[0].clientY - el._sy;
+              if (dy > 0) el.style.transform = `translateY(${dy}px)`;
+            }}
+            onTouchEnd={(e) => {
+              const el = e.currentTarget as any;
+              const m = /translateY\(([0-9.]+)px\)/.exec(el.style.transform || "");
+              const dragged = m ? parseFloat(m[1]) : 0;
+              el.style.transform = "";
+              if (dragged > 90) closeCat();
+            }}>
+            {/* Category tabs row at top of drawer (desktop pills) */}
+            <div className="cx-drawer-tabs">
+              <button className={`cx-drawer-tab ${isAll && !visibleGroup ? "active" : isAll ? "active-parent" : ""}`} onClick={() => { setActive("__all__"); setStrengthFilter("all"); onOpenChange?.(true); }}>
+                Tutti <span className="cx-drawer-tab-count">{groups.reduce((s, g) => s + g.items.length, 0)}</span>
+              </button>
+              {groups.map((g) => (
+                <button key={g.group} className={`cx-drawer-tab ${active === g.group ? "active" : ""} ${isAll && visibleGroup === g.group ? "active" : ""}`} onClick={() => { setActive(g.group); setStrengthFilter("all"); onOpenChange?.(true); }}>
+                  <span className="cx-drawer-tab-emoji">{g.emoji}</span> {g.group} <span className="cx-drawer-tab-count">{g.items.length}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Strength filter row (desktop pills) */}
+            {side === "right" && (
+              <div className="cx-drawer-strength-filters">
+                <button className={`cx-str-btn ${strengthFilter === "all" ? "active" : ""}`} onClick={() => setStrengthFilter("all")}>
+                  Tutti <span className="cx-str-cnt">{rawItems.length}</span>
+                </button>
+                <button className={`cx-str-btn ${strengthFilter === "none" ? "active" : ""}`} onClick={() => setStrengthFilter("none")} style={{"--sf-c":"#9DC85A"} as React.CSSProperties}>
+                  <span className="cx-str-dot" /> Analcolici <span className="cx-str-cnt">{rawItems.filter(i => (i.abv ?? 0) === 0).length}</span>
+                </button>
+                <button className={`cx-str-btn ${strengthFilter === "low" ? "active" : ""}`} onClick={() => setStrengthFilter("low")} style={{"--sf-c":"#F4D03F"} as React.CSSProperties}>
+                  <span className="cx-str-dot" /> Leggeri <em>1–20%</em> <span className="cx-str-cnt">{rawItems.filter(i => { const a = i.abv ?? 0; return a > 0 && a <= 20; }).length}</span>
+                </button>
+                <button className={`cx-str-btn ${strengthFilter === "mid" ? "active" : ""}`} onClick={() => setStrengthFilter("mid")} style={{"--sf-c":"#E8927C"} as React.CSSProperties}>
+                  <span className="cx-str-dot" /> Forti <em>21–40%</em> <span className="cx-str-cnt">{rawItems.filter(i => { const a = i.abv ?? 0; return a > 20 && a <= 40; }).length}</span>
+                </button>
+                <button className={`cx-str-btn ${strengthFilter === "high" ? "active" : ""}`} onClick={() => setStrengthFilter("high")} style={{"--sf-c":"#C8102E"} as React.CSSProperties}>
+                  <span className="cx-str-dot" /> Extreme <em>40%+</em> <span className="cx-str-cnt">{rawItems.filter(i => (i.abv ?? 0) > 40).length}</span>
+                </button>
+              </div>
+            )}
+
+            {/* Rozwijane listy w jednej linii (mobile): [←] kategoria | moc */}
+            <div className="cx-drop-row">
+              <button className="cx-drop-back" onClick={closeCat} aria-label="Categorie">←</button>
+              <div className={`cx-drop cx-drop-cat ${catDropOpen ? "is-open" : ""}`}>
+                <button className="cx-drop-trigger" onClick={() => { setCatDropOpen((v) => !v); setStrDropOpen(false); }}>
+                  <span className="cx-drop-cur"><span className="cx-drop-emoji">{curCatEmoji}</span> {curCatLabel}</span>
+                  <span className="cx-drop-caret">▾</span>
+                </button>
+                <div className="cx-drop-list">
+                  <button className={`cx-drop-opt ${isAll ? "active" : ""}`} onClick={() => { setActive("__all__"); setStrengthFilter("all"); onOpenChange?.(true); setCatDropOpen(false); }}>
+                    <span className="cx-drop-emoji">✦</span> Tutti <span className="cx-drop-cnt">{groups.reduce((s, g) => s + g.items.length, 0)}</span>
+                  </button>
+                  {groups.map((g) => (
+                    <button key={g.group} className={`cx-drop-opt ${active === g.group ? "active" : ""}`} onClick={() => { setActive(g.group); setStrengthFilter("all"); onOpenChange?.(true); setCatDropOpen(false); }}>
+                      <span className="cx-drop-emoji">{g.emoji}</span> {g.group} <span className="cx-drop-cnt">{g.items.length}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Rozwijana lista mocy (mobile) — tylko po prawej (alkohole) */}
+              {side === "right" && (
+                <div className={`cx-drop cx-drop-str ${strDropOpen ? "is-open" : ""}`}>
+                  <button className="cx-drop-trigger" onClick={() => { setStrDropOpen((v) => !v); setCatDropOpen(false); }}>
+                    <span className="cx-drop-cur"><span className="cx-drop-dot" style={{ background: curStrength.c }} /> {curStrength.label}</span>
+                    <span className="cx-drop-caret">▾</span>
+                  </button>
+                  <div className="cx-drop-list">
+                    {STRENGTH_OPTS.map((o) => (
+                      <button key={o.id} className={`cx-drop-opt ${strengthFilter === o.id ? "active" : ""}`} onClick={() => { setStrengthFilter(o.id); setStrDropOpen(false); }}>
+                        <span className="cx-drop-dot" style={{ background: o.c }} /> {o.label}
+                        <span className="cx-drop-cnt">{rawItems.filter((i) => o.test(i.abv ?? 0)).length}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* Strzałki nawigacji karuzeli butelek (mobile, po prawej) */}
+              <div className="cx-drop-arrows">
+                <button className="cx-drop-arrow" disabled={!canLeft} onClick={() => scrollBy(-1)} aria-label="Precedente">‹</button>
+                <button className="cx-drop-arrow" disabled={!canRight} onClick={() => scrollBy(1)} aria-label="Successivo">›</button>
+              </div>
+            </div>
             <div className="cx-drawer-head">
               <button className="cx-back" onClick={closeCat}>
                 <span className="cx-back-ico">←</span> Categorie
               </button>
-              <span className="cx-drawer-title">{current.group} <em>· {items.length}</em></span>
+              <span className="cx-drawer-title">{isAll ? "Tutti" : current!.group} <em>· {items.length}</em></span>
               <div className="cx-drawer-arrows">
                 <button className="cx-car-nav" disabled={!canLeft} onClick={() => scrollBy(-1)} aria-label="Precedente">‹</button>
                 <button className="cx-car-nav" disabled={!canRight} onClick={() => scrollBy(1)} aria-label="Successivo">›</button>
@@ -2700,17 +3751,78 @@ function AccordionPanel({
               </div>
             </div>
 
-            {/* szeroki pasek karuzeli — 4 butelki widoczne, przewijanie w bok */}
+            {/* Grid butelek — max 10 w wierszu, przewijanie w bok */}
             <div className="cx-car-scroll" ref={scrollRef} onScroll={updateArrows}>
-              {items.map((i) => (
-                <BottleCard key={i.id} ing={i} count={countOf(i.id)} disabled={disabled} onPour={onPour} onHoldAdd={onHoldAdd} onHoverReal={onHoverReal} />
+              {isAll ? groups.map((g) => {
+                const groupItems = strengthFilter === "all" ? g.items : g.items.filter((i) => {
+                  const a = (i as any).abv ?? 0;
+                  if (strengthFilter === "none") return a === 0;
+                  if (strengthFilter === "low") return a > 0 && a <= 20;
+                  if (strengthFilter === "mid") return a > 20 && a <= 40;
+                  if (strengthFilter === "high") return a > 40;
+                  return true;
+                });
+                if (groupItems.length === 0) return null;
+                return (
+                  <React.Fragment key={g.group}>
+                    <div className="cx-car-group-sep" data-group={g.group}>
+                      <span className="cx-car-group-emoji">{g.emoji}</span>
+                      <span className="cx-car-group-name">{g.group}</span>
+                      <span className="cx-car-group-count">{groupItems.length}</span>
+                    </div>
+                    {groupItems.map((i) => (
+                      <BottleCard key={i.id} ing={i} count={countOf(i.id)} disabled={disabled} onPour={onPour} onStop={closeCat} onHoldAdd={onHoldAdd} onHoverReal={onHoverReal} />
+                    ))}
+                  </React.Fragment>
+                );
+              }) : items.map((i) => (
+                <BottleCard key={i.id} ing={i} count={countOf(i.id)} disabled={disabled} onPour={onPour} onStop={closeCat} onHoldAdd={onHoldAdd} onHoverReal={onHoverReal} />
               ))}
+              {items.length === 0 && <div style={{padding:'40px',color:'rgba(255,255,255,0.5)',fontStyle:'italic',textAlign:'center',width:'100%'}}>Brak pozycji w tej kategorii</div>}
             </div>
-            <span className="cx-drawer-hint">Tocca per una dose · tieni premuto per versare</span>
+            <span className="cx-drawer-hint">Tocca per una dose · tieni premuto per versare · {items.length} pozycji</span>
           </div>
         </div>,
         document.body,
       )}
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * LayerBar — mobilny pionowy pasek warstw (po lewej). Każdy nalany składnik to
+ * warstwa o wysokości proporcjonalnej do ml. Klik warstwy → label z nazwą/ml +
+ * przycisk usuń. Rośnie podczas lania (od dołu do góry).
+ * ──────────────────────────────────────────────────────────────────────── */
+function LayerBar({ poured, totalMl, cap, onRemove }: {
+  poured: Poured[]; totalMl: number; cap: number; onRemove: (id: string) => void;
+}) {
+  const [openId, setOpenId] = useState<string | null>(null);
+  const fillFrac = Math.min(1, totalMl / cap);
+  return (
+    <div className="cx-layerbar" aria-label="Nel bicchiere">
+      <div className="cx-layerbar-track">
+        <div className="cx-layerbar-fill" style={{ height: `${fillFrac * 100}%` }}>
+          {poured.map((p) => {
+            const h = (p.ml / Math.max(1, totalMl)) * 100;
+            return (
+              <button key={p.ing.id} className={`cx-layer ${openId === p.ing.id ? "is-open" : ""}`}
+                style={{ height: `${h}%`, background: p.ing.color }}
+                onClick={() => setOpenId(openId === p.ing.id ? null : p.ing.id)}
+                aria-label={p.ing.name}>
+                {openId === p.ing.id && (
+                  <span className="cx-layer-pop" onClick={(e) => e.stopPropagation()}>
+                    <span className="cx-layer-pop-name">{p.ing.name}</span>
+                    <span className="cx-layer-pop-ml">{Math.round(p.ml)} ml</span>
+                    <span className="cx-layer-pop-x" onClick={() => { onRemove(p.ing.id); setOpenId(null); }}>Rimuovi ×</span>
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <span className="cx-layerbar-total">{totalMl}<em>ml</em></span>
     </div>
   );
 }
@@ -2813,12 +3925,15 @@ function GlassMiniModel({ url, color }: { url: string; color: string }) {
   useLayoutEffect(() => {
     const g = groupRef.current;
     if (!g || !glass) return;
+    // WAŻNE: nie nadpisuj skali węzła! Wysoka szklanka ma scale.z≈2.38 — nadpisanie
+    // setScalar() spłaszczało ją do niskiej (stąd „ten sam model"). Normalizujemy na
+    // RODZICU i po NAJWIĘKSZYM wymiarze, więc wysoka pozostaje proporcjonalnie wyższa.
     const box = new THREE.Box3().setFromObject(glass);
     const size = new THREE.Vector3(); const center = new THREE.Vector3();
     box.getSize(size); box.getCenter(center);
-    const s = 2.5 / (size.y || 1);
-    glass.position.sub(center.multiplyScalar(s));
-    glass.scale.setScalar(s);
+    const s = 2.0 / (Math.max(size.x, size.y, size.z) || 1);
+    glass.position.sub(center);  // wyśrodkuj zachowując własną (niejednorodną) skalę
+    g.scale.setScalar(s);        // normalizacja na rodzicu
     invalidate();
   }, [glass, invalidate]);
 
@@ -2873,26 +3988,42 @@ function IceToggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => vo
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
- * GlassPicker — wybór szklanki: prawdziwy model 3D + przełącznik lodu.
+ * GlassPicker — 2 kroki: 1) filmik placeholder, 2) wybór szklanki.
  * ──────────────────────────────────────────────────────────────────────── */
 function GlassPicker({ open, color, withIce, onIceChange, onPick }: {
   open: boolean; color: string; withIce: boolean;
   onIceChange: (v: boolean) => void; onPick: (g: GlassDef, withIce: boolean) => void;
 }) {
+  const [step, setStep] = useState<"video" | "glass">("video");
+
+  // Reset na "video" gdy popout się otwiera
+  useEffect(() => { if (open) setStep("video"); }, [open]);
+
   return (
     <div className={`cx-popout ${open ? "show" : ""}`} role="dialog" aria-hidden={!open}>
       <div className="cx-popout-inner">
-        <span className="cx-mini-kicker">Scegli il bicchiere</span>
-        <h3 className="cx-popout-title">Il tuo bicchiere</h3>
-        <IceToggle on={withIce} onChange={onIceChange} />
-        <div className="cx-glass-grid">
-          {GLASSES.map((g) => (
-            <button className="cx-glass-card" key={g.id} onClick={() => onPick(g, withIce)}>
-              <span className="cx-glass-art">{open && <GlassMini3D url={g.url} color={color} />}</span>
-              <span>{g.name}</span>
-            </button>
-          ))}
-        </div>
+        {step === "video" ? (
+          <div className="cx-video-step" onClick={() => setStep("glass")}>
+            <div className="cx-video-placeholder">
+              <div className="cx-video-finger">👆</div>
+              <span className="cx-video-hint">Tieni premuto per continuare</span>
+            </div>
+          </div>
+        ) : (
+          <>
+            <span className="cx-mini-kicker">Scegli il bicchiere</span>
+            <h3 className="cx-popout-title">Il tuo bicchiere</h3>
+            <IceToggle on={withIce} onChange={onIceChange} />
+            <div className="cx-glass-grid">
+              {GLASSES.map((g) => (
+                <button className="cx-glass-card" key={g.id} onClick={() => onPick(g, withIce)}>
+                  <span className="cx-glass-art">{open && <GlassMini3D url={g.url} color={color} />}</span>
+                  <span>{g.name}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -2983,7 +4114,7 @@ function NameCard({
           <h4>{drinkName}</h4>
           <p>di {customerName} · {poured.length} ingredienti</p>
           {email.trim() && <p className="cx-name-email">📧 {email}</p>}
-          <button className="cx-btn-ghost" onClick={onReset}>↺ Nuovo drink</button>
+          <button className="cx-btn-ghost" onClick={onReset}>↺ Zacznij od nowa</button>
         </div>
       </div>
     );
@@ -3006,7 +4137,7 @@ function NameCard({
         <label>Email <em>· facoltativa</em></label>
         <input className={`cx-input ${!emailOk ? "is-err" : ""}`} type="email" placeholder="per ricevere la ricetta" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={60} />
       </div>
-      <button className="cx-btn cx-btn-full" disabled={!canSubmit} onClick={() => setDone(true)} style={{ background: color }}>
+      <button className="cx-btn cx-btn-full" disabled={!canSubmit} onClick={() => { setDone(true); if (typeof localStorage !== "undefined") { const drinks = JSON.parse(localStorage.getItem("sh-my-drinks") || "[]"); drinks.push({ name: drinkName, author: customerName, ingredients: poured.map(p => ({id: p.ing.id, name: p.ing.name, color: p.ing.color, ml: Math.round(p.ml)})), ml: Math.round(poured.reduce((s,p)=>s+p.ml,0)), strength: "—", color, saved_at: new Date().toISOString() }); localStorage.setItem("sh-my-drinks", JSON.stringify(drinks)); } }} style={{ background: color, color: '#000' }}>
         Genera QR <span className="arrow">→</span>
       </button>
     </div>
@@ -3039,8 +4170,158 @@ function OrganicFlood({ floodRef, grainRef }: { floodRef: React.RefObject<HTMLDi
 /* ──────────────────────────────────────────────────────────────────────────
  * CommunitySection — "I cocktail dei clienti" (awwwards-style karty).
  * ──────────────────────────────────────────────────────────────────────── */
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * ShareDrinkBtn — popout z podglądem live + upload zdjęcia.
+ * ──────────────────────────────────────────────────────────────────────── */
+function ShareDrinkBtn() {
+  const [open, setOpen] = useState(false);
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [sent, setSent] = useState(false);
+
+  // Czytaj dane ostatniego drinka z localStorage
+  const myDrink = (() => {
+    if (typeof localStorage === "undefined") return null;
+    try {
+      const drinks = JSON.parse(localStorage.getItem("sh-my-drinks") || "[]");
+      if (drinks.length > 0) return drinks[drinks.length - 1];
+    } catch {}
+    return null;
+  })();
+
+  // Sprawdź czy użytkownik już wysłał
+  const alreadySent = typeof localStorage !== "undefined" && localStorage.getItem("sh-drink-shared") === "true";
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => setPhoto(ev.target?.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSend = () => {
+    if (typeof localStorage !== "undefined") localStorage.setItem("sh-drink-shared", "true");
+    setSent(true);
+  };
+
+  if (alreadySent && !open) {
+    const viewLabel = (() => { const L: Record<string, string> = {it:"👁 Vedi / Modifica",pl:"👁 Zobacz / Zmień",en:"👁 View / Edit",de:"👁 Ansehen / Ändern",fr:"👁 Voir / Modifier",es:"👁 Ver / Cambiar"}; return L[((typeof window!=="undefined"&&(window as any).currentLanguage)||"it") as keyof typeof L]??L.it; })();
+    return <button className="cx-comm-share-btn cx-comm-share-done" onClick={() => setOpen(true)}>{viewLabel}</button>;
+  }
+
+  return (
+    <>
+      <button className="cx-comm-share-btn" onClick={() => setOpen(true)}>{(() => { const L: Record<string,string> = {it:"Invia →",pl:"Wyślij →",en:"Submit →",de:"Senden →",fr:"Envoyer →",es:"Enviar →"}; return L[((typeof window!=="undefined"&&(window as any).currentLanguage)||"it") as keyof typeof L]??L.it; })()}</button>
+      {open && typeof document !== "undefined" && createPortal(
+        <div className="cx-share-overlay" onClick={() => setOpen(false)}>
+          <div className="cx-share-popout" onClick={(e) => e.stopPropagation()}>
+            <button className="cx-cc-popout-close" onClick={() => setOpen(false)}>×</button>
+            {sent ? (
+              <div className="cx-share-success">
+                <span className="cx-share-success-ico">🎉</span>
+                <h3>Grazie!</h3>
+                <p>Il tuo drink è stato inviato. Hai una maggiore possibilità di vincere il <strong>Drink del Mese</strong> nella nostra carta!</p>
+              </div>
+            ) : (
+              <div className="cx-share-form">
+                <div className="cx-share-preview">
+                  {photo ? (
+                    <img src={photo} alt="Drink preview" className="cx-share-photo" />
+                  ) : (
+                    <label className="cx-share-upload">
+                      <span>📷</span>
+                      <span>Carica una foto del tuo drink</span>
+                      <input type="file" accept="image/*" onChange={handleFile} hidden />
+                    </label>
+                  )}
+                </div>
+                <div className="cx-share-info">
+                  <span className="cx-mini-kicker">Anteprima live</span>
+                  <h3>{myDrink?.name || "Il tuo drink"}</h3>
+                  {myDrink && (
+                    <div className="cx-share-details">
+                      <p><strong>{myDrink.author}</strong> · {myDrink.ml}ml · {myDrink.strength}</p>
+                      <div className="cx-share-pills">
+                        {(myDrink.ingredients || []).slice(0, 6).map((ing: any, i: number) => (
+                          <span key={i} className="cx-cc-pill"><span style={{background: ing.color}} />{ing.name}</span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {!myDrink && (
+                    <div className="cx-share-nodrink">
+                      <p>Non hai ancora creato un drink!</p>
+                      <button className="cx-btn" onClick={() => { setOpen(false); document.getElementById("cocktail-rise")?.scrollIntoView({behavior:"smooth"}); }}>
+                        Crea il tuo drink →
+                      </button>
+                    </div>
+                  )}
+                  {myDrink && <p className="cx-share-hint">La foto apparirà nella community. Più creatività = Drink del Mese!</p>}
+                  {myDrink && (
+                    <button className="cx-btn cx-share-submit" disabled={!photo} onClick={handleSend}>
+                      Pubblica nella community →
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>,
+        document.body,
+      )}
+    </>
+  );
+}
+
+function CommunityFilters({ filter, setFilter, gridMode, setGridMode }: { filter: string; setFilter: (f: string) => void; gridMode: "single" | "grid"; setGridMode: (m: "single" | "grid") => void }) {
+  const filters = [
+    { id: "all", label: "Tutti" },
+    { id: "popular", label: "🔥 Popolari" },
+    { id: "liked", label: "❤️ Più amati" },
+    { id: "featured", label: "⭐ In evidenza" },
+    { id: "strong", label: "💪 Per forza" },
+  ];
+  return (
+    <div className="cx-comm-filters">
+      <div className="cx-comm-filter-row">
+        {filters.map((f) => (
+          <button key={f.id} className={`cx-comm-filter ${filter === f.id ? "active" : ""}`} onClick={() => setFilter(f.id)}>{f.label}</button>
+        ))}
+      </div>
+      <button className="cx-comm-grid-toggle" onClick={() => setGridMode(gridMode === "single" ? "grid" : "single")} aria-label="Cambia vista">
+        {gridMode === "single" ? "⊞" : "▬"}
+      </button>
+    </div>
+  );
+}
+
 function CommunitySection({ sectionRef }: { sectionRef?: React.RefObject<HTMLElement> }) {
   const headRef = useRef<HTMLHeadingElement>(null!);
+  const [dbDrinks, setDbDrinks] = useState<any[]>([]);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [commFilter, setCommFilter] = useState("all");
+  const [gridMode, setGridMode] = useState<"single" | "grid">(() => {
+    if (typeof window !== "undefined" && window.innerWidth < 768) return "grid";
+    return "single";
+  });
+
+  const loadMoreDrinks = async () => {
+    setLoadingMore(true);
+    try {
+      const { data } = await supabase
+        .from("community_drinks")
+        .select("*")
+        .eq("is_published", true)
+        .order("likes", { ascending: false })
+        .range(0, 11);
+      if (data && data.length > 0) setDbDrinks(data);
+      // Jeśli brak danych z DB — scrolluj do dodatkowych lokalnych drinków (COMMUNITY jest już wyświetlone)
+    } catch (e) { console.error(e); }
+    setLoadingMore(false);
+  };
+
 
   // tytuł w języku strony (z window.currentLanguage); fallback do IT
   const heading = useMemo(() => {
@@ -3084,6 +4365,19 @@ function CommunitySection({ sectionRef }: { sectionRef?: React.RefObject<HTMLEle
 
   return (
     <section className="cx-community" id="ready-drinks" ref={sectionRef as React.RefObject<HTMLDivElement>}>
+      {/* Gwiazdki particle na tle */}
+      <div className="cx-stars" aria-hidden="true">
+        {Array.from({length: 50}).map((_, i) => (
+          <span key={i} className="cx-star" style={{
+            left: `${Math.random() * 100}%`,
+            top: `${Math.random() * 100}%`,
+            width: `${1 + Math.random() * 2}px`,
+            height: `${1 + Math.random() * 2}px`,
+            animationDelay: `${Math.random() * 5}s`,
+            animationDuration: `${2 + Math.random() * 4}s`,
+          } as React.CSSProperties} />
+        ))}
+      </div>
       {/* neonowe strzałki w dół — zachęta do scrolla */}
       <div className="cx-neon-arrows" aria-hidden="true">
         {[0, 1, 2].map((i) => (
@@ -3104,8 +4398,52 @@ function CommunitySection({ sectionRef }: { sectionRef?: React.RefObject<HTMLEle
           </div>
           <span className="cx-comm-count">{COMMUNITY.length}</span>
         </header>
-        <div className="cx-comm-grid">
-          {COMMUNITY.map((c) => <CommunityCard key={c.name} c={c} />)}
+        {/* Pochwal się swoim drinkiem */}
+        <div className="cx-comm-share">
+          <span className="cx-comm-share-ico">📸</span>
+          <div className="cx-comm-share-txt">
+            <strong>{(() => { const L = {it:"Condividi il tuo drink",pl:"Pochwal się swoim drinkiem",en:"Share your drink",de:"Teile deinen Drink",fr:"Partage ton cocktail",es:"Comparte tu drink"}; return L[((typeof window!=="undefined"&&(window as any).currentLanguage)||"it") as keyof typeof L]??L.it; })()}</strong>
+            <em>{(() => { const L = {it:"Invia una foto — potresti vincere il Drink del Mese!",pl:"Wyślij zdjęcie — masz szansę na Drink Miesiąca!",en:"Upload a photo — you could win Drink of the Month!",de:"Lade ein Foto hoch — gewinne den Drink des Monats!",fr:"Envoie une photo — tu pourrais gagner le Cocktail du Mois!",es:"Sube una foto — podrías ganar el Drink del Mes!"}; return L[((typeof window!=="undefined"&&(window as any).currentLanguage)||"it") as keyof typeof L]??L.it; })()}</em>
+          </div>
+          <ShareDrinkBtn />
+        </div>
+        {/* Filtry sortowania community */}
+        <CommunityFilters filter={commFilter} setFilter={setCommFilter} gridMode={gridMode} setGridMode={setGridMode} />
+        <div className={`cx-comm-grid ${gridMode === "grid" ? "cx-comm-grid-2col" : ""}`}>
+          {[...COMMUNITY].sort((a, b) => {
+            if (commFilter === "liked") return b.likes - a.likes;
+            if (commFilter === "popular") return b.comments - a.comments;
+            return 0;
+          }).map((c) => <CommunityCard key={c.name} c={c} />)}
+          {dbDrinks.map((d) => (
+            <article key={d.id} className="cx-cc" style={{"--cc-strength": d.strength_value > 0.3 ? "#C8102E" : d.strength_value > 0.15 ? "#E8927C" : "#F4D03F"} as React.CSSProperties}>
+              <div className="cx-cc-strength-bar" />
+              <div className="cx-cc-vis" style={{background: `radial-gradient(120% 90% at 30% 10%, ${d.color}22, transparent 60%)`}}>
+                <span className="cx-cc-by">by {d.author_name}</span>
+                {d.photo_url && <img src={d.photo_url} style={{width:"60%",height:"80%",objectFit:"cover",borderRadius:12,opacity:0.9}} alt={d.name} />}
+              </div>
+              <div className="cx-cc-body">
+                <h3>{d.name}</h3>
+                <div className="cx-cc-pills">
+                  {(d.ingredients||[]).slice(0,4).map((ing: any, i: number) => (
+                    <span key={i} className="cx-cc-pill"><span style={{background:ing.color}} />{ing.name}</span>
+                  ))}
+                </div>
+                <div className="cx-cc-meta">
+                  <span className="cx-cc-like">{String.fromCharCode(9829)} {d.likes}</span>
+                  <span>{d.strength_label}</span>
+                </div>
+              </div>
+            </article>
+          ))}
+        </div>
+        <div className="cx-comm-more">
+          <button className="cx-comm-more-btn" onClick={loadMoreDrinks} disabled={loadingMore}>
+            <span className="cx-comm-more-fill" style={{ transform: loadingMore ? "scaleY(1)" : "scaleY(0)" }} />
+            <span className="cx-comm-more-label">
+              {loadingMore ? "..." : (() => { const L = {it:"Scopri altri drink",pl:"Zobacz więcej drinków",en:"See more drinks",de:"Mehr Drinks entdecken",fr:"Découvrir plus de cocktails",es:"Ver más drinks"}; return L[((typeof window!=="undefined"&&(window as any).currentLanguage)||"it") as keyof typeof L]??L.it; })()} →
+            </span>
+          </button>
         </div>
       </div>
     </section>
@@ -3114,36 +4452,116 @@ function CommunitySection({ sectionRef }: { sectionRef?: React.RefObject<HTMLEle
 
 function CommunityCard({ c }: { c: (typeof COMMUNITY)[number] }) {
   const [liked, setLiked] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const [popout, setPopout] = useState(false);
+  const clickTimer = useRef<number | null>(null);
+
+  // Kolor zakładki zależy od "mocy" (ilość alkoholi w przepisie)
+  const alcCount = c.ingr.filter((id) => ALCOHOLS.some((g) => g.items.some((it) => it.id === id))).length;
+  const strengthColor = alcCount === 0 ? "#9DC85A" : alcCount <= 1 ? "#F4D03F" : alcCount <= 2 ? "#E8927C" : "#C8102E";
+
+  const handleClick = () => {
+    if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; return; }
+    clickTimer.current = window.setTimeout(() => { clickTimer.current = null; setPopout(true); }, 280);
+  };
+  const handleDblClick = (e: React.MouseEvent) => {
+    e.preventDefault(); e.stopPropagation();
+    if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; }
+    setLiked((v) => !v);
+  };
+
   return (
-    <article className="cx-cc">
-      <div className="cx-cc-vis" style={{ background: `radial-gradient(120% 90% at 30% 10%, ${c.from}22, transparent 60%)` }}>
-        <span className="cx-cc-by">by {c.by}</span>
-        <svg viewBox="0 0 80 120" className="cx-cc-glass">
-          <defs>
-            <linearGradient id={`cc-${c.by}`} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor={c.from} />
-              <stop offset="100%" stopColor={c.to} />
-            </linearGradient>
-          </defs>
-          <path d="M14 14 H66 L46 56 V96 H52 V102 H28 V96 H34 V56 Z" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" />
-          <path d="M20 18 H60 L46 48 H34 Z" fill={`url(#cc-${c.by})`} />
-        </svg>
-      </div>
-      <div className="cx-cc-body">
-        <h3>{c.name}</h3>
-        <div className="cx-cc-pills">
-          {c.ingr.slice(0, 4).map((id) => {
-            const ing = ingById(id);
-            return ing ? <span key={id} className="cx-cc-pill"><span style={{ background: ing.color }} />{ing.name}</span> : null;
-          })}
+    <>
+      <article className="cx-cc" onDoubleClick={handleDblClick} onClick={handleClick} style={{ "--cc-strength": strengthColor, "--cc-from": c.from, "--cc-to": c.to } as React.CSSProperties}>
+        <div className="cx-cc-strength-bar" />
+        <span className="cx-cc-heart-corner">♥</span>
+        <div className="cx-cc-vis">
+          <div className="cx-cc-vis-bg" />
+          <span className="cx-cc-by">by {c.by}</span>
+          <span className="cx-cc-strength-dots">{Array.from({length: Math.min(5, alcCount + 1)}).map((_, i) => <span key={i} className="cx-cc-sdot" style={{background: i < alcCount ? strengthColor : 'rgba(255,255,255,0.2)'}} />)}</span>
+          <svg viewBox="0 0 80 120" className="cx-cc-glass">
+            <defs>
+              <linearGradient id={`cc-${c.by}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={c.from} />
+                <stop offset="100%" stopColor={c.to} />
+              </linearGradient>
+            </defs>
+            <path d="M14 14 H66 L46 56 V96 H52 V102 H28 V96 H34 V56 Z" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" />
+            <path d="M20 18 H60 L46 48 H34 Z" fill={`url(#cc-${c.by})`} />
+          </svg>
         </div>
-        <p className="cx-cc-quote">“{c.quote}”</p>
-        <div className="cx-cc-meta">
-          <button className={`cx-cc-like ${liked ? "on" : ""}`} onClick={() => setLiked((v) => !v)}>♥ {c.likes + (liked ? 1 : 0)}</button>
-          <span>💬 {c.comments}</span>
+        <div className="cx-cc-body">
+          <h3>{c.name}</h3>
+          <div className="cx-cc-pills">
+            {c.ingr.slice(0, 4).map((id) => {
+              const ing = ingById(id);
+              return ing ? <span key={id} className="cx-cc-pill"><span style={{ background: ing.color }} />{ing.name}</span> : null;
+            })}
+          </div>
+          <p className="cx-cc-quote">“{c.quote}”</p>
+          {expanded && (
+            <div className="cx-cc-comments-list">
+              <p className="cx-cc-cmt">Excellent, worth trying! — Guest</p>
+              <p className="cx-cc-cmt">Perfect for sunset — Luca</p>
+            </div>
+          )}
+          <div className="cx-cc-meta">
+            <button className={`cx-cc-like ${liked ? "on" : ""}`} onClick={(e) => { e.stopPropagation(); setLiked((v) => !v); }}>♥ {c.likes + (liked ? 1 : 0)}</button>
+            <button className="cx-cc-cmt-btn" onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }}>\uD83D\uDCAC {c.comments}</button>
+          </div>
         </div>
-      </div>
-    </article>
+      </article>
+
+      {/* Popout — Instagram-style detail view */}
+      {popout && typeof document !== "undefined" && createPortal(
+        <div className="cx-cc-popout-overlay" onClick={() => setPopout(false)}>
+          <div className="cx-cc-popout" onClick={(e) => e.stopPropagation()}>
+            <button className="cx-cc-popout-close" onClick={() => setPopout(false)}>×</button>
+            <div className="cx-cc-popout-left">
+              <svg viewBox="0 0 200 300" className="cx-cc-popout-glass">
+                <defs>
+                  <linearGradient id={`ccp-${c.by}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={c.from} />
+                    <stop offset="100%" stopColor={c.to} />
+                  </linearGradient>
+                </defs>
+                <path d="M35 35 H165 L115 140 V240 H130 V255 H70 V240 H85 V140 Z" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.35)" strokeWidth="2" />
+                <path d="M50 42 H150 L115 130 H85 Z" fill={`url(#ccp-${c.by})`} />
+              </svg>
+            </div>
+            <div className="cx-cc-popout-right">
+              <div className="cx-cc-popout-header">
+                <span className="cx-cc-popout-by">by {c.by}</span>
+                <h3 className="cx-cc-popout-name">{c.name}</h3>
+                <div className="cx-cc-popout-strength" style={{ color: strengthColor }}>
+                  <span className="cx-cc-popout-dot" style={{ background: strengthColor }} />
+                  {alcCount === 0 ? "Analcolico" : alcCount <= 1 ? "Leggero" : alcCount <= 2 ? "Medio" : "Forte"}
+                </div>
+              </div>
+              <div className="cx-cc-popout-ingr">
+                <span className="cx-cc-popout-label">Ingredienti</span>
+                <div className="cx-cc-popout-pills">
+                  {c.ingr.map((id) => {
+                    const ing = ingById(id);
+                    return ing ? <span key={id} className="cx-cc-pill"><span style={{ background: ing.color }} />{ing.name}</span> : null;
+                  })}
+                </div>
+              </div>
+              <div className="cx-cc-popout-comments">
+                <span className="cx-cc-popout-label">Commenti ({c.comments})</span>
+                <p className="cx-cc-cmt">“Excellent, worth trying!” — Guest</p>
+                <p className="cx-cc-cmt">“Perfect for sunset” — Luca</p>
+                <p className="cx-cc-cmt">“{c.quote}” — {c.by}</p>
+              </div>
+              <div className="cx-cc-popout-actions">
+                <button className={`cx-cc-like ${liked ? "on" : ""}`} onClick={() => setLiked((v) => !v)}>♥ {c.likes + (liked ? 1 : 0)}</button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
+    </>
   );
 }
 
@@ -3187,7 +4605,6 @@ function CocktailStyles() {
       .cx-title .cx-mini-kicker { margin-bottom:12px; color:var(--c-coral,#E8927C); }
       .cx-title h2 { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:clamp(32px,5.4vw,76px); line-height:0.92; letter-spacing:-0.035em; color:#fff; margin:0; text-wrap:balance; }
       .cx-title h2 em { font-family:var(--f-serif,"Instrument Serif",serif); font-style:italic; font-weight:400; color:var(--cx-accent,#E8927C); letter-spacing:0; }
-      .cx-title-sub { font-family:var(--f-serif,"Instrument Serif",serif); font-style:italic; font-size:clamp(14px,1.5vw,18px); color:rgba(255,255,255,0.55); margin:10px 0 0; }
 
       /* miernik mocy — 5 segmentów (kropli) */
       .cx-strength { display:inline-flex; align-items:center; gap:12px; margin-top:18px; padding:9px 18px; border-radius:999px;
@@ -3236,9 +4653,17 @@ function CocktailStyles() {
       .cx-collapse-ico.is-closed::after { transform:scaleY(1); }
 
       /* Kategorie (poziom 1) — solidne kafelki (bez przezroczystości) */
-      .cx-cats { display:flex; flex-direction:column; gap:10px; flex:1 1 auto; min-height:0; overflow-y:auto; padding:2px; }
+      .cx-cats { display:flex; flex-direction:column; gap:6px; flex:1 1 auto; min-height:0; overflow-y:auto; padding:4px 2px; }
       .cx-cats::-webkit-scrollbar { width:3px; } .cx-cats::-webkit-scrollbar-thumb { background:rgba(255,255,255,0.15); border-radius:3px; }
-      .cx-cat { position:relative; display:flex; align-items:center; gap:14px; padding:15px 16px; cursor:pointer; text-align:left; color:#fff;
+
+      /* Pastylki mocy */
+      .cx-strength-pills { display:flex; flex-direction:column; gap:6px; padding:10px 12px; margin-bottom:8px; border-radius:14px;
+        background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); }
+      .cx-strength-pills-drawer { flex:0 0 auto; margin-bottom:0; margin-right:8px; min-width:120px; align-self:center; }
+      .cx-pill-item { display:flex; align-items:center; gap:8px; font-size:11px; font-weight:600; color:rgba(255,255,255,0.8); letter-spacing:0.02em; }
+      .cx-pill-item em { font-style:normal; font-size:10px; color:rgba(255,255,255,0.45); margin-left:auto; }
+      .cx-pill-dot-s { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+      .cx-cat { position:relative; display:flex; align-items:center; gap:14px; padding:13px 14px; cursor:pointer; text-align:left; color:#fff;
         border-radius:16px; background:linear-gradient(135deg, color-mix(in srgb, var(--cat-c,#888) 14%, #15171c), #111216); border:1px solid rgba(255,255,255,0.09);
         box-shadow:0 10px 26px rgba(0,0,0,0.32); transition:transform .3s cubic-bezier(.2,.8,.2,1), background .3s, border-color .3s, box-shadow .3s; overflow:hidden; }
       .cx-cat::before { content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--cat-c,var(--cx-accent,#E8927C)); opacity:0.65; transition:opacity .3s, width .3s; }
@@ -3246,11 +4671,11 @@ function CocktailStyles() {
       .cx-menu[data-align="right"] .cx-cat { flex-direction:row-reverse; text-align:right; }
       .cx-cat:hover { transform:translateY(-2px); background:linear-gradient(135deg, color-mix(in srgb, var(--cat-c,#888) 24%, #15171c), #14161b); border-color:color-mix(in srgb, var(--cat-c,#E8927C) 50%, transparent); box-shadow:0 16px 40px rgba(0,0,0,0.45); }
       .cx-cat:hover::before { opacity:1; width:5px; }
-      .cx-cat-emoji { width:42px; height:42px; flex-shrink:0; display:grid; place-items:center; font-size:20px; border-radius:13px;
+      .cx-cat-emoji { width:36px; height:36px; flex-shrink:0; display:grid; place-items:center; font-size:17px; border-radius:11px;
         background:radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--cat-c,#888) 40%, transparent), rgba(255,255,255,0.04));
         box-shadow:inset 0 1px 0 rgba(255,255,255,0.25), 0 6px 14px rgba(0,0,0,0.3); }
       .cx-cat-txt { display:flex; flex-direction:column; gap:2px; flex:1; }
-      .cx-cat-txt strong { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:16px; letter-spacing:0.02em; }
+      .cx-cat-txt strong { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:14px; letter-spacing:0.02em; }
       .cx-cat-txt em { font-family:var(--f-serif,"Instrument Serif",serif); font-style:italic; font-size:12px; color:rgba(255,255,255,0.55); }
       .cx-cat-badge { min-width:20px; height:20px; padding:0 6px; display:grid; place-items:center; border-radius:999px; background:var(--c-coral,#E8927C); color:#fff; font-weight:800; font-size:10px; }
       .cx-cat-arrow { color:var(--cx-accent,#E8927C); font-size:15px; opacity:0.7; transition:transform .3s; }
@@ -3268,10 +4693,12 @@ function CocktailStyles() {
         pointer-events:auto; animation:cxFade .35s ease; }
       @keyframes cxFade { from { opacity:0; } to { opacity:1; } }
       .cx-drawer { position:absolute; left:0; right:0; bottom:0; pointer-events:auto; display:flex; flex-direction:column; gap:12px;
-        padding:18px clamp(20px,4vw,60px) 22px; background:linear-gradient(180deg, rgba(14,11,14,0.6) 0%, rgba(14,11,14,0.96) 30%, #0e0b0e 100%);
-        border-top:1px solid rgba(255,255,255,0.1); box-shadow:0 -30px 80px rgba(0,0,0,0.6);
+        padding:18px clamp(20px,4vw,60px) 22px; background:rgba(14,11,14,0.75); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+        border-top:1px solid rgba(255,255,255,0.12); box-shadow:0 -30px 80px rgba(0,0,0,0.6);
         animation:cxDrawerUp .5s cubic-bezier(.2,.85,.2,1); }
       @keyframes cxDrawerUp { from { transform:translateY(60px); opacity:0; } to { transform:none; opacity:1; } }
+      /* blokada scrolla strony gdy otwarta szuflada butelek / panel kategorii */
+      body[data-cx-drawer="open"], body[data-cx-sheet="open"] { overflow:hidden !important; touch-action:none; }
       .cx-drawer-head { display:flex; align-items:center; gap:16px; max-width:1240px; width:100%; margin:0 auto; }
       .cx-drawer-title { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:18px; letter-spacing:0.04em; color:#fff; }
       .cx-drawer-title em { font-style:normal; color:rgba(255,255,255,0.4); font-size:14px; }
@@ -3279,6 +4706,20 @@ function CocktailStyles() {
       .cx-drawer-close { width:38px; height:38px; display:grid; place-items:center; border-radius:50%; margin-left:6px;
         background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); color:#fff; font-size:22px; line-height:1; cursor:pointer; transition:all .25s; }
       .cx-drawer-close:hover { background:#d9745c; border-color:transparent; transform:rotate(90deg); }
+      /* Drawer category tabs — scrollable row at top */
+      .cx-drawer-tabs { display:flex; gap:8px; max-width:1240px; width:100%; margin:0 auto; overflow-x:auto; scrollbar-width:none;
+        -ms-overflow-style:none; padding:0 2px 4px; }
+      .cx-drawer-tabs::-webkit-scrollbar { display:none; }
+      .cx-drawer-tab { padding:8px 16px; border-radius:999px; white-space:nowrap; cursor:pointer;
+        font-family:var(--f-display,"Syne",serif); font-weight:700; font-size:12px; letter-spacing:0.04em;
+        color:rgba(255,255,255,0.7); background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12);
+        transition:all .25s; }
+      .cx-drawer-tab:hover { background:rgba(255,255,255,0.12); color:#fff; }
+      .cx-drawer-tab.active { background:var(--cx-accent,#E8927C); color:#fff; border-color:transparent; box-shadow:0 4px 12px rgba(232,146,124,0.4); }
+      .cx-drawer-tab.active-parent { background:rgba(232,146,124,0.25); color:#fff; border-color:rgba(232,146,124,0.4); }
+      .cx-drawer-tab-emoji { margin-right:4px; }
+      .cx-drawer-tab-count { font-size:10px; opacity:0.6; margin-left:4px; background:rgba(255,255,255,0.15); padding:1px 5px; border-radius:8px; }
+      .cx-drawer-tab.active .cx-drawer-tab-count { background:rgba(255,255,255,0.25); }
       .cx-drawer-hint { display:block; text-align:center; font-family:var(--f-serif,"Instrument Serif",serif); font-style:italic;
         font-size:12px; color:rgba(255,255,255,0.45); }
       .cx-car-nav { width:36px; height:36px; display:grid; place-items:center; border-radius:50%;
@@ -3290,41 +4731,78 @@ function CocktailStyles() {
         background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); cursor:pointer; transition:gap .25s, background .25s; }
       .cx-back:hover { gap:12px; background:rgba(255,255,255,0.1); }
       .cx-back-ico { font-size:15px; }
-      /* pasek karuzeli — 4 butelki w pełni widoczne */
+      /* karuzela butelek — JEDEN WIERSZ, scroll poziomy ze strzałkami */
       .cx-car-scroll { display:flex; gap:16px; max-width:1240px; width:100%; margin:0 auto; overflow-x:auto; overflow-y:hidden;
-        scroll-snap-type:x mandatory; scrollbar-width:none; -ms-overflow-style:none; padding:4px 2px 8px; }
+        scroll-snap-type:x proximity; scrollbar-width:none; -ms-overflow-style:none; padding:4px 2px 8px;
+        scroll-behavior:smooth; -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain; touch-action:pan-x; }
       .cx-car-scroll::-webkit-scrollbar { display:none; height:0; }
-      .cx-car-scroll > .cx-bcard { flex:0 0 calc((100% - 48px) / 4); scroll-snap-align:start; height:300px; }
-      @media (max-width:900px){ .cx-car-scroll > .cx-bcard { flex:0 0 calc((100% - 16px) / 2); } }
+      /* Separator grup w trybie "Tutti" */
+      .cx-car-group-sep { flex:0 0 auto; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; padding:0 12px; min-width:60px; align-self:stretch; border-left:2px solid rgba(255,255,255,0.1); }
+      .cx-car-group-sep:first-child { border-left:none; }
+      .cx-car-group-emoji { font-size:20px; }
+      .cx-car-group-name { font-family:var(--f-display,"Syne",serif); font-weight:700; font-size:10px; letter-spacing:0.08em; text-transform:uppercase; color:rgba(255,255,255,0.7); text-align:center; white-space:nowrap; }
+      .cx-car-group-count { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:11px; color:var(--cx-accent,#E8927C); }
+      .cx-car-scroll > .cx-bcard { flex:0 0 calc((100% - 64px) / 5); min-width:140px; scroll-snap-align:start; height:260px; }
+      @media (max-width:1200px){ .cx-car-scroll > .cx-bcard { flex:0 0 calc((100% - 36px) / 3); } }
+      @media (max-width:900px){ .cx-car-scroll > .cx-bcard { flex:0 0 calc((100% - 16px) / 2); height:240px; } }
+
+      /* Strength filter buttons */
+      .cx-drawer-strength-filters { display:flex; gap:6px; max-width:1240px; width:100%; margin:0 auto; overflow-x:auto; scrollbar-width:none; padding:0 2px; }
+      .cx-drawer-strength-filters::-webkit-scrollbar { display:none; }
+      .cx-str-btn { display:inline-flex; align-items:center; gap:5px; padding:6px 12px; border-radius:999px; white-space:nowrap; cursor:pointer;
+        font-family:var(--f-display,"Syne",serif); font-weight:700; font-size:11px; letter-spacing:0.04em;
+        color:rgba(255,255,255,0.6); background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1);
+        transition:all .25s; }
+      .cx-str-btn:hover { background:rgba(255,255,255,0.1); color:#fff; }
+      .cx-str-btn.active { background:color-mix(in srgb, var(--sf-c, var(--cx-accent,#E8927C)) 25%, rgba(20,18,26,0.9));
+        border-color:var(--sf-c, var(--cx-accent,#E8927C)); color:#fff; }
+      .cx-str-dot { width:8px; height:8px; border-radius:50%; background:var(--sf-c, #aaa); }
+      .cx-str-cnt { font-size:10px; opacity:0.6; margin-left:2px; }
+
+      /* Rozwijane listy (kategorie / moc) — domyślnie ukryte (desktop używa pigułek) */
+      .cx-drop { display:none; }
+      .cx-drop-row { display:none; }
 
       /* Boks butelki — SOLIDNY (bez glass), z modelem 3D w środku */
       .cx-bcard { position:relative; display:flex; flex-direction:column; align-items:center; gap:6px; padding:16px 10px 14px; cursor:pointer;
-        border-radius:20px; background:rgba(255,255,255,0.04);
-        border:1px solid rgba(255,255,255,0.08); color:#fff; text-align:center;
-        box-shadow:0 12px 32px rgba(0,0,0,0.38), inset 0 1px 0 rgba(255,255,255,0.06); transition:transform .35s cubic-bezier(.2,.8,.2,1), box-shadow .35s, border-color .3s, background .3s; }
+        border-radius:20px; background:radial-gradient(ellipse at 50% 70%, color-mix(in srgb, var(--bcard-liq, #888) 12%, transparent), transparent 70%), rgba(12,10,14,0.85);
+        border:1px solid color-mix(in srgb, var(--bcard-strength, rgba(255,255,255,0.1)) 40%, transparent); color:#fff; text-align:center;
+        box-shadow:0 8px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06); transition:transform .35s cubic-bezier(.2,.8,.2,1), box-shadow .35s, border-color .3s, background .3s; }
       .cx-bcard::after { content:""; position:absolute; left:50%; bottom:46px; width:60%; height:14px; transform:translateX(-50%); border-radius:50%; background:rgba(0,0,0,0.5); filter:blur(7px); opacity:0; transition:opacity .35s; pointer-events:none; }
       .cx-bcard:hover { transform:translateY(-4px); background:rgba(255,255,255,0.07); border-color:rgba(232,146,124,0.5); box-shadow:0 22px 50px rgba(0,0,0,0.5); }
       .cx-bcard:hover::after { opacity:0.5; }
       .cx-bcard.active { border-color:var(--cx-accent,#E8927C); background:rgba(232,146,124,0.12); }
+      /* Stan trzymania (lanie ciągłe) — pulsujące pomarańczowe obramowanie */
+      .cx-bcard.is-pouring-sustain { border-color:var(--cx-accent,#E8927C); background:rgba(232,146,124,0.18);
+        box-shadow:0 0 0 0 rgba(232,146,124,0.6); animation:cxSustainPulse 0.9s ease-in-out infinite; }
+      @keyframes cxSustainPulse {
+        0%,100% { box-shadow:0 0 0 0 rgba(232,146,124,0.5), 0 12px 32px rgba(0,0,0,0.38); }
+        50% { box-shadow:0 0 0 6px rgba(232,146,124,0.0), 0 18px 40px rgba(232,146,124,0.3); }
+      }
       .cx-bcard-glow { position:absolute; inset:0; border-radius:20px; pointer-events:none; opacity:0; transition:opacity .3s;
         background:radial-gradient(160px circle at var(--mx,50%) var(--my,50%), rgba(232,146,124,0.22), transparent 60%); }
       .cx-bcard:hover .cx-bcard-glow { opacity:1; }
       .cx-bcard-art { width:100%; flex:1 1 auto; min-height:0; display:flex; align-items:center; justify-content:center; }
+      .cx-bcard-art .cx-rb { width:60%; height:auto; max-height:100%; filter:drop-shadow(0 4px 12px rgba(0,0,0,0.4)); }
       .cx-mini-canvas { width:100% !important; height:100% !important; display:block; pointer-events:none; }
-      .cx-bcard-name { font-size:12px; font-weight:700; line-height:1.2; letter-spacing:0.05em; text-transform:uppercase; }
+      .cx-bcard-name { font-size:11px; font-weight:800; line-height:1.15; letter-spacing:0.03em; text-transform:uppercase;
+        text-shadow:0 1px 3px rgba(0,0,0,0.5); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; padding:0 2px; }
       .cx-bcard-ml { font-family:var(--f-serif,"Instrument Serif",serif); font-style:italic; font-size:13px; color:var(--cx-accent,#E8927C); }
       .cx-bcard-add { position:absolute; bottom:12px; right:12px; width:24px; height:24px; display:grid; place-items:center; border-radius:50%;
         background:var(--cx-accent,#E8927C); color:#fff; font-size:15px; opacity:0; transition:all .25s; box-shadow:0 6px 16px rgba(232,146,124,0.5); }
       .cx-bcard:hover .cx-bcard-add { opacity:1; }
       .cx-bcard-count { position:absolute; top:12px; left:12px; min-width:22px; height:22px; padding:0 6px; display:grid; place-items:center; border-radius:999px;
         background:var(--cx-accent,#E8927C); color:#fff; font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:11px; z-index:1; box-shadow:0 4px 10px rgba(232,146,124,0.5); }
-      .cx-bcard-tag { position:absolute; top:12px; right:12px; padding:3px 8px; border-radius:999px; z-index:1;
-        background:rgba(0,0,0,0.4); border:1px solid rgba(255,255,255,0.14); color:rgba(255,255,255,0.85);
-        font-family:var(--f-serif,"Instrument Serif",serif); font-style:italic; font-size:10px; letter-spacing:0.02em; }
+      .cx-bcard-tag { position:absolute; top:12px; right:12px; padding:5px 12px; border-radius:999px; z-index:1;
+        background:rgba(0,0,0,0.7); border:1px solid rgba(255,255,255,0.35); color:#ffffff;
+        font-family:var(--f-display,"Syne",serif); font-style:normal; font-size:14px; letter-spacing:0.06em; font-weight:800;
+        text-shadow:0 1px 3px rgba(0,0,0,0.6); box-shadow:0 2px 8px rgba(0,0,0,0.4); }
 
       /* chowanie SAMEGO menu (kart) podczas nalewania — reszta UI zostaje */
       .cx-menu.is-collapsed .cx-carousel, .cx-menu.is-collapsed .cx-cats { display:none; }
-      .cx-col.is-pouring .cx-carousel, .cx-col.is-pouring .cx-cats { opacity:0; transform:translateY(10px) scale(0.97); pointer-events:none; transition:opacity .4s ease, transform .4s ease; }
+      .cx-col.is-pouring { opacity:0.6; pointer-events:none; transition:opacity .5s ease; }
+      .cx-col-left.is-pouring { }
+      .cx-col-right.is-pouring { }
 
       /* Come funziona — premium, negative space, jedno pod drugim */
       .cx-howto { flex-shrink:0; padding:20px 18px; border-radius:20px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); }
@@ -3339,6 +4817,13 @@ function CocktailStyles() {
       .cx-howto-qr p { font-size:12px; color:rgba(255,255,255,0.6); line-height:1.4; margin:0; }
       .cx-howto-qr strong { color:#fff; }
       @media (max-height:880px){ .cx-howto{ display:none; } }
+
+      /* Reset button above right categories */
+      .cx-reset-top { flex-shrink:0; padding:8px 14px; border-radius:999px; font-family:var(--f-display,"Syne",serif);
+        font-weight:700; font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:rgba(255,255,255,0.7);
+        background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); cursor:pointer; transition:all .25s;
+        align-self:flex-end; }
+      .cx-reset-top:hover { border-color:var(--cx-accent,#E8927C); color:#fff; background:rgba(232,146,124,0.15); }
 
       /* SHAKE button */
       .cx-shake { flex-shrink:0; margin-top:6px; display:inline-flex; align-items:center; justify-content:center; gap:12px; padding:18px 26px;
@@ -3358,9 +4843,10 @@ function CocktailStyles() {
       .cx-table { position:absolute; left:50%; bottom:clamp(20px,4vh,42px); transform:translateX(-50%); z-index:7;
         width:min(440px,72vw); padding:18px 20px; border-radius:22px; pointer-events:auto; will-change:transform,opacity;
         background:#12252f; border:1px solid rgba(255,255,255,0.08);
-        box-shadow:0 24px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08); }
+        box-shadow:0 24px 64px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08);
+        transition:opacity .45s cubic-bezier(.2,.8,.2,1), transform .45s cubic-bezier(.2,.8,.2,1); }
       .cx-table-head { display:flex; justify-content:space-between; align-items:baseline; font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:11px; letter-spacing:0.16em; text-transform:uppercase; color:rgba(255,255,255,0.7); margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.1); }
-      .cx-table.is-hidden { opacity:0; pointer-events:none; transform:translateX(-50%) translateY(12px); }
+      .cx-table.is-hidden { opacity:0; pointer-events:none; transform:translateX(-50%) translateY(20px); }
       .cx-table-head span:last-child { color:var(--cx-accent,#E8927C); font-size:14px; }
       .cx-table-empty { font-family:var(--f-serif,"Instrument Serif",serif); font-style:italic; font-size:15px; opacity:0.55; text-align:center; margin:4px 0; }
       .cx-table ul { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:7px; max-height:20vh; overflow-y:auto; scrollbar-width:none; -ms-overflow-style:none; }
@@ -3378,7 +4864,8 @@ function CocktailStyles() {
       .cx-table.is-gift { background:transparent; border-color:transparent; box-shadow:none; }
 
       /* Prezent "Odbierz drinka" */
-      .cx-gift { display:flex; flex-direction:column; align-items:center; gap:14px; width:100%; padding:8px; cursor:pointer; background:none; border:none; }
+      .cx-gift { display:flex; flex-direction:column; align-items:center; gap:14px; width:100%; padding:8px; cursor:pointer; background:none; border:none; animation:cxGiftFloat 3s ease-in-out infinite; }
+      @keyframes cxGiftFloat { 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-6px); } }
       .cx-gift-stars { display:flex; gap:16px; color:var(--cx-accent,#E8927C); font-size:18px; }
       .cx-gift-stars span { animation:cxTwinkle 1.6s ease-in-out infinite; }
       .cx-gift-stars span:nth-child(2){ animation-delay:.4s; } .cx-gift-stars span:nth-child(3){ animation-delay:.8s; }
@@ -3387,7 +4874,9 @@ function CocktailStyles() {
       .cx-gift:hover .cx-gift-box { transform:translateY(-4px) scale(1.05); }
       .cx-gift-body { position:absolute; left:8px; bottom:0; width:68px; height:54px; border-radius:8px; background:linear-gradient(135deg, var(--cx-accent,#E8927C), #d9745c); box-shadow:0 12px 28px rgba(232,146,124,0.45); }
       .cx-gift-lid { position:absolute; left:2px; top:14px; width:80px; height:20px; border-radius:7px; background:linear-gradient(135deg, #f0a48f, #e07d63); transition:transform .35s cubic-bezier(.3,1.5,.5,1); z-index:2; }
-      .cx-gift:hover .cx-gift-lid { transform:translateY(-6px) rotate(-4deg); }
+      .cx-gift:hover .cx-gift-lid { transform:translateY(-12px) rotate(-8deg); }
+      .cx-gift:active .cx-gift-lid { transform:translateY(-20px) rotate(-15deg) scale(1.05); }
+      .cx-gift:active .cx-gift-body { transform:scale(0.96); }
       .cx-gift-ribbon { position:absolute; left:38px; bottom:0; width:8px; height:68px; background:rgba(255,255,255,0.75); z-index:3; }
       .cx-gift-label { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:14px; letter-spacing:0.1em; text-transform:uppercase; color:#fff; }
 
@@ -3401,6 +4890,10 @@ function CocktailStyles() {
         12% { opacity:1; }
         100% { opacity:0; transform:translate(var(--tx), var(--ty)) rotate(var(--rot)); }
       }
+
+      /* Hold timer ring — circular progress around bottle during 2s hold */
+      .cx-hold-ring { position:fixed; z-index:96; pointer-events:none; transform:translate(-50%,-50%);
+        filter:drop-shadow(0 0 8px rgba(232,146,124,0.6)); }
 
       /* PUSH cursor — czerwone kółko podążające za kursorem podczas przytrzymania */
       .cx-push-cursor { position:fixed; left:0; top:0; z-index:95; width:60px; height:60px; border-radius:50%;
@@ -3435,7 +4928,7 @@ function CocktailStyles() {
       .cx-name-info p { font-size:12px; color:rgba(255,255,255,0.6); margin:0 0 8px; }
 
       /* Canvas */
-      .cx-canvas { position:absolute; inset:0; z-index:5; }
+      .cx-canvas { position:absolute; inset:0; z-index:5; touch-action:pan-y; }
 
       /* Kinowy overlay nalewania — blur tła + duża butelka na środku */
       .cx-pour-overlay { position:fixed; inset:0; z-index:80; pointer-events:none;
@@ -3443,7 +4936,45 @@ function CocktailStyles() {
         animation:cxPourIn .3s ease both; }
       .cx-pour-overlay.is-blur { background:rgba(8,6,9,0.46); backdrop-filter:blur(16px) saturate(1.1); -webkit-backdrop-filter:blur(16px) saturate(1.1); }
       @keyframes cxPourIn { from { opacity:0; } to { opacity:1; } }
-      .cx-pour-canvas { width:100% !important; height:100% !important; display:block; }
+      .cx-pour-canvas { width:100% !important; height:100% !important; display:block;
+        mask-image:linear-gradient(to bottom, black 0%, black 82%, transparent 98%);
+        -webkit-mask-image:linear-gradient(to bottom, black 0%, black 82%, transparent 98%); }
+
+      /* Miarka napełnienia szejkera (3D, OBOK szejkera) — segmenty w kolorach trunków,
+         max wysokość = pojemność. Widoczna tylko podczas lania. */
+      .cx-gauge { position:fixed; left:calc(50% - min(170px,40vw)); top:54%; z-index:95; pointer-events:none;
+        height:min(42vh,380px); width:54px; display:flex; flex-direction:column; align-items:center; gap:7px;
+        opacity:0; transition:opacity .4s ease;
+        transform:translateY(-50%) perspective(800px) rotateY(16deg); transform-origin:right center; }
+      .cx-gauge-right { left:auto; right:calc(50% - min(170px,40vw));
+        transform:translateY(-50%) perspective(800px) rotateY(-16deg); transform-origin:left center; }
+      .cx-gauge-cap { font-family:var(--f-display,sans-serif); font-weight:800; font-size:10px; letter-spacing:.18em; color:rgba(255,255,255,.7); }
+      .cx-gauge-tube { position:relative; flex:1; width:34px; border-radius:9px;
+        background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.28);
+        overflow:hidden; box-shadow:inset 0 0 14px rgba(0,0,0,.5), 0 10px 30px rgba(0,0,0,.4); }
+      .cx-gauge-stack { position:absolute; inset:0; display:flex; flex-direction:column-reverse; }
+      .cx-gauge-seg { width:100%; border-top:1.5px solid rgba(255,255,255,0.55); box-shadow:inset 0 1px 6px rgba(255,255,255,.18); }
+      .cx-gauge-live { position:absolute; left:0; right:0; bottom:0; height:0; opacity:0;
+        border-top:2px solid #fff; box-shadow:0 0 14px rgba(255,255,255,.5); transition:opacity .15s linear; }
+      .cx-gauge-pct { font-family:var(--f-display,sans-serif); font-weight:800; font-size:13px; color:#fff; letter-spacing:.04em; text-shadow:0 1px 5px rgba(0,0,0,.7); }
+
+      /* Kółko VERSA podążające za myszą */
+      .cx-holdring { position:fixed; left:0; top:0; z-index:97; pointer-events:none; opacity:0;
+        transition:opacity .3s ease; will-change:transform; filter:drop-shadow(0 6px 18px rgba(0,0,0,.45)); }
+      .cx-holdring[data-mode="pour"] .cx-holdring-track { opacity:0; }
+
+      /* Neonowy „pop" na ścianie podczas scrollu (strzałka + nazwa sekcji niżej) */
+      .cx-scrollpop { position:absolute; left:50%; top:35%; z-index:7; pointer-events:none; opacity:0;
+        display:flex; flex-direction:column; align-items:center; gap:14px; text-align:center;
+        transform:translate(-50%,-50%) scale(.86); transition:opacity .25s ease; will-change:transform,opacity; }
+      .cx-scrollpop-label { font-family:var(--f-display,sans-serif); font-weight:800;
+        font-size:clamp(30px,6.5vw,78px); letter-spacing:.04em; text-transform:uppercase; line-height:1; color:#eafdff;
+        text-shadow:0 0 6px #5BE1FF, 0 0 18px #5BE1FF, 0 0 42px rgba(91,225,255,.8);
+        transition:filter .6s ease, transform .6s ease, opacity .4s ease; }
+      .cx-scrollpop-label[data-morphing] { filter:blur(8px); transform:scale(0.92); opacity:0.4; }
+      .cx-scrollpop-arrow { font-size:clamp(40px,7vw,88px); line-height:1; color:#eafdff;
+        text-shadow:0 0 8px #5BE1FF, 0 0 24px #5BE1FF, 0 0 52px rgba(91,225,255,.8);
+        transition:transform .5s cubic-bezier(.2,1,.3,1); }
 
       /* Overlay nalewania do szklanki (prawdziwy model, z lodem/bez) */
       .cx-glasspour { position:fixed; inset:0; z-index:82; pointer-events:none;
@@ -3466,13 +4997,21 @@ function CocktailStyles() {
       .cx-popout-inner { background:linear-gradient(160deg, rgba(18,40,54,0.86), rgba(10,24,34,0.82)); backdrop-filter:blur(28px);
         border-radius:34px; padding:clamp(26px,4vw,42px); text-align:center; border:1px solid var(--cx-stroke);
         box-shadow:0 50px 130px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.14); }
+      .cx-video-step { cursor:pointer; width:100%; aspect-ratio:16/9; display:flex; align-items:center; justify-content:center; }
+      .cx-video-placeholder { width:100%; height:100%; border-radius:20px; background:radial-gradient(ellipse at 50% 40%, #1e3a4e, #0c1a24);
+        display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;
+        border:1px solid rgba(255,255,255,0.08); overflow:hidden; }
+      .cx-video-finger { font-size:48px; animation:cxFingerPulse 2s ease-in-out infinite; }
+      @keyframes cxFingerPulse { 0%,100%{ transform:scale(1); opacity:.7; } 50%{ transform:scale(1.15); opacity:1; } }
+      .cx-video-hint { font-family:var(--f-serif,"Instrument Serif",serif); font-style:italic; font-size:14px; color:rgba(255,255,255,0.6); }
       .cx-popout-title { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:clamp(26px,4vw,42px); letter-spacing:-0.02em; margin:8px 0 24px; }
       .cx-glass-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,200px)); gap:16px; justify-content:center; }
       .cx-glass-card { display:flex; flex-direction:column; align-items:center; gap:12px; padding:18px 12px 20px; border-radius:24px;
         background:linear-gradient(145deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02)); border:1px solid var(--cx-stroke);
-        cursor:pointer; color:#fff; font-size:13px; font-weight:600; transition:all .35s cubic-bezier(.2,.8,.2,1); box-shadow:inset 0 1px 0 rgba(255,255,255,0.12); }
+        cursor:pointer; color:#fff; font-size:13px; font-weight:600; transition:all .35s cubic-bezier(.2,.8,.2,1); box-shadow:inset 0 1px 0 rgba(255,255,255,0.12);
+        width:180px; height:220px; }
       .cx-glass-card:hover { transform:translateY(-6px) scale(1.03); border-color:var(--c-sky,#5BB8D4); box-shadow:0 20px 48px rgba(0,0,0,0.45); background:linear-gradient(145deg, rgba(255,255,255,0.14), rgba(255,255,255,0.04)); }
-      .cx-glass-art { width:100%; aspect-ratio:1/1.15; display:block; }
+      .cx-glass-art { width:100%; height:140px; display:block; overflow:hidden; }
       .cx-glass-canvas { width:100% !important; height:100% !important; display:block; }
 
       /* przełącznik z lodem / bez lodu (styl iPhone) */
@@ -3493,15 +5032,16 @@ function CocktailStyles() {
       .cx-community { position:relative; z-index:9;
         background:linear-gradient(180deg, #12273a 0%, #0d1d2b 100%);
         padding:clamp(80px,11vh,150px) 0 140px; border-top-left-radius:2.4rem; border-top-right-radius:2.4rem;
+        margin-top:-80px;
         box-shadow:0 -40px 80px rgba(0,0,0,0.5); --cx-spill:0; }
       .cx-community::before { content:""; position:absolute; inset:0; border-radius:2.4rem 2.4rem 0 0; pointer-events:none;
-        background:var(--cx-flood,#E85C3A); opacity:calc(var(--cx-spill) * 0.34); mix-blend-mode:soft-light; transition:opacity .2s linear; }
-      .cx-community::after { content:""; position:absolute; left:0; right:0; top:0; height:46vh; pointer-events:none; border-radius:2.4rem 2.4rem 0 0;
-        background:linear-gradient(180deg, var(--cx-flood,#E85C3A), transparent); opacity:calc(var(--cx-spill) * 0.42); mix-blend-mode:screen; transition:opacity .2s linear; }
+        background:var(--cx-flood,#E85C3A); opacity:calc(var(--cx-spill) * 0.55); mix-blend-mode:color; transition:opacity .2s linear; }
+      .cx-community::after { content:""; position:absolute; left:0; right:0; top:0; height:60vh; pointer-events:none; border-radius:2.4rem 2.4rem 0 0;
+        background:linear-gradient(180deg, var(--cx-flood,#E85C3A), transparent); opacity:calc(var(--cx-spill) * 0.65); mix-blend-mode:screen; transition:opacity .2s linear; }
       .cx-comm-inner { max-width:1240px; margin:0 auto; padding:0 clamp(20px,5vw,72px); }
-      .cx-comm-head { display:flex; justify-content:space-between; align-items:flex-end; gap:24px; padding-bottom:36px; border-bottom:1px solid rgba(255,255,255,0.16); margin-bottom:48px; flex-wrap:wrap; }
+      .cx-comm-head { display:flex; justify-content:center; align-items:center; text-align:center; gap:24px; padding-bottom:36px; border-bottom:1px solid rgba(255,255,255,0.16); margin-bottom:48px; flex-wrap:wrap; }
       .cx-comm-head .cx-mini-kicker { color:rgba(255,255,255,0.7); }
-      .cx-comm-head h2 { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:clamp(40px,6vw,96px); line-height:0.95; letter-spacing:-0.03em; color:#fff; margin-top:14px; }
+      .cx-comm-head h2 { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:clamp(40px,6vw,96px); line-height:0.95; letter-spacing:-0.03em; color:#fff; margin-top:14px; word-break:keep-all; overflow-wrap:normal; white-space:nowrap; }
       .cx-comm-title { perspective:600px; transform-style:preserve-3d; }
       .cx-char { display:inline-block; will-change:transform,opacity; transform-origin:50% 100%; opacity:0; transition:none; }
 
@@ -3516,11 +5056,22 @@ function CocktailStyles() {
       }
       @media (prefers-reduced-motion: reduce) { .cx-neon-arrow { animation:none; } .cx-char { opacity:1 !important; transform:none !important; } }
       .cx-comm-count { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:14px; color:var(--c-coral,#E8927C); }
-      .cx-comm-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:24px; }
+      @media (max-width:768px) { .cx-cc { border-radius:16px; } .cx-cc-vis { height:100px; min-height:0; } .cx-cc-body { padding:8px 10px 12px; overflow:hidden; }
+        .cx-cc-body h3 { font-size:13px; line-height:1.2; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+        .cx-cc-pills { gap:3px; flex-wrap:nowrap; overflow:hidden; max-height:22px; } .cx-cc-pill { font-size:9px; padding:2px 5px; flex-shrink:0; }
+        .cx-cc-quote { display:none; }
+        .cx-cc-meta { font-size:10px; padding:6px 10px; } .cx-cc-glass { width:50px; } }
+      @media (max-width:768px) { .cx-comm-grid-2col .cx-cc { aspect-ratio:auto; } }
 
-      .cx-cc { background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:24px; overflow:hidden; display:flex; flex-direction:column; transition:transform .4s cubic-bezier(.2,.8,.2,1), box-shadow .4s, border-color .3s; backdrop-filter:blur(6px); }
+      .cx-cc { background:color-mix(in srgb, var(--cc-strength, #1a1a1a) 8%, rgba(12,10,14,0.95)); border:1px solid color-mix(in srgb, var(--cc-strength, rgba(255,255,255,0.1)) 40%, transparent); border-radius:24px; overflow:hidden; display:flex; flex-direction:column; transition:transform .4s cubic-bezier(.2,.8,.2,1), box-shadow .4s, border-color .3s; backdrop-filter:blur(6px); }
       .cx-cc:hover { transform:translateY(-8px); border-color:rgba(255,255,255,0.28); box-shadow:0 28px 70px rgba(0,0,0,0.4); }
-      .cx-cc-vis { position:relative; height:190px; display:flex; align-items:center; justify-content:center; }
+      .cx-cc-vis { position:relative; height:190px; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+      .cx-cc-vis-bg { position:absolute; inset:0; background:
+        radial-gradient(ellipse 140% 100% at 20% 0%, var(--cc-from, #E8927C) 0%, transparent 55%),
+        radial-gradient(ellipse 100% 80% at 85% 90%, var(--cc-to, #F4D03F) 0%, transparent 50%),
+        linear-gradient(160deg, rgba(20,16,24,0.9) 0%, rgba(12,10,14,0.95) 100%);
+        opacity:0.7; transition:opacity .4s; }
+      .cx-cc:hover .cx-cc-vis-bg { opacity:0.9; }
       .cx-cc-by { position:absolute; top:14px; right:14px; font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:rgba(255,255,255,0.8); padding:5px 10px; background:rgba(0,0,0,0.32); border-radius:999px; backdrop-filter:blur(4px); }
       .cx-cc-glass { width:96px; height:auto; filter:drop-shadow(0 12px 24px rgba(0,0,0,0.4)); transition:transform .4s; }
       .cx-cc:hover .cx-cc-glass { transform:translateY(-4px) scale(1.05); }
@@ -3533,6 +5084,36 @@ function CocktailStyles() {
       .cx-cc-meta { display:flex; justify-content:space-between; padding-top:12px; border-top:1px solid rgba(255,255,255,0.1); margin-top:auto; color:rgba(255,255,255,0.55); font-size:13px; }
       .cx-cc-like { color:rgba(255,255,255,0.65); cursor:pointer; transition:color .2s; }
       .cx-cc-like.on { color:var(--c-coral,#E8927C); }
+      /* Community share + comments */
+      .cx-comm-share { display:flex; align-items:center; gap:16px; padding:20px 24px; margin-bottom:32px; border-radius:20px;
+        background:linear-gradient(135deg, rgba(232,146,124,0.12), rgba(91,184,212,0.08)); border:1px solid rgba(255,255,255,0.12); }
+      .cx-comm-share-ico { font-size:32px; }
+      .cx-comm-share-txt { flex:1; display:flex; flex-direction:column; gap:4px; }
+      .cx-comm-share-txt strong { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:15px; color:#fff; }
+      .cx-comm-share-txt em { font-style:italic; font-size:12px; color:rgba(255,255,255,0.6); }
+      .cx-comm-share-btn { padding:10px 18px; border-radius:999px; background:var(--cx-accent,#E8927C); color:#fff;
+        font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:12px; letter-spacing:0.08em; cursor:pointer; transition:all .25s; }
+      .cx-comm-share-btn:hover { background:#fff; color:var(--c-deep,#1A3D52); }
+      .cx-comm-filters { display:flex; gap:8px; flex-wrap:wrap; margin:20px 0; align-items:center; justify-content:space-between; }
+      .cx-comm-filter-row { display:flex; gap:8px; flex-wrap:wrap; }
+      .cx-comm-filter { padding:8px 14px; border-radius:999px; font-size:11px; font-weight:600; letter-spacing:0.04em;
+        border:1px solid rgba(255,255,255,0.15); color:rgba(255,255,255,0.8); background:rgba(255,255,255,0.04); cursor:pointer; transition:all .25s; }
+      .cx-comm-filter:hover { border-color:rgba(255,255,255,0.4); background:rgba(255,255,255,0.08); }
+      .cx-comm-filter.active { background:var(--cx-accent,#E8927C); border-color:transparent; color:#fff; }
+      .cx-comm-grid-toggle { width:36px; height:36px; border-radius:10px; border:1px solid rgba(255,255,255,0.15); color:#fff; font-size:18px;
+        display:grid; place-items:center; cursor:pointer; background:rgba(255,255,255,0.04); transition:all .25s; }
+      .cx-comm-grid-toggle:hover { background:rgba(255,255,255,0.1); }
+      /* Domyślnie: 1 kolumna (single) na mobile, auto-fill na desktop */
+      .cx-comm-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:24px; }
+      .cx-comm-grid .cx-cc { transition:transform .4s cubic-bezier(.2,.8,.2,1), opacity .3s ease, box-shadow .4s; }
+      .cx-comm-grid-2col { grid-template-columns:repeat(2,1fr) !important; gap:16px !important; }
+      @media (max-width:768px) { .cx-comm-grid { grid-template-columns:1fr; gap:14px; }
+        .cx-comm-grid-2col { grid-template-columns:repeat(2,1fr) !important; gap:12px !important; } }
+      .cx-cc-comments-list { display:flex; flex-direction:column; gap:8px; padding:12px 0; border-top:1px solid rgba(255,255,255,0.08); margin-top:8px; }
+      .cx-cc-cmt { font-size:12px; color:rgba(255,255,255,0.6); line-height:1.4; margin:0; font-style:italic; }
+      .cx-cc-cmt-btn { background:none; border:none; color:rgba(255,255,255,0.55); font-size:13px; cursor:pointer; transition:color .2s; padding:0; }
+      .cx-cc-cmt-btn:hover { color:#fff; }
+
 
       @media (max-width:980px){
         .cx-col { width:clamp(160px,42vw,230px); }
@@ -3542,95 +5123,209 @@ function CocktailStyles() {
 
       /* ───────────────────── MOBILE (≤768px) ───────────────────── */
       @media (max-width:768px){
-        .cx-root { border-top-left-radius:1.6rem; border-top-right-radius:1.6rem; }
-        .cx-title { top:clamp(20px,7vh,54px); padding:0 18px; }
-        .cx-title h2 { font-size:clamp(30px,10vw,52px); }
-        .cx-title-sub { display:none; }
-        .cx-strength { margin-top:12px; padding:7px 14px; }
+        .cx-root { border-top-left-radius:1.6rem; border-top-right-radius:1.6rem; overflow-x:visible; }
+        .cx-stage { border-top-left-radius:1.6rem; border-top-right-radius:1.6rem; }
+        .cx-title { top:clamp(80px,11vh,120px); padding:0 18px; text-align:right; left:auto; right:0; max-width:62vw; margin-left:auto; }
+        .cx-title h2 { font-size:clamp(18px,5vw,28px); }
+        .cx-title .cx-mini-kicker { font-size:9px; margin-bottom:6px; }
+        .cx-strength { margin-top:8px; padding:5px 10px; font-size:10px; }
 
-        /* kolumny stają się tylko kontenerami dla FAB (okrągłych przycisków) */
-        .cx-col { position:fixed; top:50%; bottom:auto; transform:translateY(-50%); width:auto; z-index:40; pointer-events:none; gap:0; }
-        .cx-col-left { left:16px; right:auto; }
-        .cx-col-right { right:16px; left:auto; }
+        /* cx-col na mobile = display:contents → dzieci (FAB, slide, panel) pozycjonują się względem viewportu, nie kolumny */
+        .cx-col { display:contents; }
+        /* FAB widoczne TYLKO w sekcji kreatora — płynny wjazd + lekka perspektywa 3D (jak na ścianie) */
+        .cx-col-left .cx-fab, .cx-col-right .cx-fab { position:fixed; top:36%; opacity:0; visibility:hidden; pointer-events:none;
+          transition:transform .8s cubic-bezier(.16,1,.3,1), opacity .55s ease, visibility .55s; }
+        .cx-col-left .cx-fab { left:20px; transform:perspective(420px) rotateY(18deg) translateZ(-12px) translateY(-50%) translateX(-130px); }
+        .cx-col-right .cx-fab { right:20px; transform:perspective(420px) rotateY(-18deg) translateZ(-12px) translateY(-50%) translateX(130px); }
+        body[data-cx-section="creator"] .cx-col-left .cx-fab { opacity:1; visibility:visible; pointer-events:auto; transform:perspective(420px) rotateY(18deg) translateY(-50%) translateX(0); }
+        body[data-cx-section="creator"] .cx-col-right .cx-fab { opacity:1; visibility:visible; pointer-events:auto; transform:perspective(420px) rotateY(-18deg) translateY(-50%) translateX(0); }
         .cx-col.is-pouring { opacity:1; }
+        /* Podczas lania/animacji (lub wyjścia z sekcji) FAB odjeżdżają w bok i znikają */
+        .cx-col-left.is-pouring .cx-fab { transform:perspective(420px) rotateY(18deg) translateY(-50%) translateX(-180px) !important; opacity:0; pointer-events:none; }
+        .cx-col-right.is-pouring .cx-fab { transform:perspective(420px) rotateY(-18deg) translateY(-50%) translateX(180px) !important; opacity:0; pointer-events:none; }
+        /* Gdy NIE jesteśmy w sekcji kreatora — twardo schowane (np. scroll w górę/dół do innych sekcji) */
+        body:not([data-cx-section="creator"]) .cx-col-left .cx-fab,
+        body:not([data-cx-section="creator"]) .cx-col-right .cx-fab { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
+        /* podczas lania/animacji szklanki FAB też znikają (nawet jeśli is-pouring nie złapie) */
+        body[data-cx-pouring] .cx-col-left .cx-fab,
+        body[data-cx-pouring] .cx-col-right .cx-fab { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
+        /* podczas wjazdu/wyjazdu sekcji (scroll) FAB znikają */
+        body[data-cx-scrolling] .cx-col-left .cx-fab,
+        body[data-cx-scrolling] .cx-col-right .cx-fab { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
+        /* slide-to-shake widoczny tylko w sekcji kreatora */
+        .cx-slide-wrap { opacity:0; visibility:hidden; transition:opacity .3s, visibility .3s; }
+        body[data-cx-section="creator"] .cx-slide-wrap { opacity:1; visibility:visible; }
+        /* podczas lania / animacji szklanki — suwak shake znika razem z FAB */
+        .cx-col-right.is-pouring .cx-slide-wrap { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
+        body[data-cx-pouring] .cx-slide-wrap { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
+        body[data-cx-scrolling] .cx-slide-wrap { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
+        body:not([data-cx-section="creator"]) .cx-slide-wrap { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
+        /* info button tylko w sekcji kreatora */
+        .cx-minfo { opacity:0; visibility:hidden; transition:opacity .3s, visibility .3s; }
+        body[data-cx-section="creator"] .cx-minfo { opacity:1; visibility:visible; }
+        body[data-cx-pouring] .cx-minfo { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
+        body[data-cx-scrolling] .cx-minfo { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
 
-        /* SHAKE — na mobile chowamy zwykły przycisk, pokazujemy suwak na dole */
+        /* SHAKE — suwak wycentrowany na dole */
         .cx-shake-desktop { display:none; }
-        .cx-slide-wrap { display:block; position:fixed; left:50%; bottom:calc(22px + env(safe-area-inset-bottom));
-          transform:translateX(-50%); width:min(82vw,360px); z-index:41; pointer-events:auto; }
-        .cx-slide { position:relative; width:100%; height:56px; border-radius:999px; overflow:hidden;
-          background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); display:flex; align-items:center;
-          opacity:0.5; transition:opacity .3s, background .3s; touch-action:none; }
-        .cx-slide.is-on { opacity:1; background:linear-gradient(135deg, rgba(232,146,124,0.18), rgba(217,116,92,0.12)); border-color:rgba(232,146,124,0.4); }
-        .cx-slide-label { position:absolute; left:0; right:0; text-align:center; font-family:var(--f-display,"Syne",serif);
-          font-weight:800; font-size:13px; letter-spacing:0.12em; text-transform:uppercase; color:rgba(255,255,255,0.7); pointer-events:none; }
-        .cx-slide-knob { position:absolute; left:4px; top:4px; width:48px; height:48px; border-radius:50%; display:grid; place-items:center;
+        .cx-slide-wrap { display:block; position:fixed; left:50%; bottom:calc(72px + env(safe-area-inset-bottom));
+          transform:translateX(-50%); width:min(70vw,290px); z-index:41; pointer-events:auto; }
+        .cx-slide { position:relative; width:100%; height:60px; border-radius:999px; overflow:hidden;
+          background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.16); display:flex; align-items:center;
+          opacity:0.6; transition:opacity .3s, background .3s; touch-action:none; backdrop-filter:blur(8px); }
+        .cx-slide.is-on { opacity:1; background:linear-gradient(135deg, rgba(232,146,124,0.22), rgba(217,116,92,0.15)); border-color:rgba(232,146,124,0.5); }
+        .cx-slide-label { position:absolute; left:56px; right:16px; text-align:center; font-family:var(--f-display,"Syne",serif);
+          font-weight:800; font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:rgba(255,255,255,0.7); pointer-events:none; }
+        .cx-slide-knob { position:absolute; left:6px; top:6px; width:48px; height:48px; border-radius:50%; display:grid; place-items:center;
           background:linear-gradient(135deg, var(--c-coral,#E8927C), #d9745c); color:#fff; font-size:20px;
-          box-shadow:0 6px 18px rgba(232,146,124,0.5); will-change:transform; }
+          box-shadow:0 4px 14px rgba(232,146,124,0.5); will-change:transform; }
 
-        /* FAB — okrągłe przyciski po bokach (środek pionowy) */
-        .cx-fab { display:flex !important; flex-direction:column; align-items:center; justify-content:center; gap:2px;
-          width:62px; height:62px; border-radius:50%; pointer-events:auto; cursor:pointer;
-          background:linear-gradient(150deg, color-mix(in srgb, var(--cx-accent,#E8927C) 24%, #15171c), #101216);
-          border:1px solid rgba(255,255,255,0.14); color:#fff;
-          box-shadow:0 12px 30px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.12); transition:transform .3s, box-shadow .3s; }
-        .cx-fab:active { transform:scale(0.94); }
+        /* FAB — kółka duże, czytelne (jak w designie: z numerem 01/02 i napisem) */
+        .cx-fab { display:flex !important; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+          width:74px; height:74px; border-radius:50%; pointer-events:auto; cursor:pointer; z-index:40;
+          background:linear-gradient(150deg, color-mix(in srgb, var(--cx-accent,#E8927C) 18%, #1a1c22), #12141a);
+          border:1.5px solid rgba(255,255,255,0.14); color:#fff;
+          box-shadow:0 10px 28px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08); transition:transform .3s, box-shadow .3s; }
+        .cx-fab:active { transform:translateY(-50%) scale(0.9); }
         .cx-fab:disabled { opacity:0.4; }
-        .cx-fab-ico { font-size:22px; line-height:1; }
-        .cx-fab-label { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:8px; letter-spacing:0.12em; text-transform:uppercase; }
+        .cx-fab-ico { font-size:26px; line-height:1; }
+        .cx-fab-label { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:9px; letter-spacing:0.06em; text-transform:uppercase; }
 
         /* scrim pod panelem */
-        .cx-menu-scrim { display:block; position:fixed; inset:0; z-index:44; background:rgba(8,6,9,0.5);
+        .cx-menu-scrim { display:block; position:fixed; inset:0; z-index:44; background:rgba(8,6,9,0.55);
           opacity:0; visibility:hidden; transition:opacity .4s, visibility .4s; }
         .cx-menu.is-mopen .cx-menu-scrim { opacity:1; visibility:visible; }
 
-        /* panel kategorii — wysuwa się z boku (lewy/prawy) */
-        .cx-menu-panel { position:fixed; top:0; bottom:0; width:min(86vw,360px); z-index:45;
-          background:linear-gradient(180deg, #15121a, #100c12); padding:84px 18px 24px;
-          box-shadow:0 0 60px rgba(0,0,0,0.6); transition:transform .5s cubic-bezier(.2,.85,.2,1);
-          overflow-y:auto; scrollbar-width:none; }
+        /* panel kategorii — bottom sheet, UKRYTY dopóki nie klikniesz FAB */
+        .cx-menu-panel { position:fixed; left:0; right:0; bottom:0; top:auto; width:100vw; max-height:65vh; z-index:45;
+          background:linear-gradient(180deg, #17141d, #100c12); padding:32px 20px calc(24px + env(safe-area-inset-bottom));
+          box-shadow:0 -16px 48px rgba(0,0,0,0.5); transition:transform .5s cubic-bezier(.2,.85,.2,1), visibility .5s;
+          overflow-y:auto; scrollbar-width:none; border-radius:1.6rem 1.6rem 0 0;
+          transform:translateY(110%); visibility:hidden; }
         .cx-menu-panel::-webkit-scrollbar { display:none; }
-        .cx-menu-left .cx-menu-panel { left:0; border-radius:0 1.4rem 1.4rem 0; transform:translateX(-105%); }
-        .cx-menu-right .cx-menu-panel { right:0; border-radius:1.4rem 0 0 1.4rem; transform:translateX(105%); }
-        .cx-menu.is-mopen .cx-menu-panel { transform:translateX(0); }
+        .cx-menu-left .cx-menu-panel { border-radius:1.6rem 1.6rem 0 0; }
+        .cx-menu-right .cx-menu-panel { border-radius:1.6rem 1.6rem 0 0; }
+        .cx-menu.is-mopen .cx-menu-panel { transform:translateY(0); visibility:visible; }
         .cx-menu[data-align="right"] { text-align:left; }
         .cx-menu[data-align="right"] .cx-menu-head { flex-direction:row; }
 
-        /* okrągła strzałka chowająca panel — patrzy w stronę wyjścia */
-        .cx-menu-tuck { display:grid !important; place-items:center; position:absolute; top:18px;
-          width:42px; height:42px; border-radius:50%; cursor:pointer; z-index:2;
-          background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.16); color:#fff; font-size:20px; }
-        .cx-menu-left .cx-menu-tuck { right:18px; }
-        .cx-menu-right .cx-menu-tuck { left:18px; }
+        /* Drag indicator na górze bottom sheet */
+        .cx-menu-panel::before { content:""; display:block; width:40px; height:4px; border-radius:2px;
+          background:rgba(255,255,255,0.2); margin:0 auto 20px; }
+
+        /* zamknij drawer — widoczny TYLKO w otwartym bottom sheet */
+        .cx-menu-tuck { display:none !important; }
+        .cx-menu.is-mopen .cx-menu-tuck { display:grid !important; place-items:center; position:absolute; top:14px; right:16px;
+          width:38px; height:38px; border-radius:50%; cursor:pointer; z-index:2;
+          background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); color:#fff; font-size:18px; }
         .cx-collapse { display:none; }
-        .cx-cats { max-height:none; }
+        .cx-menu-head { display:none; }
+        .cx-menu-num { display:none; }
+        .cx-cats { max-height:none; padding-top:8px; }
+        /* Kategorie w drawer — więcej space między nimi */
+        .cx-cats .cx-cat { margin-bottom:8px; }
 
-        /* karuzela butelek — 2 widoczne, wjeżdża od dołu (drawer) */
-        .cx-car-scroll > .cx-bcard { flex:0 0 calc((100% - 14px) / 2); height:260px; }
-        .cx-drawer { padding:16px 14px calc(18px + env(safe-area-inset-bottom)); }
-        .cx-drawer-title { font-size:15px; }
-        .cx-drawer-hint { font-size:11px; }
+        /* karuzela butelek na mobile — 2 widoczne, wycentrowane (patrz cx-drop-row sekcja) */
+        .cx-drawer { padding:20px 16px calc(20px + env(safe-area-inset-bottom)); border-radius:1.4rem 1.4rem 0 0; }
+        .cx-drawer-title { font-size:14px; }
+        .cx-drawer-hint { font-size:10px; margin-top:12px; }
+        .cx-drawer-tabs { display:none; }
+        .cx-drawer-strength-filters { display:none; }
+        .cx-drawer-tab { padding:6px 10px; font-size:10px; }
 
-        /* tabela "nel bicchiere" — niżej, węższa, nad przyciskami */
-        .cx-table { width:min(92vw,440px); bottom:calc(104px + env(safe-area-inset-bottom)); padding:14px 16px; }
-        .cx-table ul { max-height:24vh; }
+        /* Rozwijane listy na mobile zamiast przewijanych pigułek */
+        .cx-drop-row { display:flex; gap:8px; margin-bottom:10px; align-items:center; }
+        .cx-drop-row .cx-drop { flex:1 1 0; min-width:0; }
+        .cx-drop-back { flex:0 0 auto; width:44px; height:44px; border-radius:14px; display:grid; place-items:center;
+          background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); color:var(--cx-accent,#E8927C);
+          font-size:20px; cursor:pointer; box-sizing:border-box; }
+        .cx-drop-arrows { display:none; }
+        .cx-drop-arrow { width:34px; height:42px; border-radius:11px; display:grid; place-items:center;
+          background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); color:#fff; font-size:18px; cursor:pointer; transition:opacity .2s; }
+        .cx-drop-arrow:disabled { opacity:0.25; }
+        .cx-drop { display:block; position:relative; max-width:100%; margin:0 0 8px; z-index:5; }
+        .cx-drop-row .cx-drop { margin:0; }
+        /* desktopowy nagłówek szuflady (back+tytuł+strzałki) ukryty na mobile — zastąpiony rzędem dropdownów */
+        .cx-drawer-head { display:none; }
+        /* butelki: 2 kolumny, zawijane, pionowy scroll (ten sam rozmiar dla napojów i alkoholi;
+           gdy jest dużo pozycji — scrollujesz palcem w pionie w tej sekcji) */
+        .cx-car-scroll { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; justify-content:initial;
+          overflow-x:hidden; overflow-y:auto; max-height:42vh; padding:4px 2px 8px; touch-action:pan-y;
+          -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; scroll-snap-type:none; }
+        .cx-car-scroll > .cx-bcard { flex:initial; width:auto; min-width:0; height:200px; scroll-snap-align:none; }
+        /* separatory grup w trybie Tutti zajmują pełną szerokość siatki */
+        .cx-car-scroll > .cx-car-group-sep { grid-column:1 / -1; }
+        .cx-drop + .cx-drop { margin-top:0; }
+        .cx-drop-trigger { display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%;
+          height:44px; padding:0 14px; border-radius:14px; cursor:pointer; color:#fff; box-sizing:border-box;
+          background:linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,255,255,0.03));
+          border:1px solid rgba(255,255,255,0.14); font-family:var(--f-display,"Syne",serif); font-weight:800;
+          font-size:13px; letter-spacing:0.03em; }
+        .cx-drop-cur { display:flex; align-items:center; gap:9px; min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+        .cx-drop-emoji { font-size:15px; flex-shrink:0; }
+        .cx-drop-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+        .cx-drop-caret { transition:transform .3s; opacity:0.7; font-size:12px; }
+        .cx-drop.is-open .cx-drop-caret { transform:rotate(180deg); }
+        .cx-drop-list { position:absolute; left:0; right:0; top:calc(100% + 6px); z-index:20;
+          background:#16131d; border:1px solid rgba(255,255,255,0.14); border-radius:14px; overflow:hidden auto;
+          max-height:0; opacity:0; visibility:hidden; transform:translateY(-6px);
+          transition:max-height .35s cubic-bezier(.2,.85,.2,1), opacity .25s, transform .3s, visibility .35s;
+          box-shadow:0 18px 50px rgba(0,0,0,0.55); }
+        .cx-drop.is-open .cx-drop-list { max-height:240px; opacity:1; visibility:visible; transform:none; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
+        .cx-drop-opt { display:flex; align-items:center; gap:10px; width:100%; padding:12px 14px; cursor:pointer;
+          color:rgba(255,255,255,0.82); background:none; border:none; border-bottom:1px solid rgba(255,255,255,0.06);
+          font-family:var(--f-display,"Syne",serif); font-weight:700; font-size:13px; text-align:left; }
+        .cx-drop-opt:last-child { border-bottom:none; }
+        .cx-drop-opt.active { background:rgba(232,146,124,0.16); color:#fff; }
+        .cx-drop-cnt { margin-left:auto; font-size:11px; opacity:0.55; }
+
+        /* tabela "nel bicchiere" — na mobile zastąpiona pionowym paskiem warstw (LayerBar) */
+        .cx-table { display:none !important; }
+
+        /* LayerBar — pionowy pasek warstw po lewej */
+        .cx-layerbar { position:fixed; left:14px; top:50%; transform:translateY(-50%); z-index:43;
+          display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:auto; }
+        body[data-cx-pouring] .cx-layerbar, body[data-cx-scrolling] .cx-layerbar,
+        body:not([data-cx-section="creator"]) .cx-layerbar { opacity:0; visibility:hidden; pointer-events:none; transition:opacity .3s, visibility .3s; }
+        .cx-layerbar-track { position:relative; width:30px; height:min(46vh,360px); border-radius:16px;
+          background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.16); overflow:visible;
+          box-shadow:inset 0 2px 8px rgba(0,0,0,0.4); }
+        .cx-layerbar-fill { position:absolute; left:0; right:0; bottom:0; display:flex; flex-direction:column-reverse;
+          border-radius:0 0 15px 15px; overflow:visible; transition:height .5s cubic-bezier(.2,.85,.2,1); }
+        .cx-layer { position:relative; width:100%; border:none; cursor:pointer; min-height:8px; transition:height .45s cubic-bezier(.2,.85,.2,1), filter .2s;
+          box-shadow:inset 0 1px 0 rgba(255,255,255,0.22); }
+        .cx-layer:first-child { border-radius:0 0 15px 15px; }
+        .cx-layer:last-child { border-radius:15px 15px 0 0; }
+        .cx-layer.is-open { filter:brightness(1.25); }
+        .cx-layer-pop { position:absolute; left:calc(100% + 10px); top:50%; transform:translateY(-50%);
+          display:flex; flex-direction:column; gap:3px; padding:10px 12px; border-radius:12px; white-space:nowrap;
+          background:#15121a; border:1px solid rgba(255,255,255,0.16); box-shadow:0 12px 36px rgba(0,0,0,0.55); z-index:5; }
+        .cx-layer-pop-name { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:13px; color:#fff; }
+        .cx-layer-pop-ml { font-size:11px; color:rgba(255,255,255,0.55); }
+        .cx-layer-pop-x { margin-top:4px; font-size:11px; font-weight:700; color:#ff6b6b; cursor:pointer; }
+        .cx-layerbar-total { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:13px; color:#fff; }
+        .cx-layerbar-total em { font-style:normal; font-size:9px; opacity:0.6; display:block; text-align:center; }
 
         /* QR/instrukcje chowamy w popout (osobny komponent) */
         .cx-howto { display:none; }
 
-        /* mobilne koło "i" (lewy górny obszar) z instrukcjami */
-        .cx-minfo { display:block; position:fixed; left:16px; top:calc(96px + env(safe-area-inset-top)); transform:none; z-index:42; }
-        .cx-minfo-fab { display:grid; place-items:center; width:44px; height:44px; border-radius:50%; cursor:pointer;
-          background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.18); color:#fff;
-          box-shadow:0 8px 22px rgba(0,0,0,0.4); transition:transform .3s, background .3s; }
+        /* mobilne koło "i" — lewy dół, nad slide-to-shake */
+        .cx-minfo { display:block; position:fixed; left:16px; bottom:calc(116px + env(safe-area-inset-bottom)); top:auto; right:auto; transform:none; z-index:42; }
+        .cx-minfo-fab { display:grid; place-items:center; width:40px; height:40px; border-radius:50%; cursor:pointer;
+          background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); color:#fff;
+          box-shadow:0 6px 18px rgba(0,0,0,0.35); transition:transform .3s, background .3s; }
         .cx-minfo.is-open .cx-minfo-fab { background:var(--cx-accent,#E8927C); }
-        .cx-minfo-i { font-family:var(--f-serif,"Instrument Serif",serif); font-style:italic; font-weight:700; font-size:20px; }
-        .cx-minfo-pop { position:absolute; left:0; top:calc(100% + 12px); width:min(74vw,300px);
-          background:#15121a; border:1px solid rgba(255,255,255,0.12); border-radius:18px; padding:18px 16px;
-          box-shadow:0 24px 60px rgba(0,0,0,0.55); opacity:0; visibility:hidden; transform:translateY(-8px) scale(0.96);
-          transform-origin:top left; transition:opacity .35s, transform .35s, visibility .35s; }
+        .cx-minfo-i { font-family:var(--f-serif,"Instrument Serif",serif); font-style:italic; font-weight:700; font-size:18px; }
+        .cx-minfo-pop { position:absolute; left:0; bottom:calc(100% + 10px); width:min(70vw,280px);
+          background:#15121a; border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:16px 14px;
+          box-shadow:0 -16px 50px rgba(0,0,0,0.5); opacity:0; visibility:hidden; transform:translateY(6px) scale(0.96);
+          transform-origin:bottom left; transition:opacity .3s, transform .3s, visibility .3s; }
         .cx-minfo.is-open .cx-minfo-pop { opacity:1; visibility:visible; transform:none; }
-        .cx-minfo-steps { display:flex; flex-direction:column; gap:14px; margin-top:14px; }
+        .cx-minfo-steps { display:flex; flex-direction:column; gap:12px; margin-top:12px; }
+        /* Wybór szklanki na mobile — 2 obok siebie, mniejsze */
+        .cx-glass-grid { grid-template-columns:repeat(2,1fr) !important; gap:12px !important; }
+        .cx-glass-card { width:100% !important; height:170px !important; padding:12px 8px 14px !important; border-radius:18px !important; }
+        .cx-glass-art { height:104px !important; }
       }
 
       @media (max-width:768px) and (max-height:680px){
@@ -3641,7 +5336,94 @@ function CocktailStyles() {
       @media (prefers-reduced-motion: reduce){
         .cx-popout, .cx-shake, .cx-cat, .cx-cc { transition:none; }
       }
-    `}</style>
+    
+      /* Popout overlay (Instagram-style) */
+      .cx-cc-popout-overlay { position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.75); backdrop-filter:blur(8px);
+        display:flex; align-items:center; justify-content:center; padding:24px; animation:cxFade .3s ease; }
+      .cx-cc-popout { display:grid; grid-template-columns:1fr 1fr; width:min(900px,92vw); max-height:85vh; border-radius:24px; overflow:hidden;
+        background:#12171e; border:1px solid rgba(255,255,255,0.1); box-shadow:0 40px 100px rgba(0,0,0,0.6); animation:cxFadeUp .4s ease; }
+      @media (max-width:768px) { .cx-cc-popout { grid-template-columns:1fr; max-height:92vh; overflow-y:auto; } }
+      .cx-cc-popout-close { position:absolute; top:16px; right:16px; z-index:2; width:40px; height:40px; border-radius:50%;
+        background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.15); color:#fff; font-size:20px;
+        display:grid; place-items:center; cursor:pointer; transition:all .25s; }
+      .cx-cc-popout-close:hover { background:#fff; color:#000; }
+      .cx-cc-popout-left { display:flex; align-items:center; justify-content:center; padding:40px; background:rgba(0,0,0,0.3); }
+      .cx-cc-popout-glass { width:80%; max-width:200px; filter:drop-shadow(0 20px 40px rgba(0,0,0,0.5)); }
+      .cx-cc-popout-right { padding:32px; display:flex; flex-direction:column; gap:20px; overflow-y:auto; }
+      .cx-cc-popout-by { font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color:rgba(255,255,255,0.5); }
+      .cx-cc-popout-name { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:28px; letter-spacing:-0.02em; color:#fff; margin:4px 0; }
+      .cx-cc-popout-strength { display:flex; align-items:center; gap:8px; font-size:12px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; }
+      .cx-cc-popout-dot { width:10px; height:10px; border-radius:50%; }
+      .cx-cc-popout-label { display:block; font-size:10px; letter-spacing:0.2em; text-transform:uppercase; color:rgba(255,255,255,0.5); margin-bottom:10px; }
+      .cx-cc-popout-pills { display:flex; flex-wrap:wrap; gap:6px; }
+      .cx-cc-popout-comments { display:flex; flex-direction:column; gap:8px; padding-top:16px; border-top:1px solid rgba(255,255,255,0.08); }
+      .cx-cc-popout-actions { padding-top:16px; border-top:1px solid rgba(255,255,255,0.08); }
+
+      /* Strength color bar on card */
+      .cx-cc-strength-bar { position:absolute; top:0; left:0; right:0; height:3px; background:var(--cc-strength,#E8927C); border-radius:3px 3px 0 0; z-index:2; }
+      .cx-cc { position:relative; }
+
+      
+      /* Share drink popout */
+      .cx-share-overlay { position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.75); backdrop-filter:blur(8px);
+        display:flex; align-items:center; justify-content:center; padding:24px; animation:cxFade .3s ease; }
+      .cx-share-popout { width:min(700px,92vw); max-height:85vh; border-radius:24px; overflow:hidden; position:relative;
+        background:#12171e; border:1px solid rgba(255,255,255,0.1); box-shadow:0 40px 100px rgba(0,0,0,0.6); animation:cxFadeUp .4s ease; }
+      .cx-share-form { display:grid; grid-template-columns:1fr 1fr; min-height:360px; }
+      @media (max-width:600px) { .cx-share-form { grid-template-columns:1fr; } }
+      .cx-share-preview { display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.3); min-height:300px; }
+      .cx-share-photo { width:100%; height:100%; object-fit:cover; }
+      .cx-share-upload { display:flex; flex-direction:column; align-items:center; gap:12px; padding:40px; cursor:pointer;
+        color:rgba(255,255,255,0.5); font-size:14px; text-align:center; border:2px dashed rgba(255,255,255,0.15); border-radius:16px; margin:20px;
+        transition:border-color .3s, color .3s; }
+      .cx-share-upload:hover { border-color:var(--cx-accent,#E8927C); color:#fff; }
+      .cx-share-upload span:first-child { font-size:40px; }
+      .cx-share-info { padding:28px; display:flex; flex-direction:column; gap:14px; }
+      .cx-share-info h3 { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:24px; color:#fff; margin:0; }
+      .cx-share-hint { font-size:13px; color:rgba(255,255,255,0.6); line-height:1.5; }
+      .cx-share-submit { margin-top:auto; }
+      .cx-share-submit:disabled { opacity:0.4; cursor:not-allowed; }
+      .cx-share-success { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:60px 32px; text-align:center; }
+      .cx-share-success-ico { font-size:56px; }
+      .cx-share-success h3 { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:32px; color:#fff; margin:0; }
+      .cx-share-success p { font-size:15px; color:rgba(255,255,255,0.7); max-width:360px; line-height:1.5; }
+      .cx-comm-share-done { background:rgba(91,184,212,0.2); border-color:rgba(91,184,212,0.4); color:var(--c-sky,#5BB8D4); cursor:default; }
+      .cx-comm-share-done:hover { background:rgba(91,184,212,0.2); color:var(--c-sky,#5BB8D4); }
+
+      
+      /* Particles/gwiazdki na tle community */
+      .cx-stars { position:absolute; inset:0; pointer-events:none; overflow:hidden; z-index:0; }
+      .cx-star { position:absolute; background:#fff; border-radius:50%; opacity:0.3;
+        animation:cxStarTwinkle var(--duration,3s) infinite ease-in-out; will-change:transform,opacity; }
+      @keyframes cxStarTwinkle { 0%,100%{ opacity:0.2; transform:scale(0.7); } 50%{ opacity:0.9; transform:scale(1.3); } }
+
+      
+      /* Zobacz więcej drinków */
+      .cx-comm-more { display:flex; justify-content:center; margin-top:48px; }
+      .cx-comm-more-btn { position:relative; overflow:hidden; padding:16px 32px; border-radius:999px; font-family:var(--f-display,"Syne",serif);
+        font-weight:800; font-size:14px; letter-spacing:0.08em; text-transform:uppercase; color:#fff;
+        background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); cursor:pointer; transition:all .3s; }
+      .cx-comm-more-btn:hover { border-color:var(--cx-accent,#E8927C); transform:translateY(-2px); }
+      .cx-comm-more-fill { position:absolute; inset:0; background:var(--cx-accent,#E8927C); border-radius:999px;
+        transform-origin:center bottom; transition:transform 0.6s cubic-bezier(0.16,1,0.3,1); z-index:0; }
+      .cx-comm-more-label { position:relative; z-index:1; }
+
+      
+      .cx-cc-heart-corner { position:absolute; top:14px; left:14px; z-index:3; font-size:16px; color:rgba(255,255,255,0.3); transition:color .3s, transform .3s; cursor:pointer; }
+      .cx-cc:hover .cx-cc-heart-corner { color:var(--cc-strength, #E8927C); transform:scale(1.2); }
+
+      
+      .cx-cc-strength-dots { position:absolute; top:14px; left:50%; transform:translateX(-50%); z-index:3; display:flex; gap:4px; }
+      .cx-cc-sdot { width:7px; height:7px; border-radius:50%; box-shadow:0 0 4px currentColor; }
+
+      
+      .cx-share-details { display:flex; flex-direction:column; gap:8px; }
+      .cx-share-details p { font-size:13px; color:rgba(255,255,255,0.7); margin:0; }
+      .cx-share-pills { display:flex; flex-wrap:wrap; gap:4px; }
+      .cx-share-nodrink { padding:20px 0; text-align:center; }
+      .cx-share-nodrink p { font-size:14px; color:rgba(255,255,255,0.6); margin:0 0 16px; }
+
+      `}</style>
   );
 }
 

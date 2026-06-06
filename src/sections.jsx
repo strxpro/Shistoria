@@ -598,7 +598,7 @@ function Footer({ t }) {
         <div className="footer-bottom">
           <span>© 2026 S'Historia · Rena Majore · Sardegna</span>
           <span>P.IVA 01234567890</span>
-          <span style={{ fontFamily: "var(--f-serif)", fontStyle: "italic" }}>Con amore, dal 1980.</span>
+          <span style={{ fontFamily: "var(--f-serif)", fontStyle: "italic" }}>Con amore, dal 1996.</span>
         </div>
       </div>
       <style>{`
