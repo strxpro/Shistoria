@@ -1348,6 +1348,18 @@ function Scene({
       if (!drag.current.active) return;
       drag.current.active = false;
       gl.domElement.style.cursor = drag.current.follow ? "grab" : "auto";
+      const isMob = typeof window !== "undefined" && window.innerWidth < 768;
+      const sh = handles.current.shaker?.root;
+      // Na mobile (brak ciągłego follow za kursorem) animujemy powrót do spoczynku GSAP-em,
+      // bo frameloop="demand" nie renderuje sam po puszczeniu palca.
+      if (isMob && sh) {
+        gsap.killTweensOf(sh.rotation);
+        gsap.killTweensOf(sh.position);
+        gsap.to(sh.rotation, { x: 0, y: 0, z: deg(CONFIG.shakerRestTilt), duration: 0.7, ease: "power3.out", onUpdate: invalidate });
+        gsap.to(sh.position, { x: CONFIG.shakerRest.x, y: CONFIG.shakerRest.y, z: CONFIG.shakerRest.z, duration: 0.7, ease: "power3.out", onUpdate: invalidate });
+        drag.current.spinY = 0;
+      }
+      drag.current.idle = 0;
       invalidate();
     };
     window.addEventListener("pointermove", move, { passive: true });
