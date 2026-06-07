@@ -3244,31 +3244,46 @@ function shapeFor(ing: Ingredient): "wine" | "spirit" | "can" | "round" {
  * Limit aktywnych kontekstów GPU = ~8-16, więc bez lazy → crash.
  * Fallback: SVG RowBottle (natychmiastowy).
  * ──────────────────────────────────────────────────────────────────────── */
+// Globalny tracker aktywnych kontekstów 3D na mobile (max 3 jednocześnie — limit iOS)
+const _active3D: Set<string> = typeof window !== "undefined" ? ((window as any).__sh3d || ((window as any).__sh3d = new Set())) : new Set();
+const MAX_MOBILE_3D = 3;
+
 function LazyBottle3D({ id, name, color, shape, ml, real }: { id: string; name: string; color: string; shape: "wine" | "spirit" | "can" | "round"; ml: number; real: boolean }) {
   const ref = useRef<HTMLDivElement>(null!);
   const [visible, setVisible] = useState(false);
-  // Na telefonie NIE montujemy osobnych kontekstów WebGL per-kafelek (iOS limit ~8-16 →
-  // "client-side exception"/biały ekran). Używamy lekkiego SVG. 3D tylko na desktopie.
   const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+  const uid = `${id}-${color}`;
 
   useEffect(() => {
-    if (isMobile) return;
     const el = ref.current;
     if (!el) return;
     const io = new IntersectionObserver(
-      (entries) => { setVisible(entries[0]?.isIntersecting ?? false); },
-      { rootMargin: "100px 0px 100px 0px", threshold: 0.1 }
+      (entries) => {
+        const isVis = entries[0]?.isIntersecting ?? false;
+        if (isVis) {
+          // Na mobile: limit aktywnych kontekstów — jeśli przekroczony, nie montuj nowego
+          if (isMobile && _active3D.size >= MAX_MOBILE_3D && !_active3D.has(uid)) {
+            setVisible(false); return;
+          }
+          _active3D.add(uid);
+          setVisible(true);
+        } else {
+          _active3D.delete(uid);
+          setVisible(false);
+        }
+      },
+      { rootMargin: "50px 0px 50px 0px", threshold: 0.15 }
     );
     io.observe(el);
-    return () => io.disconnect();
-  }, [isMobile]);
+    return () => { io.disconnect(); _active3D.delete(uid); };
+  }, [isMobile, uid]);
 
   return (
     <div ref={ref} style={{ width: "100%", height: "100%", position: "relative" }}>
-      {visible && !isMobile ? (
+      {visible ? (
         <MiniBottle3D id={id} name={name} color={color} hovered={false} playing={false} sustaining={false} />
       ) : (
-        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", opacity: isMobile ? 1 : 0.4 }}>
+        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.6 }}>
           <RowBottle color={color} ml={ml} real={real} shape={shape} />
         </div>
       )}
