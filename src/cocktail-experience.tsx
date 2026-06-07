@@ -3235,8 +3235,12 @@ function shapeFor(ing: Ingredient): "wine" | "spirit" | "can" | "round" {
 function LazyBottle3D({ id, name, color, shape, ml, real }: { id: string; name: string; color: string; shape: "wine" | "spirit" | "can" | "round"; ml: number; real: boolean }) {
   const ref = useRef<HTMLDivElement>(null!);
   const [visible, setVisible] = useState(false);
+  // Na telefonie NIE montujemy osobnych kontekstów WebGL per-kafelek (iOS limit ~8-16 →
+  // "client-side exception"/biały ekran). Używamy lekkiego SVG. 3D tylko na desktopie.
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
 
   useEffect(() => {
+    if (isMobile) return;
     const el = ref.current;
     if (!el) return;
     const io = new IntersectionObserver(
@@ -3245,14 +3249,14 @@ function LazyBottle3D({ id, name, color, shape, ml, real }: { id: string; name: 
     );
     io.observe(el);
     return () => io.disconnect();
-  }, []);
+  }, [isMobile]);
 
   return (
     <div ref={ref} style={{ width: "100%", height: "100%", position: "relative" }}>
-      {visible ? (
+      {visible && !isMobile ? (
         <MiniBottle3D id={id} name={name} color={color} hovered={false} playing={false} sustaining={false} />
       ) : (
-        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.4 }}>
+        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", opacity: isMobile ? 1 : 0.4 }}>
           <RowBottle color={color} ml={ml} real={real} shape={shape} />
         </div>
       )}

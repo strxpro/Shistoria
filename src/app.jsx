@@ -11,6 +11,7 @@ import { Eventi, SocialFeed, Attrazioni, Recensioni, Contatti, Footer } from "./
 import { Storia } from "./storia";
 import { useTweaks, TweaksPanel, TweakSection, TweakToggle, TweakRadio, TweakSelect, TweakColor } from "./tweaks-panel";
 import { CustomCursor, Preloader, Navigation, useReveal } from "./shell";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 const { useState: useStateA, useEffect: useEffectA, useRef: useRefA } = React;
 
@@ -241,7 +242,7 @@ export default function App() {
 
       <main>
         <Hero t={tr} variant={t.heroVariant} />
-        <Storia t={tr} orientation={t.storiaOrientation} />
+        <ErrorBoundary><Storia t={tr} orientation={t.storiaOrientation} /></ErrorBoundary>
         <Ristorante t={tr} />
         <FullMenu />
         <DessertSection />
@@ -249,10 +250,19 @@ export default function App() {
           <Bar t={tr} dark={t.barDark} />
         </RiseCard>
         <RiseCard id="cocktail-rise" z={3} peek="Cocktail" peekBg="linear-gradient(180deg, #BFE6F5 0%, #173445 100%)" bg="var(--c-deep)" riseTo="start start">
-          <CocktailExperience />
+          <ErrorBoundary fallback={
+            <div style={{minHeight:"60vh",display:"flex",alignItems:"center",justifyContent:"center",background:"var(--c-deep)",color:"#fff",textAlign:"center",padding:"40px"}}>
+              <div>
+                <p style={{fontFamily:"var(--f-display)",fontWeight:800,fontSize:"24px",marginBottom:"8px"}}>Cocktail Maker</p>
+                <p style={{opacity:0.7,fontSize:"14px"}}>Esperienza 3D non disponibile su questo dispositivo.</p>
+              </div>
+            </div>
+          }>
+            <CocktailExperience />
+          </ErrorBoundary>
         </RiseCard>
         <Eventi t={tr} />
-        <Attrazioni t={tr} />
+        <ErrorBoundary><Attrazioni t={tr} /></ErrorBoundary>
         <SocialFeed t={tr} />
         <Recensioni t={tr} />
         <Contatti t={tr} />
