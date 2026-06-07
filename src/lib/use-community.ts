@@ -3,7 +3,7 @@
  * sync z localStorage, obsługuje polubienia i komentarze.
  */
 import { useState, useEffect, useCallback } from "react";
-import { supabase, getSessionId, publishDrink, uploadDrinkPhoto, likeDrink, addComment, getCommunityDrinks } from "./supabase";
+import { supabase, getSessionId, publishDrink, uploadDrinkPhoto, likeDrink, addComment, getCommunityDrinks, claimDrink } from "./supabase";
 
 export interface CommunityDrink {
   id: string;
@@ -17,6 +17,7 @@ export interface CommunityDrink {
   color: string;
   photo_url?: string;
   likes: number;
+  claimed_count: number;
   is_drink_of_month: boolean;
   created_at: string;
 }
@@ -117,5 +118,13 @@ export function useCommunityDrinks(initialLimit = 6) {
     return await addComment(drinkId, author, content);
   }, []);
 
-  return { drinks, loading, hasMore, loadMore, publish, like, comment };
+  const claim = useCallback(async (drinkId: string, name: string) => {
+    const order = await claimDrink(drinkId, name);
+    if (order) {
+      setDrinks((prev) => prev.map((d) => d.id === drinkId ? { ...d, claimed_count: (d as any).claimed_count ? (d as any).claimed_count + 1 : 1 } : d));
+    }
+    return order;
+  }, []);
+
+  return { drinks, loading, hasMore, loadMore, publish, like, comment, claim };
 }

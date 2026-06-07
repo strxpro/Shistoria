@@ -126,6 +126,55 @@ export async function createOrder(drink: {
   return data;
 }
 
+// ─── Claim (odbiór drinka) ────────────────────────────────────────────────────
+
+export async function claimDrink(drinkId: string, claimerName: string) {
+  // Tworzy zamówienie (QR) z powiązaniem do drinka community
+  const { data: drink } = await supabase
+    .from('community_drinks')
+    .select('*')
+    .eq('id', drinkId)
+    .single();
+  
+  if (!drink) return null;
+
+  // Utwórz order dla barmana
+  const order = await createOrder({
+    drink_id: drinkId,
+    drink_name: drink.name,
+    author_name: claimerName || 'Anonimo',
+    ingredients: drink.ingredients || [],
+    total_ml: drink.total_ml,
+    strength_label: drink.strength_label,
+  });
+
+  // Zwiększ licznik claimed
+  const { error: rpcErr } = await supabase.rpc('increment_claims', { drink_uuid: drinkId });
+  if (rpcErr) {
+    // fallback: ręcznie zwiększ (RPC może nie istnieć)
+    const { data: cur } = await supabase.from('community_drinks')
+      .select('claimed_count')
+      .eq('id', drinkId)
+      .single();
+    if (cur) {
+      await supabase.from('community_drinks')
+        .update({ claimed_count: (cur.claimed_count || 0) + 1 })
+        .eq('id', drinkId);
+    }
+  }
+
+  return order;
+}
+
+export async function getClaimCount(drinkId: string): Promise<number> {
+  const { data } = await supabase
+    .from('community_drinks')
+    .select('claimed_count')
+    .eq('id', drinkId)
+    .single();
+  return data?.claimed_count || 0;
+}
+
 export async function getOrder(orderId: string) {
   const { data, error } = await supabase
     .from('drink_orders')
