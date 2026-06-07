@@ -218,6 +218,7 @@ function StoriaArc({ data }) {
     if (!sec) return;
     let raf = 0;
     let snapTimer = 0;
+    let animId = 0;
     let snapping = false;
 
     const computeProgress = () => {
@@ -227,32 +228,44 @@ function StoriaArc({ data }) {
       return Math.min(1, Math.max(0, -rect.top / total));
     };
 
-    // delikatny magnetyczny snap — po zatrzymaniu scrolla dociąga do najbliższej daty
+    // własna, płynna animacja scrolla (easeOutCubic) — bez teleportacji, czas zależny od dystansu
+    const animateTo = (targetY) => {
+      cancelAnimationFrame(animId);
+      const startY = window.scrollY;
+      const dist = targetY - startY;
+      if (Math.abs(dist) < 2) { snapping = false; return; }
+      const dur = Math.min(620, 260 + Math.abs(dist) * 0.9); // dłuższy dystans = trochę dłużej, ale płynnie
+      const t0 = performance.now();
+      snapping = true;
+      const step = (now) => {
+        const e = Math.min(1, (now - t0) / dur);
+        const k = 1 - Math.pow(1 - e, 3); // easeOutCubic — miękkie wytracenie
+        window.scrollTo(0, Math.round(startY + dist * k));
+        if (e < 1) animId = requestAnimationFrame(step);
+        else snapping = false;
+      };
+      animId = requestAnimationFrame(step);
+    };
+
+    // magnetyczne dociąganie do NAJBLIŻSZEJ daty po zatrzymaniu scrolla
     const doSnap = () => {
       if (snapping) return;
       const p = computeProgress();
       if (p == null) return;
-      // snap tylko w fazie przewijania kół (nie podczas rozszerzania ostatniego zdjęcia)
-      if (p >= 0.84) return;
+      if (p >= 0.84) return; // nie ruszaj w fazie rozszerzania ostatniego zdjęcia
       const nLocal = data.length;
       const travel = p / 0.84;
       const exactLocal = travel * (nLocal - 1);
-      const nearest = Math.round(exactLocal);
+      const nearest = Math.max(0, Math.min(nLocal - 1, Math.round(exactLocal)));
       const frac = Math.abs(exactLocal - nearest);
-      // dociągaj tylko gdy jesteśmy wystarczająco blisko (delikatnie), nie w połowie drogi
-      if (frac < 0.04 || frac > 0.46) return;
-      const targetTravel = nearest / (nLocal - 1);
-      const targetP = targetTravel * 0.84;
+      if (frac < 0.012) return; // już praktycznie na dacie — nie szarp
+      const targetP = (nearest / (nLocal - 1)) * 0.84;
       const total = sec.offsetHeight - window.innerHeight;
       const secTop = sec.getBoundingClientRect().top + window.scrollY;
-      const targetY = Math.round(secTop + targetP * total);
-      snapping = true;
-      window.scrollTo({ top: targetY, behavior: "smooth" });
-      setTimeout(() => { snapping = false; }, 650);
+      animateTo(Math.round(secTop + targetP * total));
     };
 
     const onScroll = () => {
-      // throttle przez rAF — płynniej, bez skoków
       if (!raf) {
         raf = requestAnimationFrame(() => {
           raf = 0;
@@ -260,17 +273,26 @@ function StoriaArc({ data }) {
           if (p != null) setProgress(p);
         });
       }
-      // resetuj licznik bezczynności — snap dopiero gdy scroll się zatrzyma
       if (snapTimer) clearTimeout(snapTimer);
-      if (!snapping) snapTimer = setTimeout(doSnap, 140);
+      if (!snapping) snapTimer = setTimeout(doSnap, 110);
     };
+
+    // dotyk anuluje trwający snap — użytkownik ma pełną kontrolę
+    const onTouchStart = () => { cancelAnimationFrame(animId); snapping = false; if (snapTimer) clearTimeout(snapTimer); };
+    const onTouchEnd = () => { if (snapTimer) clearTimeout(snapTimer); snapTimer = setTimeout(doSnap, 110); };
+
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchend", onTouchEnd, { passive: true });
     return () => {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchend", onTouchEnd);
       if (raf) cancelAnimationFrame(raf);
+      if (animId) cancelAnimationFrame(animId);
       if (snapTimer) clearTimeout(snapTimer);
     };
   }, [data.length]);
@@ -338,25 +360,31 @@ function StoriaArc({ data }) {
           {data.map((item, i) => {
             const angle = (i - exact) * SPREAD - 90; // -90 = góra koła
             const rad = angle * Math.PI / 180;
-            const x = Math.cos(rad) * R;
-            const y = Math.sin(rad) * R;
+            // kropka DOKŁADNIE na linii okręgu (promień R)
+            const dotX = Math.cos(rad) * R;
+            const dotY = Math.sin(rad) * R;
+            // etykieta nieco na zewnątrz łuku (dalej od środka), stycznie
+            const labR = R + 30;
+            const lx = Math.cos(rad) * labR;
+            const ly = Math.sin(rad) * labR;
             const dist = Math.abs(i - exact);
             const op = Math.max(0.4, 1 - dist * 0.22);   // ZAWSZE widoczne (min 0.4)
             const sc = Math.max(0.78, 1 - dist * 0.08);
             const isActive = i === activeIdx;
-            // kropka na samym okręgu + etykieta tuż nad kropką, ułożona stycznie ("na pilo")
             return (
-              <div key={i} className="sarc-tick"
-                style={{ transform: `translate(-50%,-50%) translate(${x}px, ${y}px) rotate(${angle + 90}deg)`, opacity: op }}>
-                <button className={`sarc-date ${isActive ? "active" : ""}`} style={{ transform: `scale(${sc})` }}
+              <React.Fragment key={i}>
+                {/* kropka na samym okręgu */}
+                <span className={`sarc-dot ${isActive ? "active" : ""}`}
+                  style={{ transform: `translate(-50%,-50%) translate(${dotX}px, ${dotY}px)`, opacity: op }} />
+                {/* etykieta daty — stycznie do okręgu, tuż na zewnątrz */}
+                <button className={`sarc-date ${isActive ? "active" : ""}`}
+                  style={{ transform: `translate(-50%,-50%) translate(${lx}px, ${ly}px) rotate(${angle + 90}deg) scale(${sc})`, opacity: op }}
                   onClick={() => setPopout(item)}>
                   {item.year}
                 </button>
-                <span className={`sarc-dot ${isActive ? "active" : ""}`} />
-              </div>
+              </React.Fragment>
             );
           })}
-          <div className="sarc-wheel-marker" />
         </div>
 
         <div className="sarc-progress" style={{ opacity: Math.max(0, 1 - ease * 2.5) }}><div className="sarc-progress-bar" style={{ width: `${travelP * 100}%` }} /></div>
@@ -402,17 +430,16 @@ function StoriaArc({ data }) {
         .sarc-photo-title { font-family: var(--f-display); font-weight: 700; font-size: 22px; margin: 6px 0 8px; color: #fff; }
         .sarc-photo-text { font-family: var(--f-serif); font-style: italic; font-size: 14px; line-height: 1.45; color: rgba(255,255,255,0.92); max-width: 92%; }
         .sarc-photo-more { margin-top: 12px; background: none; border: none; color: #fff; font-family: var(--f-body); font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; cursor: pointer; padding: 0; opacity: 0.85; }
-        /* PÓŁKOLE z datami — niżej; kropki NA okręgu, etykiety ułożone stycznie ("na pilo"), zawsze widoczne */
+        /* PÓŁKOLE z datami — niżej; kropki NA okręgu, etykiety stycznie tuż na zewnątrz, zawsze widoczne */
         .sarc-wheel { position: absolute; left: 50%; top: calc(72vh + 280px); width: 1px; height: 1px; transition: transform .15s ease-out, opacity .15s ease-out; }
         .sarc-wheel-ring { position: absolute; left: 50%; top: 50%; width: 520px; height: 520px; margin: -260px 0 0 -260px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.14); }
-        .sarc-wheel-marker { position: absolute; left: 50%; top: -260px; width: 16px; height: 16px; border-radius: 50%; background: var(--c-coral, #E8927C); transform: translate(-50%, -50%); box-shadow: 0 0 0 6px rgba(232,146,124,0.22), 0 4px 14px rgba(0,0,0,0.3); z-index: 3; }
-        /* tick = kontener obrócony stycznie do okręgu; w środku data + kropka na obwodzie */
-        .sarc-tick { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; transition: opacity .25s ease; will-change: transform, opacity; }
-        .sarc-date { background: none; border: none; cursor: pointer; font-family: var(--f-display); font-weight: 800;
-          font-size: 18px; color: rgba(255,255,255,0.92); white-space: nowrap; padding: 0 0 6px; transition: color .3s, font-size .3s; }
-        .sarc-date.active { color: var(--c-coral, #E8927C); font-size: 24px; }
-        .sarc-dot { width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,0.55); transition: all .3s; }
-        .sarc-dot.active { width: 13px; height: 13px; background: var(--c-coral, #E8927C); box-shadow: 0 0 0 5px rgba(232,146,124,0.2); }
+        /* etykieta daty — pozycjonowana absolutnie względem środka koła */
+        .sarc-date { position: absolute; left: 0; top: 0; background: none; border: none; cursor: pointer; font-family: var(--f-display); font-weight: 800;
+          font-size: 17px; color: rgba(255,255,255,0.92); white-space: nowrap; padding: 0; transition: color .3s, font-size .3s, opacity .25s ease; will-change: transform, opacity; }
+        .sarc-date.active { color: var(--c-coral, #E8927C); font-size: 23px; }
+        /* kropka — DOKŁADNIE na linii okręgu */
+        .sarc-dot { position: absolute; left: 0; top: 0; width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,0.7); transition: width .3s, height .3s, background .3s, opacity .25s ease; will-change: transform, opacity; }
+        .sarc-dot.active { width: 14px; height: 14px; background: var(--c-coral, #E8927C); box-shadow: 0 0 0 5px rgba(232,146,124,0.22); }
         .sarc-expand { overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,0.5); will-change: width, height; }
         .sarc-expand-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 0 24px 28px; color: #fff; text-shadow: 0 2px 12px rgba(0,0,0,0.4); }
         .sarc-progress { position: absolute; left: 8vw; right: 8vw; bottom: 4vh; height: 2px; background: rgba(255,255,255,0.12); border-radius: 2px; }
