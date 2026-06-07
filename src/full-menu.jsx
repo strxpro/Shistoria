@@ -21,11 +21,15 @@ function FullMenu() {
 function MobileFullMenu() {
   const [activeCat, setActiveCat] = useStateM(window.FULL_MENU[0].id);
   const [dishPopout, setDishPopout] = useStateM(null);
+  const [catSheet, setCatSheet] = useStateM(false);
+  const [pillVisible, setPillVisible] = useStateM(false);
   const catBarRef = useRefM(null);
+  const sectionRef = useRefM(null);
 
   // klik w kategorię → scroll do sekcji
   const goToCat = (id) => {
     setActiveCat(id);
+    setCatSheet(false);
     const el = document.querySelector(`[data-mcat="${id}"]`);
     if (el) {
       const top = el.getBoundingClientRect().top + window.scrollY - 120;
@@ -58,6 +62,11 @@ function MobileFullMenu() {
             bar.scrollTo({ left, behavior: "smooth" });
           }
         }
+        // floating pill widoczny gdy jesteśmy wewnątrz sekcji menu (sticky pasek wyjechał górą)
+        if (sectionRef.current) {
+          const r = sectionRef.current.getBoundingClientRect();
+          setPillVisible(r.top < -60 && r.bottom > window.innerHeight * 0.5);
+        }
       });
     };
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -69,7 +78,7 @@ function MobileFullMenu() {
   const conv = (p) => (typeof window !== "undefined" && window.convertPriceExtra ? window.convertPriceExtra(p, lang) : "");
 
   return (
-    <section className="mfm" id="menu">
+    <section className="mfm" id="menu" ref={sectionRef}>
       <div className="mfm-head">
         <span className="mfm-kicker">— Menu · 03</span>
         <h2 className="mfm-title">La carta della casa</h2>
@@ -97,19 +106,24 @@ function MobileFullMenu() {
             <ul className="mfm-list">
               {cat.items.map((it, i) => (
                 <li key={i} className={`mfm-item ${it.featured ? "feat" : ""}`} onClick={() => setDishPopout({ ...it, icon: cat.icon })}>
-                  <div className="mfm-item-top">
-                    <span className="mfm-item-name">
-                      {it.name}
-                      {it.featured && <span className="mfm-star">★</span>}
-                      {it.allergen && <span className="mfm-allergen">({it.allergen})</span>}
-                    </span>
-                    <span className="mfm-item-price">
-                      <span className="mfm-price-eur">{it.price}</span>
-                      {conv(it.price) && <span className="mfm-price-conv">{conv(it.price)}</span>}
-                      {it.note && <span className="mfm-price-note">/ {it.note}</span>}
-                    </span>
+                  <div className="mfm-item-thumb">
+                    {it.img ? <img src={it.img} alt="" loading="lazy" /> : <span className="mfm-item-thumb-ph">{cat.icon}</span>}
                   </div>
-                  {it.desc && <p className="mfm-item-desc">{it.desc}</p>}
+                  <div className="mfm-item-main">
+                    <div className="mfm-item-top">
+                      <span className="mfm-item-name">
+                        {it.name}
+                        {it.featured && <span className="mfm-star">★</span>}
+                        {it.allergen && <span className="mfm-allergen">({it.allergen})</span>}
+                      </span>
+                      <span className="mfm-item-price">
+                        <span className="mfm-price-eur">{it.price}</span>
+                        {conv(it.price) && <span className="mfm-price-conv">{conv(it.price)}</span>}
+                        {it.note && <span className="mfm-price-note">/ {it.note}</span>}
+                      </span>
+                    </div>
+                    {it.desc && <p className="mfm-item-desc">{it.desc}</p>}
+                  </div>
                 </li>
               ))}
             </ul>
@@ -129,6 +143,30 @@ function MobileFullMenu() {
           <p>In caso di allergie comunicare al personale. Coperto e servizio: €3,00.</p>
         </div>
       </div>
+
+      {/* floating pill — wysuwany przycisk kategorii (gdy pasek wyjechał górą) */}
+      <button className={`mfm-pill ${pillVisible && !catSheet ? "show" : ""}`} onClick={() => setCatSheet(true)}>
+        <span className="mfm-pill-icon">☰</span> Categorie
+      </button>
+
+      {/* bottom sheet z kategoriami — wysuwa się z dołu */}
+      {catSheet && (
+        <div className="mfm-sheet-overlay" onClick={() => setCatSheet(false)}>
+          <div className="mfm-sheet" onClick={(e) => e.stopPropagation()}>
+            <div className="mfm-sheet-handle" />
+            <span className="mfm-sheet-title">Categorie</span>
+            <div className="mfm-sheet-list">
+              {window.FULL_MENU.map((c) => (
+                <button key={c.id} className={`mfm-sheet-btn ${activeCat === c.id ? "active" : ""}`} onClick={() => goToCat(c.id)}>
+                  <span className="mfm-sheet-icon">{c.icon}</span>
+                  <span>{c.label}</span>
+                  <span className="mfm-sheet-count">{c.items.length}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* popout dania */}
       {dishPopout && (
@@ -169,8 +207,13 @@ function MobileFullMenu() {
         .mfm-cat-title { display: flex; align-items: baseline; gap: 10px; font-family: var(--f-display); font-weight: 800; font-size: 26px; color: var(--c-deep); margin-bottom: 16px; letter-spacing: -0.02em; overflow-wrap: anywhere; }
         .mfm-cat-num { font-size: 13px; color: var(--c-sky); flex: 0 0 auto; }
         .mfm-list { list-style: none; padding: 0; margin: 0; }
-        .mfm-item { padding: 14px 0; border-bottom: 1px solid var(--c-line); cursor: pointer; }
+        .mfm-item { display: flex; gap: 12px; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid var(--c-line); cursor: pointer; }
         .mfm-item.feat { background: rgba(245,237,224,0.5); border-radius: 12px; padding: 14px 12px; margin: 6px 0; border-bottom: 1px solid transparent; }
+        .mfm-item-thumb { flex: 0 0 auto; width: 56px; height: 56px; border-radius: 12px; overflow: hidden; background: linear-gradient(135deg, var(--c-sand), #E8DDC8); display: flex; align-items: center; justify-content: center; }
+        .mfm-item-thumb img { width: 100%; height: 100%; object-fit: cover; }
+        .mfm-item-thumb-ph { font-size: 24px; opacity: 0.45; }
+        .mfm-item.feat .mfm-item-thumb { width: 64px; height: 64px; }
+        .mfm-item-main { min-width: 0; flex: 1; }
         .mfm-item-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
         .mfm-item-name { font-family: var(--f-display); font-weight: 700; font-size: 16px; color: var(--c-deep); line-height: 1.25; overflow-wrap: anywhere; word-break: break-word; min-width: 0; flex: 1; }
         .mfm-star { color: var(--c-coral); font-size: 13px; margin-left: 4px; }
@@ -199,6 +242,23 @@ function MobileFullMenu() {
         .mfm-pop-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
         .mfm-pop-price { font-family: var(--f-display); font-weight: 800; font-size: 22px; color: var(--c-sky); }
         .mfm-pop-allergen { font-size: 11px; color: var(--c-mute); }
+        /* floating pill */
+        .mfm-pill { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 120px); z-index: 90; display: inline-flex; align-items: center; gap: 8px; padding: 12px 22px; border-radius: 999px; background: var(--c-deep); color: #fff; border: none; font-family: var(--f-body); font-size: 14px; font-weight: 600; box-shadow: 0 12px 36px rgba(14,34,48,0.35); cursor: pointer; opacity: 0; transition: transform .35s cubic-bezier(.16,1,.3,1), opacity .35s; }
+        .mfm-pill.show { transform: translate(-50%, 0); opacity: 1; }
+        .mfm-pill-icon { font-size: 16px; }
+        /* bottom sheet */
+        .mfm-sheet-overlay { position: fixed; inset: 0; z-index: 210; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); display: flex; align-items: flex-end; animation: mfmFade .2s ease; }
+        @keyframes mfmFade { from { opacity: 0; } to { opacity: 1; } }
+        .mfm-sheet { width: 100%; background: #fff; border-radius: 24px 24px 0 0; padding: 12px 16px calc(20px + env(safe-area-inset-bottom)); box-shadow: 0 -10px 40px rgba(0,0,0,0.2); animation: mfmSlideUp .35s cubic-bezier(.16,1,.3,1); max-height: 70vh; overflow-y: auto; }
+        @keyframes mfmSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .mfm-sheet-handle { width: 40px; height: 4px; border-radius: 2px; background: var(--c-line); margin: 4px auto 14px; }
+        .mfm-sheet-title { display: block; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--c-mute); margin-bottom: 12px; padding: 0 4px; }
+        .mfm-sheet-list { display: flex; flex-direction: column; gap: 4px; }
+        .mfm-sheet-btn { display: flex; align-items: center; gap: 12px; padding: 14px 12px; border-radius: 12px; border: none; background: none; font-family: var(--f-body); font-size: 15px; color: var(--c-deep); text-align: left; cursor: pointer; }
+        .mfm-sheet-btn.active { background: var(--c-deep); color: #fff; }
+        .mfm-sheet-icon { font-size: 18px; }
+        .mfm-sheet-btn span:nth-child(2) { flex: 1; }
+        .mfm-sheet-count { font-family: var(--f-display); font-weight: 700; font-size: 13px; opacity: 0.55; }
       `}</style>
     </section>
   );
