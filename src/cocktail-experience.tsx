@@ -3744,7 +3744,7 @@ function AccordionPanel({
               </div>
             )}
 
-            {/* Rozwijane listy w jednej linii (mobile): [←] kategoria | moc */}
+            {/* Rozwijane listy w jednej linii (mobile): [←] kategoria | moc | × */}
             <div className="cx-drop-row">
               <button className="cx-drop-back" onClick={closeCat} aria-label="Categorie">←</button>
               <div className={`cx-drop cx-drop-cat ${catDropOpen ? "is-open" : ""}`}>
@@ -3786,6 +3786,8 @@ function AccordionPanel({
                 <button className="cx-drop-arrow" disabled={!canLeft} onClick={() => scrollBy(-1)} aria-label="Precedente">‹</button>
                 <button className="cx-drop-arrow" disabled={!canRight} onClick={() => scrollBy(1)} aria-label="Successivo">›</button>
               </div>
+              {/* Krzyżyk zamykający — zawsze stały w prawym rogu */}
+              <button className="cx-drop-close" onClick={closeCat} aria-label="Chiudi">×</button>
             </div>
             <div className="cx-drawer-head">
               <button className="cx-back" onClick={closeCat}>
@@ -5308,6 +5310,9 @@ function CocktailStyles() {
         .cx-drop-arrow { width:34px; height:42px; border-radius:11px; display:grid; place-items:center;
           background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); color:#fff; font-size:18px; cursor:pointer; transition:opacity .2s; }
         .cx-drop-arrow:disabled { opacity:0.25; }
+        .cx-drop-close { flex:0 0 auto; width:40px; height:40px; border-radius:50%; display:grid; place-items:center;
+          background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); color:#fff; font-size:20px; cursor:pointer; transition:background .2s; }
+        .cx-drop-close:active { background:rgba(232,146,124,0.3); }
         .cx-drop { display:block; position:relative; max-width:100%; margin:0 0 8px; z-index:5; }
         .cx-drop-row .cx-drop { margin:0; }
         /* desktopowy nagłówek szuflady (back+tytuł+strzałki) ukryty na mobile — zastąpiony rzędem dropdownów */
