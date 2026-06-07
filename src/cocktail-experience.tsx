@@ -5250,9 +5250,9 @@ function CocktailStyles() {
 
         /* SHAKE — suwak wycentrowany na dole */
         .cx-shake-desktop { display:none; }
-        /* gauge nie nachodzi na FAB */
-        .cx-gauge { left:calc(50% - min(120px, 30vw)) !important; top:46% !important; }
-        .cx-gauge-right { right:calc(50% - min(120px, 30vw)) !important; left:auto !important; }
+        /* gauge nie nachodzi na FAB — przesunięta jeszcze bliżej środka */
+        .cx-gauge { left:calc(50% - min(100px, 24vw)) !important; top:44% !important; }
+        .cx-gauge-right { right:calc(50% - min(100px, 24vw)) !important; left:auto !important; }
         .cx-slide-wrap { display:block; position:fixed; left:50%; bottom:calc(72px + env(safe-area-inset-bottom));
           transform:translateX(-50%); width:min(70vw,290px); z-index:41; pointer-events:auto; }
         .cx-slide { position:relative; width:100%; height:60px; border-radius:999px; overflow:hidden;
@@ -5419,13 +5419,15 @@ function CocktailStyles() {
           transform-origin:bottom left; transition:opacity .3s, transform .3s, visibility .3s; }
         .cx-minfo.is-open .cx-minfo-pop { opacity:1; visibility:visible; transform:none; }
         .cx-minfo-steps { display:flex; flex-direction:column; gap:12px; margin-top:12px; }
-        /* Wybór szklanki na mobile — 2 obok siebie, mniejsze, mieści się */
-        .cx-popout { width:min(560px, 96vw) !important; }
-        .cx-popout-inner { padding:16px 12px 20px !important; border-radius:22px !important; }
-        .cx-glass-grid { grid-template-columns:repeat(2,1fr) !important; gap:8px !important; }
-        .cx-glass-card { width:100% !important; height:140px !important; padding:10px 6px 12px !important; border-radius:16px !important; }
-        .cx-glass-art { height:80px !important; }
-        .cx-popout-title { font-size:clamp(20px,5vw,30px) !important; margin:4px 0 14px !important; }
+        /* Wybór szklanki na mobile — wyśrodkowane, mieszczą się */
+        .cx-popout { width:96vw !important; left:2vw !important; transform:translate(0,-50%) scale(1) !important; }
+        .cx-popout.show { transform:translate(0,-50%) scale(1) !important; }
+        .cx-popout-inner { padding:16px 10px 18px !important; border-radius:20px !important; }
+        .cx-glass-grid { grid-template-columns:1fr 1fr !important; gap:10px !important; justify-items:center; }
+        .cx-glass-card { width:100% !important; min-height:150px !important; max-height:180px !important; padding:12px 8px 14px !important; border-radius:16px !important; overflow:hidden; display:flex !important; flex-direction:column !important; align-items:center !important; justify-content:center !important; }
+        .cx-glass-card span { font-size:12px !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; text-align:center; }
+        .cx-glass-art { height:80px !important; width:80px !important; flex:0 0 auto; }
+        .cx-popout-title { font-size:clamp(18px,5vw,26px) !important; margin:4px 0 12px !important; }
       }
 
       @media (max-width:768px) and (max-height:680px){
