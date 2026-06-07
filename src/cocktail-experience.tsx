@@ -1988,11 +1988,12 @@ function CocktailExperience() {
           // ZAWSZE widoczny podczas shaking (animacja trzęsienia) — niezależnie od fazy scroll
           if (stageRef.current === "shaking") {
             api.shakerRoot.visible = true;
+            api.shakerTop.visible = true;
           } else {
             api.shakerRoot.visible = !isGlassActive && !isGlassExiting;
           }
           if (phase === "enter") applyEnter(p / (isMobileCx ? 0.28 : CONFIG.enterEnd));
-          else if (phase === "exit") applyExit((p - CONFIG.exitStart) / (1 - CONFIG.exitStart));
+          else if (phase === "exit" && stageRef.current !== "shaking") applyExit((p - CONFIG.exitStart) / (1 - CONFIG.exitStart));
 
           // Neonowy „pop": pojawia się gdy UI znika (wczesny exit). Scroll w dół → strzałka
           // w dół; scroll w górę → strzałka obraca się do góry, napis wtapia się w ścianę.
