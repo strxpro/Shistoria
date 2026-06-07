@@ -2181,7 +2181,7 @@ function CocktailExperience() {
         {/* Canvas */}
         <div className="cx-canvas">
           {inView && (
-            <Canvas frameloop="demand" shadows dpr={isMobileDevice ? [1, 1.5] : [1, 2]}
+            <Canvas frameloop={isMobileDevice ? "always" : "demand"} shadows dpr={isMobileDevice ? [1, 1.5] : [1, 2]}
               gl={{ antialias: true, alpha: true, powerPreference: "high-performance", failIfMajorPerformanceCaveat: false }}
               camera={{ position: [CONFIG.camPos.x, CONFIG.camPos.y, CONFIG.camPos.z], fov: 36 }}>
               <Scene initialColor={mixedColor} onReady={onSceneReady}
