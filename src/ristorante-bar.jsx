@@ -252,7 +252,7 @@ function Bar({ t, dark = true }) {
             <div className="bar-hours-day">Martedì · chiuso</div>
           </div>
           <div className="bar-hours-right">
-            <a href="#cocktail-builder" className="btn bar-cta">
+            <a href="#contatti" className="btn bar-cta" onClick={(e) => { e.preventDefault(); const el = document.getElementById("contatti"); if (el) el.scrollIntoView({ behavior: "smooth" }); }}>
               <span className="bar-cta-icon">☀</span>
               {t("bar.apertivoCta")} <span className="arrow">→</span>
             </a>
@@ -276,7 +276,7 @@ function Bar({ t, dark = true }) {
         .bar-hours { display: grid; grid-template-columns: 1fr; gap: 48px; padding-top: 80px; margin-top: 80px; border-top: 1px solid ${dark ? "rgba(255,255,255,0.1)" : "var(--c-line)"}; }
         @media (min-width: 768px) { .bar-hours { grid-template-columns: 1fr 1fr; gap: 96px; align-items: center; } }
         .bar-hours-title { font-family: var(--f-display); font-weight: 800; font-size: 40px; margin-top: 12px; letter-spacing: -0.02em; }
-        .bar-hours-num { font-family: var(--f-display); font-weight: 800; font-size: clamp(40px, 6vw, 72px); color: var(--c-coral); margin-top: 12px; letter-spacing: -0.03em; line-height: 1; }
+        .bar-hours-num { font-family: var(--f-display); font-weight: 800; font-size: clamp(36px, 6vw, 64px); color: var(--c-coral); margin-top: 12px; letter-spacing: -0.03em; line-height: 1.05; white-space: nowrap; }
         .bar-hours-num + .bar-hours-num { margin-top: 4px; }
         .bar-hours-day { font-family: var(--f-serif); font-style: italic; font-size: 18px; opacity: 0.65; margin-top: 16px; }
         .bar-cta { background: var(--grad-sunset); color: #fff; padding: 22px 36px; font-size: 14px; }
@@ -290,7 +290,7 @@ function Bar({ t, dark = true }) {
           .bar-intro { font-size: clamp(16px, 4.5vw, 20px); max-width: 100%; overflow-wrap: anywhere; }
           .bar-hours { padding-top: 48px; margin-top: 48px; gap: 32px; }
           .bar-hours-title { font-size: clamp(28px, 8vw, 40px); overflow-wrap: anywhere; }
-          .bar-hours-num { font-size: clamp(40px, 12vw, 64px); }
+          .bar-hours-num { font-size: clamp(30px, 8.5vw, 44px); white-space: nowrap; }
           .bar-cta-sub { font-size: 18px !important; overflow-wrap: anywhere; }
         }
       `}</style>

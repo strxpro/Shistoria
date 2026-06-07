@@ -682,7 +682,115 @@ function DesktopFullMenu() {
 
 // ─── Drinks list with filter (replaces simple cocktail carousel) ──────────────
 function DrinksList({ dark = true }) {
+  const [isMobile, setIsMobile] = useStateM(typeof window !== "undefined" && window.innerWidth < 768);
+  useEffectM(() => {
+    const onR = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", onR);
+    return () => window.removeEventListener("resize", onR);
+  }, []);
+  if (isMobile) return <MobileDrinksList dark={dark} />;
+  return <DesktopDrinksList dark={dark} />;
+}
+
+// kategorie, które mają sens ze zdjęciem (gotowe drinki, piwa, kawy, bibite)
+const DRINKS_WITH_PHOTO = new Set(["cocktails", "analcolici", "smoothie", "bibite", "birre-spina", "birre-bottiglia", "birre-artigianali", "caffe"]);
+
+// ─── MOBILE: menu napojów — zdjęcia dla drinków/piw, lista dla czystych alkoholi ──
+function MobileDrinksList({ dark = true }) {
   const [filter, setFilter] = useStateM("cocktails");
+  const lang = typeof window !== "undefined" ? window.currentLanguage : "it";
+  const conv = (p) => (typeof window !== "undefined" && window.convertPriceExtra ? window.convertPriceExtra(p, lang) : "");
+  const items = useMemoM(
+    () => window.DRINKS_MENU.items.filter((i) => i.cat === filter),
+    [filter]
+  );
+  const withPhoto = DRINKS_WITH_PHOTO.has(filter);
+
+  return (
+    <div className={`mdr ${dark ? "mdr-dark" : ""}`}>
+      {/* pasek filtrów — przewijany palcem */}
+      <div className="mdr-filters">
+        {window.DRINKS_MENU.filters.filter((f) => f.id !== "all").map((f) => {
+          const count = window.DRINKS_MENU.items.filter((i) => i.cat === f.id).length;
+          if (count === 0) return null;
+          return (
+            <button key={f.id} className={`mdr-filter ${filter === f.id ? "active" : ""}`} onClick={() => setFilter(f.id)}>
+              {f.label}<span className="mdr-filter-num">{count}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* siatka — ze zdjęciami (drinki/piwa) lub prosta lista (alkohole) */}
+      {withPhoto ? (
+        <div className="mdr-grid">
+          {items.map((it, i) => (
+            <div key={`${filter}-${i}`} className="mdr-card">
+              <div className="mdr-card-img">
+                {it.img ? <img src={it.img} alt={it.name} loading="lazy" /> : <DrinkGlassSVG cat={it.cat} />}
+              </div>
+              <div className="mdr-card-body">
+                <h4 className="mdr-card-name">{it.name}</h4>
+                {it.desc && <p className="mdr-card-desc">{it.desc}</p>}
+                <div className="mdr-card-price">
+                  <span>{it.price}</span>
+                  {conv(it.price) && <span className="mdr-card-conv">{conv(it.price)}</span>}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <ul className="mdr-list">
+          {items.map((it, i) => (
+            <li key={`${filter}-${i}`} className="mdr-row">
+              <div className="mdr-row-main">
+                <span className="mdr-row-name">{it.name}</span>
+                {it.desc && <span className="mdr-row-desc">{it.desc}</span>}
+              </div>
+              <span className="mdr-row-price">
+                {it.price}{conv(it.price) && <span className="mdr-card-conv"> {conv(it.price)}</span>}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {items.length === 0 && <div className="mdr-empty">Niente in questa categoria.</div>}
+
+      <style>{`
+        .mdr { margin-top: 8px; }
+        .mdr-filters { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; padding: 0 0 14px; margin: 0 -4px 8px; }
+        .mdr-filters::-webkit-scrollbar { display: none; }
+        .mdr-filter { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; cursor: pointer;
+          border: 1px solid ${dark ? "rgba(255,255,255,0.2)" : "var(--c-line)"}; background: ${dark ? "rgba(255,255,255,0.05)" : "#fff"}; color: ${dark ? "rgba(255,255,255,0.9)" : "var(--c-deep)"}; transition: all .2s; }
+        .mdr-filter.active { background: var(--c-coral); border-color: var(--c-coral); color: #fff; }
+        .mdr-filter-num { font-family: var(--f-display); font-weight: 700; font-size: 10px; opacity: 0.6; }
+        /* siatka kart ze zdjęciami */
+        .mdr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        .mdr-card { background: ${dark ? "rgba(255,255,255,0.06)" : "#fff"}; border-radius: 16px; overflow: hidden; box-shadow: 0 6px 20px rgba(0,0,0,0.10); display: flex; flex-direction: column; }
+        .mdr-card-img { position: relative; aspect-ratio: 4/3; background: ${dark ? "linear-gradient(135deg,#1a3d52,#0e2230)" : "linear-gradient(135deg, var(--c-sand), #E8DDC8)"}; display: grid; place-items: center; overflow: hidden; }
+        .mdr-card-img img { width: 100%; height: 100%; object-fit: cover; }
+        .mdr-card-img svg { width: 56%; height: 70%; }
+        .mdr-card-body { padding: 12px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
+        .mdr-card-name { font-family: var(--f-display); font-weight: 700; font-size: 15px; line-height: 1.2; color: ${dark ? "#fff" : "var(--c-deep)"}; overflow-wrap: anywhere; }
+        .mdr-card-desc { font-family: var(--f-serif); font-style: italic; font-size: 12px; line-height: 1.35; color: ${dark ? "rgba(255,255,255,0.6)" : "var(--c-mute)"}; overflow-wrap: anywhere; flex: 1; }
+        .mdr-card-price { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; margin-top: 4px; font-family: var(--f-display); font-weight: 800; font-size: 16px; color: var(--c-coral); }
+        .mdr-card-conv { font-family: var(--f-body); font-weight: 400; font-size: 10px; color: ${dark ? "rgba(255,255,255,0.5)" : "var(--c-mute)"}; }
+        /* prosta lista — czyste alkohole */
+        .mdr-list { list-style: none; padding: 0; margin: 0; }
+        .mdr-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 13px 0; border-bottom: 1px solid ${dark ? "rgba(255,255,255,0.1)" : "var(--c-line)"}; }
+        .mdr-row-main { min-width: 0; flex: 1; }
+        .mdr-row-name { font-family: var(--f-display); font-weight: 700; font-size: 15px; color: ${dark ? "#fff" : "var(--c-deep)"}; overflow-wrap: anywhere; }
+        .mdr-row-desc { display: block; font-family: var(--f-serif); font-style: italic; font-size: 12px; color: ${dark ? "rgba(255,255,255,0.55)" : "var(--c-mute)"}; margin-top: 2px; overflow-wrap: anywhere; }
+        .mdr-row-price { flex: 0 0 auto; font-family: var(--f-display); font-weight: 800; font-size: 15px; color: var(--c-coral); white-space: nowrap; text-align: right; }
+        .mdr-empty { padding: 32px 0; text-align: center; font-style: italic; color: ${dark ? "rgba(255,255,255,0.5)" : "var(--c-mute)"}; }
+      `}</style>
+    </div>
+  );
+}
+
+// ─── DESKTOP drinks list ──────────────────────────────────────────────────────
+function DesktopDrinksList({ dark = true }) {
   const trackRef = useRefM(null);
   const items = useMemoM(
     () => filter === "all" ? window.DRINKS_MENU.items : window.DRINKS_MENU.items.filter((i) => i.cat === filter),
