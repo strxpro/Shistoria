@@ -15,8 +15,49 @@ function FullMenu() {
   const [dishPopout, setDishPopout] = useStateM(null);
   const [pillVisible, setPillVisible] = useStateM(false);
   const navRef = useRefM(null);
+  const catListRef = useRefM(null);
   const footerRef = useRefM(null);
   const lastScrollY = useRefM(0);
+
+  // pasek kategorii (mobile): drag palcem/myszką w bok + bezwładność
+  useEffectM(() => {
+    const ul = catListRef.current;
+    if (!ul) return;
+    let down = false, startX = 0, startScroll = 0, moved = false, lastX = 0, vX = 0, momentum = 0;
+    const onDown = (x) => { down = true; moved = false; startX = x; lastX = x; startScroll = ul.scrollLeft; cancelAnimationFrame(momentum); };
+    const onMove = (x) => {
+      if (!down) return;
+      const dx = x - startX;
+      if (Math.abs(dx) > 4) moved = true;
+      ul.scrollLeft = startScroll - dx;
+      vX = x - lastX; lastX = x;
+    };
+    const onUp = () => {
+      if (!down) return; down = false;
+      // bezwładność
+      const decay = () => {
+        if (Math.abs(vX) < 0.4) return;
+        ul.scrollLeft -= vX; vX *= 0.92; momentum = requestAnimationFrame(decay);
+      };
+      momentum = requestAnimationFrame(decay);
+    };
+    const ts = (e) => onDown(e.touches[0].clientX);
+    const tm = (e) => onMove(e.touches[0].clientX);
+    const te = () => onUp();
+    ul.addEventListener("touchstart", ts, { passive: true });
+    ul.addEventListener("touchmove", tm, { passive: true });
+    ul.addEventListener("touchend", te, { passive: true });
+    // zapobiega kliknięciu kategorii zaraz po przeciągnięciu
+    const onClickCapture = (e) => { if (moved) { e.stopPropagation(); e.preventDefault(); moved = false; } };
+    ul.addEventListener("click", onClickCapture, true);
+    return () => {
+      ul.removeEventListener("touchstart", ts);
+      ul.removeEventListener("touchmove", tm);
+      ul.removeEventListener("touchend", te);
+      ul.removeEventListener("click", onClickCapture, true);
+      cancelAnimationFrame(momentum);
+    };
+  }, []);
 
   // Scroll into category on click
   const scrollToCat = (id) => {
@@ -98,7 +139,7 @@ function FullMenu() {
           <aside className="fmenu-nav" ref={navRef}>
             <span className="kicker fmenu-nav-label">— Categorie</span>
             {/* Full category list */}
-            <ul>
+            <ul ref={catListRef}>
               {window.FULL_MENU.map((c) => {
                 const ratio = ratios[c.id] || 0;
                 const borderOpacity = activeCat === c.id ? 1 : Math.min(1, ratio * 2.5);
@@ -359,8 +400,8 @@ function FullMenu() {
         .fmenu-footer { margin: 64px auto 0; padding: 48px; background: var(--c-sand); border-radius: 24px; text-align: center; width: 100%; max-width: 100%; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
         .fmenu-footer-quote { overflow-wrap: anywhere; word-break: break-word; hyphens: auto; max-width: 100%; width: 100%; margin: 0; font-size: clamp(16px, 4vw, 24px); white-space: normal; box-sizing: border-box; text-align: center; }
         @media (max-width: 768px) {
-          .fmenu-footer { padding: 20px 12px; margin-top: 32px; border-radius: 16px; max-width: calc(100vw - 48px); }
-          .fmenu-footer-quote { font-size: clamp(13px, 3.6vw, 16px) !important; line-height: 1.5; letter-spacing: 0; }
+          .fmenu-footer { padding: 22px 16px; margin-top: 32px; border-radius: 16px; max-width: 100%; width: 100%; box-sizing: border-box; }
+          .fmenu-footer-quote { font-size: clamp(14px, 3.8vw, 17px) !important; line-height: 1.5; letter-spacing: 0; max-width: 100%; }
         }
       `}</style>
     </section>

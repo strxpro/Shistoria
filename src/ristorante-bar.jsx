@@ -135,12 +135,12 @@ function Ristorante({ t }) {
             <div className="rist-chef-play">▶</div>
           </div>
           <div className="rist-chef-text">
-            <span className="eyebrow">— {t("ristorante.chefTitle")}</span>
+            <span className="eyebrow">— {t("ristorante.chefEyebrow")}</span>
             <SplitReveal as="h3" className="h3" style={{ marginTop: 16 }}>{t("ristorante.chefTitle")}</SplitReveal>
             <ScrollReveal textClassName="rist-chef-body" staggerDelay={0.02} blurStrength={2}>
               {t("ristorante.chefText")}
             </ScrollReveal>
-            <a href="#menu" className="btn">{t("ristorante.cta")} <span className="arrow">→</span></a>
+            <a href="#menu" className="btn rist-chef-cta">{t("ristorante.cta")} <span className="arrow">→</span></a>
           </div>
         </div>
       </div>
@@ -177,6 +177,7 @@ function Ristorante({ t }) {
         .rist-chef-img { position: relative; height: 540px; border-radius: 20px; overflow: hidden; }
         .rist-chef-play { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 80px; height: 80px; border-radius: 50%; background: rgba(255,255,255,0.95); color: var(--c-deep); display: flex; align-items: center; justify-content: center; font-size: 22px; padding-left: 4px; backdrop-filter: blur(6px); }
         .rist-chef-body { font-size: 18px; line-height: 1.6; color: var(--c-deep); margin: 24px 0 32px; max-width: 460px; }
+        .rist-chef-cta { margin-top: 16px; }
         .rist-gallery-masonry { padding: 96px 0; }
         .rist-gallery-mobile { padding: 96px 0; }
         .rist-gal-item { border-radius: 16px; overflow: hidden; }

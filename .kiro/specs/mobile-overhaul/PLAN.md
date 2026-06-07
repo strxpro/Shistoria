@@ -161,37 +161,43 @@
 ### C1. 🟠 Nagłówki „Chef's Table"
 - **Problem:** nagłówek się powtarza / skleja.
 - **Do zrobienia:**
-  - [ ] Naprawić powtarzanie/sklejanie nagłówka.
-  - [ ] Dodać tekst: **otwieranie wina i filetowanie ryby przy kliencie**.
-  - [ ] Dodać **odstęp** między tekstem a przyciskiem *„Vedi il menu completo"*.
+  - [x] Naprawić powtarzanie/sklejanie nagłówka. (eyebrow miał ten sam tekst co h3 → eyebrow teraz `chefEyebrow` „L'esperienza")
+  - [x] Dodać tekst: **otwieranie wina i filetowanie ryby przy kliencie**. (zmieniony `chefText` we wszystkich 6 językach)
+  - [x] Dodać **odstęp** między tekstem a przyciskiem *„Vedi il menu completo"*. (`.rist-chef-cta { margin-top:16px }`)
+  - ✅ *Zrobione w `ristorante-bar.jsx` + `data.js`.*
 
 ### C2. 🟠 Pasek kategorii — swipe palcem
 - **Problem:** nie da się przesuwać paska kategorii w bok.
 - **Do zrobienia:**
-  - [ ] Włączyć **poziomy swipe** palcem na pasku kategorii (płynny).
+  - [x] Włączyć **poziomy swipe** palcem na pasku kategorii (płynny).
+  - ✅ *Dodany jawny drag-to-scroll z bezwładnością (`catListRef`) + blokada kliknięcia po przeciągnięciu, w `FullMenu`.*
 
 ### C3. 🔴 Składniki dań — zawijanie (od 2 dni!)
 - **Problem:** składniki pod daniami **wychodzą poza ekran**.
 - **Do zrobienia:**
-  - [ ] Składniki **mieszczą się** na ekranie.
-  - [ ] Jeśli za długie → **zawijają do nowej linii** (nie ucinają się).
+  - [x] Składniki **mieszczą się** na ekranie. (`grid-template-columns: 52px minmax(0,1fr) auto`, `min-width:0`)
+  - [x] Jeśli za długie → **zawijają do nowej linii**. (`overflow-wrap:anywhere; word-break:break-word` na `.fmenu-row-desc` i `.fmenu-row-name`)
+  - ✅ *Obsłużone w CSS `FullMenu`.*
 
 ### C4. 🟠 Popout dania — pełna widoczność
 - **Do zrobienia:**
-  - [ ] Wysuwany popout dania **w pełni widoczny**, wyrównany.
-  - [ ] Tekst w popout **nieucięty**.
+  - [x] Wysuwany popout dania **w pełni widoczny**, wyrównany. (`width: min(480px, 92vw)`, wyśrodkowany flex overlay)
+  - [x] Tekst w popout **nieucięty**.
+  - ✅ *Obsłużone; do weryfikacji wizualnej na bieżąco.*
 
 ### C5. 🔴 Box „cuciniamo solo quello..." — responsywność (od 2 dni!)
 - **Problem:** box pod menu restauracji **wychodzi poza ekran** na telefonie.
 - **Do zrobienia:**
-  - [ ] Cała treść **mieści się** na ekranie, box **wyśrodkowany**.
-  - [ ] **Plan B:** jeśli się nie da → **ukryć** box na telefonie i stworzyć **dedykowany responsywny element tylko mobile**.
+  - [x] Cała treść **mieści się** na ekranie, box **wyśrodkowany**. (zmieniony `max-width: calc(100vw-48px)` → `max-width:100%; width:100%; box-sizing:border-box` — poprzednie powodowało przepełnienie bo `100vw` ignorował padding kontenera i scrollbar)
+  - ✅ *Zrobione w `FullMenu` CSS `@media (max-width:768px)`.*
 
 ### C6. 🟡 Ceny i alergeny w menu
+- **Stan:** ceny już są w `FULL_MENU`, przeliczanie walut przez `window.convertPrice`. Do dopracowania format + klik alergenu.
 - **Do zrobienia:**
-  - [ ] Dodać **ceny dań** (brakuje ich).
+  - [x] Dodać **ceny dań**. (są w `menu-data.js` przy każdej pozycji)
   - [ ] Przeliczenie waluty → **od nowej linii, mniejszą czcionką, w nawiasach**.
   - [ ] Kliknięcie **numeru alergenu** → pokazuje, którego składnika dotyczy.
+  - ⏳ *Format waluty + interaktywne alergeny — do zrobienia w kolejnej turze (wymaga zmiany `convertPrice` i mapy alergenów).*
 
 > 📎 *Odpowiada wymaganiom: 5, 6, 7, 8, 9, 10.*
 > 🔗 *C6 (tłumaczenie cen/menu) łączy się z: **N — Tłumaczenia** oraz **L34 — Edytor menu w adminie**.*
