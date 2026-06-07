@@ -35,6 +35,8 @@ function RiseCard({ children, z = 2, distance = 240, peek = null, peekBg = "line
   });
   const peekY = useTransform(scrollYProgress, [0, 0.5, 0.95], [80, 0, 70]);
   const peekOpacity = useTransform(scrollYProgress, [0, 0.1, 0.82, 0.98], [0, 1, 1, 0]);
+  // mobile: peek chowa się przy scrollu (fade) — jak wcześniej
+  const peekOpacityMobile = useTransform(scrollYProgress, [0, 0.12, 0.78, 0.96], [0, 1, 1, 0]);
 
   // `bg` paints behind the card so the rise's transient gap never exposes the
   // fixed full-screen background images from earlier sections (e.g. Storia).
@@ -59,16 +61,16 @@ function RiseCard({ children, z = 2, distance = 240, peek = null, peekBg = "line
           }}>{peek}</div>
         </motion.div>
       )}
-      {/* Mobile: prosty statyczny peek na górze sekcji (jak na początku — działało poprawnie) */}
+      {/* Mobile: peek (Bar / Cocktail) — w normalnym flow, chowa się (fade) przy scrollu */}
       {peek && isMobile && (
-        <div aria-hidden="true" style={{
+        <motion.div aria-hidden="true" style={{
           width: "100%", padding: "16px 0 14px", textAlign: "center",
-          background: peekBg, color: peekColor,
+          background: peekBg, color: peekColor, opacity: peekOpacityMobile,
           fontFamily: "var(--f-display)", fontWeight: 800,
           letterSpacing: "0.06em", textTransform: "uppercase",
           fontSize: "clamp(28px, 10vw, 52px)", lineHeight: 1,
           borderTopLeftRadius: "1.8rem", borderTopRightRadius: "1.8rem",
-        }}>{peek}</div>
+        }}>{peek}</motion.div>
       )}
       {isMobile ? (
         <div>{children}</div>

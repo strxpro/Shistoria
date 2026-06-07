@@ -1349,24 +1349,23 @@ function Scene({
       drag.current.spinY += d;       // obrót podążający 1:1 za ruchem
       drag.current.vel = d;          // prędkość → bezwładność po puszczeniu
       drag.current.idle = 0;
-      // SZEJKER stoi w miejscu — obraca się POKÓJ/TŁO (jak w poprzednim modelu).
-      const room = roomRef.current;
-      if (room) { room.rotation.y = drag.current.spinY; }
+      // Obraca się SAM SZEJKER (nie pokój) — użytkownik kręci shakerem.
+      const sh = handles.current.shaker?.root;
+      if (sh) { sh.rotation.y = drag.current.spinY; }
       invalidate();
     };
     const up = () => {
       if (!drag.current.active) return;
       drag.current.active = false;
       gl.domElement.style.cursor = drag.current.follow ? "grab" : "auto";
-      const room = roomRef.current;
-      // Po puszczeniu: bezwładność tła + miękki powrót do 0 (snap), napędzane GSAP-em
-      // (frameloop="demand" nie renderuje sam po puszczeniu palca).
-      if (room) {
-        gsap.killTweensOf(room.rotation);
+      const sh = handles.current.shaker?.root;
+      // Po puszczeniu: bezwładność shakera + miękki powrót do 0 (snap), napędzane GSAP-em
+      if (sh) {
+        gsap.killTweensOf(sh.rotation);
         const target = drag.current.spinY + drag.current.vel * 8; // lekka bezwładność
-        gsap.to(room.rotation, { y: target, duration: 0.3, ease: "power2.out", onUpdate: invalidate,
+        gsap.to(sh.rotation, { y: target, duration: 0.3, ease: "power2.out", onUpdate: invalidate,
           onComplete: () => {
-            gsap.to(room.rotation, { y: 0, duration: 1.1, ease: "elastic.out(1, 0.7)", onUpdate: invalidate });
+            gsap.to(sh.rotation, { y: 0, duration: 1.1, ease: "elastic.out(1, 0.7)", onUpdate: invalidate });
             drag.current.spinY = 0;
           } });
       }
@@ -3547,11 +3546,11 @@ function AccordionPanel({
 
   // Definicje filtra mocy (dla rozwijanej listy na mobile)
   const STRENGTH_OPTS = [
-    { id: "all", label: "Tutti", c: "var(--cx-accent,#E8927C)", test: (_a: number) => true },
-    { id: "none", label: "Analcolici", c: "#9DC85A", test: (a: number) => a === 0 },
-    { id: "low", label: "Leggeri 1–20%", c: "#F4D03F", test: (a: number) => a > 0 && a <= 20 },
-    { id: "mid", label: "Forti 21–40%", c: "#E8927C", test: (a: number) => a > 20 && a <= 40 },
-    { id: "high", label: "Extreme 40%+", c: "#C8102E", test: (a: number) => a > 40 },
+    { id: "all", label: "Tutte", c: "var(--cx-accent,#E8927C)", test: (_a: number) => true },
+    { id: "none", label: "🚫 Analcolici", c: "#9DC85A", test: (a: number) => a === 0 },
+    { id: "low", label: "🌱 Leggeri 1–20%", c: "#F4D03F", test: (a: number) => a > 0 && a <= 20 },
+    { id: "mid", label: "🥃 Forti 21–40%", c: "#E8927C", test: (a: number) => a > 20 && a <= 40 },
+    { id: "high", label: "🔥 Extreme 40%+", c: "#C8102E", test: (a: number) => a > 40 },
   ];
   const curStrength = STRENGTH_OPTS.find((o) => o.id === strengthFilter) ?? STRENGTH_OPTS[0];
   const curCatLabel = isAll ? "Tutti" : (current?.group ?? "Tutti");
@@ -3769,7 +3768,7 @@ function AccordionPanel({
               {side === "right" && (
                 <div className={`cx-drop cx-drop-str ${strDropOpen ? "is-open" : ""}`}>
                   <button className="cx-drop-trigger" onClick={() => { setStrDropOpen((v) => !v); setCatDropOpen(false); }}>
-                    <span className="cx-drop-cur"><span className="cx-drop-dot" style={{ background: curStrength.c }} /> {curStrength.label}</span>
+                    <span className="cx-drop-cur"><span className="cx-drop-strlabel">💪 Forza:</span> <span className="cx-drop-dot" style={{ background: curStrength.c }} /> {curStrength.label}</span>
                     <span className="cx-drop-caret">▾</span>
                   </button>
                   <div className="cx-drop-list">
