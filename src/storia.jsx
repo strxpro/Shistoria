@@ -212,6 +212,7 @@ function StoriaArc({ data }) {
   const sectionRef = useRefS(null);
   const [progress, setProgress] = useStateS(0);
   const [popout, setPopout] = useStateS(null);
+  const goToRef = useRefS(null); // funkcja nawigacji do indeksu daty (ustawiana w useEffect)
 
   useEffectS(() => {
     const sec = sectionRef.current;
@@ -265,6 +266,24 @@ function StoriaArc({ data }) {
       animateTo(Math.round(secTop + targetP * total));
     };
 
+    // przejście do konkretnej daty (klik w datę / swipe karuzelowy)
+    const goToIndex = (idx) => {
+      const nLocal = data.length;
+      const i = Math.max(0, Math.min(nLocal - 1, idx));
+      const targetP = (i / (nLocal - 1)) * 0.84;
+      const total = sec.offsetHeight - window.innerHeight;
+      const secTop = sec.getBoundingClientRect().top + window.scrollY;
+      animateTo(Math.round(secTop + targetP * total));
+    };
+    goToRef.current = goToIndex;
+
+    const currentIndex = () => {
+      const p = computeProgress();
+      if (p == null) return 0;
+      const travel = Math.min(1, p / 0.84);
+      return Math.round(travel * (data.length - 1));
+    };
+
     const onScroll = () => {
       if (!raf) {
         raf = requestAnimationFrame(() => {
@@ -277,19 +296,35 @@ function StoriaArc({ data }) {
       if (!snapping) snapTimer = setTimeout(doSnap, 110);
     };
 
-    // dotyk anuluje trwający snap — użytkownik ma pełną kontrolę
-    const onTouchStart = () => { cancelAnimationFrame(animId); snapping = false; if (snapTimer) clearTimeout(snapTimer); };
-    const onTouchEnd = () => { if (snapTimer) clearTimeout(snapTimer); snapTimer = setTimeout(doSnap, 110); };
+    // SWIPE poziomy jak karuzela: lewo = następna data, prawo = poprzednia
+    let tStartX = 0, tStartY = 0, tMoved = false;
+    const onTouchStart = (e) => {
+      cancelAnimationFrame(animId); snapping = false; if (snapTimer) clearTimeout(snapTimer);
+      tStartX = e.touches[0].clientX; tStartY = e.touches[0].clientY; tMoved = false;
+    };
+    const onTouchMove = (e) => {
+      const dx = e.touches[0].clientX - tStartX;
+      const dy = e.touches[0].clientY - tStartY;
+      // poziomy gest dominujący → traktuj jak karuzelę
+      if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy) * 1.4 && !tMoved) {
+        tMoved = true;
+        const cur = currentIndex();
+        goToIndex(dx < 0 ? cur + 1 : cur - 1);
+      }
+    };
+    const onTouchEnd = () => { if (snapTimer) clearTimeout(snapTimer); if (!tMoved) snapTimer = setTimeout(doSnap, 110); };
 
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
     window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchmove", onTouchMove, { passive: true });
     window.addEventListener("touchend", onTouchEnd, { passive: true });
     return () => {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
       window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchmove", onTouchMove);
       window.removeEventListener("touchend", onTouchEnd);
       if (raf) cancelAnimationFrame(raf);
       if (animId) cancelAnimationFrame(animId);
@@ -376,10 +411,10 @@ function StoriaArc({ data }) {
                 {/* kropka na samym okręgu */}
                 <span className={`sarc-dot ${isActive ? "active" : ""}`}
                   style={{ transform: `translate(-50%,-50%) translate(${dotX}px, ${dotY}px)`, opacity: op }} />
-                {/* etykieta daty — stycznie do okręgu, tuż na zewnątrz */}
+                {/* etykieta daty — klik przenosi do punktu (jak karuzela) */}
                 <button className={`sarc-date ${isActive ? "active" : ""}`}
                   style={{ transform: `translate(-50%,-50%) translate(${lx}px, ${ly}px) rotate(${angle + 90}deg) scale(${sc})`, opacity: op }}
-                  onClick={() => setPopout(item)}>
+                  onClick={() => { if (goToRef.current) goToRef.current(i); }}>
                   {item.year}
                 </button>
               </React.Fragment>
@@ -394,8 +429,10 @@ function StoriaArc({ data }) {
       {popout && typeof document !== "undefined" && createPortal(
         <div className="storia-popout-overlay" onClick={() => setPopout(null)}>
           <div className="storia-popout" onClick={(e) => e.stopPropagation()}>
-            <button className="storia-popout-close" onClick={() => setPopout(null)}>×</button>
-            <div className="storia-popout-img"><Placeholder type={popout.phType} label={`${popout.year}`} style={{width:"100%",height:"100%"}} /></div>
+            <div className="storia-popout-img">
+              <Placeholder type={popout.phType} label={`${popout.year}`} style={{width:"100%",height:"100%"}} />
+              <button className="storia-popout-close" onClick={() => setPopout(null)}>×</button>
+            </div>
             <div className="storia-popout-body">
               <span className="storia-popout-year">{popout.year}</span>
               <h3>{popout.title}</h3>
@@ -407,8 +444,8 @@ function StoriaArc({ data }) {
             @keyframes storiaFadeIn { from { opacity:0; } to { opacity:1; } }
             .storia-popout { width:94vw; max-height:88vh; overflow-y:auto; border-radius:24px; background:#fff; box-shadow:0 40px 100px rgba(0,0,0,0.3); animation:storiaPop .4s cubic-bezier(.16,1,.3,1); }
             @keyframes storiaPop { from { transform:scale(0.9) translateY(20px); opacity:0; } to { transform:none; opacity:1; } }
-            .storia-popout-close { position:absolute; top:16px; right:16px; width:40px; height:40px; border-radius:50%; background:rgba(0,0,0,0.06); border:none; font-size:22px; cursor:pointer; display:grid; place-items:center; z-index:2; }
-            .storia-popout-img { width:100%; height:220px; border-radius:24px 24px 0 0; overflow:hidden; }
+            .storia-popout-close { position:absolute; top:12px; right:12px; width:40px; height:40px; border-radius:50%; background:rgba(0,0,0,0.45); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); border:1px solid rgba(255,255,255,0.4); color:#fff; font-size:24px; cursor:pointer; display:grid; place-items:center; z-index:3; line-height:1; }
+            .storia-popout-img { position:relative; width:100%; height:220px; border-radius:24px 24px 0 0; overflow:hidden; }
             .storia-popout-body { padding:20px; display:flex; flex-direction:column; gap:12px; }
             .storia-popout-year { font-family:var(--f-display); font-weight:800; font-size:36px; color:var(--c-sky); letter-spacing:-0.03em; }
             .storia-popout-body h3 { font-family:var(--f-display); font-weight:700; font-size:22px; color:var(--c-deep); }
