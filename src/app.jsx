@@ -228,7 +228,7 @@ export default function App() {
       if (id === "cocktail-rise") {
         const isMobile = window.innerWidth < 768;
         // .cx-scroll ma 600vh; hold zaczyna się po ~28% (mobile)/26% (desktop). Celujemy pewnie w hold.
-        topPos = el.getBoundingClientRect().top + window.scrollY + window.innerHeight * (isMobile ? 2.4 : 1.5);
+        topPos = el.getBoundingClientRect().top + window.scrollY + window.innerHeight * (isMobile ? 2.8 : 1.5);
       }
       if (window.lenis) {
         window.lenis.scrollTo(topPos, { immediate: true });
