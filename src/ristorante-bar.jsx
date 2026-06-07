@@ -175,14 +175,15 @@ function Ristorante({ t }) {
         .rist-chef { padding: 96px 0; display: grid; grid-template-columns: 1fr; gap: 48px; align-items: center; }
         @media (min-width: 1024px) { .rist-chef { grid-template-columns: 1.2fr 1fr; gap: 96px; } }
         .rist-chef-img { position: relative; height: 540px; border-radius: 20px; overflow: hidden; }
+        @media (max-width: 768px) { .rist-chef { padding: 56px 0; gap: 28px; } .rist-chef-img { height: 300px; } }
         .rist-chef-play { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 80px; height: 80px; border-radius: 50%; background: rgba(255,255,255,0.95); color: var(--c-deep); display: flex; align-items: center; justify-content: center; font-size: 22px; padding-left: 4px; backdrop-filter: blur(6px); }
         .rist-chef-body { font-size: 18px; line-height: 1.6; color: var(--c-deep); margin: 24px 0 32px; max-width: 460px; text-wrap: pretty; display: block; clear: both; }
         .rist-chef-cta { margin-top: 16px; }
-        /* tytuł "Al tavolo, davanti a voi" — JEDNA linijka, dopasowany rozmiar */
+        /* tytuł "Al tavolo, davanti a voi" — zawija się, nie ucina (różne długości tłumaczeń) */
         @media (max-width: 768px) {
-          .rist-chef-text .srt { white-space: nowrap !important; }
-          .rist-chef-text .h3 { font-size: clamp(20px, 6vw, 32px); line-height: 1.1; }
-          .rist-chef-body { font-size: 16px; margin: 20px 0 28px; max-width: 100%; }
+          .rist-chef-text .srt { white-space: normal !important; overflow-wrap: anywhere; word-break: break-word; max-width: 100%; }
+          .rist-chef-text .h3 { font-size: clamp(24px, 7vw, 36px); line-height: 1.1; }
+          .rist-chef-body { font-size: 16px; margin: 18px 0 24px; max-width: 100%; }
         }
         .rist-gallery-masonry { padding: 96px 0; }
         .rist-gallery-mobile { padding: 96px 0; }
