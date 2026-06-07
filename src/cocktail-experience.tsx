@@ -237,7 +237,7 @@ const CONFIG = {
   camTargetTop: { x: 0, y: 1.1, z: 0 },
 
   streamTop: 0.6,
-  streamHeight: 4.2,
+  streamHeight: 5.2,
 
   scrollLength: "+=600%",
   enterEnd: 0.26,
@@ -2563,8 +2563,8 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
   // szejkerem widocznym pod spodem. Szejker spoczywa w shakerRest, wlot ~górna krawędź.
   const target = useMemo(() => {
     const r = CONFIG.shakerRest;
-    // wlot szejkera: trochę powyżej środka modelu (mouth), lekko z przodu
-    return new THREE.Vector3(r.x, r.y + 1.7, r.z + 0.1);
+    // strumień wpada GŁĘBOKO do shakera (do środka/dna — wizualnie "wlewa się do środka")
+    return new THREE.Vector3(r.x, r.y + 0.4, r.z + 0.08);
   }, []);
 
   const liquidMat = useMemo(() => new THREE.MeshStandardMaterial({
