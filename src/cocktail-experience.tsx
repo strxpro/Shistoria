@@ -1985,7 +1985,12 @@ function CocktailExperience() {
           // shaker widoczny tylko gdy NIE pokazujemy modelu szklanki (lanie/gotowa) i nie jesteśmy w exit glassReady
           const isGlassExiting = phase === "exit" && stageRef.current === "glassReady";
           const isGlassActive = !!inSceneGlassRef.current || stageRef.current === "glassReady" || stageRef.current === "pickGlass";
-          api.shakerRoot.visible = !isGlassActive && !isGlassExiting;
+          // ZAWSZE widoczny podczas shaking (animacja trzęsienia) — niezależnie od fazy scroll
+          if (stageRef.current === "shaking") {
+            api.shakerRoot.visible = true;
+          } else {
+            api.shakerRoot.visible = !isGlassActive && !isGlassExiting;
+          }
           if (phase === "enter") applyEnter(p / (isMobileCx ? 0.28 : CONFIG.enterEnd));
           else if (phase === "exit") applyExit((p - CONFIG.exitStart) / (1 - CONFIG.exitStart));
 
@@ -2142,7 +2147,10 @@ function CocktailExperience() {
           <button className={`cx-shake cx-shake-desktop ${canShake ? "is-on" : ""}`} onClick={doShake} disabled={!canShake}>
             <span className="cx-shake-ico">∿</span><span>SHAKE</span><span className="cx-shake-arrow">→</span>
           </button>
-          <div className="cx-slide-wrap"><SlideToShake enabled={canShake} onConfirm={doShake} /></div>
+          <div className="cx-slide-wrap">
+            <SlideToShake enabled={canShake} onConfirm={doShake} />
+            {!canShake && stage === "build" && <span className="cx-slide-hint">Versa almeno 2 ingredienti per shakerare</span>}
+          </div>
         </div>
 
         {/* DÓŁ-ŚRODEK — prezent → formularz (pokazuje się po nalaniu) */}
@@ -2563,8 +2571,8 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
   // szejkerem widocznym pod spodem. Szejker spoczywa w shakerRest, wlot ~górna krawędź.
   const target = useMemo(() => {
     const r = CONFIG.shakerRest;
-    // strumień wpada GŁĘBOKO do shakera (do środka/dna — wizualnie "wlewa się do środka")
-    return new THREE.Vector3(r.x, r.y + 0.4, r.z + 0.08);
+    // strumień wpada w SAM ŚRODEK shakera — nisko, niewidoczny (ukryty wewnątrz modelu)
+    return new THREE.Vector3(r.x, r.y - 0.4, r.z + 0.05);
   }, []);
 
   const liquidMat = useMemo(() => new THREE.MeshStandardMaterial({
@@ -5250,7 +5258,8 @@ function CocktailStyles() {
         .cx-slide { position:relative; width:100%; height:60px; border-radius:999px; overflow:hidden;
           background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.16); display:flex; align-items:center;
           opacity:0.6; transition:opacity .3s, background .3s; touch-action:none; backdrop-filter:blur(8px); }
-        .cx-slide.is-on { opacity:1; background:linear-gradient(135deg, rgba(232,146,124,0.22), rgba(217,116,92,0.15)); border-color:rgba(232,146,124,0.5); }
+        .cx-slide.is-on { opacity:1; background:linear-gradient(135deg, rgba(232,146,124,0.35), rgba(217,116,92,0.25)); border-color:rgba(232,146,124,0.7); box-shadow:0 0 20px rgba(232,92,58,0.3); }
+        .cx-slide-hint { display:block; text-align:center; font-family:var(--f-serif,"Instrument Serif",serif); font-style:italic; font-size:11px; color:rgba(255,255,255,0.5); margin-top:8px; }
         .cx-slide-label { position:absolute; left:56px; right:16px; text-align:center; font-family:var(--f-display,"Syne",serif);
           font-weight:800; font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:rgba(255,255,255,0.7); pointer-events:none; }
         .cx-slide-knob { position:absolute; left:6px; top:6px; width:48px; height:48px; border-radius:50%; display:grid; place-items:center;
@@ -5412,10 +5421,11 @@ function CocktailStyles() {
         .cx-minfo-steps { display:flex; flex-direction:column; gap:12px; margin-top:12px; }
         /* Wybór szklanki na mobile — 2 obok siebie, mniejsze, mieści się */
         .cx-popout { width:min(560px, 96vw) !important; }
-        .cx-popout-inner { padding:18px 14px 22px !important; border-radius:24px !important; }
-        .cx-glass-grid { grid-template-columns:repeat(2,1fr) !important; gap:10px !important; }
-        .cx-glass-card { width:100% !important; height:160px !important; padding:12px 8px 14px !important; border-radius:18px !important; }
-        .cx-glass-art { height:96px !important; }
+        .cx-popout-inner { padding:16px 12px 20px !important; border-radius:22px !important; }
+        .cx-glass-grid { grid-template-columns:repeat(2,1fr) !important; gap:8px !important; }
+        .cx-glass-card { width:100% !important; height:140px !important; padding:10px 6px 12px !important; border-radius:16px !important; }
+        .cx-glass-art { height:80px !important; }
+        .cx-popout-title { font-size:clamp(20px,5vw,30px) !important; margin:4px 0 14px !important; }
       }
 
       @media (max-width:768px) and (max-height:680px){
