@@ -170,26 +170,26 @@
 - **Problem:** nie da się przesuwać paska kategorii w bok.
 - **Do zrobienia:**
   - [x] Włączyć **poziomy swipe** palcem na pasku kategorii (płynny).
-  - ✅ *Dodany jawny drag-to-scroll z bezwładnością (`catListRef`) + blokada kliknięcia po przeciągnięciu, w `FullMenu`.*
+  - ✅ *W `MobileFullMenu`: sticky pasek `.mfm-catbar` z `overflow-x:auto`, auto-scroll do aktywnej kategorii, + floating pill „Categorie" otwierający bottom sheet z dołu.*
 
 ### C3. 🔴 Składniki dań — zawijanie (od 2 dni!)
 - **Problem:** składniki pod daniami **wychodzą poza ekran**.
-- **Do zrobienia:**
-  - [x] Składniki **mieszczą się** na ekranie. (`grid-template-columns: 52px minmax(0,1fr) auto`, `min-width:0`)
-  - [x] Jeśli za długie → **zawijają do nowej linii**. (`overflow-wrap:anywhere; word-break:break-word` na `.fmenu-row-desc` i `.fmenu-row-name`)
-  - ✅ *Obsłużone w CSS `FullMenu`.*
+- **ROZWIĄZANIE OSTATECZNE:** stworzony **osobny komponent `MobileFullMenu`** (telefon < 768px), desktop (`DesktopFullMenu`) ukryty na mobile. Layout **flex** (nie grid) → nazwy i składniki w pełni się zawijają.
+  - [x] Składniki **mieszczą się** na ekranie.
+  - [x] Jeśli za długie → **zawijają do nowej linii**.
+  - [x] Miniaturki zdjęć po lewej przy daniach.
+  - ✅ *Gotowe — nowy czysty komponent mobilny.*
 
 ### C4. 🟠 Popout dania — pełna widoczność
 - **Do zrobienia:**
-  - [x] Wysuwany popout dania **w pełni widoczny**, wyrównany. (`width: min(480px, 92vw)`, wyśrodkowany flex overlay)
+  - [x] Wysuwany popout dania **w pełni widoczny**, wyrównany. (`.mfm-pop` max-width 400px, krzyżyk na zdjęciu)
   - [x] Tekst w popout **nieucięty**.
-  - ✅ *Obsłużone; do weryfikacji wizualnej na bieżąco.*
+  - ✅ *Gotowe w `MobileFullMenu`.*
 
 ### C5. 🔴 Box „cuciniamo solo quello..." — responsywność (od 2 dni!)
-- **Problem:** box pod menu restauracji **wychodzi poza ekran** na telefonie.
-- **Do zrobienia:**
-  - [x] Cała treść **mieści się** na ekranie, box **wyśrodkowany**. (zmieniony `max-width: calc(100vw-48px)` → `max-width:100%; width:100%; box-sizing:border-box` — poprzednie powodowało przepełnienie bo `100vw` ignorował padding kontenera i scrollbar)
-  - ✅ *Zrobione w `FullMenu` CSS `@media (max-width:768px)`.*
+- **ROZWIĄZANIE OSTATECZNE:** w `MobileFullMenu` prosty `.mfm-quote-box` (`width:100%; box-sizing:border-box; overflow-wrap:anywhere`).
+  - [x] Cała treść **mieści się** na ekranie, box **wyśrodkowany**.
+  - ✅ *Gotowe — osobny element mobilny.*
 
 ### C6. 🟡 Ceny i alergeny w menu
 - **Stan:** ceny już są w `FULL_MENU`, przeliczanie walut przez `window.convertPrice`. Do dopracowania format + klik alergenu.
