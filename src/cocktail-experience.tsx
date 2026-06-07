@@ -237,7 +237,7 @@ const CONFIG = {
   camTargetTop: { x: 0, y: 1.1, z: 0 },
 
   streamTop: 0.6,
-  streamHeight: 2.6,
+  streamHeight: 4.2,
 
   scrollLength: "+=600%",
   enterEnd: 0.26,
@@ -1967,8 +1967,8 @@ function CocktailExperience() {
             }
             if (phase === "hold") {
               // Nie pokazuj szejkera jeśli szklanka jest gotowa lub trwa lanie (użytkownik wraca scrollem)
-              const glassDone = stageRef.current === "glassReady" || stageRef.current === "pickGlass" || stageRef.current === "shaking" || !!inSceneGlassRef.current;
-              api.shakerRoot.visible = stageRef.current === "build" && !glassDone;
+              const glassDone = stageRef.current === "glassReady" || stageRef.current === "pickGlass" || !!inSceneGlassRef.current;
+              api.shakerRoot.visible = (stageRef.current === "build" || stageRef.current === "shaking") && !glassDone;
               api.shakerRoot.scale.setScalar(1);
               api.shakerRoot.rotation.set(0, 0, deg(CONFIG.shakerRestTilt));
               api.shakerRoot.position.set(CONFIG.shakerRest.x, CONFIG.shakerRest.y, CONFIG.shakerRest.z);
@@ -5392,10 +5392,12 @@ function CocktailStyles() {
           transform-origin:bottom left; transition:opacity .3s, transform .3s, visibility .3s; }
         .cx-minfo.is-open .cx-minfo-pop { opacity:1; visibility:visible; transform:none; }
         .cx-minfo-steps { display:flex; flex-direction:column; gap:12px; margin-top:12px; }
-        /* Wybór szklanki na mobile — 2 obok siebie, mniejsze */
-        .cx-glass-grid { grid-template-columns:repeat(2,1fr) !important; gap:12px !important; }
-        .cx-glass-card { width:100% !important; height:170px !important; padding:12px 8px 14px !important; border-radius:18px !important; }
-        .cx-glass-art { height:104px !important; }
+        /* Wybór szklanki na mobile — 2 obok siebie, mniejsze, mieści się */
+        .cx-popout { width:min(560px, 96vw) !important; }
+        .cx-popout-inner { padding:18px 14px 22px !important; border-radius:24px !important; }
+        .cx-glass-grid { grid-template-columns:repeat(2,1fr) !important; gap:10px !important; }
+        .cx-glass-card { width:100% !important; height:160px !important; padding:12px 8px 14px !important; border-radius:18px !important; }
+        .cx-glass-art { height:96px !important; }
       }
 
       @media (max-width:768px) and (max-height:680px){
