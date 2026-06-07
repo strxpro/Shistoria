@@ -4740,7 +4740,7 @@ function CocktailStyles() {
       .cx-back-ico { font-size:16px; }
 
       /* Drawer kategorii — SZEROKI pasek na dole sceny (4 butelki widoczne) */
-      .cx-drawer-wrap { position:fixed; inset:0; z-index:60; pointer-events:none; }
+      .cx-drawer-wrap { position:fixed; inset:0; z-index:60; pointer-events:none; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
       .cx-drawer-backdrop { position:absolute; inset:0; background:rgba(8,6,9,0.55); backdrop-filter:blur(3px);
         pointer-events:auto; animation:cxFade .35s ease; }
       @keyframes cxFade { from { opacity:0; } to { opacity:1; } }
@@ -5227,6 +5227,9 @@ function CocktailStyles() {
 
         /* SHAKE — suwak wycentrowany na dole */
         .cx-shake-desktop { display:none; }
+        /* gauge nie nachodzi na FAB */
+        .cx-gauge { left:calc(50% - min(120px, 30vw)) !important; top:46% !important; }
+        .cx-gauge-right { right:calc(50% - min(120px, 30vw)) !important; left:auto !important; }
         .cx-slide-wrap { display:block; position:fixed; left:50%; bottom:calc(72px + env(safe-area-inset-bottom));
           transform:translateX(-50%); width:min(70vw,290px); z-index:41; pointer-events:auto; }
         .cx-slide { position:relative; width:100%; height:60px; border-radius:999px; overflow:hidden;
