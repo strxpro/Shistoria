@@ -171,6 +171,7 @@ function Ristorante({ t }) {
         .rist-meta span { font-family: var(--f-display); font-weight: 800; font-size: 40px; line-height: 1; color: var(--c-sky); letter-spacing: -0.03em; }
         .rist-meta label { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--c-mute); margin-top: 4px; }
         .rist-marquee { padding: 80px 0; background: var(--c-sand); }
+        @media (max-width: 768px) { .rist-marquee { padding: 36px 0; } }
         .rist-chef { padding: 96px 0; display: grid; grid-template-columns: 1fr; gap: 48px; align-items: center; }
         @media (min-width: 1024px) { .rist-chef { grid-template-columns: 1.2fr 1fr; gap: 96px; } }
         .rist-chef-img { position: relative; height: 540px; border-radius: 20px; overflow: hidden; }

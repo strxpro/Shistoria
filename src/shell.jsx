@@ -932,7 +932,7 @@ function Marquee({ items, separator = "✦" }) {
     const onEnter = () => { isHovered = true; };
     const onLeave = () => { isHovered = false; };
     // Touch/drag support: grab marquee and throw it — na mobile WOLNIEJ
-    const dragFactor = mobile ? 0.012 : 0.02;
+    const dragFactor = mobile ? 0.006 : 0.02;
     const onTouchStart = (e) => { isDragging = true; dragStartX = e.touches[0].clientX; dragStartPos = pos.current; };
     const onTouchMove = (e) => { if (!isDragging) return; const dx = e.touches[0].clientX - dragStartX; pos.current = dragStartPos - dx * dragFactor; };
     const onTouchEnd = () => { isDragging = false; };
