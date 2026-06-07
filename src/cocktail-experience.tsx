@@ -5264,8 +5264,15 @@ function CocktailStyles() {
         .cx-menu-left .cx-menu-panel { border-radius:1.6rem 1.6rem 0 0; }
         .cx-menu-right .cx-menu-panel { border-radius:1.6rem 1.6rem 0 0; }
         .cx-menu.is-mopen .cx-menu-panel { transform:translateY(0); visibility:visible; }
+        /* Spirits (prawy panel) MA wyglądać identycznie jak mixery na mobile — pełny reset odwrócenia */
         .cx-menu[data-align="right"] { text-align:left; }
         .cx-menu[data-align="right"] .cx-menu-head { flex-direction:row; }
+        .cx-menu[data-align="right"] .cx-cat { flex-direction:row; text-align:left; }
+        .cx-menu[data-align="right"] .cx-cat::before { left:0; right:auto; }
+        .cx-menu[data-align="right"] .cx-back { align-self:flex-start; }
+        /* panel kategorii — wspólna wysokość/scroll dla obu stron */
+        .cx-menu-panel { max-height:72vh; overflow-y:auto; -webkit-overflow-scrolling:touch; }
+        .cx-cats { max-height:none; overflow:visible; }
 
         /* Drag indicator na górze bottom sheet */
         .cx-menu-panel::before { content:""; display:block; width:40px; height:4px; border-radius:2px;
