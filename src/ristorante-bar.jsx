@@ -131,7 +131,7 @@ function Ristorante({ t }) {
       <div className="container">
         <div className="rist-chef reveal">
           <div className="rist-chef-img">
-            <Placeholder type="dark" label="LOOP VIDEO · Chef's hands close-up" style={{ width: "100%", height: "100%" }} />
+            <Placeholder type="dark" label="LOOP VIDEO · Vino aperto e pesce sfilettato al tavolo" style={{ width: "100%", height: "100%" }} />
             <div className="rist-chef-play">▶</div>
           </div>
           <div className="rist-chef-text">
