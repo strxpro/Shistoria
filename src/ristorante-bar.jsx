@@ -61,8 +61,42 @@ function GalleryMasonry({ items }) {
   );
 }
 
+// wyciąga prawdziwe składniki z dań (z opisów desc w FULL_MENU) + losowo miesza
+function buildDishIngredients() {
+  try {
+    const menu = window.FULL_MENU || [];
+    const set = new Set();
+    for (const cat of menu) {
+      // pomijamy aperitivo (to drinki, nie dania)
+      if (cat.id === "aperitivo") continue;
+      for (const it of (cat.items || [])) {
+        if (!it.desc) continue;
+        for (let part of it.desc.split(/[,/]/)) {
+          part = part.trim();
+          // odfiltruj puste / zbyt długie frazy
+          if (part.length >= 3 && part.length <= 22) {
+            // kapitalizacja pierwszej litery
+            set.add(part.charAt(0).toUpperCase() + part.slice(1));
+          }
+        }
+      }
+    }
+    const arr = Array.from(set);
+    // Fisher–Yates shuffle (losowa kolejność)
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  } catch {
+    return [];
+  }
+}
+
 function Ristorante({ t }) {
-  const ingredients = Array.isArray(t("ristorante.ingredientsList")) ? t("ristorante.ingredientsList") : window.INGREDIENTS;
+  const dishIngredients = useStateR(() => buildDishIngredients())[0];
+  const fallback = Array.isArray(t("ristorante.ingredientsList")) ? t("ristorante.ingredientsList") : window.INGREDIENTS;
+  const ingredients = dishIngredients && dishIngredients.length > 6 ? dishIngredients : fallback;
   const ScrollReveal = window.ScrollReveal || (({ children }) => <>{children}</>);
 
   return (

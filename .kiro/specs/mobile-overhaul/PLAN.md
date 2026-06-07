@@ -134,14 +134,16 @@
 > [!NOTE]
 > 📂 **Pliki:** `src/app.jsx` / `src/sections.jsx` (peek banner Bar/Cocktail)
 
-### B1. 🟡 Spokojniejszy baner peek
-- **Problem:** tekst za duży, animacja za szybka, baner „ucieka" przy dotyku.
+### B1. 🟡 Marquee składników (Ristorante) — mniejszy, wolniejszy, animowany
+- **Cel:** pasek ze składnikami na mobile mniejszy, ale **nadal animowany i przeciągalny** (wolniej), z **prawdziwymi składnikami z dań** (losowo).
 - **Do zrobienia:**
-  - [x] Tekst **mniejszy**. (`fontSize 14vw→8vw`, max 72px→46px, mniejszy padding i letter-spacing)
-  - [x] Animacja **wolniejsza**. (na mobile baner jest **statyczny** — brak animacji, więc nic nie „lata")
-  - [x] Przewijanie palcem → ruch banera **wolniejszy**. (mobile: baner nie porusza się ze scrollem)
-  - [x] Baner **statyczny/stabilny** (nie rusza się przy dotyku). (renderowany jako zwykły `div`, nie motion)
-  - ✅ *Zrobione w `RiseCard` (`src/app.jsx`) — gałąź `peek && isMobile`.*
+  - [x] Tekst **mniejszy** na mobile. (fontSize 56→30, gap 64→32, separator 18→13)
+  - [x] Animacja **wolniejsza** na mobile. (baseSpeed 0.3→0.16, moveFactor 0.015→0.011, scrollFactor 0.05→0.025)
+  - [x] Przewijanie/przeciąganie palcem **wolniejsze** (dragFactor 0.02→0.012), ale **nadal można złapać i przesuwać**.
+  - [x] **Prawdziwe składniki z dań** (losowo) — `buildDishIngredients()` wyciąga składniki z opisów `desc` w `FULL_MENU` (pomija aperitivo/drinki), miesza Fisher–Yates.
+  - ✅ *Zrobione w `Marquee` (`src/shell.jsx`) + `Ristorante` (`src/ristorante-bar.jsx`).*
+
+> 📌 **Uwaga:** baner peek „Bar/Cocktail" (z poprzedniego commita) został zmniejszony i jest statyczny — to OSOBNY element od tego marquee.
 
 > 📎 *Odpowiada wymaganiu: 4.*
 

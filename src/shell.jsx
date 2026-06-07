@@ -910,6 +910,13 @@ function Marquee({ items, separator = "✦" }) {
   const pos = useRef(0);
   const lastScrollY = useRef(typeof window !== "undefined" ? window.scrollY : 0);
   const speed = useRef(1);
+  const [isMobile, setIsMobile] = useState(typeof window !== "undefined" && window.innerWidth < 768);
+
+  useEffect(() => {
+    const onR = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", onR);
+    return () => window.removeEventListener("resize", onR);
+  }, []);
 
   useEffect(() => {
     let rafId;
@@ -917,15 +924,17 @@ function Marquee({ items, separator = "✦" }) {
     let isDragging = false;
     let dragStartX = 0;
     let dragStartPos = 0;
+    const mobile = window.innerWidth < 768;
 
     const track = trackRef.current;
     if (!track) return;
 
     const onEnter = () => { isHovered = true; };
     const onLeave = () => { isHovered = false; };
-    // Touch/drag support: grab marquee and throw it
+    // Touch/drag support: grab marquee and throw it — na mobile WOLNIEJ
+    const dragFactor = mobile ? 0.012 : 0.02;
     const onTouchStart = (e) => { isDragging = true; dragStartX = e.touches[0].clientX; dragStartPos = pos.current; };
-    const onTouchMove = (e) => { if (!isDragging) return; const dx = e.touches[0].clientX - dragStartX; pos.current = dragStartPos - dx * 0.02; };
+    const onTouchMove = (e) => { if (!isDragging) return; const dx = e.touches[0].clientX - dragStartX; pos.current = dragStartPos - dx * dragFactor; };
     const onTouchEnd = () => { isDragging = false; };
 
     track.parentElement.addEventListener("mouseenter", onEnter);
@@ -934,18 +943,22 @@ function Marquee({ items, separator = "✦" }) {
     track.parentElement.addEventListener("touchmove", onTouchMove, { passive: true });
     track.parentElement.addEventListener("touchend", onTouchEnd);
 
+    // mobile: wolniejszy bazowy ruch i mniejszy wpływ scrolla
+    const baseSpeed = mobile ? 0.16 : 0.3;
+    const scrollFactor = mobile ? 0.025 : 0.05;
+    const moveFactor = mobile ? 0.011 : 0.015;
+
     const tick = () => {
       const scrollY = window.scrollY;
       const scrollDelta = scrollY - lastScrollY.current;
       lastScrollY.current = scrollY;
 
-      const baseSpeed = 0.3;
-      const scrollInfluence = scrollDelta * 0.05;
+      const scrollInfluence = scrollDelta * scrollFactor;
       let targetSpeed = (isHovered || isDragging) ? 0 : baseSpeed + scrollInfluence;
-      
+
       targetSpeed = Math.max(-1.2, Math.min(1.5, targetSpeed));
       speed.current += (targetSpeed - speed.current) * 0.05;
-      pos.current += speed.current * 0.015; 
+      pos.current += speed.current * moveFactor;
 
       if (pos.current >= 25) pos.current -= 25;
       else if (pos.current < 0) pos.current += 25;
@@ -965,15 +978,19 @@ function Marquee({ items, separator = "✦" }) {
       track.parentElement.removeEventListener("touchmove", onTouchMove);
       track.parentElement.removeEventListener("touchend", onTouchEnd);
     };
-  }, []);
+  }, [isMobile]);
+
+  const gap = isMobile ? 32 : 64;
+  const fontSize = isMobile ? 30 : 56;
+  const sepSize = isMobile ? 13 : 18;
 
   return (
     <div className="marquee" style={{ overflow: "hidden", display: "flex", width: "100%" }}>
-      <div className="marquee-inner" ref={trackRef} style={{ display: "flex", gap: 64, whiteSpace: "nowrap", paddingRight: 64, willChange: "transform" }}>
+      <div className="marquee-inner" ref={trackRef} style={{ display: "flex", gap, whiteSpace: "nowrap", paddingRight: gap, willChange: "transform" }}>
         {content.map((it, i) => (
-          <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 64 }}>
-            <span style={{ fontFamily: "var(--f-display)", fontWeight: 800, fontSize: 56, letterSpacing: "-0.02em", color: "var(--c-deep)" }}>{it}</span>
-            <span style={{ color: "var(--c-sky)", fontSize: 18 }}>{separator}</span>
+          <span key={i} style={{ display: "inline-flex", alignItems: "center", gap }}>
+            <span style={{ fontFamily: "var(--f-display)", fontWeight: 800, fontSize, letterSpacing: "-0.02em", color: "var(--c-deep)" }}>{it}</span>
+            <span style={{ color: "var(--c-sky)", fontSize: sepSize }}>{separator}</span>
           </span>
         ))}
       </div>
