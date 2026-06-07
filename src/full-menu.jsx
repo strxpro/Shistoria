@@ -7,6 +7,205 @@ const { useState: useStateM, useEffect: useEffectM, useRef: useRefM, useMemo: us
 
 // ─── Full categorized menu ───────────────────────────────────────────────────
 function FullMenu() {
+  const [isMobile, setIsMobile] = useStateM(typeof window !== "undefined" && window.innerWidth < 768);
+  useEffectM(() => {
+    const onR = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", onR);
+    return () => window.removeEventListener("resize", onR);
+  }, []);
+  if (isMobile) return <MobileFullMenu />;
+  return <DesktopFullMenu />;
+}
+
+// ─── MOBILE menu — osobny, prosty, w pełni responsywny element (tylko telefon) ──
+function MobileFullMenu() {
+  const [activeCat, setActiveCat] = useStateM(window.FULL_MENU[0].id);
+  const [dishPopout, setDishPopout] = useStateM(null);
+  const catBarRef = useRefM(null);
+
+  // klik w kategorię → scroll do sekcji
+  const goToCat = (id) => {
+    setActiveCat(id);
+    const el = document.querySelector(`[data-mcat="${id}"]`);
+    if (el) {
+      const top = el.getBoundingClientRect().top + window.scrollY - 120;
+      window.scrollTo({ top, behavior: "smooth" });
+    }
+  };
+
+  // podświetlanie aktywnej kategorii przy scrollu + auto-scroll paska do aktywnej
+  useEffectM(() => {
+    let raf = 0;
+    const onScroll = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const cats = document.querySelectorAll("[data-mcat]");
+        let best = null, bestDist = Infinity;
+        const trigger = window.innerHeight * 0.28;
+        cats.forEach((el) => {
+          const r = el.getBoundingClientRect();
+          const d = Math.abs(r.top - trigger);
+          if (r.top < window.innerHeight * 0.6 && r.bottom > 0 && d < bestDist) { bestDist = d; best = el.dataset.mcat; }
+        });
+        if (best && best !== activeCat) {
+          setActiveCat(best);
+          // przewiń pasek kategorii tak, by aktywna była widoczna
+          const btn = catBarRef.current?.querySelector(`[data-mcatbtn="${best}"]`);
+          if (btn && catBarRef.current) {
+            const bar = catBarRef.current;
+            const left = btn.offsetLeft - bar.offsetWidth / 2 + btn.offsetWidth / 2;
+            bar.scrollTo({ left, behavior: "smooth" });
+          }
+        }
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+    return () => { window.removeEventListener("scroll", onScroll); if (raf) cancelAnimationFrame(raf); };
+  }, [activeCat]);
+
+  const lang = typeof window !== "undefined" ? window.currentLanguage : "it";
+  const conv = (p) => (typeof window !== "undefined" && window.convertPriceExtra ? window.convertPriceExtra(p, lang) : "");
+
+  return (
+    <section className="mfm" id="menu">
+      <div className="mfm-head">
+        <span className="mfm-kicker">— Menu · 03</span>
+        <h2 className="mfm-title">La carta della casa</h2>
+        <p className="mfm-intro">Pasta fatta in casa, pesce del giorno, pizze cotte nel forno a legna.</p>
+      </div>
+
+      {/* sticky pasek kategorii — przewijany palcem */}
+      <div className="mfm-catbar-wrap">
+        <div className="mfm-catbar" ref={catBarRef}>
+          {window.FULL_MENU.map((c) => (
+            <button key={c.id} data-mcatbtn={c.id}
+              className={`mfm-cattab ${activeCat === c.id ? "active" : ""}`}
+              onClick={() => goToCat(c.id)}>
+              <span className="mfm-cattab-icon">{c.icon}</span>{c.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* listy dań po kategoriach */}
+      <div className="mfm-cats">
+        {window.FULL_MENU.map((cat, ci) => (
+          <div key={cat.id} className="mfm-cat" data-mcat={cat.id}>
+            <h3 className="mfm-cat-title"><span className="mfm-cat-num">{String(ci + 1).padStart(2, "0")}</span>{cat.label}</h3>
+            <ul className="mfm-list">
+              {cat.items.map((it, i) => (
+                <li key={i} className={`mfm-item ${it.featured ? "feat" : ""}`} onClick={() => setDishPopout({ ...it, icon: cat.icon })}>
+                  <div className="mfm-item-top">
+                    <span className="mfm-item-name">
+                      {it.name}
+                      {it.featured && <span className="mfm-star">★</span>}
+                      {it.allergen && <span className="mfm-allergen">({it.allergen})</span>}
+                    </span>
+                    <span className="mfm-item-price">
+                      <span className="mfm-price-eur">{it.price}</span>
+                      {conv(it.price) && <span className="mfm-price-conv">{conv(it.price)}</span>}
+                      {it.note && <span className="mfm-price-note">/ {it.note}</span>}
+                    </span>
+                  </div>
+                  {it.desc && <p className="mfm-item-desc">{it.desc}</p>}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+
+        {/* box cuciniamo — prosty, w pełni responsywny */}
+        <div className="mfm-quote-box">
+          <p className="mfm-quote">"Cuciniamo solo quello che troveremmo a tavola da nonna."</p>
+          <span className="mfm-quote-sign">— La famiglia</span>
+        </div>
+
+        <div className="mfm-note">
+          <p><strong>Informazioni:</strong></p>
+          <p>(*) Prodotto congelato o abbattuto per sicurezza.</p>
+          <p>Allergeni indicati tra parentesi (1-14).</p>
+          <p>In caso di allergie comunicare al personale. Coperto e servizio: €3,00.</p>
+        </div>
+      </div>
+
+      {/* popout dania */}
+      {dishPopout && (
+        <div className="mfm-pop-overlay" onClick={() => setDishPopout(null)}>
+          <div className="mfm-pop" onClick={(e) => e.stopPropagation()}>
+            <div className="mfm-pop-img">
+              {dishPopout.img ? <img src={dishPopout.img} alt={dishPopout.name} /> : <span className="mfm-pop-ph">{dishPopout.icon}</span>}
+              <button className="mfm-pop-close" onClick={() => setDishPopout(null)}>×</button>
+            </div>
+            <div className="mfm-pop-body">
+              <h3>{dishPopout.name}{dishPopout.featured && <span className="mfm-star"> ★</span>}</h3>
+              {dishPopout.desc && <p className="mfm-pop-desc">{dishPopout.desc}</p>}
+              <div className="mfm-pop-foot">
+                <span className="mfm-pop-price">{dishPopout.price}{conv(dishPopout.price) && <span className="mfm-price-conv"> {conv(dishPopout.price)}</span>}</span>
+                {dishPopout.allergen && <span className="mfm-pop-allergen">Allergeni: {dishPopout.allergen}</span>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <style>{`
+        .mfm { background: var(--c-bg); padding: 80px 0 80px; overflow-x: hidden; width: 100%; box-sizing: border-box; }
+        .mfm-head { padding: 0 20px; margin-bottom: 20px; }
+        .mfm-kicker { display: block; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--c-sky); margin-bottom: 12px; }
+        .mfm-title { font-family: var(--f-display); font-weight: 800; font-size: clamp(30px, 9vw, 46px); line-height: 1; color: var(--c-deep); letter-spacing: -0.02em; overflow-wrap: anywhere; }
+        .mfm-intro { font-family: var(--f-serif); font-style: italic; font-size: 15px; line-height: 1.4; color: var(--c-mute); margin-top: 12px; overflow-wrap: anywhere; }
+        /* sticky pasek kategorii */
+        .mfm-catbar-wrap { position: sticky; top: 0; z-index: 20; background: var(--c-bg); padding: 12px 0; box-shadow: 0 4px 16px rgba(0,0,0,0.04); }
+        .mfm-catbar { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; padding: 0 20px; }
+        .mfm-catbar::-webkit-scrollbar { display: none; }
+        .mfm-cattab { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; padding: 9px 14px; border-radius: 999px; font-family: var(--f-body); font-size: 13px; font-weight: 600; white-space: nowrap; border: 1px solid var(--c-line); background: #fff; color: var(--c-deep); transition: all 0.2s; }
+        .mfm-cattab.active { background: var(--c-deep); color: #fff; border-color: var(--c-deep); }
+        .mfm-cattab-icon { font-size: 14px; }
+        /* listy */
+        .mfm-cats { padding: 24px 20px 0; }
+        .mfm-cat { margin-bottom: 36px; scroll-margin-top: 80px; }
+        .mfm-cat-title { display: flex; align-items: baseline; gap: 10px; font-family: var(--f-display); font-weight: 800; font-size: 26px; color: var(--c-deep); margin-bottom: 16px; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+        .mfm-cat-num { font-size: 13px; color: var(--c-sky); flex: 0 0 auto; }
+        .mfm-list { list-style: none; padding: 0; margin: 0; }
+        .mfm-item { padding: 14px 0; border-bottom: 1px solid var(--c-line); cursor: pointer; }
+        .mfm-item.feat { background: rgba(245,237,224,0.5); border-radius: 12px; padding: 14px 12px; margin: 6px 0; border-bottom: 1px solid transparent; }
+        .mfm-item-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+        .mfm-item-name { font-family: var(--f-display); font-weight: 700; font-size: 16px; color: var(--c-deep); line-height: 1.25; overflow-wrap: anywhere; word-break: break-word; min-width: 0; flex: 1; }
+        .mfm-star { color: var(--c-coral); font-size: 13px; margin-left: 4px; }
+        .mfm-allergen { font-family: var(--f-body); font-size: 10px; font-weight: 400; color: var(--c-mute); margin-left: 5px; letter-spacing: 0.03em; white-space: nowrap; }
+        .mfm-item-price { display: flex; flex-direction: column; align-items: flex-end; flex: 0 0 auto; text-align: right; }
+        .mfm-price-eur { font-family: var(--f-display); font-weight: 700; font-size: 15px; color: var(--c-sky); white-space: nowrap; }
+        .mfm-price-conv { font-family: var(--f-body); font-weight: 400; font-size: 10px; color: var(--c-mute); white-space: nowrap; margin-top: 1px; }
+        .mfm-price-note { font-family: var(--f-serif); font-style: italic; font-size: 11px; color: var(--c-mute); white-space: nowrap; }
+        .mfm-item-desc { font-family: var(--f-serif); font-style: italic; font-size: 13px; color: var(--c-mute); line-height: 1.4; margin: 6px 0 0; overflow-wrap: anywhere; word-break: break-word; }
+        /* box cuciniamo — prosty, mieści się zawsze */
+        .mfm-quote-box { margin: 12px 0 28px; padding: 22px 18px; background: var(--c-sand); border-radius: 16px; text-align: center; box-sizing: border-box; width: 100%; }
+        .mfm-quote { font-family: var(--f-serif); font-style: italic; font-size: 16px; line-height: 1.5; color: var(--c-deep); margin: 0; overflow-wrap: anywhere; word-break: break-word; }
+        .mfm-quote-sign { display: block; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--c-sky); margin-top: 12px; }
+        .mfm-note { font-size: 12px; color: var(--c-mute); line-height: 1.5; padding-bottom: 8px; }
+        .mfm-note p { margin: 0 0 5px; overflow-wrap: anywhere; }
+        /* popout */
+        .mfm-pop-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(14,34,48,0.55); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .mfm-pop { width: 100%; max-width: 400px; background: #fff; border-radius: 20px; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,0.3); }
+        .mfm-pop-img { position: relative; height: 200px; background: linear-gradient(135deg, var(--c-sand), #E8DDC8); display: flex; align-items: center; justify-content: center; }
+        .mfm-pop-img img { width: 100%; height: 100%; object-fit: cover; }
+        .mfm-pop-ph { font-size: 56px; opacity: 0.4; }
+        .mfm-pop-close { position: absolute; top: 12px; right: 12px; width: 38px; height: 38px; border-radius: 50%; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.4); color: #fff; font-size: 22px; display: grid; place-items: center; cursor: pointer; }
+        .mfm-pop-body { padding: 20px; }
+        .mfm-pop-body h3 { font-family: var(--f-display); font-weight: 700; font-size: 21px; color: var(--c-deep); overflow-wrap: anywhere; }
+        .mfm-pop-desc { font-family: var(--f-serif); font-style: italic; font-size: 14px; color: var(--c-mute); line-height: 1.5; margin: 10px 0 16px; overflow-wrap: anywhere; }
+        .mfm-pop-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .mfm-pop-price { font-family: var(--f-display); font-weight: 800; font-size: 22px; color: var(--c-sky); }
+        .mfm-pop-allergen { font-size: 11px; color: var(--c-mute); }
+      `}</style>
+    </section>
+  );
+}
+
+// ─── Desktop categorized menu ────────────────────────────────────────────────
+function DesktopFullMenu() {
   const [activeCat, setActiveCat] = useStateM(window.FULL_MENU[0].id);
   const [ratios, setRatios] = useStateM({});
   const sectionRef = useRefM(null);

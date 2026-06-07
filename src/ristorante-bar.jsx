@@ -178,10 +178,10 @@ function Ristorante({ t }) {
         .rist-chef-play { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 80px; height: 80px; border-radius: 50%; background: rgba(255,255,255,0.95); color: var(--c-deep); display: flex; align-items: center; justify-content: center; font-size: 22px; padding-left: 4px; backdrop-filter: blur(6px); }
         .rist-chef-body { font-size: 18px; line-height: 1.6; color: var(--c-deep); margin: 24px 0 32px; max-width: 460px; text-wrap: pretty; display: block; clear: both; }
         .rist-chef-cta { margin-top: 16px; }
-        /* tytuł Chef/al tavolo: zawijanie na mobile (SplitReveal .srt ma nowrap → wymuszamy normal) */
+        /* tytuł "Al tavolo, davanti a voi" — JEDNA linijka, dopasowany rozmiar */
         @media (max-width: 768px) {
-          .rist-chef-text .srt { white-space: normal !important; overflow-wrap: anywhere; }
-          .rist-chef-text .h3 { font-size: clamp(28px, 8vw, 44px); line-height: 1.05; }
+          .rist-chef-text .srt { white-space: nowrap !important; }
+          .rist-chef-text .h3 { font-size: clamp(20px, 6vw, 32px); line-height: 1.1; }
           .rist-chef-body { font-size: 16px; margin: 20px 0 28px; max-width: 100%; }
         }
         .rist-gallery-masonry { padding: 96px 0; }
