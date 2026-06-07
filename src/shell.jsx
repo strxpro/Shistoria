@@ -712,9 +712,9 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
         /* Highlight Cocktail Maker link in mobile menu */
         .mobile-links a.nav-highlight { color:var(--c-coral,#E8927C) !important; }
         
-        .mobile-menu-inner { position: relative; z-index: 2; padding: 40px 24px calc(120px + env(safe-area-inset-bottom)); margin-top: 0; max-width: 100%; box-sizing: border-box; flex: 1; display: flex; flex-direction: column; justify-content: center; min-height: 100%; }
+        .mobile-menu-inner { position: relative; z-index: 2; padding: calc(110px + env(safe-area-inset-top)) 24px calc(130px + env(safe-area-inset-bottom)); margin-top: 0; max-width: 100%; box-sizing: border-box; flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100%; }
         .nav.scrolled .mobile-menu-inner { margin-top: 0; }
-        .mobile-links { display: flex; flex-direction: column; gap: 8px; margin-top: 0; max-width: 100%; }
+        .mobile-links { display: flex; flex-direction: column; gap: 8px; margin: auto 0; max-width: 100%; width: 100%; align-items: center; text-align: center; }
         .mobile-links a {
           font-family: var(--f-display);
           font-weight: 800;
@@ -744,7 +744,7 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
         }
         
         /* 3D wave text effect */
-        .ml-word { display: flex; flex-wrap: wrap; min-width: 0; overflow: hidden; }
+        .ml-word { display: flex; flex-wrap: wrap; min-width: 0; overflow: hidden; justify-content: center; }
         .mobile-links a .arrow { flex: 0 0 auto; }
         .ml-char-wrap { position: relative; display: inline-block; transform-style: preserve-3d; transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); transform-origin: 50% 50% -0.4em; }
         .ml-char-front { display: inline-block; transform: translateZ(0.4em); }

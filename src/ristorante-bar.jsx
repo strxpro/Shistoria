@@ -246,9 +246,10 @@ function Bar({ t, dark = true }) {
         <div className="bar-hours reveal">
           <div className="bar-hours-left">
             <span className="eyebrow">— {t("bar.hoursTitle")}</span>
-            <h4 className="bar-hours-title">Mar — Dom</h4>
-            <div className="bar-hours-num">18:00 → 02:00</div>
-            <div className="bar-hours-day">Lun · chiuso</div>
+            <h4 className="bar-hours-title">Tutti i giorni</h4>
+            <div className="bar-hours-num">12:00 → 14:30</div>
+            <div className="bar-hours-num">19:00 → 23:00</div>
+            <div className="bar-hours-day">Martedì · chiuso</div>
           </div>
           <div className="bar-hours-right">
             <a href="#cocktail-builder" className="btn bar-cta">
@@ -275,7 +276,8 @@ function Bar({ t, dark = true }) {
         .bar-hours { display: grid; grid-template-columns: 1fr; gap: 48px; padding-top: 80px; margin-top: 80px; border-top: 1px solid ${dark ? "rgba(255,255,255,0.1)" : "var(--c-line)"}; }
         @media (min-width: 768px) { .bar-hours { grid-template-columns: 1fr 1fr; gap: 96px; align-items: center; } }
         .bar-hours-title { font-family: var(--f-display); font-weight: 800; font-size: 40px; margin-top: 12px; letter-spacing: -0.02em; }
-        .bar-hours-num { font-family: var(--f-display); font-weight: 800; font-size: clamp(56px, 7vw, 96px); color: var(--c-coral); margin-top: 24px; letter-spacing: -0.03em; line-height: 1; }
+        .bar-hours-num { font-family: var(--f-display); font-weight: 800; font-size: clamp(40px, 6vw, 72px); color: var(--c-coral); margin-top: 12px; letter-spacing: -0.03em; line-height: 1; }
+        .bar-hours-num + .bar-hours-num { margin-top: 4px; }
         .bar-hours-day { font-family: var(--f-serif); font-style: italic; font-size: 18px; opacity: 0.65; margin-top: 16px; }
         .bar-cta { background: var(--grad-sunset); color: #fff; padding: 22px 36px; font-size: 14px; }
         .bar-cta:hover { background: var(--grad-sunset); transform: translateY(-2px); filter: brightness(1.1); }
