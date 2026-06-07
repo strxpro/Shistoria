@@ -28,9 +28,9 @@ function RiseCard({ children, z = 2, distance = 240, peek = null, peekBg = "line
     target: ref,
     offset: ["start end", riseTo],
   });
-  // On mobile: no transform at all (sticky needs it). On desktop: rise animation.
+  // On mobile: RÓWNIEŻ rise (karta wjeżdża od dołu, nakładając się na peek). Mniejszy dystans.
   const transform = useTransform(scrollYProgress, (p) => {
-    if (isMobile) return "none";
+    if (isMobile) return p >= 0.99 ? "none" : `translateY(${(distance * 0.4) * (1 - p)}px)`;
     return p >= 0.99 ? "none" : `translateY(${distance * (1 - p)}px)`;
   });
   const peekY = useTransform(scrollYProgress, [0, 0.5, 0.95], [80, 0, 70]);
@@ -82,7 +82,7 @@ function RiseCard({ children, z = 2, distance = 240, peek = null, peekBg = "line
         </motion.div>
       )}
       {isMobile ? (
-        <div style={{ position: "relative", zIndex: 1 }}>{children}</div>
+        <motion.div style={{ transform, position: "relative", zIndex: 1 }}>{children}</motion.div>
       ) : (
         <motion.div style={{ transform }}>
           {children}
