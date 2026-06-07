@@ -219,6 +219,25 @@ function StoriaArc({ data }) {
   const [progress, setProgress] = useStateS(0);
   const [popout, setPopout] = useStateS(null);
   const goToRef = useRefS(null); // funkcja nawigacji do indeksu daty (ustawiana w useEffect)
+  // wysokość wrappera w PX, ustalona raz — odporna na pasek URL (zmiana vh nie przesuwa sekcji)
+  const [wrapH, setWrapH] = useStateS(0);
+
+  useEffectS(() => {
+    const compute = () => {
+      // bazujemy na visualViewport / innerHeight zapisanym raz; aktualizujemy TYLKO przy zmianie szerokości
+      const vh = window.innerHeight;
+      setWrapH(Math.round(vh * (data.length * 0.4 + 0.9)));
+    };
+    compute();
+    let lastW = window.innerWidth;
+    const onResize = () => {
+      // pasek URL zmienia tylko wysokość → ignorujemy; reagujemy tylko na zmianę szerokości (orientacja)
+      if (window.innerWidth !== lastW) { lastW = window.innerWidth; compute(); }
+    };
+    window.addEventListener("resize", onResize);
+    window.addEventListener("orientationchange", compute);
+    return () => { window.removeEventListener("resize", onResize); window.removeEventListener("orientationchange", compute); };
+  }, [data.length]);
 
   useEffectS(() => {
     const sec = sectionRef.current;
@@ -336,13 +355,11 @@ function StoriaArc({ data }) {
 
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
     window.addEventListener("touchstart", onTouchStart, { passive: true });
     window.addEventListener("touchmove", onTouchMove, { passive: true });
     window.addEventListener("touchend", onTouchEnd, { passive: true });
     return () => {
       window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
       window.removeEventListener("touchstart", onTouchStart);
       window.removeEventListener("touchmove", onTouchMove);
       window.removeEventListener("touchend", onTouchEnd);
@@ -373,7 +390,7 @@ function StoriaArc({ data }) {
   const SPREAD = 26;        // stopni między kolejnymi datami
   // aktywny obrót: aktywna data na samej górze koła (kąt -90°)
   return (
-    <div ref={sectionRef} className="sarc-wrap" style={{ height: `${n * 40 + 90}vh` }}>
+    <div ref={sectionRef} className="sarc-wrap" style={{ height: wrapH ? `${wrapH}px` : `${n * 40 + 90}vh` }}>
       <div className="sarc-sticky" style={{ background: bg, "--sarc-bg": bg }}>
         {/* ZDJĘCIE u góry — odpowiada aktywnej dacie; podczas tail rozszerza się na cały ekran */}
         {!isExpanding ? (
@@ -477,7 +494,7 @@ function StoriaArc({ data }) {
 
       <style>{`
         .sarc-wrap { position: relative; }
-        .sarc-sticky { position: sticky; top: 0; height: 100vh; overflow: hidden; transition: background .6s ease; }
+        .sarc-sticky { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; transition: background .6s ease; }
         /* ZDJĘCIE u góry — wysokie, gładki gradient wtapiający w tło; białe napisy na dole */
         .sarc-photo { position: absolute; top: 0; left: 0; right: 0; height: 72vh; overflow: hidden; animation: sarcPhotoIn .5s ease; }
         @keyframes sarcPhotoIn { from { opacity: 0; } to { opacity: 1; } }

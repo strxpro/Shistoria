@@ -302,8 +302,8 @@ function FullMenu() {
       )}
 
       <style>{`
-        .fmenu { background: var(--c-bg); padding: 120px 0 160px; position: relative; min-height: 100vh; overflow-x: clip; }
-        @media (max-width: 768px) { .fmenu { padding: 90px 0 100px; } }
+        .fmenu { background: var(--c-bg); padding: 120px 0 160px; position: relative; min-height: 100vh; overflow-x: clip; max-width: 100vw; }
+        @media (max-width: 768px) { .fmenu { padding: 90px 0 100px; overflow-x: hidden; } }
         /* Dish photo pop-out */
         .fmenu-dish-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(14,34,48,0.55); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; padding: 24px; animation: fmenuFadeIn .25s ease; }
         .fmenu-dish-popout { position: relative; width: min(480px, 92vw); background: #fff; border-radius: 24px; overflow: hidden; box-shadow: 0 40px 100px rgba(0,0,0,0.3); animation: fmenuPopIn .4s cubic-bezier(.16,1,.3,1); }

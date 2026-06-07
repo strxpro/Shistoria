@@ -129,6 +129,15 @@ a { color: inherit; text-decoration: none; }
 .srt {
   display: inline-block;
   white-space: nowrap;
+  max-width: 100%;
+}
+/* mobile: pozwól nagłówkom SplitReveal zawijać się, by nie wyjeżdżały poza ekran */
+@media (max-width: 768px) {
+  .srt {
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
 }
 .srt .char {
   display: inline-block;
