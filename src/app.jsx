@@ -36,6 +36,10 @@ function RiseCard({ children, z = 2, distance = 240, peek = null, peekBg = "line
   const peekY = useTransform(scrollYProgress, [0, 0.5, 0.95], [80, 0, 70]);
   const peekOpacity = useTransform(scrollYProgress, [0, 0.1, 0.82, 0.98], [0, 1, 1, 0]);
 
+  // peek na mobile też animowany (chowa się/wychyla przy scrollu jak desktop)
+  const peekYMobile = useTransform(scrollYProgress, [0, 0.5, 0.95], [60, 0, 50]);
+  const peekOpacityMobile = useTransform(scrollYProgress, [0, 0.12, 0.8, 0.98], [0, 1, 1, 0]);
+
   // `bg` paints behind the card so the rise's transient gap never exposes the
   // fixed full-screen background images from earlier sections (e.g. Storia).
   return (
@@ -59,21 +63,27 @@ function RiseCard({ children, z = 2, distance = 240, peek = null, peekBg = "line
           }}>{peek}</div>
         </motion.div>
       )}
-      {/* Mobile: baner-nagłówek (Bar / Cocktail) NACHODZI na poprzednią sekcję z zaokrąglonym rogiem */}
+      {/* Mobile: animowany peek (Bar / Cocktail) — chowa się/wychyla przy scrollu, zaokrąglone rogi */}
       {peek && isMobile && (
-        <div aria-hidden="true" style={{
-          position: "relative", zIndex: 3, marginTop: "-32px", marginBottom: "-12px",
-          width: "100%", padding: "30px 0 22px", textAlign: "center",
-          background: peekBg, color: peekColor,
-          fontFamily: "var(--f-display)", fontWeight: 800,
-          letterSpacing: "0.06em", textTransform: "uppercase",
-          fontSize: "clamp(30px, 10vw, 56px)", lineHeight: 1,
-          borderTopLeftRadius: "2.2rem", borderTopRightRadius: "2.2rem",
-          boxShadow: "0 -10px 30px rgba(0,0,0,0.18)",
-        }}>{peek}</div>
+        <motion.div
+          aria-hidden="true"
+          style={{
+            position: "absolute", left: 0, right: 0, top: 0,
+            pointerEvents: "none", y: peekYMobile, opacity: peekOpacityMobile, zIndex: 3,
+          }}
+        >
+          <div style={{
+            width: "100%", padding: "20px 0 16px", textAlign: "center",
+            background: peekBg, color: peekColor,
+            fontFamily: "var(--f-display)", fontWeight: 800,
+            letterSpacing: "0.06em", textTransform: "uppercase",
+            fontSize: "clamp(30px, 11vw, 60px)", lineHeight: 1,
+            borderTopLeftRadius: "2.2rem", borderTopRightRadius: "2.2rem",
+          }}>{peek}</div>
+        </motion.div>
       )}
       {isMobile ? (
-        <div>{children}</div>
+        <div style={{ borderTopLeftRadius: "2.2rem", borderTopRightRadius: "2.2rem", overflow: "hidden", position: "relative" }}>{children}</div>
       ) : (
         <motion.div style={{ transform }}>
           {children}

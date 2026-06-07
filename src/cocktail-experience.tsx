@@ -76,6 +76,13 @@ const _rawModelsBase = (process.env.NEXT_PUBLIC_MODELS_URL || "").trim().replace
 const MODELS_BASE = _rawModelsBase.replace(/\/[^/]+\.glb$/i, "");
 const modelUrl = (file: string) => MODELS_BASE ? `${MODELS_BASE}/${file}` : `/${file}`;
 
+// Modele są skompresowane Draco — decoder MUSI być dostępny. drei domyślnie ściąga go
+// z gstatic CDN, co na mobile (Safari/Chrome) często zawodzi → modele się nie dekodują
+// i są niewidoczne mimo działającego Canvas. Wskazujemy LOKALNY decoder z /public/draco/.
+try {
+  (useGLTF as any).setDecoderPath?.("/draco/");
+} catch { /* ignore */ }
+
 const BOTTLE_URL = modelUrl("WINOILIKIERY.glb");       // wina + likiery (wino, Etykieta, Liquid, Cylinder)
 const SPIRIT_URL = modelUrl("wodkarum.glb");           // wódka/rum/tequila (butelka, Etykieta, LIQUID, zakretka)
 const WHISKYGIN_URL = modelUrl("whiskigin.glb");       // whisky + gin (Liquid, LiquidAction)
