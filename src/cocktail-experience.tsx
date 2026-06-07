@@ -1474,13 +1474,11 @@ function Scene({
           />
         )}
       </Suspense>
-      {/* Environment (HDR z sieci) — TYLKO desktop. Na mobile (iOS) ładowanie HDR z CDN
-          potrafi wywalić kontekst WebGL; tam wystarczą światła + ContactShadows. */}
-      {typeof window !== "undefined" && window.innerWidth >= 768 && (
-        <Suspense fallback={null}>
-          <Environment preset="city" />
-        </Suspense>
-      )}
+      {/* Environment (HDR) — przywrócone też na mobile (crash był od złych modeli z Supabase,
+          nie od HDR). Daje realistyczne odbicia metalu/szkła. */}
+      <Suspense fallback={null}>
+        <Environment preset="city" />
+      </Suspense>
       <ContactShadows position={[0, -3.48, 0]} opacity={0.55} scale={14} blur={2.2} far={6} color="#000" />
     </>
   );
@@ -2176,8 +2174,8 @@ function CocktailExperience() {
         {/* Canvas */}
         <div className="cx-canvas">
           {inView && (
-            <Canvas frameloop="demand" shadows={!isMobileDevice} dpr={isMobileDevice ? [1, 1.5] : [1, 2]}
-              gl={{ antialias: !isMobileDevice, alpha: true, powerPreference: "default", failIfMajorPerformanceCaveat: false, preserveDrawingBuffer: false }}
+            <Canvas frameloop="demand" shadows dpr={isMobileDevice ? [1, 1.5] : [1, 2]}
+              gl={{ antialias: true, alpha: true, powerPreference: "high-performance", failIfMajorPerformanceCaveat: false }}
               camera={{ position: [CONFIG.camPos.x, CONFIG.camPos.y, CONFIG.camPos.z], fov: 36 }}>
               <Scene initialColor={mixedColor} onReady={onSceneReady}
                 glassPour={(glassPourOpen || glassFilled) ? {
