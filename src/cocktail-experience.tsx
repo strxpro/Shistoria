@@ -1513,6 +1513,8 @@ function CocktailExperience() {
   const inSceneGlassRef = useRef<THREE.Group | null>(null); // root modelu szklanki (in-scene) — do wyjścia scrollem
   const [sceneReady, setSceneReady] = useState(false);
   const [inView, setInView] = useState(false); // mount Canvas tylko gdy sekcja blisko viewportu
+  // Telefon: lżejsze ustawienia WebGL (bez cieni, niższy DPR) — iOS pada przy ciężkim kontekście.
+  const [isMobileDevice] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
 
   const [poured, setPoured] = useState<Poured[]>([]);
   const [stage, setStage] = useState<Stage>("build");
@@ -2168,8 +2170,8 @@ function CocktailExperience() {
         {/* Canvas */}
         <div className="cx-canvas">
           {inView && (
-            <Canvas frameloop="demand" shadows dpr={[1, 2]}
-              gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
+            <Canvas frameloop="demand" shadows={!isMobileDevice} dpr={isMobileDevice ? [1, 1.5] : [1, 2]}
+              gl={{ antialias: !isMobileDevice, alpha: true, powerPreference: "default", failIfMajorPerformanceCaveat: false, preserveDrawingBuffer: false }}
               camera={{ position: [CONFIG.camPos.x, CONFIG.camPos.y, CONFIG.camPos.z], fov: 36 }}>
               <Scene initialColor={mixedColor} onReady={onSceneReady}
                 glassPour={(glassPourOpen || glassFilled) ? {

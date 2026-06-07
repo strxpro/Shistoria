@@ -345,18 +345,23 @@ function FullMenu() {
         .fmenu-row-desc { font-family: var(--f-serif); font-style: italic; font-size: 15px; color: var(--c-mute); margin-top: 6px; line-height: 1.4; overflow-wrap: anywhere; word-break: break-word; }
         .fmenu-row-dots { flex: 1; border-bottom: 1px dotted var(--c-line); transform: translateY(-4px); min-width: 40px; }
         @media (max-width: 640px) { .fmenu-row-dots { display: none; }
-          .fmenu-row { grid-template-columns: 52px 1fr auto; gap: 12px; padding: 14px 0; }
-          .fmenu-row.featured { grid-template-columns: 64px 1fr auto; padding: 16px 10px; margin: 4px 0; }
+          .fmenu-row { grid-template-columns: 52px minmax(0,1fr) auto; gap: 12px; padding: 14px 0; }
+          .fmenu-row.featured { grid-template-columns: 64px minmax(0,1fr) auto; padding: 16px 10px; margin: 4px 0; }
           .fmenu-row-thumb { width: 52px; height: 52px; border-radius: 12px; }
           .fmenu-row.featured .fmenu-row-thumb { width: 64px; height: 64px; }
-          .fmenu-row-name { font-size: 16px; }
+          .fmenu-row-main { min-width: 0; }
+          .fmenu-row-name { font-size: 16px; overflow-wrap: anywhere; word-break: break-word; }
           .fmenu-row-desc { font-size: 13px; }
+          .fmenu-row-price { font-size: 16px; }
         }
         .fmenu-row-price { font-family: var(--f-display); font-weight: 700; font-size: 18px; color: var(--c-sky); white-space: nowrap; letter-spacing: -0.01em; }
         .fmenu-row-note { font-family: var(--f-serif); font-style: italic; font-size: 13px; color: var(--c-mute); margin-left: 4px; font-weight: 400; }
         .fmenu-footer { margin: 64px auto 0; padding: 48px; background: var(--c-sand); border-radius: 24px; text-align: center; width: 100%; max-width: 100%; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
         .fmenu-footer-quote { overflow-wrap: anywhere; word-break: break-word; hyphens: auto; max-width: 100%; width: 100%; margin: 0; font-size: clamp(16px, 4vw, 24px); white-space: normal; box-sizing: border-box; text-align: center; }
-        @media (max-width: 768px) { .fmenu-footer { padding: 22px 14px; margin-top: 36px; border-radius: 16px; } .fmenu-footer-quote { font-size: clamp(13px, 3.6vw, 17px) !important; line-height: 1.45; letter-spacing: 0; } }
+        @media (max-width: 768px) {
+          .fmenu-footer { padding: 20px 12px; margin-top: 32px; border-radius: 16px; max-width: calc(100vw - 48px); }
+          .fmenu-footer-quote { font-size: clamp(13px, 3.6vw, 16px) !important; line-height: 1.5; letter-spacing: 0; }
+        }
       `}</style>
     </section>
   );
