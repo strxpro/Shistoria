@@ -112,7 +112,7 @@ function Ristorante({ t }) {
             </ScrollReveal>
             <div className="rist-meta">
               <div><span>20</span><label>posti</label></div>
-              <div><span>30+</span><label>anni</label></div>
+              <div><span>{new Date().getFullYear() - 1996}</span><label>anni</label></div>
               <div><span>1</span><label>famiglia</label></div>
             </div>
           </div>
