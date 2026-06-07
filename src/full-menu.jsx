@@ -278,9 +278,9 @@ function FullMenu() {
         .fmenu-nav-label { display: block; margin-bottom: 16px; }
         .fmenu-nav ul { list-style: none; display: flex; flex-direction: column; gap: 2px; padding: 0; }
         @media (max-width: 1023px) {
-          /* Pasek kategorii na górze — wszystkie kategorie, scrollowalny palcem */
-          .fmenu-nav { position: relative; top: 0; z-index: 20; padding: 0 0 12px; }
-          .fmenu-nav ul { display: flex; flex-direction: row; flex-wrap: nowrap; gap: 8px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; padding-bottom: 4px; touch-action: pan-x; }
+          /* Pasek kategorii na górze — wszystkie kategorie, scrollowalny palcem w bok */
+          .fmenu-nav { position: relative; top: 0; z-index: 20; padding: 0 0 12px; max-width: 100%; overflow: visible; }
+          .fmenu-nav ul { display: flex; flex-direction: row; flex-wrap: nowrap; gap: 8px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -webkit-overflow-scrolling: touch; padding-bottom: 4px; touch-action: pan-x; width: 100%; max-width: 100%; }
           .fmenu-nav ul::-webkit-scrollbar { display: none; }
           .fmenu-nav li { flex: 0 0 auto; }
           .fmenu-nav button { white-space: nowrap; width: auto; }
@@ -324,7 +324,7 @@ function FullMenu() {
         .fmenu-cat-num { font-family: var(--f-display); font-weight: 800; font-size: 14px; color: var(--c-sky); }
         .fmenu-cat-title { font-family: var(--f-display); font-weight: 800; font-size: clamp(36px, 4vw, 56px); letter-spacing: -0.025em; color: var(--c-deep); line-height: 1; }
         .fmenu-cat-line { flex: 1; height: 1px; background: var(--c-line); }
-        .fmenu-list { list-style: none; display: flex; flex-direction: column; padding: 0; }
+        .fmenu-list { list-style: none; display: flex; flex-direction: column; padding: 0; min-width: 0; max-width: 100%; }
         .fmenu-row { display: grid; grid-template-columns: 64px 1fr auto auto; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--c-line); align-items: center; transition: background 0.3s; }
         .fmenu-row:last-child { border-bottom: 0; }
         .fmenu-row:hover { background: rgba(245,237,224,0.5); }

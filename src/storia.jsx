@@ -209,36 +209,23 @@ function StoriaArc({ data }) {
   useEffectS(() => {
     const sec = sectionRef.current;
     if (!sec) return;
-    let snapTimer = null;
+    let raf = 0;
     const onScroll = () => {
-      const rect = sec.getBoundingClientRect();
-      const total = sec.offsetHeight - window.innerHeight;
-      if (total <= 0) return;
-      const p = Math.min(1, Math.max(0, -rect.top / total));
-      setProgress(p);
-
-      // MAGNETYCZNY SNAP: po zatrzymaniu scrolla dosuń do najbliższej daty (lekki snap).
-      if (snapTimer) clearTimeout(snapTimer);
-      // nie snapuj w fazie rozszerzania ostatniego zdjęcia (p > 0.84)
-      if (p < 0.82 && p > 0.02) {
-        snapTimer = setTimeout(() => {
-          const nLocal = data.length;
-          const travel = p / 0.84;
-          const idx = Math.round(travel * (nLocal - 1));
-          const targetTravel = idx / (nLocal - 1);
-          const targetP = targetTravel * 0.84;
-          const top0 = sec.offsetTop;
-          const targetScroll = top0 + targetP * total;
-          if (Math.abs(window.scrollY - targetScroll) > 4) {
-            window.scrollTo({ top: targetScroll, behavior: "smooth" });
-          }
-        }, 110);
-      }
+      // throttle przez rAF — płynniej, bez skoków
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        const rect = sec.getBoundingClientRect();
+        const total = sec.offsetHeight - window.innerHeight;
+        if (total <= 0) return;
+        const p = Math.min(1, Math.max(0, -rect.top / total));
+        setProgress(p);
+      });
     };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
-    return () => { window.removeEventListener("scroll", onScroll); window.removeEventListener("resize", onScroll); if (snapTimer) clearTimeout(snapTimer); };
+    return () => { window.removeEventListener("scroll", onScroll); window.removeEventListener("resize", onScroll); if (raf) cancelAnimationFrame(raf); };
   }, [data.length]);
 
   const n = data.length;
@@ -373,7 +360,7 @@ function StoriaArc({ data }) {
         .sarc-wheel-ring { position: absolute; left: 50%; top: 50%; width: 520px; height: 520px; margin: -260px 0 0 -260px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,0.14); }
         .sarc-wheel-marker { position: absolute; left: 50%; top: -260px; width: 16px; height: 16px; border-radius: 50%; background: var(--c-coral, #E8927C); transform: translate(-50%, -50%); box-shadow: 0 0 0 6px rgba(232,146,124,0.22), 0 4px 14px rgba(0,0,0,0.3); z-index: 3; }
         /* tick = kontener obrócony stycznie do okręgu; w środku data + kropka na obwodzie */
-        .sarc-tick { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; transition: opacity .3s ease, transform .4s cubic-bezier(.2,.85,.2,1); will-change: transform, opacity; }
+        .sarc-tick { position: absolute; left: 0; top: 0; display: flex; flex-direction: column; align-items: center; transition: opacity .25s ease; will-change: transform, opacity; }
         .sarc-date { background: none; border: none; cursor: pointer; font-family: var(--f-display); font-weight: 800;
           font-size: 18px; color: rgba(255,255,255,0.92); white-space: nowrap; padding: 0 0 6px; transition: color .3s, font-size .3s; }
         .sarc-date.active { color: var(--c-coral, #E8927C); font-size: 24px; }

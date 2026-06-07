@@ -276,9 +276,11 @@ function Attrazioni({ t }) {
         /* Mobile: mapa przyklejona na górze (z tłem), kategorie i lista przewijają się POD nią */
         @media (max-width: 1023px) {
           .atr-cats { position: relative; z-index: 1; margin-bottom: 16px; padding-bottom: 16px; }
-          .atr-map { position: sticky; top: 64px; z-index: 10; margin-bottom: 16px; padding: 8px 0; background: var(--c-bg); }
+          .atr-map { position: sticky; top: 60px; z-index: 10; margin-bottom: 16px; padding: 8px 0 12px; background: var(--c-bg); }
           .atr-map-bg { aspect-ratio: 16/10; box-shadow: 0 16px 40px rgba(26,61,82,0.18); background: #D8ECF3; }
+          /* lista pod mapą; ostatni element (przycisk dojazdu) ma zapas, by nie chował się pod mapę */
           .atr-list { position: relative; z-index: 4; }
+          .atr-directions { position: relative; z-index: 11; margin-top: 24px; align-self: center; }
         }
         .atr-map-bg { position: relative; aspect-ratio: 4/3; border-radius: 20px; overflow: hidden; background: #D8ECF3; box-shadow: 0 24px 80px rgba(26,61,82,0.12); }
         /* Leaflet map */
