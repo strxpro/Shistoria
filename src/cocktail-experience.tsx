@@ -1448,6 +1448,8 @@ function Scene({
   return (
     <>
       <ambientLight intensity={0.6} />
+      {/* Hemisphere — daje metalowi co odbijać gdy brak HDR Environment (mobile) */}
+      <hemisphereLight args={["#dfeeff", "#3a2e26", 0.8]} />
       <directionalLight position={[4, 9, 6]} intensity={1.45} castShadow shadow-mapSize={[1024, 1024]} />
       <directionalLight position={[-6, 4, -4]} intensity={0.4} color="#8fd0ff" />
       <Suspense fallback={null}>
@@ -1470,11 +1472,13 @@ function Scene({
           />
         )}
       </Suspense>
-      {/* Environment (HDR z sieci) w OSOBNYM Suspense — nie blokuje montażu modeli/onReady,
-          gdy sieć jest wolna. Reflekty dojdą gdy się załadują. */}
-      <Suspense fallback={null}>
-        <Environment preset="city" />
-      </Suspense>
+      {/* Environment (HDR z sieci) — TYLKO desktop. Na mobile (iOS) ładowanie HDR z CDN
+          potrafi wywalić kontekst WebGL; tam wystarczą światła + ContactShadows. */}
+      {typeof window !== "undefined" && window.innerWidth >= 768 && (
+        <Suspense fallback={null}>
+          <Environment preset="city" />
+        </Suspense>
+      )}
       <ContactShadows position={[0, -3.48, 0]} opacity={0.55} scale={14} blur={2.2} far={6} color="#000" />
     </>
   );
