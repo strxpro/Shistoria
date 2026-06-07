@@ -413,3 +413,15 @@ window.convertPrice = function(priceStr, lang) {
   // Zawsze EUR + obok ~przelicznik
   return priceStr + " \u2248" + converted + cur.symbol;
 };
+
+// zwraca tylko przelicznik w nawiasach, np. "(≈28 zł)" — albo "" gdy IT/brak
+window.convertPriceExtra = function(priceStr, lang) {
+  if (!lang || lang === "it") return "";
+  const cur = window.CURRENCY_RATES[lang];
+  if (!cur || cur.rate === 1) return "";
+  const match = priceStr.match(/([\d.,]+)/);
+  if (!match) return "";
+  const eur = parseFloat(match[1].replace(",", "."));
+  const converted = Math.round(eur * cur.rate);
+  return "(\u2248" + converted + cur.symbol + ")";
+};

@@ -18,6 +18,7 @@ function FullMenu() {
   const catListRef = useRefM(null);
   const footerRef = useRefM(null);
   const lastScrollY = useRefM(0);
+  const idleTimer = useRefM(null);
 
   // pasek kategorii (mobile): drag palcem/myszką w bok + bezwładność
   useEffectM(() => {
@@ -113,6 +114,11 @@ function FullMenu() {
         if (currentY > lastScrollY.current + 20) setNavCollapsed(true);
         else if (currentY < lastScrollY.current - 10) setNavCollapsed(false);
         lastScrollY.current = currentY;
+        // auto-chowanie paska kategorii po 2s bezczynności (gdy stoimy w miejscu)
+        if (idleTimer.current) clearTimeout(idleTimer.current);
+        idleTimer.current = setTimeout(() => {
+          if (window.innerWidth < 1024) setNavCollapsed(true);
+        }, 2000);
       }
     };
     
@@ -253,7 +259,10 @@ function FullMenu() {
                       </div>
                       <div className="fmenu-row-dots" />
                       <div className="fmenu-row-price">
-                        {typeof window !== "undefined" && window.convertPrice ? window.convertPrice(it.price, window.currentLanguage) : it.price}
+                        <span className="fmenu-row-price-eur">{it.price}</span>
+                        {typeof window !== "undefined" && window.convertPriceExtra && window.convertPriceExtra(it.price, window.currentLanguage) && (
+                          <span className="fmenu-row-price-conv">{window.convertPriceExtra(it.price, window.currentLanguage)}</span>
+                        )}
                         {it.note && <span className="fmenu-row-note">/ {it.note}</span>}
                       </div>
                     </motion.li>
@@ -385,7 +394,7 @@ function FullMenu() {
         .fmenu-row-allergen { font-family: var(--f-body); font-size: 11px; font-weight: 400; color: var(--c-mute); letter-spacing: 0.05em; }
         .fmenu-row-desc { font-family: var(--f-serif); font-style: italic; font-size: 15px; color: var(--c-mute); margin-top: 6px; line-height: 1.4; overflow-wrap: anywhere; word-break: break-word; }
         .fmenu-row-dots { flex: 1; border-bottom: 1px dotted var(--c-line); transform: translateY(-4px); min-width: 40px; }
-        @media (max-width: 640px) { .fmenu-row-dots { display: none; }
+        @media (max-width: 768px) { .fmenu-row-dots { display: none; }
           .fmenu-row { grid-template-columns: 52px minmax(0,1fr) auto; gap: 12px; padding: 14px 0; }
           .fmenu-row.featured { grid-template-columns: 64px minmax(0,1fr) auto; padding: 16px 10px; margin: 4px 0; }
           .fmenu-row-thumb { width: 52px; height: 52px; border-radius: 12px; }
@@ -394,14 +403,18 @@ function FullMenu() {
           .fmenu-row-name { font-size: 16px; overflow-wrap: anywhere; word-break: break-word; }
           .fmenu-row-desc { font-size: 13px; }
           .fmenu-row-price { font-size: 16px; }
+          .fmenu-row-price-conv { font-size: 10px; }
         }
-        .fmenu-row-price { font-family: var(--f-display); font-weight: 700; font-size: 18px; color: var(--c-sky); white-space: nowrap; letter-spacing: -0.01em; }
+        .fmenu-row-price { font-family: var(--f-display); font-weight: 700; font-size: 18px; color: var(--c-sky); letter-spacing: -0.01em; display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
+        .fmenu-row-price-eur { white-space: nowrap; }
+        .fmenu-row-price-conv { font-family: var(--f-body); font-weight: 400; font-size: 11px; color: var(--c-mute); white-space: nowrap; margin-top: 2px; }
         .fmenu-row-note { font-family: var(--f-serif); font-style: italic; font-size: 13px; color: var(--c-mute); margin-left: 4px; font-weight: 400; }
-        .fmenu-footer { margin: 64px auto 0; padding: 48px; background: var(--c-sand); border-radius: 24px; text-align: center; width: 100%; max-width: 100%; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
-        .fmenu-footer-quote { overflow-wrap: anywhere; word-break: break-word; hyphens: auto; max-width: 100%; width: 100%; margin: 0; font-size: clamp(16px, 4vw, 24px); white-space: normal; box-sizing: border-box; text-align: center; }
+        .fmenu-footer { margin: 64px auto 0; padding: 48px; background: var(--c-sand); border-radius: 24px; text-align: center; width: 100%; max-width: 100%; min-width: 0; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
+        .fmenu-footer-quote { overflow-wrap: anywhere; word-break: break-word; hyphens: auto; max-width: 100%; min-width: 0; width: 100%; margin: 0; font-size: clamp(16px, 4vw, 24px); white-space: normal; box-sizing: border-box; text-align: center; }
         @media (max-width: 768px) {
-          .fmenu-footer { padding: 22px 16px; margin-top: 32px; border-radius: 16px; max-width: 100%; width: 100%; box-sizing: border-box; }
-          .fmenu-footer-quote { font-size: clamp(14px, 3.8vw, 17px) !important; line-height: 1.5; letter-spacing: 0; max-width: 100%; }
+          .fmenu-footer { padding: 20px 14px; margin-top: 32px; border-radius: 16px; max-width: 100%; width: 100%; box-sizing: border-box; }
+          .fmenu-footer-quote { font-size: clamp(14px, 3.8vw, 17px) !important; line-height: 1.5; letter-spacing: 0; max-width: 100%; white-space: normal !important; }
+          .fmenu-footer .kicker { font-size: 11px; }
         }
       `}</style>
     </section>

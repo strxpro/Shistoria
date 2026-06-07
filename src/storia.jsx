@@ -74,16 +74,22 @@ function Storia({ t, orientation = "horizontal" }) {
   }, []);
 
   useEffectS(() => {
+    let raf = 0;
     const onScroll = () => {
-      if (fgImgRef.current) {
-        const rect = fgImgRef.current.parentElement.getBoundingClientRect();
-        const p = (window.innerHeight - rect.top) / window.innerHeight;
-        // parallax depth effect
-        fgImgRef.current.style.transform = `translate3d(0, ${(p - 0.5) * 80}px, 0) scale(1.1)`;
-      }
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        if (fgImgRef.current) {
+          const rect = fgImgRef.current.parentElement.getBoundingClientRect();
+          const p = (window.innerHeight - rect.top) / window.innerHeight;
+          // parallax depth effect — płynny dzięki rAF
+          fgImgRef.current.style.transform = `translate3d(0, ${(p - 0.5) * 60}px, 0) scale(1.1)`;
+        }
+      });
     };
     window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    onScroll();
+    return () => { window.removeEventListener("scroll", onScroll); if (raf) cancelAnimationFrame(raf); };
   }, []);
 
   return (
@@ -136,7 +142,7 @@ function Storia({ t, orientation = "horizontal" }) {
         @media (min-width: 1024px) { .storia-intro { grid-template-columns: 1fr 1fr; gap: 96px; align-items: center; margin-bottom: 120px; } }
         
         .storia-image-mask { position: relative; width: 100%; aspect-ratio: 4/5; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.1); cursor: none; }
-        .storia-image-inner { position: absolute; inset: -10%; background: url('/hero-vintage.png') center/cover no-repeat; will-change: transform; transition: transform 0.1s linear; }
+        .storia-image-inner { position: absolute; inset: -10%; background: url('/hero-vintage.png') center/cover no-repeat; will-change: transform; }
 
         .storia-intro-right { display: flex; flex-direction: column; }
         .storia-quote { font-size: clamp(48px, 7vw, 120px); line-height: 0.95; margin: 24px 0 48px; }
@@ -255,19 +261,24 @@ function StoriaArc({ data }) {
       animId = requestAnimationFrame(step);
     };
 
-    // magnetyczne dociąganie do NAJBLIŻSZEJ daty po zatrzymaniu scrolla
+    // magnetyczne dociąganie do NAJBLIŻSZEJ daty — TYLKO gdy scroll całkowicie się zatrzymał
+    let lastY = window.scrollY;
+    let stableCount = 0;
     const doSnap = () => {
       if (snapping) return;
       if (!isPinned()) return; // tylko gdy sekcja przypięta — inaczej blokuje scroll całej strony
+      // upewnij się, że scroll naprawdę stoi (nie momentum) — pozycja niezmienna
+      if (Math.abs(window.scrollY - lastY) > 1) { lastY = window.scrollY; return; }
       const p = computeProgress();
       if (p == null) return;
-      if (p <= 0.001 || p >= 0.84) return; // nie ruszaj na samym początku ani w fazie rozszerzania
+      if (p <= 0.02 || p >= 0.82) return; // nie ruszaj na początku ani w fazie rozszerzania
       const nLocal = data.length;
       const travel = p / 0.84;
       const exactLocal = travel * (nLocal - 1);
       const nearest = Math.max(0, Math.min(nLocal - 1, Math.round(exactLocal)));
       const frac = Math.abs(exactLocal - nearest);
-      if (frac < 0.012) return; // już praktycznie na dacie — nie szarp
+      // dociągaj tylko gdy blisko daty (0.05–0.3) — nie szarpie z daleka, nie przeskakuje
+      if (frac < 0.05 || frac > 0.3) return;
       const targetP = (nearest / (nLocal - 1)) * 0.84;
       const total = sec.offsetHeight - window.innerHeight;
       const secTop = sec.getBoundingClientRect().top + window.scrollY;
@@ -301,7 +312,7 @@ function StoriaArc({ data }) {
         });
       }
       if (snapTimer) clearTimeout(snapTimer);
-      if (!snapping) snapTimer = setTimeout(doSnap, 110);
+      if (!snapping) snapTimer = setTimeout(doSnap, 350);
     };
 
     // SWIPE poziomy jak karuzela: lewo = następna data, prawo = poprzednia
@@ -321,7 +332,7 @@ function StoriaArc({ data }) {
         goToIndex(dx < 0 ? cur + 1 : cur - 1);
       }
     };
-    const onTouchEnd = () => { if (snapTimer) clearTimeout(snapTimer); if (!tMoved && isPinned()) snapTimer = setTimeout(doSnap, 110); };
+    const onTouchEnd = () => { if (snapTimer) clearTimeout(snapTimer); if (!tMoved && isPinned()) snapTimer = setTimeout(doSnap, 350); };
 
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });

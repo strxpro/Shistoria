@@ -196,8 +196,16 @@
 - **Do zrobienia:**
   - [x] Dodać **ceny dań**. (są w `menu-data.js` przy każdej pozycji)
   - [ ] Przeliczenie waluty → **od nowej linii, mniejszą czcionką, w nawiasach**.
-  - [ ] Kliknięcie **numeru alergenu** → pokazuje, którego składnika dotyczy.
-  - ⏳ *Format waluty + interaktywne alergeny — do zrobienia w kolejnej turze (wymaga zmiany `convertPrice` i mapy alergenów).*
+  - [ ] Kliknięcie **numeru alergenu** → pokazuje, którego składnika dotyczy. ⏳ *(do zrobienia — wymaga mapy alergenów)*
+  - [x] Przeliczenie waluty → **od nowej linii, mniejszą czcionką, w nawiasach**. (nowy `convertPriceExtra` → `(≈28 zł)` pod ceną EUR, klasa `.fmenu-row-price-conv`)
+
+> 📌 **Tura poprawek (zgłoszone):**
+> - **Storia teleportacja przy scroll w dół** — snap odpalał się podczas momentum iOS. Teraz snap czeka aż scroll całkowicie stanie (sprawdza stabilność pozycji), debounce 350ms, dociąga tylko blisko daty (frac 0.05–0.3). Bez teleportacji.
+> - **Parallax zdjęcia pod hero trzęsie się** — `transform` był ustawiany na każdym evencie scroll bez rAF + miał `transition 0.1s`. Teraz przez `requestAnimationFrame`, bez transition → płynnie.
+> - **Składniki/tytuły ucięte w menu** — przyczyna: cena z przeliczeniem waluty (`6,00 € ≈28zł`) miała `white-space:nowrap` i rozpychała grid. Rozdzielone: EUR osobno, przeliczenie pod spodem w nawiasach (mniejsze). Media query wierszy rozszerzone 640→768px.
+> - **Box „cuciniamo solo quello"** — wzmocnione ograniczenia (`min-width:0`, `white-space:normal !important`, mniejszy padding) — teraz zawija się i mieści.
+> - **Pasek kategorii auto-chowanie po 2s** bezczynności (timer `idleTimer` → `setNavCollapsed(true)`).
+> - **Tekst „al tavolo"** — dodany `text-wrap: pretty` by uniknąć sierot („Il vino" zostaje razem).
 
 > 📎 *Odpowiada wymaganiom: 5, 6, 7, 8, 9, 10.*
 > 🔗 *C6 (tłumaczenie cen/menu) łączy się z: **N — Tłumaczenia** oraz **L34 — Edytor menu w adminie**.*
