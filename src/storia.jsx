@@ -64,7 +64,14 @@ function LightboxMorph({ pos, onClose }) {
 function Storia({ t, orientation = "horizontal" }) {
   const data = window.STORIA_DATA;
   const [lightboxOpen, setLightboxOpen] = useStateS(false);
+  const [isMobileStoria, setIsMobileStoria] = useStateS(typeof window !== "undefined" && window.innerWidth < 768);
   const fgImgRef = useRefS(null);
+
+  useEffectS(() => {
+    const onR = () => setIsMobileStoria(window.innerWidth < 768);
+    window.addEventListener("resize", onR);
+    return () => window.removeEventListener("resize", onR);
+  }, []);
 
   useEffectS(() => {
     const onScroll = () => {
@@ -108,7 +115,7 @@ function Storia({ t, orientation = "horizontal" }) {
             <div className="storia-meta">
               <div className="storia-meta-row">
                 <span className="storia-num">01 / {String(data.length).padStart(2, "0")}</span>
-                <span className="storia-hint">{orientation === "horizontal" ? t("storia.orientationHorizontal") : t("storia.orientationVertical")}</span>
+                <span className="storia-hint">{(isMobileStoria || orientation !== "horizontal") ? t("storia.orientationVertical") : t("storia.orientationHorizontal")}</span>
               </div>
               <SplitReveal as="h3" className="storia-heading">{t("storia.heading")}</SplitReveal>
             </div>
@@ -210,22 +217,62 @@ function StoriaArc({ data }) {
     const sec = sectionRef.current;
     if (!sec) return;
     let raf = 0;
+    let snapTimer = 0;
+    let snapping = false;
+
+    const computeProgress = () => {
+      const rect = sec.getBoundingClientRect();
+      const total = sec.offsetHeight - window.innerHeight;
+      if (total <= 0) return null;
+      return Math.min(1, Math.max(0, -rect.top / total));
+    };
+
+    // delikatny magnetyczny snap — po zatrzymaniu scrolla dociąga do najbliższej daty
+    const doSnap = () => {
+      if (snapping) return;
+      const p = computeProgress();
+      if (p == null) return;
+      // snap tylko w fazie przewijania kół (nie podczas rozszerzania ostatniego zdjęcia)
+      if (p >= 0.84) return;
+      const nLocal = data.length;
+      const travel = p / 0.84;
+      const exactLocal = travel * (nLocal - 1);
+      const nearest = Math.round(exactLocal);
+      const frac = Math.abs(exactLocal - nearest);
+      // dociągaj tylko gdy jesteśmy wystarczająco blisko (delikatnie), nie w połowie drogi
+      if (frac < 0.04 || frac > 0.46) return;
+      const targetTravel = nearest / (nLocal - 1);
+      const targetP = targetTravel * 0.84;
+      const total = sec.offsetHeight - window.innerHeight;
+      const secTop = sec.getBoundingClientRect().top + window.scrollY;
+      const targetY = Math.round(secTop + targetP * total);
+      snapping = true;
+      window.scrollTo({ top: targetY, behavior: "smooth" });
+      setTimeout(() => { snapping = false; }, 650);
+    };
+
     const onScroll = () => {
       // throttle przez rAF — płynniej, bez skoków
-      if (raf) return;
-      raf = requestAnimationFrame(() => {
-        raf = 0;
-        const rect = sec.getBoundingClientRect();
-        const total = sec.offsetHeight - window.innerHeight;
-        if (total <= 0) return;
-        const p = Math.min(1, Math.max(0, -rect.top / total));
-        setProgress(p);
-      });
+      if (!raf) {
+        raf = requestAnimationFrame(() => {
+          raf = 0;
+          const p = computeProgress();
+          if (p != null) setProgress(p);
+        });
+      }
+      // resetuj licznik bezczynności — snap dopiero gdy scroll się zatrzyma
+      if (snapTimer) clearTimeout(snapTimer);
+      if (!snapping) snapTimer = setTimeout(doSnap, 140);
     };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll);
-    return () => { window.removeEventListener("scroll", onScroll); window.removeEventListener("resize", onScroll); if (raf) cancelAnimationFrame(raf); };
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+      if (snapTimer) clearTimeout(snapTimer);
+    };
   }, [data.length]);
 
   const n = data.length;
