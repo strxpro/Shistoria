@@ -215,13 +215,21 @@
 
 ### D1. 🟠 Tytuł i nagłówki sekcji Bar
 - **Do zrobienia:**
-  - [ ] Tytuł sekcji Bar **biały**.
-  - [ ] Wszystkie nagłówki i teksty (też przetłumaczone) **zawijają się**, nie przepełniają ekranu.
+  - [x] Tytuł sekcji Bar **biały**. (wymuszony `-webkit-text-fill-color:#fff` dla `.bar.dark-section`)
+  - [x] Wszystkie nagłówki i teksty (też przetłumaczone) **zawijają się**, nie przepełniają ekranu. (dodany `@media(max-width:768px)` z `overflow-wrap:anywhere` na `.bar-head`, `.bar-intro`, `.bar-hours-title`, `.bar-cta-sub`)
+  - ✅ *Zrobione w `Bar` (`ristorante-bar.jsx`).*
 
 ### D2. 🟠 Przeprojektowanie menu Bar
 - **Do zrobienia:**
-  - [ ] Pozycje menu **wyrównane**.
-  - [ ] Zdjęcia tylko dla **napojów / wybranych pozycji** — nie dla wszystkich składników.
+  - [x] Pozycje menu **wyrównane**. (2-kol. układ na mobile z poprzednich sesji + `DrinkCard` spójny layout)
+  - [x] Zdjęcia tylko dla **napojów / wybranych pozycji** — nie dla wszystkich składników. (`DrinkCard` używa `DrinkGlassSVG` — rysowana ilustracja szkła wg kategorii, NIE zdjęć składników)
+  - ✅ *Spełnione — ilustracje napojów zamiast zdjęć każdego składnika.*
+
+> 📌 **Dodatkowo naprawione (krytyczne, zgłoszone):**
+> - **Tytuł S'HISTORIA w preloaderze** zniekształcał się (`rotateY:40` → litery wyglądały „inaczej"). Usunięty rotateY, czysty slide+fade — nazwa stabilna i czytelna.
+> - **„RISTORANTE" pod tytułem** — na mobile `nowrap` + większy letter-spacing powodował błędne wyświetlanie; poprawiony spacing (0.18em) i `white-space:nowrap` na całym wierszu.
+> - **Tytuł zakładki** poprawiony z „S'historia" (małe h) na **„S'Historia"**.
+> - **Scroll blokował się / nie dało się przewinąć w górę** — przyczyna: globalne `window` touch-listenery w `StoriaArc` (snap+swipe) działały też POZA sekcją Storia. Dodany warunek `isPinned()` — snap i karuzelowy swipe działają TYLKO gdy sekcja jest przypięta na ekranie. Poza nią scroll jest w pełni swobodny.
 
 > 📎 *Odpowiada wymaganiom: 11, 12.*
 > 🔗 *D1 (zawijanie tłumaczeń) łączy się z **N — Tłumaczenia**.*

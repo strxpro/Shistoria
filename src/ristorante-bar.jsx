@@ -274,6 +274,17 @@ function Bar({ t, dark = true }) {
         .bar-cta { background: var(--grad-sunset); color: #fff; padding: 22px 36px; font-size: 14px; }
         .bar-cta:hover { background: var(--grad-sunset); transform: translateY(-2px); filter: brightness(1.1); }
         .bar-cta-icon { font-size: 16px; }
+        /* mobile: zawijanie nagłówków/tekstów, nic poza ekran */
+        @media (max-width: 768px) {
+          .bar { padding: 80px 0; }
+          .bar-head { margin-bottom: 40px; max-width: 100%; }
+          .bar-head .h2, .bar.dark-section .bar-head .srt { overflow-wrap: anywhere; word-break: break-word; }
+          .bar-intro { font-size: clamp(16px, 4.5vw, 20px); max-width: 100%; overflow-wrap: anywhere; }
+          .bar-hours { padding-top: 48px; margin-top: 48px; gap: 32px; }
+          .bar-hours-title { font-size: clamp(28px, 8vw, 40px); overflow-wrap: anywhere; }
+          .bar-hours-num { font-size: clamp(40px, 12vw, 64px); }
+          .bar-cta-sub { font-size: 18px !important; overflow-wrap: anywhere; }
+        }
       `}</style>
     </section>
   );

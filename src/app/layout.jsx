@@ -1,8 +1,8 @@
 import '../styles.css';
 
 export const metadata = {
-  title: 'S\'historia',
-  description: 'S\'historia - Cocktail Bar Experience',
+  title: "S'Historia",
+  description: "S'Historia · Ristorante & Cocktail Bar — Rena Majore, Sardegna",
 };
 
 export default function RootLayout({ children }) {

@@ -122,18 +122,18 @@ function Preloader({ onDone, t }) {
     if (typeof window !== "undefined") window.addEventListener("cx-scene-ready", onReady, { once: true });
     const cap = setTimeout(() => { ready = true; }, 6000);
 
-    // --- ENTER: letters appear one by one from RIGHT side (dramatic slide + fade) ---
+    // --- ENTER: letters appear one by one from RIGHT side (czysty slide + fade, bez zniekształcania nazwy) ---
     const enterTl = gsap.timeline();
-    enterTl.set(chars, { opacity: 0, x: 80, rotateY: 40 });
-    enterTl.set(subChars, { opacity: 0, y: 30 });
+    enterTl.set(chars, { opacity: 0, x: 40 });
+    enterTl.set(subChars, { opacity: 0, y: 20 });
     // Stagger from last to first (right to left visual appearance)
     enterTl.to(chars, {
-      opacity: 1, x: 0, rotateY: 0, duration: 0.9, stagger: { each: 0.07, from: "end" }, ease: "power3.out",
+      opacity: 1, x: 0, duration: 0.7, stagger: { each: 0.06, from: "end" }, ease: "power3.out",
     }, 0.4);
     // Sub text "ristorante" enters from below, letter by letter
     enterTl.to(subChars, {
-      opacity: 1, y: 0, duration: 0.6, stagger: { each: 0.04, from: "end" }, ease: "power2.out",
-    }, 1.2);
+      opacity: 1, y: 0, duration: 0.5, stagger: { each: 0.04, from: "end" }, ease: "power2.out",
+    }, 1.1);
 
     // --- FILL: wave fills letters from bottom to top (simulated via gradient mask) ---
     // We animate a CSS variable --fill that controls the fill height
@@ -265,9 +265,10 @@ function Preloader({ onDone, t }) {
         @media (max-width: 480px) {
           .pre-char { font-size: clamp(24px, 8vw, 32px); letter-spacing: -0.04em; }
           .pre-char-outline { -webkit-text-stroke-width: 1px; }
-          .pre-sub-char { font-size: 10px; letter-spacing: 0.15em; }
+          .pre-sub-char { font-size: 10px; letter-spacing: 0.18em; }
+          .pre-sub-row { flex-wrap: nowrap; white-space: nowrap; }
           .pre-root { gap: 8px; padding: 0 12px; }
-          .pre-main { flex-wrap: nowrap; }
+          .pre-main { flex-wrap: nowrap; white-space: nowrap; }
         }
         @media (max-width: 380px) {
           .pre-char { font-size: 22px; }

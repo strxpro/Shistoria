@@ -229,6 +229,13 @@ function StoriaArc({ data }) {
       return Math.min(1, Math.max(0, -rect.top / total));
     };
 
+    // czy sekcja jest realnie przypięta na ekranie (sticky aktywne)?
+    // tylko wtedy snap/swipe mają prawo działać — inaczej blokowałyby scroll całej strony
+    const isPinned = () => {
+      const rect = sec.getBoundingClientRect();
+      return rect.top <= 1 && rect.bottom >= window.innerHeight - 1;
+    };
+
     // własna, płynna animacja scrolla (easeOutCubic) — bez teleportacji, czas zależny od dystansu
     const animateTo = (targetY) => {
       cancelAnimationFrame(animId);
@@ -251,9 +258,10 @@ function StoriaArc({ data }) {
     // magnetyczne dociąganie do NAJBLIŻSZEJ daty po zatrzymaniu scrolla
     const doSnap = () => {
       if (snapping) return;
+      if (!isPinned()) return; // tylko gdy sekcja przypięta — inaczej blokuje scroll całej strony
       const p = computeProgress();
       if (p == null) return;
-      if (p >= 0.84) return; // nie ruszaj w fazie rozszerzania ostatniego zdjęcia
+      if (p <= 0.001 || p >= 0.84) return; // nie ruszaj na samym początku ani w fazie rozszerzania
       const nLocal = data.length;
       const travel = p / 0.84;
       const exactLocal = travel * (nLocal - 1);
@@ -303,6 +311,7 @@ function StoriaArc({ data }) {
       tStartX = e.touches[0].clientX; tStartY = e.touches[0].clientY; tMoved = false;
     };
     const onTouchMove = (e) => {
+      if (!isPinned()) return; // poza przypiętą sekcją nie przejmujemy gestu
       const dx = e.touches[0].clientX - tStartX;
       const dy = e.touches[0].clientY - tStartY;
       // poziomy gest dominujący → traktuj jak karuzelę
@@ -312,7 +321,7 @@ function StoriaArc({ data }) {
         goToIndex(dx < 0 ? cur + 1 : cur - 1);
       }
     };
-    const onTouchEnd = () => { if (snapTimer) clearTimeout(snapTimer); if (!tMoved) snapTimer = setTimeout(doSnap, 110); };
+    const onTouchEnd = () => { if (snapTimer) clearTimeout(snapTimer); if (!tMoved && isPinned()) snapTimer = setTimeout(doSnap, 110); };
 
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
