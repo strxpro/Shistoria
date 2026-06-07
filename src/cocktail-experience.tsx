@@ -63,6 +63,13 @@ import { useGSAP } from "@gsap/react";
 
 gsap.registerPlugin(ScrollTrigger);
 
+// Na mobile pasek URL przeglądarki (pojawia/chowa się przy scrollu) zmienia wysokość
+// viewportu → ScrollTrigger przeliczał pin i scena "zatrzymywała się"/pokazywała puste tło.
+// ignoreMobileResize sprawia, że ST ignoruje te zmiany wysokości na urządzeniach dotykowych.
+if (typeof window !== "undefined") {
+  try { ScrollTrigger.config({ ignoreMobileResize: true }); } catch { /* ignore */ }
+}
+
 import { supabase, getSessionId } from "./lib/supabase";
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -4649,7 +4656,7 @@ function CocktailStyles() {
         letter-spacing:0.05em; font-size:clamp(40px,8vw,104px); line-height:1; color:#0E2230; }
 
       .cx-scroll { position:relative; height:600vh; z-index:1; }
-      .cx-stage { position:sticky; top:0; height:100vh; width:100%; overflow:hidden; }
+      .cx-stage { position:sticky; top:0; height:100vh; height:100svh; width:100%; overflow:hidden; }
 
       /* Wyśrodkowany tytuł */
       .cx-title { position:absolute; top:clamp(28px,5vh,60px); left:0; right:0; z-index:6; text-align:center; pointer-events:none; will-change:transform,opacity; padding:0 16px; }

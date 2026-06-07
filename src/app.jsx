@@ -63,27 +63,29 @@ function RiseCard({ children, z = 2, distance = 240, peek = null, peekBg = "line
           }}>{peek}</div>
         </motion.div>
       )}
-      {/* Mobile: animowany peek (Bar / Cocktail) — chowa się/wychyla przy scrollu, zaokrąglone rogi */}
+      {/* Mobile: peek (Bar / Cocktail) — sticky na górze, wysuwa się przy wejściu i chowa gdy mijasz */}
       {peek && isMobile && (
         <motion.div
           aria-hidden="true"
           style={{
-            position: "absolute", left: 0, right: 0, top: 0,
-            pointerEvents: "none", y: peekYMobile, opacity: peekOpacityMobile, zIndex: 3,
+            position: "sticky", top: 0, left: 0, right: 0,
+            pointerEvents: "none", opacity: peekOpacityMobile, zIndex: 5,
+            marginBottom: "-1px",
           }}
         >
           <div style={{
-            width: "100%", padding: "20px 0 16px", textAlign: "center",
+            width: "100%", padding: "16px 0 14px", textAlign: "center",
             background: peekBg, color: peekColor,
             fontFamily: "var(--f-display)", fontWeight: 800,
             letterSpacing: "0.06em", textTransform: "uppercase",
-            fontSize: "clamp(30px, 11vw, 60px)", lineHeight: 1,
-            borderTopLeftRadius: "2.2rem", borderTopRightRadius: "2.2rem",
+            fontSize: "clamp(28px, 10vw, 52px)", lineHeight: 1,
+            borderTopLeftRadius: "1.8rem", borderTopRightRadius: "1.8rem",
+            boxShadow: "0 6px 20px rgba(0,0,0,0.18)",
           }}>{peek}</div>
         </motion.div>
       )}
       {isMobile ? (
-        <div style={{ borderTopLeftRadius: "2.2rem", borderTopRightRadius: "2.2rem", overflow: "hidden", position: "relative" }}>{children}</div>
+        <div style={{ borderTopLeftRadius: "1.8rem", borderTopRightRadius: "1.8rem", overflow: "hidden", position: "relative", marginTop: peek ? "-56px" : 0 }}>{children}</div>
       ) : (
         <motion.div style={{ transform }}>
           {children}
