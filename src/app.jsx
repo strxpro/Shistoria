@@ -59,14 +59,14 @@ function RiseCard({ children, z = 2, distance = 240, peek = null, peekBg = "line
           }}>{peek}</div>
         </motion.div>
       )}
-      {/* Mobile: statyczny baner-nagłówek (Bar / Cocktail) na górze sekcji */}
+      {/* Mobile: statyczny baner-nagłówek (Bar / Cocktail) na górze sekcji — mniejszy, spokojny */}
       {peek && isMobile && (
         <div aria-hidden="true" style={{
-          width: "100%", padding: "18px 0", textAlign: "center",
+          width: "100%", padding: "14px 0", textAlign: "center",
           background: peekBg, color: peekColor,
           fontFamily: "var(--f-display)", fontWeight: 800,
-          letterSpacing: "0.08em", textTransform: "uppercase",
-          fontSize: "clamp(40px, 14vw, 72px)", lineHeight: 1,
+          letterSpacing: "0.06em", textTransform: "uppercase",
+          fontSize: "clamp(26px, 8vw, 46px)", lineHeight: 1,
           borderTopLeftRadius: "1.6rem", borderTopRightRadius: "1.6rem",
         }}>{peek}</div>
       )}

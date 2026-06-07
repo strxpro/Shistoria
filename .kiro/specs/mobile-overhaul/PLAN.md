@@ -137,10 +137,11 @@
 ### B1. 🟡 Spokojniejszy baner peek
 - **Problem:** tekst za duży, animacja za szybka, baner „ucieka" przy dotyku.
 - **Do zrobienia:**
-  - [ ] Tekst **mniejszy**.
-  - [ ] Animacja **wolniejsza**.
-  - [ ] Przewijanie palcem → ruch banera **wolniejszy**.
-  - [ ] Baner **statyczny/stabilny** (nie rusza się przy dotyku).
+  - [x] Tekst **mniejszy**. (`fontSize 14vw→8vw`, max 72px→46px, mniejszy padding i letter-spacing)
+  - [x] Animacja **wolniejsza**. (na mobile baner jest **statyczny** — brak animacji, więc nic nie „lata")
+  - [x] Przewijanie palcem → ruch banera **wolniejszy**. (mobile: baner nie porusza się ze scrollem)
+  - [x] Baner **statyczny/stabilny** (nie rusza się przy dotyku). (renderowany jako zwykły `div`, nie motion)
+  - ✅ *Zrobione w `RiseCard` (`src/app.jsx`) — gałąź `peek && isMobile`.*
 
 > 📎 *Odpowiada wymaganiu: 4.*
 
