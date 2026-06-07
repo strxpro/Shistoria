@@ -61,19 +61,28 @@ function RiseCard({ children, z = 2, distance = 240, peek = null, peekBg = "line
           }}>{peek}</div>
         </motion.div>
       )}
-      {/* Mobile: peek (Bar / Cocktail) — w normalnym flow, chowa się (fade) przy scrollu */}
+      {/* Mobile: peek (Bar / Cocktail) — TEN SAM efekt co desktop: podnosi się, zatrzymuje,
+          a karta (dzieci) nachodzi na niego. Peek wystaje ponad kartę (ujemny top), karta go przykrywa. */}
       {peek && isMobile && (
-        <motion.div aria-hidden="true" style={{
-          width: "100%", padding: "16px 0 14px", textAlign: "center",
-          background: peekBg, color: peekColor, opacity: peekOpacityMobile,
-          fontFamily: "var(--f-display)", fontWeight: 800,
-          letterSpacing: "0.06em", textTransform: "uppercase",
-          fontSize: "clamp(28px, 10vw, 52px)", lineHeight: 1,
-          borderTopLeftRadius: "1.8rem", borderTopRightRadius: "1.8rem",
-        }}>{peek}</motion.div>
+        <motion.div
+          aria-hidden="true"
+          style={{
+            position: "absolute", left: 0, right: 0, top: "-44px",
+            pointerEvents: "none", y: peekY, opacity: peekOpacity, zIndex: 0,
+          }}
+        >
+          <div style={{
+            width: "100%", padding: "18px 0 26px", textAlign: "center",
+            background: peekBg, color: peekColor,
+            fontFamily: "var(--f-display)", fontWeight: 800,
+            letterSpacing: "0.06em", textTransform: "uppercase",
+            fontSize: "clamp(32px, 12vw, 64px)", lineHeight: 1,
+            borderTopLeftRadius: "1.8rem", borderTopRightRadius: "1.8rem",
+          }}>{peek}</div>
+        </motion.div>
       )}
       {isMobile ? (
-        <div>{children}</div>
+        <div style={{ position: "relative", zIndex: 1 }}>{children}</div>
       ) : (
         <motion.div style={{ transform }}>
           {children}

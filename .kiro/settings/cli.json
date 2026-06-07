@@ -1,0 +1,14 @@
+{
+  "chat.modelDefaults": {
+    "claude-opus-4.8": {
+      "output_config": {
+        "effort": "max"
+      },
+      "thinking": {
+        "type": "adaptive",
+        "display": "summarized"
+      },
+      "max_tokens": 128000
+    }
+  }
+}
