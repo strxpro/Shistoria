@@ -745,3 +745,54 @@
 **Następny krok:** po zatwierdzeniu planu → tworzymy `design.md` (architektura techniczna: schemat DB, komponenty, integracje), potem `tasks.md` (lista zadań do odhaczania) i ruszamy **Fazą 1**.
 
 </div>
+
+
+---
+
+<div align="center">
+
+## ✅ POSTĘP PRAC — LOG ZMIAN (do sprawdzenia)
+
+</div>
+
+| # | Co zrobione | Status | Commit |
+|:-:|:-----------|:------:|:------:|
+| 1 | Storia: tekst nawigacji, magnetyczny snap, klik w datę, swipe karuzela | ✅ | 5d748da–fb974e9 |
+| 2 | Marquee składników: mniejszy, wolniejszy, prawdziwe składniki z dań | ✅ | 6199b17–2464c44 |
+| 3 | Ristorante: MobileFullMenu (składniki się zawijają, cuciniamo mieści się, pill kategorii, miniaturki) | ✅ | 08a1edd–18a0310 |
+| 4 | Ristorante: tytuł "Al tavolo" + tekst o winie/rybie (6 języków) | ✅ | c766fc6 |
+| 5 | Bar: MobileDrinksList (karty ze zdjęciami/lista alkoholi), godziny 12-14:30/19-23, CTA→kontakt | ✅ | 03f5d13 |
+| 6 | Nawigacja: hamburger linki od lewej, peek Bar/Cocktail z efektem nachodzenia karty | ✅ | 682067d |
+| 7 | Kreator E1: lokalny decoder Draco + frameloop=always → modele ładują się na mobile | ✅ | 394aa00–5f47ab7 |
+| 8 | Kreator E2/E3: panel Spirits jak mixery, etykieta MOC z emoji, równa wysokość kategorii | ✅ | 0aa8d4a–b882b85 |
+| 9 | Kreator E4: strumień do ŚRODKA shakera (niewidoczny za ściankami), wydłużony | ✅ | dcf5f18–bf6f42a |
+| 10 | Kreator E6: obrót shakera (nie pokoju) z bezwładnością + powrotem | ✅ | b882b85 |
+| 11 | Kreator E7: shaker WIDOCZNY podczas shake (fix czarnego ekranu) — shakerTop visible + blokada applyExit | ✅ | 220b32c |
+| 12 | Kreator E8: szklanki wyśrodkowane na mobile (96vw, grid 1fr 1fr) | ✅ | bf6f42a |
+| 13 | Kreator E9: krzyżyk stały w prawym rogu drawer, komunikat "2 składniki" pod sliderem | ✅ | 1f8998f–2ad3a60 |
+| 14 | Kreator: modele 3D butelek NA MOBILE (max 3 jednocześnie, IntersectionObserver) | ✅ | 5902ddb |
+| 15 | Kreator: blokada kopiowania (user-select:none) w drawerze butelek | ✅ | 1fa4986 |
+| 16 | Kreator: gauge nie nachodzi na FAB (przesunięta bliżej środka) | ✅ | bf6f42a |
+| 17 | Sekcja F/G: API claimDrink + hook claim() + kolumna claimed_count w Supabase | ✅ | 4af3d12 |
+| 18 | Storia: nie teleportuje przy pasku URL (px zamiast vh, isPinned) | ✅ | 7d3b14f |
+| 19 | Globalnie: .srt/.h2/.h3 zawijają się na mobile (nie wyjeżdżają poza ekran) | ✅ | 7d3b14f–3873d12 |
+| 20 | Preloader: tytuł S'HISTORIA stabilny (bez rotateY), RISTORANTE poprawny | ✅ | a7524ed |
+| 21 | Sekcja "Obsługa": niższe zdjęcie (300px), tytuł zawija się | ✅ | 3873d12 |
+| 22 | .kiro/settings/cli.json: effort=max, thinking=adaptive, max_tokens=128000 | ✅ | 22cb8c7 |
+
+### ⏳ DO ZROBIENIA (następne kroki):
+
+- [ ] Animacja szklanki: widoczny shaker podczas animacji, strumień ze shakera do szklanki, liquid key shapes (napełnianie), kolor cieczy = mix składników
+- [ ] Rozpoznawanie istniejących drinków (Long Island, Gin Tonic itp.) — wyświetlenie nazwy gdy składniki pasują
+- [ ] F/G frontend: przycisk "Odbierz drink" + QR popout + licznik w community
+- [ ] F: double-tap = like (Instagram style), komentarze, share bar
+- [ ] F: featured drink (drink miesiąca/tygodnia) z koroną
+- [ ] H: karuzela wydarzeń (piramida)
+- [ ] I: mapa atrakcji — sync kart przy scrollu, dystans, pin restauracji
+- [ ] J: kontakt — Google Maps iframe, formularz e-mail + WhatsApp
+- [ ] K: komentarze (lokalne + Google)
+- [ ] L: admin — edytor menu, wiadomości (skopiować z gioielleria-main), statystyki (z VillaDea-main)
+- [ ] M: preloader z "1996", hamburger pozycja linków, stopka wyśrodkowana
+- [ ] N: pełne tłumaczenia + geolokalizacja → auto-język
+- [ ] O: integracje make.com / callmebot / Instagram / Facebook (wymaga API od Ciebie)
+
