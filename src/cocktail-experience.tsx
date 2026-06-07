@@ -63,13 +63,6 @@ import { useGSAP } from "@gsap/react";
 
 gsap.registerPlugin(ScrollTrigger);
 
-// Na mobile pasek URL przeglądarki (pojawia/chowa się przy scrollu) zmienia wysokość
-// viewportu → ScrollTrigger przeliczał pin i scena "zatrzymywała się"/pokazywała puste tło.
-// ignoreMobileResize sprawia, że ST ignoruje te zmiany wysokości na urządzeniach dotykowych.
-if (typeof window !== "undefined") {
-  try { ScrollTrigger.config({ ignoreMobileResize: true }); } catch { /* ignore */ }
-}
-
 import { supabase, getSessionId } from "./lib/supabase";
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -4656,7 +4649,7 @@ function CocktailStyles() {
         letter-spacing:0.05em; font-size:clamp(40px,8vw,104px); line-height:1; color:#0E2230; }
 
       .cx-scroll { position:relative; height:600vh; z-index:1; }
-      .cx-stage { position:sticky; top:0; height:100vh; height:100svh; width:100%; overflow:hidden; }
+      .cx-stage { position:sticky; top:0; height:100vh; width:100%; overflow:hidden; }
 
       /* Wyśrodkowany tytuł */
       .cx-title { position:absolute; top:clamp(28px,5vh,60px); left:0; right:0; z-index:6; text-align:center; pointer-events:none; will-change:transform,opacity; padding:0 16px; }
@@ -4721,7 +4714,7 @@ function CocktailStyles() {
       .cx-pill-item { display:flex; align-items:center; gap:8px; font-size:11px; font-weight:600; color:rgba(255,255,255,0.8); letter-spacing:0.02em; }
       .cx-pill-item em { font-style:normal; font-size:10px; color:rgba(255,255,255,0.45); margin-left:auto; }
       .cx-pill-dot-s { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
-      .cx-cat { position:relative; display:flex; align-items:center; gap:14px; padding:13px 14px; cursor:pointer; text-align:left; color:#fff;
+      .cx-cat { position:relative; display:flex; align-items:center; gap:14px; padding:13px 14px; cursor:pointer; text-align:left; color:#fff; flex:0 0 auto;
         border-radius:16px; background:linear-gradient(135deg, color-mix(in srgb, var(--cat-c,#888) 14%, #15171c), #111216); border:1px solid rgba(255,255,255,0.09);
         box-shadow:0 10px 26px rgba(0,0,0,0.32); transition:transform .3s cubic-bezier(.2,.8,.2,1), background .3s, border-color .3s, box-shadow .3s; overflow:hidden; }
       .cx-cat::before { content:""; position:absolute; left:0; top:0; bottom:0; width:4px; background:var(--cat-c,var(--cx-accent,#E8927C)); opacity:0.65; transition:opacity .3s, width .3s; }
@@ -5277,9 +5270,10 @@ function CocktailStyles() {
         .cx-menu[data-align="right"] .cx-cat { flex-direction:row; text-align:left; }
         .cx-menu[data-align="right"] .cx-cat::before { left:0; right:auto; }
         .cx-menu[data-align="right"] .cx-back { align-self:flex-start; }
-        /* panel kategorii — wspólna wysokość/scroll dla obu stron */
+        /* panel kategorii — wspólna wysokość/scroll dla obu stron; kategorie NIE ściskają się */
         .cx-menu-panel { max-height:72vh; overflow-y:auto; -webkit-overflow-scrolling:touch; }
-        .cx-cats { max-height:none; overflow:visible; }
+        .cx-cats { max-height:none; overflow:visible; flex:0 0 auto; }
+        .cx-cats .cx-cat { flex:0 0 auto; min-height:62px; }
 
         /* Drag indicator na górze bottom sheet */
         .cx-menu-panel::before { content:""; display:block; width:40px; height:4px; border-radius:2px;
