@@ -70,8 +70,10 @@ import { supabase, getSessionId } from "./lib/supabase";
  * ──────────────────────────────────────────────────────────────────────── */
 // Bazowy URL modeli 3D. Domyślnie pliki lokalne z /public; można przełączyć na
 // Supabase Storage (CDN) ustawiając NEXT_PUBLIC_MODELS_URL na adres bucketa "model".
-// Przykład: https://slatelpipxtqveydgslc.supabase.co/storage/v1/object/public/model
-const MODELS_BASE = (process.env.NEXT_PUBLIC_MODELS_URL || "").replace(/\/$/, "");
+// Sanityzacja: usuwamy końcowy "/", a jeśli ktoś przez pomyłkę wskazał konkretny
+// plik (".../model/puszka.glb"), odcinamy go do samego folderu (".../model").
+const _rawModelsBase = (process.env.NEXT_PUBLIC_MODELS_URL || "").trim().replace(/\/+$/, "");
+const MODELS_BASE = _rawModelsBase.replace(/\/[^/]+\.glb$/i, "");
 const modelUrl = (file: string) => MODELS_BASE ? `${MODELS_BASE}/${file}` : `/${file}`;
 
 const BOTTLE_URL = modelUrl("WINOILIKIERY.glb");       // wina + likiery (wino, Etykieta, Liquid, Cylinder)

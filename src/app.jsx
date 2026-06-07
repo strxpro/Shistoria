@@ -265,8 +265,7 @@ export default function App() {
             <div style={{minHeight:"60vh",display:"flex",alignItems:"center",justifyContent:"center",background:"var(--c-deep)",color:"#fff",textAlign:"center",padding:"32px"}}>
               <div style={{maxWidth:"600px"}}>
                 <p style={{fontFamily:"var(--f-display)",fontWeight:800,fontSize:"24px",marginBottom:"12px"}}>Cocktail Maker</p>
-                <p style={{opacity:0.7,fontSize:"13px",marginBottom:"16px"}}>Errore caricamento 3D. Dettaglio (mostralo allo sviluppatore):</p>
-                <pre style={{textAlign:"left",whiteSpace:"pre-wrap",wordBreak:"break-word",fontSize:"11px",lineHeight:1.5,background:"rgba(255,255,255,0.08)",padding:"14px",borderRadius:"10px",color:"#ffd0c0",overflow:"auto",maxHeight:"40vh"}}>{msg}{stack ? "\n\n" + stack : ""}</pre>
+                <p style={{opacity:0.7,fontSize:"14px"}}>Esperienza 3D temporaneamente non disponibile.</p>
               </div>
             </div>
           )}>
