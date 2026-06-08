@@ -819,7 +819,7 @@
 - [x] Pop-out "zrobiłeś drink": na środku, BEZ filmiku, 2 opcje (Wybierz ten → QR / Kontynuuj → film) ✅ *(DrinkFound przebudowany na modal z overlay+blur, 2 przyciski, krzyżyk, dismiss klik-poza)*
 - [ ] Pop-out "odbierz drink": opacity 100%, nie przeskakuje, dismiss klik-poza, krzyżyk, tło blur+blokada scroll
 - [ ] QR trafia do zakładki opcji (po prawej, gdzie szklanka) — łatwy dostęp
-- [ ] Nazwy w boksach butelek mniejsze, pigułki w prawym górnym rogu
+- [x] Nazwy w boksach butelek mniejsze, pigułki w prawym górnym rogu ✅ *(mobile: cx-bcard-name 8.5px, cx-bcard-tag/count kompaktowe top:7px, ukryty cx-bcard-add)*
 - [ ] Szpary/luki w UI (hamburger menu, odstępy) — wyrównanie
 - [x] Scroll-do-shakera przy wejściu z menu ✅ *(onSelectSection w app.jsx — cocktail-rise ląduje w fazie hold, shaker wycentrowany)*
 - [x] Wyszukiwarka lupa na mobile (w drawerze) ✅ *(przycisk 🔍 w cx-drop-row + pasek wyszukiwania z wynikami i cross-panel hint)*

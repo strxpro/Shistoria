@@ -5922,6 +5922,13 @@ function CocktailStyles() {
           overflow-x:hidden; overflow-y:auto; max-height:42vh; padding:4px 2px 8px; touch-action:pan-y;
           -webkit-overflow-scrolling:touch; overscroll-behavior-y:contain; scroll-snap-type:none; }
         .cx-car-scroll > .cx-bcard { flex:initial; width:auto; min-width:0; height:200px; scroll-snap-align:none; }
+        /* mobile: mniejsze nazwy butelek + kompaktowe pigułki w prawym górnym rogu */
+        .cx-bcard { padding:12px 8px 12px; }
+        .cx-bcard-name { font-size:8.5px; line-height:1.1; min-height:2.2em; letter-spacing:0.01em; }
+        .cx-bcard-ml { font-size:11px; }
+        .cx-bcard-tag { top:7px; right:7px; left:auto; padding:2px 7px; font-size:9px; letter-spacing:0.03em; border-radius:999px; }
+        .cx-bcard-count { top:7px; left:7px; min-width:18px; height:18px; padding:0 5px; font-size:9px; }
+        .cx-bcard-add { display:none; }
         /* separatory grup w trybie Tutti zajmują pełną szerokość siatki */
         .cx-car-scroll > .cx-car-group-sep { grid-column:1 / -1; }
         .cx-drop + .cx-drop { margin-top:0; }
