@@ -1741,16 +1741,16 @@ function CocktailExperience() {
         document.body.style.overflow = "";
       },
     });
-    tl.to(top.position, { y: restY, duration: 0.3, ease: "power4.in" }, 0)
-      .to(api.shakerRoot.position, { y: CONFIG.shakerRest.y - 0.14, duration: 0.08, ease: "power2.out" }, 0.3)
-      .to(api.shakerRoot.position, { y: CONFIG.shakerRest.y, duration: 0.5, ease: "elastic.out(1,0.35)" }, 0.38);
+    tl.to(top.position, { y: restY, duration: 0.2, ease: "power4.in" }, 0)
+      .to(api.shakerRoot.position, { y: CONFIG.shakerRest.y - 0.1, duration: 0.06, ease: "power2.out" }, 0.2)
+      .to(api.shakerRoot.position, { y: CONFIG.shakerRest.y, duration: 0.35, ease: "elastic.out(1,0.4)" }, 0.26);
 
     const jitter = gsap.timeline();
-    for (let i = 0; i < 7; i++) jitter.to(api.shakerRoot.rotation, { z: (i % 2 === 0 ? 1 : -1) * deg(10), duration: 0.08, ease: "power1.inOut" });
-    jitter.to(api.shakerRoot.rotation, { z: 0, duration: 0.12 });
-    tl.add(jitter, 0.7);
+    for (let i = 0; i < 5; i++) jitter.to(api.shakerRoot.rotation, { z: (i % 2 === 0 ? 1 : -1) * deg(8), duration: 0.06, ease: "power1.inOut" });
+    jitter.to(api.shakerRoot.rotation, { z: 0, duration: 0.08 });
+    tl.add(jitter, 0.5);
 
-    tl.to(top.position, { y: restY + lift, duration: 0.5, ease: "power2.out" }, "+=0.12");
+    tl.to(top.position, { y: restY + lift, duration: 0.35, ease: "power2.out" }, "+=0.08");
   }, [poured.length]);
 
   /* wybór szklanki → stary shaker odjeżdża za ekran, potem odpala się PRAWDZIWA
@@ -5273,6 +5273,11 @@ function CocktailStyles() {
         /* gauge nie nachodzi na FAB — niższa, bliżej środka */
         .cx-gauge { left:calc(50% - min(80px, 18vw)) !important; top:50% !important; height:min(32vh, 240px) !important; }
         .cx-gauge-right { right:calc(50% - min(80px, 18vw)) !important; left:auto !important; }
+        /* przycisk reset widoczny na mobile — góra-prawo */
+        .cx-reset-top { position:fixed !important; top:calc(16px + env(safe-area-inset-top)); right:16px; z-index:42; align-self:auto !important;
+          padding:10px 16px !important; font-size:11px !important; background:rgba(14,11,14,0.75) !important; backdrop-filter:blur(8px);
+          border:1px solid rgba(255,255,255,0.18) !important; box-shadow:0 6px 20px rgba(0,0,0,0.4); }
+        body:not([data-cx-section="creator"]) .cx-reset-top { display:none !important; }
         .cx-slide-wrap { display:block; position:fixed; left:50%; bottom:calc(72px + env(safe-area-inset-bottom));
           transform:translateX(-50%); width:min(70vw,290px); z-index:41; pointer-events:auto; }
         .cx-slide { position:relative; width:100%; height:60px; border-radius:999px; overflow:hidden;
