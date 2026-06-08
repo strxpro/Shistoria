@@ -1401,9 +1401,9 @@ function Scene({
 
     if (sh && drag.current.follow) {
       if (drag.current.active) {
-        // podczas chwytu SZEJKER stoi w miejscu (rusza się tło). Trzymamy go w spoczynku.
+        // podczas chwytu — shaker obraca się wg drag.spinY (handler move ustawia sh.rotation.y)
+        // NIE resetujemy rotation.y! Tylko stabilizujemy pozycję i inne osie.
         sh.rotation.x += (0 - sh.rotation.x) * 0.16;
-        sh.rotation.y += (0 - sh.rotation.y) * 0.16;
         sh.rotation.z += (deg(CONFIG.shakerRestTilt) - sh.rotation.z) * 0.16;
         sh.position.x += (CONFIG.shakerRest.x - sh.position.x) * 0.12;
         sh.position.y += (CONFIG.shakerRest.y - sh.position.y) * 0.12;
@@ -1949,6 +1949,8 @@ function CocktailExperience() {
         onLeave: () => { if (typeof document !== "undefined") delete document.body.dataset.cxScrolling; },
         onLeaveBack: () => { if (typeof document !== "undefined") delete document.body.dataset.cxScrolling; },
         onUpdate: (self) => {
+          // GUARD: gdy trwa animacja shake/pour/glass → nie ruszaj pozycji shakera/UI
+          if (busyRef.current) return;
           const p = self.progress;
           // Na mobile cała animacja wjazdu szejkera dzieje się w przypiętym scrollu (stabilnie,
           // bez przeskoku między triggerami). enterEnd dłuższy → wjazd jest widoczny podczas scrollu.
