@@ -631,7 +631,7 @@ function Recensioni({ t }) {
 
 // ─── Contatti ─────────────────────────────────────────────────────────────────
 function Contatti({ t }) {
-  const [form, setForm] = useStateE({ name: "", email: "", phone: "", date: "", people: 2, message: "", language: "it" });
+  const [form, setForm] = useStateE({ name: "", email: "", phone: "", date: "", people: 2, message: "" });
   const [submitted, setSubmitted] = useStateE(false);
   const [errors, setErrors] = useStateE({});
 
@@ -645,7 +645,9 @@ function Contatti({ t }) {
     setErrors(err);
     if (Object.keys(err).length > 0) return;
 
-    // Zapisz do Supabase (lokalna kopia)
+    const lang = (typeof window !== "undefined" && window.currentLanguage) || "it";
+
+    // Zapisz do Supabase
     try {
       const { createClient } = await import("@supabase/supabase-js");
       const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://slatelpipxtqveydgslc.supabase.co';
@@ -658,20 +660,29 @@ function Contatti({ t }) {
         date: form.date || null,
         people: form.people,
         message: form.message || null,
-        language: form.language || (window.currentLanguage || "it"),
+        language: lang, // auto-wykryty język klienta
       });
     } catch (err2) { console.error("Contact save error:", err2); }
 
-    // Webhook make.com (jeśli skonfigurowany) — wysyła dane formularza do automatyzacji
+    // Webhook make.com (e-mail do właściciela po IT + do klienta w jego języku)
     const webhookUrl = typeof window !== "undefined" && window.__MAKECOM_CONTACT_WEBHOOK;
     if (webhookUrl) {
       try {
         await fetch(webhookUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...form, source_language: window.currentLanguage || "it", timestamp: new Date().toISOString() }),
+          body: JSON.stringify({ ...form, source_language: lang, timestamp: new Date().toISOString() }),
         });
       } catch (err3) { console.error("Webhook error:", err3); }
+    }
+
+    // WhatsApp callmebot (powiadomienie właściciela) — jeśli skonfigurowany
+    const cmb = typeof window !== "undefined" && window.__CALLMEBOT;
+    if (cmb && cmb.phone && cmb.apikey) {
+      try {
+        const msg = encodeURIComponent(`Nuova prenotazione S'Historia:\n${form.name} (${lang})\n${form.email} ${form.phone}\n${form.people} pers. ${form.date}\n${form.message || ""}`);
+        await fetch(`https://api.callmebot.com/whatsapp.php?phone=${cmb.phone}&text=${msg}&apikey=${cmb.apikey}`, { mode: "no-cors" });
+      } catch (err4) { console.error("WhatsApp error:", err4); }
     }
 
     setSubmitted(true);
@@ -752,17 +763,6 @@ function Contatti({ t }) {
                       <span>{form.people}</span>
                       <button type="button" onClick={() => setForm((f) => ({ ...f, people: Math.min(20, f.people + 1) }))}>+</button>
                     </div>
-                  </div>
-                  <div className="field">
-                    <label>{t("contatti.fields.language")}</label>
-                    <select value={form.language} onChange={upd("language")}>
-                      <option value="it">Italiano</option>
-                      <option value="en">English</option>
-                      <option value="pl">Polski</option>
-                      <option value="de">Deutsch</option>
-                      <option value="fr">Français</option>
-                      <option value="es">Español</option>
-                    </select>
                   </div>
                   <div className="field" style={{ gridColumn: "1 / -1" }}>
                     <label>{t("contatti.fields.message")}</label>
