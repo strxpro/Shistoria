@@ -1111,7 +1111,11 @@ function InSceneGlassPour({ url, withIce, color, onReveal, onDone, onModelReady 
   const { invalidate } = useThree();
   const cloned = useMemo(() => scene.clone(true), [scene]);
   const { actions, mixer } = useAnimations(animations, rootRef);
-  const liquidMesh = useMemo(() => (cloned.getObjectByName("liguid") || cloned.getObjectByName("liquid") || cloned.getObjectByName("Liquid") || cloned.getObjectByName("LIQUID")) as THREE.Mesh | null, [cloned]);
+  const liquidMesh = useMemo((): THREE.Mesh | null => {
+    let found: THREE.Mesh | null = null;
+    cloned.traverse((o) => { if (!found && (o as THREE.Mesh).isMesh && /^li[gq]uid/i.test(o.name)) found = o as THREE.Mesh; });
+    return found;
+  }, [cloned]);
   const onModelReadyRef = useRef(onModelReady);
   onModelReadyRef.current = onModelReady; // stabilne — bez re-runów efektu
   const colorRefLocal = useRef(color);
@@ -5587,8 +5591,12 @@ function CocktailStyles() {
         /* ALE: prezent/QR (glassReady) w portalu na mobile */
         .cx-table { display:none !important; }
         .cx-table-desktop { display:none !important; }
-        .cx-table-mobile-portal { position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom)); width:min(360px, 88vw); z-index:9990; transform:translateX(-50%); pointer-events:auto; text-align:center; color:#fff; }
-        .cx-table-mobile-portal.is-gift { background:transparent; }
+        .cx-table-mobile-portal { position:fixed; inset:0; z-index:9990; display:flex; flex-direction:column; align-items:center; justify-content:flex-end;
+          padding:16px 16px calc(24px + env(safe-area-inset-bottom)); pointer-events:none; color:#fff; }
+        .cx-table-mobile-portal > * { pointer-events:auto; width:min(380px, 92vw); max-height:70vh; overflow-y:auto; border-radius:22px;
+          background:rgba(12,20,30,0.95); border:1px solid rgba(255,255,255,0.1); backdrop-filter:blur(16px); padding:20px; box-shadow:0 24px 64px rgba(0,0,0,0.5); }
+        .cx-table-mobile-portal.is-gift { justify-content:center; }
+        .cx-table-mobile-portal.is-gift > * { background:transparent; border:none; box-shadow:none; backdrop-filter:none; overflow:visible; padding:0; }
 
         /* LayerBar — pionowy pasek warstw po lewej — NIŻEJ żeby nie nachodzić na FAB */
         .cx-layerbar { position:fixed; left:14px; top:auto; bottom:calc(140px + env(safe-area-inset-bottom)); transform:none; z-index:43;
