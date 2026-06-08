@@ -2341,6 +2341,12 @@ function MiniBottleModel({ id, name, color, hovered, playing, sustaining }: { id
         });
         mesh.material = lm;
       }
+      // FALLBACK: puszka metalBody — nierozpoznany mesh (nie liquid/cork) → nałóż owijkę
+      else if (model.metalBody && !inList(mesh.name, model.liquid) && !inList(mesh.name, model.cork)) {
+        mesh.material = new THREE.MeshStandardMaterial({
+          color: "#ffffff", map: makeCanTexture(name, color), roughness: 0.32, metalness: 0.5,
+        });
+      }
     });
     // Fallback: jeśli model nie ma mesha z nazwą etykiety, stwórz płaszczyzną-etykietę
     if (!labelFound && model.label.length > 0) {
@@ -2811,9 +2817,9 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
     if (outer.current) {
       const ox = outer.current.position.x;
       const oy = outer.current.position.y;
-      // Jeśli neck jest zbyt daleko od outer (>2 jedn.) — resetuj do pozycji bliżej otworu
-      if (Math.abs(_neck.x - ox) > 2.0 || Math.abs(_neck.y - oy) > 2.5) {
-        _neck.set(ox + (side === "left" ? 0.3 : -0.3), oy - 0.4, outer.current.position.z);
+      // Jeśli neck jest zbyt daleko od outer (>1.2 jedn.) — resetuj do pozycji bliżej otworu
+      if (Math.abs(_neck.x - ox) > 1.2 || Math.abs(_neck.y - oy) > 1.8) {
+        _neck.set(ox + (side === "left" ? 0.4 : -0.4), oy - 0.3, outer.current.position.z);
       }
     }
 
