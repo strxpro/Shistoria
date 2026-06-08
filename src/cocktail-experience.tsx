@@ -1540,15 +1540,12 @@ function Scene({
           />
         )}
       </Suspense>
-      {/* Environment (HDR) — TYLKO desktop (na mobile GPU nie daje rady → Context Lost) */}
-      {typeof window !== "undefined" && window.innerWidth >= 768 && (
-        <Suspense fallback={null}>
-          <Environment preset="city" />
-        </Suspense>
-      )}
-      {typeof window !== "undefined" && window.innerWidth >= 768 && (
-        <ContactShadows position={[0, -3.48, 0]} opacity={0.55} scale={14} blur={2.2} far={6} color="#000" />
-      )}
+      {/* Environment (HDR) — przywrócone (światło było zepsute bez HDR).
+          Crash był od mini-canvas butelek, nie od HDR — te są teraz SVG na mobile. */}
+      <Suspense fallback={null}>
+        <Environment preset="city" />
+      </Suspense>
+      <ContactShadows position={[0, -3.48, 0]} opacity={0.55} scale={14} blur={2.2} far={6} color="#000" />
     </>
   );
 }
@@ -2271,7 +2268,7 @@ function CocktailExperience() {
         </div>
 
         {/* DÓŁ-ŚRODEK — prezent → formularz (wewnątrz sticky-stage, NIE portal/sticky) */}
-        <div ref={tableRef} className={`cx-table ${(glassPourOpen && !glassFilled) || (stage !== "glassReady" && poured.length === 0) ? "is-hidden" : ""} ${stage === "glassReady" && !claimed ? "is-gift" : ""}`}>
+        <div ref={tableRef} className={`cx-table ${(glassPourOpen && !glassFilled) || (stage !== "glassReady" && poured.length === 0) ? "is-hidden" : ""} ${stage === "glassReady" && !claimed ? "is-gift" : ""} ${stage === "glassReady" && claimed ? "cx-table-glassready" : ""}`}>
           {stage === "glassReady" ? (
             claimed ? (
               <NameCard color={mixedColor} drinkName={drinkName} setDrinkName={setDrinkName}
@@ -3444,7 +3441,7 @@ function LazyBottle3D({ id, name, color, shape, ml, real }: { id: string; name: 
  * HoldTimer — circular progress indicator (2 seconds) around bottle card.
  * When user holds for 2s, triggers pouring. Shows thick ring timer.
  * ──────────────────────────────────────────────────────────────────────── */
-const HOLD_DURATION = 1200; // ms — po tym czasie zaczyna lać (szybsze na mobile)
+const HOLD_DURATION = 1500; // ms — przytrzymaj 1.5s żeby zaczęło lać
 
 /* Wielojęzyczny napis nalewania (wg window.currentLanguage) */
 function getPourLabel(): string {
@@ -3522,7 +3519,7 @@ function BottleCard({
   const [holdActive, setHoldActive] = useState(false);
   const [holdPos, setHoldPos] = useState({ x: 0, y: 0 });
   const btnRef = useRef<HTMLButtonElement>(null!);
-  const holdRef = useRef<{ raf: number | null; startTime: number; fired: boolean; cx: number; cy: number }>({ raf: null, startTime: 0, fired: false, cx: 0, cy: 0 });
+  const holdRef = useRef<{ raf: number | null; startTime: number; fired: boolean; cx: number; cy: number; showRingTimer?: number }>({ raf: null, startTime: 0, fired: false, cx: 0, cy: 0 });
   const playTimerRef = useRef<number | null>(null);
 
   // odpal natywną animację butelki (korek/butelka/ciecz) i auto-reset po jej czasie
@@ -3547,6 +3544,7 @@ function BottleCard({
 
   const cancelHold = () => {
     if (holdRef.current.raf) { cancelAnimationFrame(holdRef.current.raf); holdRef.current.raf = null; }
+    if (holdRef.current.showRingTimer) { clearTimeout(holdRef.current.showRingTimer); holdRef.current.showRingTimer = undefined; }
     setHoldActive(false);
     setHoldProgress(0);
     if (!holdRef.current.fired) window.dispatchEvent(new Event("cx-hold-end")); // schowaj kółko (gdy nie odpalono lania)
@@ -3565,8 +3563,13 @@ function BottleCard({
     setHoldPos({ x: bx, y: by });
     setHoldActive(true);
     setHoldProgress(0);
-    // pokaż kółko VERSA w punkcie dotknięcia (ważne na telefonie — brak pointermove)
-    window.dispatchEvent(new CustomEvent("cx-hold-start", { detail: { x: clientX, y: clientY } }));
+    // Kółko VERSA pokazuje się dopiero po 280ms (szybki tap NIE pokazuje kółka)
+    const showRingDelay = window.setTimeout(() => {
+      if (!holdRef.current.fired) {
+        window.dispatchEvent(new CustomEvent("cx-hold-start", { detail: { x: clientX, y: clientY } }));
+      }
+    }, 280);
+    holdRef.current.showRingTimer = showRingDelay;
 
     const tick = () => {
       const elapsed = Date.now() - holdRef.current.startTime;
@@ -5147,8 +5150,9 @@ function CocktailStyles() {
       .cx-bcard-art { width:100%; flex:1 1 auto; min-height:0; display:flex; align-items:center; justify-content:center; }
       .cx-bcard-art .cx-rb { width:60%; height:auto; max-height:100%; filter:drop-shadow(0 4px 12px rgba(0,0,0,0.4)); }
       .cx-mini-canvas { width:100% !important; height:100% !important; display:block; pointer-events:none; }
-      .cx-bcard-name { font-size:11px; font-weight:800; line-height:1.15; letter-spacing:0.03em; text-transform:uppercase;
-        text-shadow:0 1px 3px rgba(0,0,0,0.5); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%; padding:0 2px; }
+      .cx-bcard-name { font-size:10px; font-weight:800; line-height:1.15; letter-spacing:0.02em; text-transform:uppercase;
+        text-shadow:0 1px 3px rgba(0,0,0,0.5); overflow:hidden; max-width:100%; padding:0 2px;
+        display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; text-align:center; min-height:2.3em; }
       .cx-bcard-ml { font-family:var(--f-serif,"Instrument Serif",serif); font-style:italic; font-size:13px; color:var(--cx-accent,#E8927C); }
       .cx-bcard-add { position:absolute; bottom:12px; right:12px; width:24px; height:24px; display:grid; place-items:center; border-radius:50%;
         background:var(--cx-accent,#E8927C); color:#fff; font-size:15px; opacity:0; transition:all .25s; box-shadow:0 6px 16px rgba(232,146,124,0.5); }
@@ -5717,10 +5721,11 @@ function CocktailStyles() {
         .cx-drop-opt.active { background:rgba(232,146,124,0.16); color:#fff; }
         .cx-drop-cnt { margin-left:auto; font-size:11px; opacity:0.55; }
 
-        /* tabela "nel bicchiere" — na mobile: absolute wewnątrz sticky-stage (NIE fixed/portal) */
-        .cx-table { position:absolute !important; left:50% !important; bottom:calc(20px + env(safe-area-inset-bottom)) !important;
-          transform:translateX(-50%) !important; width:min(360px, 90vw) !important; z-index:50 !important; pointer-events:auto !important; display:block !important; }
-        .cx-table.is-hidden { opacity:0 !important; pointer-events:none !important; transform:translateX(-50%) translateY(20px) !important; }
+        /* tabela "nel bicchiere" — na mobile UKRYTA podczas build (jest LayerBar) */
+        /* Widoczna TYLKO w glassReady (prezent/formularz/QR) */
+        .cx-table { display:none !important; }
+        .cx-table.is-gift, .cx-table.cx-table-glassready { position:absolute !important; left:50% !important; bottom:calc(20px + env(safe-area-inset-bottom)) !important; transform:translateX(-50%) !important;
+          width:min(360px, 90vw) !important; z-index:50 !important; pointer-events:auto !important; display:block !important; }
         .cx-table.is-gift { background:transparent !important; border-color:transparent !important; box-shadow:none !important; }
 
         /* LayerBar — pionowy pasek warstw po lewej — NIŻEJ żeby nie nachodzić na FAB */

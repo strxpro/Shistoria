@@ -23,6 +23,7 @@ function MobileFullMenu() {
   const [dishPopout, setDishPopout] = useStateM(null);
   const [catSheet, setCatSheet] = useStateM(false);
   const [pillVisible, setPillVisible] = useStateM(false);
+  const sheetTouch = useRefM(null);
 
   // Gdy pill categories widoczny LUB sheet otwarty → hamburger w prawo
   useEffectM(() => {
@@ -160,7 +161,19 @@ function MobileFullMenu() {
       {/* bottom sheet z kategoriami — wysuwa się z dołu */}
       {catSheet && (
         <div className="mfm-sheet-overlay" onClick={() => setCatSheet(false)}>
-          <div className="mfm-sheet" onClick={(e) => e.stopPropagation()}>
+          <div className="mfm-sheet" onClick={(e) => e.stopPropagation()}
+            onTouchStart={(e) => { sheetTouch.current = { y: e.touches[0].clientY, dy: 0 }; }}
+            onTouchMove={(e) => {
+              if (!sheetTouch.current) return;
+              const dy = e.touches[0].clientY - sheetTouch.current.y;
+              if (dy > 0) { sheetTouch.current.dy = dy; e.currentTarget.style.transform = `translateY(${dy}px)`; }
+            }}
+            onTouchEnd={(e) => {
+              const dy = sheetTouch.current?.dy || 0;
+              e.currentTarget.style.transform = "";
+              sheetTouch.current = null;
+              if (dy > 80) setCatSheet(false); // pociągnięcie w dół > 80px → zamknij
+            }}>
             <div className="mfm-sheet-handle" />
             <span className="mfm-sheet-title">Categorie</span>
             <div className="mfm-sheet-list">
@@ -255,9 +268,9 @@ function MobileFullMenu() {
         .mfm-pill.show { transform: translate(-50%, 0); opacity: 1; }
         .mfm-pill-icon { font-size: 16px; }
         /* bottom sheet */
-        .mfm-sheet-overlay { position: fixed; inset: 0; z-index: 210; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); display: flex; align-items: flex-end; animation: mfmFade .2s ease; }
+        .mfm-sheet-overlay { position: fixed; inset: 0; z-index: 3000; background: rgba(0,0,0,0.4); backdrop-filter: blur(4px); display: flex; align-items: flex-end; animation: mfmFade .2s ease; }
         @keyframes mfmFade { from { opacity: 0; } to { opacity: 1; } }
-        .mfm-sheet { width: 100%; background: #fff; border-radius: 24px 24px 0 0; padding: 12px 16px calc(20px + env(safe-area-inset-bottom)); box-shadow: 0 -10px 40px rgba(0,0,0,0.2); animation: mfmSlideUp .35s cubic-bezier(.16,1,.3,1); max-height: 70vh; overflow-y: auto; }
+        .mfm-sheet { width: 100%; background: #fff; border-radius: 24px 24px 0 0; padding: 12px 16px calc(20px + env(safe-area-inset-bottom)); box-shadow: 0 -10px 40px rgba(0,0,0,0.2); animation: mfmSlideUp .35s cubic-bezier(.16,1,.3,1); max-height: 70vh; overflow-y: auto; transition: transform .25s cubic-bezier(.2,.8,.2,1); touch-action: pan-y; }
         @keyframes mfmSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
         .mfm-sheet-handle { width: 40px; height: 4px; border-radius: 2px; background: var(--c-line); margin: 4px auto 14px; }
         .mfm-sheet-title { display: block; font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--c-mute); margin-bottom: 12px; padding: 0 4px; }
