@@ -1106,7 +1106,7 @@ function InSceneGlassPour({ url, withIce, color, onReveal, onDone, onModelReady 
   const { invalidate } = useThree();
   const cloned = useMemo(() => scene.clone(true), [scene]);
   const { actions, mixer } = useAnimations(animations, rootRef);
-  const liquidMesh = useMemo(() => cloned.getObjectByName("liguid") as THREE.Mesh | null, [cloned]);
+  const liquidMesh = useMemo(() => (cloned.getObjectByName("liguid") || cloned.getObjectByName("liquid") || cloned.getObjectByName("Liquid") || cloned.getObjectByName("LIQUID")) as THREE.Mesh | null, [cloned]);
   const onModelReadyRef = useRef(onModelReady);
   onModelReadyRef.current = onModelReady; // stabilne — bez re-runów efektu
   const colorRefLocal = useRef(color);
@@ -1118,10 +1118,8 @@ function InSceneGlassPour({ url, withIce, color, onReveal, onDone, onModelReady 
     const root = rootRef.current;
     if (!root) return;
     cloned.scale.setScalar(1); cloned.position.set(0, 0, 0); cloned.rotation.set(0, 0, 0); // reset
-    const toRemove: THREE.Object3D[] = [];
     cloned.traverse((o) => {
-      // ukryj wbudowany shaker w modelu szklanki (mamy własny w głównej scenie)
-      if (/shaker/i.test(o.name)) { toRemove.push(o); return; }
+      // ZOSTAWIAMY wbudowany shaker w modelu szklanki (widoczny podczas animacji nalewania)
       const mesh = o as THREE.Mesh;
       if (!mesh.isMesh) return;
       mesh.castShadow = true; mesh.receiveShadow = true;
@@ -1133,8 +1131,6 @@ function InSceneGlassPour({ url, withIce, color, onReveal, onDone, onModelReady 
         if (mesh.name === "szklanka") { mat.transparent = true; mat.depthWrite = false; mat.opacity = Math.min(mat.opacity ?? 1, 0.4); }
       }
     });
-    // Ukryj wbudowany shaker (visible=false, NIE usuwaj — nie psuje animacji/bounding box)
-    toRemove.forEach((o) => { o.visible = false; });
     if (liquidMesh && liquidMesh.material) {
       const lm = (liquidMesh.material as THREE.MeshStandardMaterial).clone();
       lm.transparent = false; lm.side = THREE.DoubleSide;
@@ -3058,7 +3054,7 @@ function GlassPourModel({ url, withIce, color, opacity, onReveal, onDone }: {
   const cloned = useMemo(() => scene.clone(true), [scene]);
   const { actions, mixer } = useAnimations(animations, rootRef);
 
-  const liquidMesh = useMemo(() => cloned.getObjectByName("liguid") as THREE.Mesh | null, [cloned]);
+  const liquidMesh = useMemo(() => (cloned.getObjectByName("liguid") || cloned.getObjectByName("liquid") || cloned.getObjectByName("Liquid") || cloned.getObjectByName("LIQUID")) as THREE.Mesh | null, [cloned]);
 
   // tekstury flipY=false; materiał liquidu = finalna mieszanka; WYŚRODKOWANIE na szklance
   useLayoutEffect(() => {
