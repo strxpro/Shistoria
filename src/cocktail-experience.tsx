@@ -123,11 +123,11 @@ const rangeFor = (url: string) => GLASS_RANGES[url] ?? GLASS_RANGES["/szkloniski
  *  - napoje gazowane (cola/soda…) → puszka.glb
  */
 type ModelDef = { url: string; metalCork: boolean; metalBody?: boolean; noStream?: boolean; corkSnap?: boolean; manualCork?: boolean; fit: number; glass: string[]; label: string[]; liquid: string[]; cork: string[] };
-const CAN_IDS = ["tonica", "soda", "cola", "coca-cola", "coca-zero", "fanta", "sprite", "ginger", "lemonsoda", "redbull", "bitter", "san-pellegrino", "the-pesca", "the-limone", "crodino", "aranciata-amara"];
+const CAN_IDS = ["tonica", "soda", "cola", "coca-cola", "coca-zero", "fanta", "sprite", "ginger", "lemonsoda", "redbull", "bitter", "san-pellegrino", "the-pesca", "the-limone", "crodino", "aranciata-amara", "aperol-soda", "tonica-prem", "birra-heineken", "birra-heineken-00", "birra-ichnusa", "birra-ichnusa-nf", "birra-ichnusa-limone", "birra-messina", "birra-moretti-rossa", "birra-corona", "birra-peroni-gf", "birra-franziskaner", "birra-bulldog", "birra-warsteiner"];
 const SOK_IDS = ["limone", "arancia", "pompelmo", "cranberry", "ananas", "pesca", "passion", "cocco"];
 function modelForId(id: string): ModelDef {
   const whiskygin = ["gin", "gin-mare", "gin-botanist", "gin-botanist-cask", "gin-tanqueray", "gin-tanqueray-00", "gin-pink", "gin-oyster", "gin-oyster-citrus", "gin-provence", "gin-luz", "gin-sapling", "gin-pervas", "gin-emporia", "gin-genesi", "gin-acrobatico", "gin-palma", "gin-palma-dest", "gin-tropical", "gin-mediterraneo", "gin-bus", "whisky", "whisky-high-comm", "whisky-oro-pilla", "whisky-bushmills", "whisky-glen-grant", "whisky-teachers", "whisky-bankhall", "whisky-crabbie", "whisky-port-charl", "bourbon", "whisky-scotch", "woodford", "jameson", "jack-daniels", "jack-fire", "jack-apple", "jack-honey", "gentleman-jack", "bruichladdich", "bruichladdich-18", "octomore-161", "octomore-162", "fujimi", "euyu"].includes(id);
-  const spirit = ["rum", "rum-bianco", "rum-cocco", "rum-don-papa", "rum-kraken", "rum-matusalem", "rum-santa-teresa", "rum-black-tears", "rum-pellerossa", "rum-pampero", "rum-arcane", "rum-torquoise", "rum-anacaona", "rum-yellow-snake", "rum-pasador-pas", "rum-pasador-xo", "rum-bocatheva", "vodka", "vodka-citr", "vodka-sapling", "vodka-sapling-rasp", "vodka-beluga", "vodka-beluga-rosa", "vodka-eiko", "tequila", "tequila-reposada", "tequila-dobel", "tequila-espolon", "tequila-1800", "tequila-1800-rep", "tequila-1800-ane", "tequila-1800-crist", "mezcal"].includes(id);
+  const spirit = ["rum", "rum-bianco", "rum-cocco", "rum-don-papa", "rum-kraken", "rum-matusalem", "rum-santa-teresa", "rum-black-tears", "rum-pellerossa", "rum-pampero", "rum-arcane", "rum-torquoise", "rum-anacaona", "rum-yellow-snake", "rum-pasador-pas", "rum-pasador-xo", "rum-bocatheva", "vodka", "vodka-citr", "vodka-sapling", "vodka-sapling-rasp", "vodka-beluga", "vodka-beluga-rosa", "vodka-beluga-allure", "vodka-beluga-gold", "vodka-eiko", "tequila", "tequila-reposada", "tequila-dobel", "tequila-espolon", "tequila-1800", "tequila-1800-rep", "tequila-1800-ane", "tequila-1800-crist", "mezcal"].includes(id);
   const can = CAN_IDS.includes(id);
   const sok = SOK_IDS.includes(id);
   if (sok) {
@@ -273,6 +273,7 @@ const MIXERS: { group: string; emoji: string; items: Ingredient[] }[] = [
       { id: "tonica-prem", name: "Tonica Premium", color: "#D8E8F0", ml: 60 },
       { id: "soda", name: "Soda", color: "#F0F4F5", ml: 60 },
       { id: "lemonsoda", name: "Lemon Soda", color: "#F5E16D", ml: 60 },
+      { id: "aperol-soda", name: "Aperol Soda", color: "#FF6B1A", ml: 60 },
       { id: "aranciata-amara", name: "Aranciata Amara", color: "#F08030", ml: 60 },
       { id: "bitter", name: "Bitter", color: "#C8102E", ml: 60 },
       { id: "san-pellegrino", name: "Cocktail S.Pellegrino", color: "#F0A040", ml: 60 },
@@ -353,6 +354,8 @@ const ALCOHOLS: { group: string; emoji: string; items: Ingredient[] }[] = [
       { id: "vodka-eiko", name: "Eiko", color: "#FFFFFF", ml: 45, isReal: true, abv: 40 },
       { id: "vodka-beluga", name: "Beluga", color: "#FFFFFF", ml: 45, isReal: true, abv: 40 },
       { id: "vodka-beluga-rosa", name: "Beluga Rosa E Lime", color: "#FFB6C1", ml: 45, isReal: true, abv: 40 },
+      { id: "vodka-beluga-allure", name: "Beluga Allure", color: "#FFFFFF", ml: 45, isReal: true, abv: 40 },
+      { id: "vodka-beluga-gold", name: "Beluga Gold Line", color: "#F5E6A8", ml: 45, isReal: true, abv: 40 },
     ],
   },
   {
@@ -477,6 +480,27 @@ const ALCOHOLS: { group: string; emoji: string; items: Ingredient[] }[] = [
       { id: "grappa-amarone", name: "Giare Amarone", color: "#8B4513", ml: 30, isReal: true, abv: 41 },
       { id: "grappa-18lune", name: "18 Lune Whiskey", color: "#CD7F32", ml: 30, isReal: true, abv: 41 },
       { id: "grappa-18lune-rum", name: "18 Lune Rum", color: "#A0522D", ml: 30, isReal: true, abv: 41 },
+      { id: "grappa-aromatica", name: "Aromatica", color: "#FFFFFF", ml: 30, isReal: true, abv: 40 },
+      { id: "grappa-trentina", name: "Trentina", color: "#FFFFFF", ml: 30, isReal: true, abv: 42 },
+      { id: "grappa-liberna", name: "Liberna", color: "#FFFFFF", ml: 30, isReal: true, abv: 42 },
+    ],
+  },
+  {
+    group: "Birre",
+    emoji: "🍺",
+    items: [
+      { id: "birra-heineken", name: "Heineken", color: "#E8C547", ml: 200, isReal: true, abv: 5 },
+      { id: "birra-heineken-00", name: "Heineken 00", color: "#E8C547", ml: 200, isReal: true, abv: 0 },
+      { id: "birra-ichnusa", name: "Ichnusa", color: "#D4A82B", ml: 200, isReal: true, abv: 5 },
+      { id: "birra-ichnusa-nf", name: "Ichnusa non filtrata", color: "#C9952B", ml: 200, isReal: true, abv: 5 },
+      { id: "birra-ichnusa-limone", name: "Ichnusa al limone", color: "#E6D24A", ml: 200, isReal: true, abv: 3 },
+      { id: "birra-messina", name: "Messina", color: "#D4A82B", ml: 200, isReal: true, abv: 5 },
+      { id: "birra-moretti-rossa", name: "Moretti Rossa", color: "#9C4A1A", ml: 200, isReal: true, abv: 7 },
+      { id: "birra-corona", name: "Corona", color: "#E8D88A", ml: 200, isReal: true, abv: 5 },
+      { id: "birra-peroni-gf", name: "Peroni senza glutine", color: "#E8C547", ml: 200, isReal: true, abv: 5 },
+      { id: "birra-franziskaner", name: "Franziskaner", color: "#C9952B", ml: 200, isReal: true, abv: 5 },
+      { id: "birra-bulldog", name: "Bulldog", color: "#D4A82B", ml: 200, isReal: true, abv: 5 },
+      { id: "birra-warsteiner", name: "Warsteiner", color: "#E8C547", ml: 200, isReal: true, abv: 5 },
     ],
   },
 ];
@@ -3409,24 +3433,25 @@ function shapeFor(ing: Ingredient): "wine" | "spirit" | "can" | "round" {
  * ──────────────────────────────────────────────────────────────────────── */
 // Globalny tracker aktywnych kontekstów 3D na mobile (max 3 jednocześnie — limit iOS)
 const _active3D: Set<string> = typeof window !== "undefined" ? ((window as any).__sh3d || ((window as any).__sh3d = new Set())) : new Set();
-const MAX_MOBILE_3D = 1;
+const MAX_MOBILE_3D = 1;   // mobile: max 1 kontekst 3D naraz (iOS limit)
+const MAX_DESKTOP_3D = 8;  // desktop: więcej
 
 function LazyBottle3D({ id, name, color, shape, ml, real }: { id: string; name: string; color: string; shape: "wine" | "spirit" | "can" | "round"; ml: number; real: boolean }) {
   const ref = useRef<HTMLDivElement>(null!);
   const [visible, setVisible] = useState(false);
   const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
   const uid = `${id}-${color}`;
+  const limit = isMobile ? MAX_MOBILE_3D : MAX_DESKTOP_3D;
 
   useEffect(() => {
-    // Na mobile: nie montujemy mini-canvas (GPU overload) — zawsze SVG fallback
-    if (isMobile) return;
     const el = ref.current;
     if (!el) return;
     const io = new IntersectionObserver(
       (entries) => {
         const isVis = entries[0]?.isIntersecting ?? false;
         if (isVis) {
-          if (_active3D.size >= MAX_MOBILE_3D && !_active3D.has(uid)) {
+          // Limit aktywnych kontekstów WebGL — jeśli przekroczony, zostań SVG
+          if (_active3D.size >= limit && !_active3D.has(uid)) {
             setVisible(false); return;
           }
           _active3D.add(uid);
@@ -3436,18 +3461,18 @@ function LazyBottle3D({ id, name, color, shape, ml, real }: { id: string; name: 
           setVisible(false);
         }
       },
-      { rootMargin: "50px 0px 50px 0px", threshold: 0.15 }
+      { rootMargin: "0px", threshold: 0.5 }
     );
     io.observe(el);
     return () => { io.disconnect(); _active3D.delete(uid); };
-  }, [isMobile, uid]);
+  }, [limit, uid]);
 
   return (
     <div ref={ref} style={{ width: "100%", height: "100%", position: "relative" }}>
-      {!isMobile && visible ? (
+      {visible ? (
         <MiniBottle3D id={id} name={name} color={color} hovered={false} playing={false} sustaining={false} />
       ) : (
-        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.6 }}>
+        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.7 }}>
           <RowBottle color={color} ml={ml} real={real} shape={shape} />
         </div>
       )}
