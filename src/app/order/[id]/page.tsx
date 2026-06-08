@@ -27,6 +27,24 @@ export default function OrderPage({ params }: { params: { id: string } }) {
       .from("drink_orders")
       .update({ status: "completed", scanned_at: new Date().toISOString() })
       .eq("id", params.id);
+    // Jeśli zamówienie powiązane z drinkiem community → zwiększ licznik odebrań (claimed_count)
+    if (order?.drink_id) {
+      const { error: rpcErr } = await supabase.rpc("increment_claims", { drink_uuid: order.drink_id });
+      if (rpcErr) {
+        // fallback: ręczny inkrement gdy RPC nie istnieje
+        const { data: cur } = await supabase
+          .from("community_drinks")
+          .select("claimed_count")
+          .eq("id", order.drink_id)
+          .single();
+        if (cur) {
+          await supabase
+            .from("community_drinks")
+            .update({ claimed_count: (cur.claimed_count || 0) + 1 })
+            .eq("id", order.drink_id);
+        }
+      }
+    }
     setDone(true);
   };
 

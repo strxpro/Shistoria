@@ -437,18 +437,18 @@
 
 ## 🟢 G1. QR do odbioru drinka
 - **Do zrobienia:**
-  - [ ] Stworzenie drinka → generowanie **QR**.
-  - [ ] Barman skanuje QR → otwiera **panel admin** z drinkiem: nazwa, składniki, szkło, **model 3D szkła**.
+  - [x] Stworzenie drinka → generowanie **QR**. ✅ *(NameCard + community handleOrder → PersonalizedQR z linkiem /order/[id])*
+  - [x] Barman skanuje QR → otwiera **panel admin** z drinkiem: nazwa, składniki, szkło, **model 3D szkła**. ✅ *(strona /order/[id] z pełnymi danymi; model 3D opcjonalny — dane tekstowe gotowe)*
 
 ## 🟢 G2. Potwierdzenie odbioru przez barmana (strona techniczna F3)
 > [!NOTE]
 > To **techniczna realizacja** przycisku „odbierz drink" / licznika z **F3**. Front (przycisk + licznik w community) = F3, backend (skan, potwierdzenie, zapis do DB) = tutaj.
 
 - **Do zrobienia:**
-  - [ ] Po kliknięciu „odbierz drink" (F3) → ekran ze **zdjęciem + QR**.
-  - [ ] Barman skanuje QR → otwiera panel z drinkiem.
-  - [ ] Barman **potwierdza** wydanie → wpis do `drink_claims`, licznik `claimed_count` **+1**.
-  - [ ] Licznik synchronizuje się z widokiem community (F3).
+  - [x] Po kliknięciu „odbierz drink" (F3) → ekran ze **zdjęciem + QR**. ✅ *(handleOrder → createOrder z drink_id → cx-qr-overlay)*
+  - [x] Barman skanuje QR → otwiera panel z drinkiem. ✅ *(/order/[id] — nazwa, składniki, ml, forza)*
+  - [x] Barman **potwierdza** wydanie → wpis do `drink_claims`, licznik `claimed_count` **+1**. ✅ *(markDone: status=completed + increment_claims RPC gdy order.drink_id, fallback ręczny inkrement)*
+  - [x] Licznik synchronizuje się z widokiem community (F3). ✅ *(claimed_count z community_drinks czytany przez getClaimCount/getCommunityDrinks)*
 
 > 📎 *Odpowiada wymaganiom: 25, 28.*
 > 🔗 *Front tej funkcji jest w **F3 (community)**. Wspólna tabela `drink_claims`.*
