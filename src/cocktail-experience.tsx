@@ -64,6 +64,7 @@ import { useGSAP } from "@gsap/react";
 gsap.registerPlugin(ScrollTrigger);
 
 import { supabase, getSessionId } from "./lib/supabase";
+import { PersonalizedQR } from "./components/PersonalizedQR";
 
 /* ──────────────────────────────────────────────────────────────────────────
  * Assets
@@ -4190,20 +4191,45 @@ function NameCard({
   poured: Poured[]; onReset: () => void;
 }) {
   const [done, setDone] = useState(false);
+  const [orderId, setOrderId] = useState<string | null>(null);
   const [email, setEmail] = useState("");
-  const seed = `${drinkName}|${customerName}|${email}|${poured.map((p) => p.ing.id).join(",")}`;
-  const matrix = useMemo(() => qrMatrix(seed), [seed]);
   const emailOk = email.trim() === "" || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim());
   const canSubmit = drinkName.trim().length > 1 && customerName.trim().length > 1 && emailOk;
+  const orderUrl = orderId ? `${typeof window !== "undefined" ? window.location.origin : ""}/order/${orderId}` : "";
+
+  const handleSubmit = async () => {
+    setDone(true);
+    // Zapisz lokalnie
+    if (typeof localStorage !== "undefined") {
+      const drinks = JSON.parse(localStorage.getItem("sh-my-drinks") || "[]");
+      drinks.push({ name: drinkName, author: customerName, ingredients: poured.map(p => ({id: p.ing.id, name: p.ing.name, color: p.ing.color, ml: Math.round(p.ml)})), ml: Math.round(poured.reduce((s,p)=>s+p.ml,0)), strength: "—", color, saved_at: new Date().toISOString() });
+      localStorage.setItem("sh-my-drinks", JSON.stringify(drinks));
+    }
+    // Utwórz order w Supabase → prawdziwy QR z linkiem
+    try {
+      const { createOrder } = await import("./lib/supabase");
+      const order = await createOrder({
+        drink_name: drinkName,
+        author_name: customerName,
+        ingredients: poured.map(p => ({id: p.ing.id, name: p.ing.name, color: p.ing.color, ml: Math.round(p.ml)})),
+        total_ml: Math.round(poured.reduce((s,p)=>s+p.ml,0)),
+        strength_label: "—",
+      });
+      if (order?.id) setOrderId(order.id);
+    } catch (e) { console.error("Order creation failed:", e); }
+  };
 
   if (done) {
     return (
       <div className="cx-name cx-name-qr">
         <div className="cx-qr">
-          <svg viewBox={`0 0 ${matrix.length} ${matrix.length}`} shapeRendering="crispEdges">
-            <rect width={matrix.length} height={matrix.length} fill="#fff" />
-            {matrix.map((row, y) => row.map((on, x) => (on ? <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill="#0E2230" /> : null)))}
-          </svg>
+          {orderUrl ? (
+            <PersonalizedQR url={orderUrl} color={color} size={108} icon="🍸" />
+          ) : (
+            <div style={{ width: 108, height: 108, background: "#fff", borderRadius: 14, display: "grid", placeItems: "center" }}>
+              <span style={{ fontSize: 20, opacity: 0.4 }}>⏳</span>
+            </div>
+          )}
         </div>
         <div className="cx-name-info">
           <span className="cx-mini-kicker">Mostralo al barman</span>
@@ -4233,7 +4259,7 @@ function NameCard({
         <label>Email <em>· facoltativa</em></label>
         <input className={`cx-input ${!emailOk ? "is-err" : ""}`} type="email" placeholder="per ricevere la ricetta" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={60} />
       </div>
-      <button className="cx-btn cx-btn-full" disabled={!canSubmit} onClick={() => { setDone(true); if (typeof localStorage !== "undefined") { const drinks = JSON.parse(localStorage.getItem("sh-my-drinks") || "[]"); drinks.push({ name: drinkName, author: customerName, ingredients: poured.map(p => ({id: p.ing.id, name: p.ing.name, color: p.ing.color, ml: Math.round(p.ml)})), ml: Math.round(poured.reduce((s,p)=>s+p.ml,0)), strength: "—", color, saved_at: new Date().toISOString() }); localStorage.setItem("sh-my-drinks", JSON.stringify(drinks)); } }} style={{ background: color, color: '#000' }}>
+      <button className="cx-btn cx-btn-full" disabled={!canSubmit} onClick={handleSubmit} style={{ background: color, color: '#000' }}>
         Genera QR <span className="arrow">→</span>
       </button>
     </div>
