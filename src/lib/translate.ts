@@ -1,81 +1,84 @@
 /**
- * Auto-tłumaczenie tekstu (prosty helper).
- * W produkcji podłączyć pod Google Translate API lub DeepL.
- * Na razie: cache z prostymi tłumaczeniami + fallback do oryginału.
+ * Auto-translate text using Google Translate API (free tier via googleapis fetch).
+ * Falls back to original text if translation fails.
  */
 
-const CACHE_KEY = "sh-translations";
+const GOOGLE_TRANSLATE_URL = "https://translation.googleapis.com/language/translate/v2";
 
-type LangCode = "it" | "pl" | "en" | "de" | "fr" | "es";
+// Klucz API Google Translate — ustaw w .env.local jako GOOGLE_TRANSLATE_API_KEY
+// Albo użyj darmowego endpointu (ograniczone zapytania)
+const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_TRANSLATE_KEY || process.env.GOOGLE_TRANSLATE_API_KEY || "";
 
-// Proste tłumaczenia (placeholder — w produkcji API)
-const SIMPLE_DICT: Record<string, Record<LangCode, string>> = {
-  "Live Music": { it: "Musica dal vivo", pl: "Muzyka na żywo", en: "Live Music", de: "Live-Musik", fr: "Musique live", es: "Música en vivo" },
-  "Degustazione": { it: "Degustazione", pl: "Degustacja", en: "Tasting", de: "Verkostung", fr: "Dégustation", es: "Degustación" },
-  "Special Dinner": { it: "Cena speciale", pl: "Kolacja specjalna", en: "Special Dinner", de: "Spezielles Dinner", fr: "Dîner spécial", es: "Cena especial" },
-  "Aperitivo": { it: "Aperitivo", pl: "Aperitivo", en: "Aperitivo", de: "Aperitivo", fr: "Apéritif", es: "Aperitivo" },
-};
-
-// Pobierz tłumaczenie z cache
-function getFromCache(text: string, lang: LangCode): string | null {
-  if (typeof localStorage === "undefined") return null;
-  try {
-    const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || "{}");
-    return cache[`${lang}:${text}`] || null;
-  } catch { return null; }
-}
-
-// Zapisz tłumaczenie do cache
-function saveToCache(text: string, lang: LangCode, translation: string) {
-  if (typeof localStorage === "undefined") return;
-  try {
-    const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || "{}");
-    cache[`${lang}:${text}`] = translation;
-    localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
-  } catch { /* ignore */ }
-}
+export type Lang = "it" | "pl" | "en" | "de" | "fr" | "es";
+export const ALL_LANGS: Lang[] = ["it", "pl", "en", "de", "fr", "es"];
+export const TRANSLATE_TARGETS: Lang[] = ["pl", "en", "de", "fr", "es"]; // wszystkie oprócz IT (oryginał)
 
 /**
- * Przetłumacz tekst na dany język.
- * Używa prostego słownika + cache. W przyszłości: API call.
+ * Tłumaczy tekst z włoskiego na dany język.
+ * Zwraca przetłumaczony tekst lub oryginał przy błędzie.
  */
-export async function translateText(text: string, targetLang: LangCode): Promise<string> {
-  if (targetLang === "it") return text; // Oryginał to włoski
+export async function translateText(text: string, targetLang: Lang): Promise<string> {
+  if (!text || !text.trim()) return "";
+  if (targetLang === "it") return text; // oryginał
 
-  // Sprawdź prosty słownik
-  if (SIMPLE_DICT[text]?.[targetLang]) return SIMPLE_DICT[text][targetLang];
-
-  // Sprawdź cache
-  const cached = getFromCache(text, targetLang);
-  if (cached) return cached;
-
-  // TODO: W produkcji — call do Google Translate API:
-  // const response = await fetch(`https://translation.googleapis.com/language/translate/v2?key=YOUR_KEY`, {
-  //   method: 'POST',
-  //   body: JSON.stringify({ q: text, source: 'it', target: targetLang, format: 'text' })
-  // });
-  // const data = await response.json();
-  // const translation = data.data.translations[0].translatedText;
-  // saveToCache(text, targetLang, translation);
-  // return translation;
-
-  // Fallback: zwróć oryginał z prefiksem języka (do debugowania)
-  return text;
-}
-
-/**
- * Przetłumacz obiekt z eventami na wszystkie języki.
- * Zwraca obiekt { pl: "...", en: "...", de: "...", fr: "...", es: "..." }
- */
-export async function translateEventDescription(
-  italianText: string
-): Promise<Record<LangCode, string>> {
-  const langs: LangCode[] = ["it", "pl", "en", "de", "fr", "es"];
-  const result: Record<string, string> = {};
-
-  for (const lang of langs) {
-    result[lang] = await translateText(italianText, lang);
+  // Próba z Google Translate API (wymaga klucza)
+  if (API_KEY) {
+    try {
+      const res = await fetch(`${GOOGLE_TRANSLATE_URL}?key=${API_KEY}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ q: text, source: "it", target: targetLang, format: "text" }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return data?.data?.translations?.[0]?.translatedText || text;
+      }
+    } catch { /* fallback */ }
   }
 
-  return result as Record<LangCode, string>;
+  // Fallback: darmowy endpoint Google Translate (nieoficjalny, ograniczony)
+  try {
+    const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=it&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = await res.json();
+      // Format: [[["translated text","original text",...],...]]
+      if (Array.isArray(data) && Array.isArray(data[0])) {
+        return data[0].map((seg: any) => seg[0]).join("");
+      }
+    }
+  } catch { /* ignore */ }
+
+  return text; // ostatni fallback — oryginał
+}
+
+/**
+ * Tłumaczy tekst na WSZYSTKIE języki docelowe.
+ * Zwraca obiekt { pl: "...", en: "...", de: "...", fr: "...", es: "..." }
+ */
+export async function translateToAll(textIt: string): Promise<Record<Lang, string>> {
+  const result: Record<string, string> = { it: textIt };
+  
+  // Równoległe tłumaczenie na wszystkie języki
+  const translations = await Promise.allSettled(
+    TRANSLATE_TARGETS.map(async (lang) => ({
+      lang,
+      text: await translateText(textIt, lang),
+    }))
+  );
+
+  for (const t of translations) {
+    if (t.status === "fulfilled") {
+      result[t.value.lang] = t.value.text;
+    }
+  }
+
+  return result as Record<Lang, string>;
+}
+
+/**
+ * Tłumaczy nazwę kategorii na wszystkie języki.
+ */
+export async function translateCategoryName(nameIt: string): Promise<Record<Lang, string>> {
+  return translateToAll(nameIt);
 }

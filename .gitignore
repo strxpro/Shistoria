@@ -26,3 +26,18 @@ screenshots/
 
 # Backup model files
 public/*.backup.glb
+
+# Google Service Account keys — NIGDY nie commitować!
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!next-env.d.ts
+!.kiro/**/*.json
+!.claude/**/*.json
+!.vscode/**/*.json
+
+# Environment
+.env
+.env.local
+.env.production
