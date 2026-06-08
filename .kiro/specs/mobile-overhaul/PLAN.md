@@ -794,7 +794,7 @@
 - [x] L: admin — Messages + Reviews + Stats panele, responsywny mobile ✅
 - [x] M: preloader z "1996", stopka wyśrodkowana ✅
 - [x] N: geolokalizacja → auto-język (ipapi.co + navigator.language fallback) ✅
-- [ ] O: integracje make.com / callmebot / Instagram / Facebook — webhook ready, wymaga API od Ciebie
+- [x] O: integracje make.com — rezerwacja+email+WhatsApp, share drink email, Ogłoś Drink del Mese (auto-wybór, email do wszystkich) ✅ (webhook URL z env)
 
 ### 🐛 NAPRAWIONE BUGI MOBILE (sesja iteracyjna):
 - [x] GPU Context Lost: Environment/ContactShadows off na mobile, mini-butelki SVG (zero mini-canvas) ✅
@@ -807,5 +807,32 @@
 - [x] Hamburger przesuwa się w prawo przy pill Categorie ✅
 - [x] Crash 'filter is not defined': DesktopDrinksList brakujący useState + guardy window.DRINKS_MENU ✅
 - [x] Favicon 404 + ErrorBoundary na każdej sekcji ✅
+- [x] Logo wyśrodkowane domyślnie (left:50%), przesuwa w lewo tylko przy drawer/sheet ✅
+- [x] Wyszukiwarka (lupa) składników z podpowiedzią cross-panel ✅
+- [x] Lokalna baza 426 drinków (cocktails-db.json) — zero API, darmowe, rozpoznawanie po Szejkuj ✅
+- [x] Strumień ukryty (ciecz rośnie w szejkerze, nie strumień nad) ✅
+- [x] Drawer zamyka się klik poza (wrap pointer-events auto + stopPropagation) ✅
+- [x] Dodane brakujące butelki: Beluga Allure/Gold, grappy, 12 piw Birre, Aperol Soda ✅
+- [x] Mobile: wszystkie butelki SVG (zawsze widoczne) ✅
+
+### ⏳ DO DOPRACOWANIA (zgłoszone, w toku):
+- [x] Pop-out "zrobiłeś drink": na środku, BEZ filmiku, 2 opcje (Wybierz ten → QR / Kontynuuj → film) ✅ *(DrinkFound przebudowany na modal z overlay+blur, 2 przyciski, krzyżyk, dismiss klik-poza)*
+- [ ] Pop-out "odbierz drink": opacity 100%, nie przeskakuje, dismiss klik-poza, krzyżyk, tło blur+blokada scroll
+- [ ] QR trafia do zakładki opcji (po prawej, gdzie szklanka) — łatwy dostęp
+- [ ] Nazwy w boksach butelek mniejsze, pigułki w prawym górnym rogu
+- [ ] Szpary/luki w UI (hamburger menu, odstępy) — wyrównanie
+- [ ] Scroll-do-shakera przy wejściu z menu
+- [ ] Wyszukiwarka lupa na mobile (w drawerze)
+- [ ] Nalewanie: ciecz ma trafiać do ŚRODKA szejkera (poziom rośnie) — sprawdzić po deploy
+
+### 🔑 KONFIGURACJA make.com (do zrobienia przez właściciela):
+- Webhook URL (Custom webhook w make.com) → Vercel env:
+  - NEXT_PUBLIC_MAKE_CONTACT_WEBHOOK (rezerwacje)
+  - NEXT_PUBLIC_MAKE_DRINK_WEBHOOK (share drinka)
+  - NEXT_PUBLIC_MAKE_WINNER_WEBHOOK (drink miesiąca)
+- W scenariuszu: Translate (pole `lang`) → Email (właściciel IT + klient w jego języku) → WhatsApp (callmebot/Twilio)
+
+
+
 
 

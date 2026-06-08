@@ -1661,6 +1661,7 @@ function CocktailExperience() {
   const recognized = useMemo(() => recognizeCocktail(poured), [poured]);
   const [apiDrink, setApiDrink] = useState<import("./lib/cocktail-db").ApiDrink | null>(null);
   const [apiSearching, setApiSearching] = useState(false);
+  const [drinkChoiceOpen, setDrinkChoiceOpen] = useState(false);
 
   const stageRef = useRef<Stage>("build");
   const colorRef = useRef(mixedColor);
@@ -1822,11 +1823,14 @@ function CocktailExperience() {
     const api = sceneApiRef.current;
     if (!api || busyRef.current || stageRef.current !== "build" || poured.length < 2) return;
 
-    // Szukaj pasującego drinka w TheCocktailDB (asynchronicznie, nie blokuje animacji)
+    // Szukaj pasującego drinka w lokalnej bazie (asynchronicznie)
     setApiDrink(null);
     setApiSearching(true);
     findCocktailByIngredients(poured.map((p) => p.ing.id))
-      .then((d) => { setApiDrink(d); })
+      .then((d) => {
+        setApiDrink(d);
+        if (d) setDrinkChoiceOpen(true); // znaleziono → pokaż modal wyboru
+      })
       .catch(() => {})
       .finally(() => setApiSearching(false));
     busyRef.current = true;
@@ -2355,13 +2359,40 @@ function CocktailExperience() {
         {/* flood + grain — w sticky-stage, rośnie spod szejkera */}
         <OrganicFlood floodRef={floodRef} grainRef={grainRef} />
 
-        {/* wybór szklanki — chowa się gdy startuje animacja nalewania */}
-        <GlassPicker open={stage === "pickGlass" && !glassPourOpen} color={mixedColor} withIce={withIce}
+        {/* wybór szklanki — chowa się gdy startuje animacja nalewania LUB modal wyboru drinka */}
+        <GlassPicker open={stage === "pickGlass" && !glassPourOpen && !drinkChoiceOpen} color={mixedColor} withIce={withIce}
           onIceChange={setWithIce} onPick={pickGlass} />
 
-        {/* Znaleziony drink z TheCocktailDB — baner nad wyborem szklanki */}
-        {stage === "pickGlass" && !glassPourOpen && (apiSearching || apiDrink) && (
-          <DrinkFound drink={apiDrink} searching={apiSearching} />
+        {/* Modal: znaleziono klasyczny drink → 2 opcje (zamów od razu / kontynuuj) */}
+        {drinkChoiceOpen && apiDrink && (
+          <DrinkFound drink={apiDrink} searching={false}
+            onOrderNow={async () => {
+              setDrinkChoiceOpen(false);
+              // Stwórz order od razu → pokaż QR
+              try {
+                const order = await createOrder({
+                  drink_name: apiDrink.name,
+                  author_name: customerName || "Anonimo",
+                  ingredients: poured.map(p => ({ id: p.ing.id, name: p.ing.name, color: p.ing.color, ml: Math.round(p.ml) })),
+                  total_ml: totalMl,
+                  strength_label: strength.label,
+                });
+                if (order?.id) {
+                  setChosenGlass(GLASSES[0]);
+                  setGlassFilled(true);
+                  setStage("glassReady");
+                  setClaimed(true);
+                  (window as any).__sh_orderId = order.id;
+                }
+              } catch (e) { console.error(e); }
+            }}
+            onContinue={() => setDrinkChoiceOpen(false)}
+          />
+        )}
+
+        {/* Spinner podczas szukania */}
+        {stage === "pickGlass" && !glassPourOpen && apiSearching && !drinkChoiceOpen && (
+          <DrinkFound drink={null} searching={true} />
         )}
 
         {/* mobilne koło "i" z instrukcjami (popout) */}
@@ -4266,38 +4297,68 @@ function GlassPicker({ open, color, withIce, onIceChange, onPick }: {
  * DrinkFound — baner z drinkiem znalezionym w TheCocktailDB (nazwa, zdjęcie, składniki).
  * Etykiety w języku strony; nazwa drinka = oryginalna (nazwa własna).
  * ──────────────────────────────────────────────────────────────────────── */
-function DrinkFound({ drink, searching }: { drink: import("./lib/cocktail-db").ApiDrink | null; searching: boolean }) {
+function DrinkFound({ drink, searching, onOrderNow, onContinue }: {
+  drink: import("./lib/cocktail-db").ApiDrink | null;
+  searching: boolean;
+  onOrderNow?: () => void;
+  onContinue?: () => void;
+}) {
   const lang = (typeof window !== "undefined" && (window as any).currentLanguage) || "it";
-  const L: Record<string, { found: string; ingredients: string; searching: string; classic: string }> = {
-    it: { found: "Hai creato un classico!", ingredients: "Ingredienti ufficiali", searching: "Cerco il tuo drink...", classic: "Cocktail riconosciuto" },
-    pl: { found: "Stworzyłeś klasyka!", ingredients: "Oficjalne składniki", searching: "Szukam Twojego drinka...", classic: "Rozpoznany koktajl" },
-    en: { found: "You made a classic!", ingredients: "Official ingredients", searching: "Searching your drink...", classic: "Recognized cocktail" },
-    de: { found: "Ein Klassiker!", ingredients: "Offizielle Zutaten", searching: "Suche dein Getränk...", classic: "Erkannter Cocktail" },
-    fr: { found: "Un classique!", ingredients: "Ingrédients officiels", searching: "Recherche de ton cocktail...", classic: "Cocktail reconnu" },
-    es: { found: "¡Un clásico!", ingredients: "Ingredientes oficiales", searching: "Buscando tu trago...", classic: "Cóctel reconocido" },
+  const L: Record<string, { found: string; ingredients: string; searching: string; classic: string; order: string; cont: string }> = {
+    it: { found: "Hai creato un classico!", ingredients: "Ingredienti ufficiali", searching: "Cerco il tuo drink...", classic: "Cocktail riconosciuto", order: "Scegli questo", cont: "Continua comunque" },
+    pl: { found: "Stworzyłeś klasyka!", ingredients: "Oficjalne składniki", searching: "Szukam Twojego drinka...", classic: "Rozpoznany koktajl", order: "Wybierz ten", cont: "Kontynuuj mimo to" },
+    en: { found: "You made a classic!", ingredients: "Official ingredients", searching: "Searching your drink...", classic: "Recognized cocktail", order: "Choose this one", cont: "Continue anyway" },
+    de: { found: "Ein Klassiker!", ingredients: "Offizielle Zutaten", searching: "Suche dein Getränk...", classic: "Erkannter Cocktail", order: "Diesen wählen", cont: "Trotzdem weiter" },
+    fr: { found: "Un classique!", ingredients: "Ingrédients officiels", searching: "Recherche de ton cocktail...", classic: "Cocktail reconnu", order: "Choisir celui-ci", cont: "Continuer quand même" },
+    es: { found: "¡Un clásico!", ingredients: "Ingredientes oficiales", searching: "Buscando tu trago...", classic: "Cóctel reconocido", order: "Elegir este", cont: "Continuar igualmente" },
   };
   const tr = L[lang] ?? L.it;
   if (typeof document === "undefined") return null;
 
-  return createPortal(
-    <div className="cx-drinkfound">
-      {searching && !drink ? (
+  // Tryb spinnera (szukanie) — mały baner na górze, bez modala
+  if (searching && !drink) {
+    return createPortal(
+      <div className="cx-drinkfound">
         <div className="cx-drinkfound-loading"><span className="cx-df-spin" /> {tr.searching}</div>
-      ) : drink ? (
-        <div className="cx-drinkfound-card">
-          {drink.thumb && <img src={drink.thumb} alt={drink.name} className="cx-df-img" loading="lazy" />}
-          <div className="cx-df-body">
-            <span className="cx-df-kicker">✨ {tr.found}</span>
-            <h4 className="cx-df-name">{drink.name}</h4>
-            <span className="cx-df-label">{tr.ingredients}</span>
-            <div className="cx-df-ingr">
-              {drink.ingredients.slice(0, 6).map((ing, i) => (
-                <span key={i} className="cx-df-pill">{ing.name}{ing.measure ? ` · ${ing.measure}` : ""}</span>
-              ))}
-            </div>
+      </div>,
+      document.body,
+    );
+  }
+
+  if (!drink) return null;
+
+  // Tryb modala (znaleziono klasyk) — wyśrodkowany pop-out z 2 przyciskami
+  const isModal = !!(onOrderNow || onContinue);
+  const dismiss = onContinue || (() => {});
+
+  return createPortal(
+    <div className="cx-df-overlay" onClick={isModal ? dismiss : undefined}>
+      <div className="cx-drinkfound-card cx-df-modal" onClick={(e) => e.stopPropagation()}>
+        {isModal && (
+          <button className="cx-df-close" onClick={dismiss} aria-label="Chiudi">✕</button>
+        )}
+        {drink.thumb && <img src={drink.thumb} alt={drink.name} className="cx-df-img" loading="lazy" />}
+        <div className="cx-df-body">
+          <span className="cx-df-kicker">✨ {tr.found}</span>
+          <h4 className="cx-df-name">{drink.name}</h4>
+          <span className="cx-df-label">{tr.ingredients}</span>
+          <div className="cx-df-ingr">
+            {drink.ingredients.slice(0, 6).map((ing, i) => (
+              <span key={i} className="cx-df-pill">{ing.name}{ing.measure ? ` · ${ing.measure}` : ""}</span>
+            ))}
           </div>
+          {isModal && (
+            <div className="cx-df-actions">
+              {onOrderNow && (
+                <button className="cx-df-btn cx-df-btn-primary" onClick={onOrderNow}>🍸 {tr.order}</button>
+              )}
+              {onContinue && (
+                <button className="cx-df-btn cx-df-btn-ghost" onClick={onContinue}>{tr.cont}</button>
+              )}
+            </div>
+          )}
         </div>
-      ) : null}
+      </div>
     </div>,
     document.body,
   );
@@ -5301,6 +5362,28 @@ function CocktailStyles() {
       .cx-df-label { font-size:9px; letter-spacing:0.12em; text-transform:uppercase; color:rgba(255,255,255,0.5); }
       .cx-df-ingr { display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; }
       .cx-df-pill { font-size:10px; padding:3px 8px; border-radius:999px; background:rgba(255,255,255,0.1); color:rgba(255,255,255,0.85); }
+
+      /* DrinkFound — MODAL (znaleziono klasyk) wyśrodkowany z 2 przyciskami */
+      .cx-df-overlay { position:fixed; inset:0; z-index:80; display:flex; align-items:center; justify-content:center; padding:20px;
+        background:rgba(8,12,18,0.55); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); animation:cxFadeIn .25s ease; }
+      @keyframes cxFadeIn { from { opacity:0; } to { opacity:1; } }
+      .cx-df-modal { position:relative; flex-direction:column; gap:14px; width:min(380px, 92vw); padding:22px; align-items:center; text-align:center; }
+      .cx-df-modal .cx-df-img { width:120px; height:120px; border-radius:16px; }
+      .cx-df-modal .cx-df-body { width:100%; }
+      .cx-df-modal .cx-df-ingr { justify-content:center; }
+      .cx-df-close { position:absolute; top:10px; right:10px; width:30px; height:30px; border-radius:50%; border:1px solid rgba(255,255,255,0.2);
+        background:rgba(0,0,0,0.4); color:#fff; font-size:14px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center;
+        transition:all .2s; }
+      .cx-df-close:hover { background:rgba(232,146,124,0.3); border-color:var(--c-coral,#E8927C); }
+      .cx-df-actions { display:flex; flex-direction:column; gap:10px; margin-top:16px; width:100%; }
+      .cx-df-btn { width:100%; padding:14px 18px; border-radius:14px; font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:14px;
+        letter-spacing:0.04em; cursor:pointer; transition:all .25s cubic-bezier(.2,.8,.2,1); border:1px solid transparent; }
+      .cx-df-btn-primary { color:#fff; background:linear-gradient(135deg, var(--c-coral,#E8927C), #d9745c);
+        box-shadow:0 12px 32px rgba(232,146,124,0.45), inset 0 1px 0 rgba(255,255,255,0.3); }
+      .cx-df-btn-primary:hover { transform:translateY(-2px); box-shadow:0 18px 44px rgba(232,146,124,0.6); }
+      .cx-df-btn-primary:active { transform:translateY(0) scale(0.98); }
+      .cx-df-btn-ghost { color:rgba(255,255,255,0.7); background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.14); }
+      .cx-df-btn-ghost:hover { color:#fff; background:rgba(255,255,255,0.12); }
 
       /* SHAKE button */
       .cx-shake { flex-shrink:0; margin-top:6px; display:inline-flex; align-items:center; justify-content:center; gap:12px; padding:18px 26px;
