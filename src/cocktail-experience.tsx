@@ -63,7 +63,7 @@ import { useGSAP } from "@gsap/react";
 
 gsap.registerPlugin(ScrollTrigger);
 
-import { supabase, getSessionId } from "./lib/supabase";
+import { supabase, getSessionId, createOrder } from "./lib/supabase";
 import { PersonalizedQR } from "./components/PersonalizedQR";
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -4207,7 +4207,6 @@ function NameCard({
     }
     // Utwórz order w Supabase → prawdziwy QR z linkiem
     try {
-      const { createOrder } = await import("./lib/supabase");
       const order = await createOrder({
         drink_name: drinkName,
         author_name: customerName,
@@ -5300,8 +5299,8 @@ function CocktailStyles() {
 
         /* SHAKE — suwak wycentrowany na dole */
         .cx-shake-desktop { display:none; }
-        /* gauge nie nachodzi na FAB — niższa, bliżej środka */
-        .cx-gauge { left:calc(50% - min(80px, 18vw)) !important; top:50% !important; height:min(32vh, 240px) !important; }
+        /* gauge nie nachodzi na FAB — niższa od FAB */
+        .cx-gauge { left:calc(50% - min(80px, 18vw)) !important; top:68% !important; height:min(24vh, 180px) !important; }
         .cx-gauge-right { right:calc(50% - min(80px, 18vw)) !important; left:auto !important; }
         /* przycisk reset widoczny na mobile — góra-prawo */
         .cx-reset-top { position:fixed !important; top:calc(16px + env(safe-area-inset-top)); right:16px; z-index:42; align-self:auto !important;
