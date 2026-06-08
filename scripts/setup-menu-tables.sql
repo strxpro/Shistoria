@@ -3,6 +3,10 @@
 -- Uruchom w Supabase SQL Editor: https://supabase.com/dashboard/project/slatelpipxtqveydgslc/sql
 -- ═══════════════════════════════════════════════════════════════════════════
 
+-- UWAGA: usuwamy starą tabelę menu_items (miała inny schema z poprzednich sesji)
+DROP TABLE IF EXISTS menu_items CASCADE;
+DROP TABLE IF EXISTS menu_categories CASCADE;
+
 -- Kategorie menu (Antipasti, Primi, Secondi, Pizze, Contorni, Dolci...)
 CREATE TABLE IF NOT EXISTS menu_categories (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
