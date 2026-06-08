@@ -823,7 +823,7 @@
 - [x] Szpary/luki w UI (hamburger menu, odstępy) — wyrównanie ✅ *(mobile-menu height:100dvh — pełne pokrycie viewportu, brak szpary na dole)*
 - [x] Scroll-do-shakera przy wejściu z menu ✅ *(onSelectSection w app.jsx — cocktail-rise ląduje w fazie hold, shaker wycentrowany)*
 - [x] Wyszukiwarka lupa na mobile (w drawerze) ✅ *(przycisk 🔍 w cx-drop-row + pasek wyszukiwania z wynikami i cross-panel hint)*
-- [ ] Nalewanie: ciecz ma trafiać do ŚRODKA szejkera (poziom rośnie) — sprawdzić po deploy
+- [x] Nalewanie: ciecz ma trafiać do ŚRODKA szejkera (poziom rośnie) ✅ *(strumień ukryty `s.visible=false` w PourBottle useFrame; pour twen ustawia `api.shakerFill.v` — ciecz rośnie w środku szejkera)*
 
 ### 🔑 KONFIGURACJA make.com (do zrobienia przez właściciela):
 - Webhook URL (Custom webhook w make.com) → Vercel env:
