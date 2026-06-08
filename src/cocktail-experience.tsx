@@ -3433,25 +3433,24 @@ function shapeFor(ing: Ingredient): "wine" | "spirit" | "can" | "round" {
  * ──────────────────────────────────────────────────────────────────────── */
 // Globalny tracker aktywnych kontekstów 3D na mobile (max 3 jednocześnie — limit iOS)
 const _active3D: Set<string> = typeof window !== "undefined" ? ((window as any).__sh3d || ((window as any).__sh3d = new Set())) : new Set();
-const MAX_MOBILE_3D = 1;   // mobile: max 1 kontekst 3D naraz (iOS limit)
-const MAX_DESKTOP_3D = 8;  // desktop: więcej
+const MAX_DESKTOP_3D = 8;
 
 function LazyBottle3D({ id, name, color, shape, ml, real }: { id: string; name: string; color: string; shape: "wine" | "spirit" | "can" | "round"; ml: number; real: boolean }) {
   const ref = useRef<HTMLDivElement>(null!);
   const [visible, setVisible] = useState(false);
   const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
   const uid = `${id}-${color}`;
-  const limit = isMobile ? MAX_MOBILE_3D : MAX_DESKTOP_3D;
 
   useEffect(() => {
+    // Na mobile: ZAWSZE SVG (RowBottle) — wszystkie butelki widoczne, zero Context Lost
+    if (isMobile) return;
     const el = ref.current;
     if (!el) return;
     const io = new IntersectionObserver(
       (entries) => {
         const isVis = entries[0]?.isIntersecting ?? false;
         if (isVis) {
-          // Limit aktywnych kontekstów WebGL — jeśli przekroczony, zostań SVG
-          if (_active3D.size >= limit && !_active3D.has(uid)) {
+          if (_active3D.size >= MAX_DESKTOP_3D && !_active3D.has(uid)) {
             setVisible(false); return;
           }
           _active3D.add(uid);
@@ -3461,18 +3460,18 @@ function LazyBottle3D({ id, name, color, shape, ml, real }: { id: string; name: 
           setVisible(false);
         }
       },
-      { rootMargin: "0px", threshold: 0.5 }
+      { rootMargin: "50px 0px 50px 0px", threshold: 0.15 }
     );
     io.observe(el);
     return () => { io.disconnect(); _active3D.delete(uid); };
-  }, [limit, uid]);
+  }, [isMobile, uid]);
 
   return (
     <div ref={ref} style={{ width: "100%", height: "100%", position: "relative" }}>
-      {visible ? (
+      {!isMobile && visible ? (
         <MiniBottle3D id={id} name={name} color={color} hovered={false} playing={false} sustaining={false} />
       ) : (
-        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.7 }}>
+        <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", opacity: 0.85 }}>
           <RowBottle color={color} ml={ml} real={real} shape={shape} />
         </div>
       )}
