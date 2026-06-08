@@ -664,19 +664,13 @@ function Contatti({ t }) {
       });
     } catch (err2) { console.error("Contact save error:", err2); }
 
-    // Webhook make.com (e-mail do właściciela po IT + do klienta w jego języku)
-    const webhookUrl = typeof window !== "undefined" && window.__MAKECOM_CONTACT_WEBHOOK;
-    if (webhookUrl) {
-      try {
-        await fetch(webhookUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...form, source_language: lang, timestamp: new Date().toISOString() }),
-        });
-      } catch (err3) { console.error("Webhook error:", err3); }
-    }
+    // make.com webhook (e-mail właściciel po IT + klient w jego języku + WhatsApp)
+    try {
+      const { sendReservation } = await import("./lib/make-webhooks");
+      await sendReservation({ name: form.name, email: form.email, phone: form.phone, date: form.date, people: form.people, message: form.message, lang });
+    } catch (err3) { console.error("Make webhook error:", err3); }
 
-    // WhatsApp callmebot (powiadomienie właściciela) — jeśli skonfigurowany
+    // WhatsApp callmebot (fallback bezpośredni, jeśli skonfigurowany window.__CALLMEBOT)
     const cmb = typeof window !== "undefined" && window.__CALLMEBOT;
     if (cmb && cmb.phone && cmb.apikey) {
       try {

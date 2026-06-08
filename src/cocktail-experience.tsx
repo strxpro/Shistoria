@@ -4561,6 +4561,20 @@ function ShareDrinkBtn() {
         photo_url: photo || undefined,
       });
     } catch (e) { console.error("Publish error:", e); }
+    // make.com — e-mail do twórcy (jeśli podał email przy drinku)
+    if (myDrink.email) {
+      try {
+        const { sendDrinkShared } = await import("./lib/make-webhooks");
+        await sendDrinkShared({
+          drink_name: myDrink.name || "Senza nome",
+          author_name: myDrink.author || "Anonimo",
+          author_email: myDrink.email,
+          ingredients: myDrink.ingredients || [],
+          lang: (typeof window !== "undefined" && (window as any).currentLanguage) || "it",
+          photo_url: photo || undefined,
+        });
+      } catch (e) { console.error("Make drink webhook error:", e); }
+    }
     if (typeof localStorage !== "undefined") localStorage.setItem("sh-drink-shared", "true");
     setSent(true);
   };

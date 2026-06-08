@@ -362,6 +362,38 @@ function DrinksPanel() {
     load();
   };
 
+  // Ogłoś Drink del Mese — wybiera drink z najwięcej polubień (śr. likes+claimed)
+  // i wysyła e-mail do WSZYSTKICH twórców (każdy w swoim języku przez make.com).
+  const announceWinnerOfMonth = async () => {
+    if (drinks.length === 0) { alert("Brak drinków."); return; }
+    // Wybierz zwycięzcę: najwyższy score = likes + claimed_count
+    const winner = [...drinks].sort((a, b) => ((b.likes || 0) + (b.claimed_count || 0)) - ((a.likes || 0) + (a.claimed_count || 0)))[0];
+    if (!confirm(`Ogłosić "${winner.name}" jako Drink del Mese i wysłać e-mail do wszystkich twórców?`)) return;
+    // Oznacz zwycięzcę
+    await supabase.from("community_drinks").update({ is_drink_of_month: false }).neq("id", "00000000-0000-0000-0000-000000000000");
+    await supabase.from("community_drinks").update({ is_drink_of_month: true }).eq("id", winner.id);
+    // Zbierz unikalne emaile twórców
+    const recipients = drinks
+      .filter((d) => d.author_email)
+      .map((d) => ({ email: d.author_email, name: d.author_name || "Anonimo", lang: d.language || "it" }))
+      .filter((r, i, arr) => arr.findIndex((x) => x.email === r.email) === i);
+    try {
+      const { announceWinner } = await import("../../lib/make-webhooks");
+      await announceWinner({
+        winner_drink: winner.name,
+        winner_author: winner.author_name,
+        winner_email: winner.author_email,
+        recipients,
+        period: "month",
+      });
+      alert(`Ogłoszono "${winner.name}"! E-mail wysłany do ${recipients.length} twórców.`);
+    } catch (e) {
+      console.error(e);
+      alert("Drink oznaczony, ale e-mail nie wyszedł (sprawdź konfigurację make.com).");
+    }
+    load();
+  };
+
   const remove = async (id: string) => {
     if (confirm("Eliminare questo drink?")) {
       await supabase.from("community_drinks").delete().eq("id", id);
@@ -373,6 +405,7 @@ function DrinksPanel() {
     <div className="admin-panel">
       <header className="admin-panel-head">
         <h1>Drink dei Clienti</h1>
+        <button className="admin-btn" onClick={announceWinnerOfMonth}>👑 Ogłoś Drink del Mese</button>
         <span className="admin-count">{drinks.length} creazioni</span>
       </header>
 
