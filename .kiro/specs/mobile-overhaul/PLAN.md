@@ -820,7 +820,7 @@
 - [ ] Pop-out "odbierz drink": opacity 100%, nie przeskakuje, dismiss klik-poza, krzyżyk, tło blur+blokada scroll
 - [ ] QR trafia do zakładki opcji (po prawej, gdzie szklanka) — łatwy dostęp
 - [x] Nazwy w boksach butelek mniejsze, pigułki w prawym górnym rogu ✅ *(mobile: cx-bcard-name 8.5px, cx-bcard-tag/count kompaktowe top:7px, ukryty cx-bcard-add)*
-- [ ] Szpary/luki w UI (hamburger menu, odstępy) — wyrównanie
+- [x] Szpary/luki w UI (hamburger menu, odstępy) — wyrównanie ✅ *(mobile-menu height:100dvh — pełne pokrycie viewportu, brak szpary na dole)*
 - [x] Scroll-do-shakera przy wejściu z menu ✅ *(onSelectSection w app.jsx — cocktail-rise ląduje w fazie hold, shaker wycentrowany)*
 - [x] Wyszukiwarka lupa na mobile (w drawerze) ✅ *(przycisk 🔍 w cx-drop-row + pasek wyszukiwania z wynikami i cross-panel hint)*
 - [ ] Nalewanie: ciecz ma trafiać do ŚRODKA szejkera (poziom rośnie) — sprawdzić po deploy

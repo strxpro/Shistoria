@@ -664,6 +664,7 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
         .mobile-menu {
           position: fixed;
           inset: 0;
+          height: 100dvh;
           z-index: 2000;
           background: var(--c-deep);
           color: #fff;
