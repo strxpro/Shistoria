@@ -64,6 +64,7 @@ import { useGSAP } from "@gsap/react";
 gsap.registerPlugin(ScrollTrigger);
 
 import { supabase, getSessionId, createOrder, publishDrink, likeDrink, addComment, claimDrink as claimDrinkApi } from "./lib/supabase";
+import { findCocktailByIngredients } from "./lib/cocktail-db";
 import { PersonalizedQR } from "./components/PersonalizedQR";
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -1634,6 +1635,8 @@ function CocktailExperience() {
   const totalMl = useMemo(() => Math.round(poured.reduce((s, p) => s + p.ml, 0)), [poured]);
   const strength = useMemo(() => strengthOf(poured), [poured]);
   const recognized = useMemo(() => recognizeCocktail(poured), [poured]);
+  const [apiDrink, setApiDrink] = useState<import("./lib/cocktail-db").ApiDrink | null>(null);
+  const [apiSearching, setApiSearching] = useState(false);
 
   const stageRef = useRef<Stage>("build");
   const colorRef = useRef(mixedColor);
@@ -1794,6 +1797,14 @@ function CocktailExperience() {
   const doShake = useCallback(() => {
     const api = sceneApiRef.current;
     if (!api || busyRef.current || stageRef.current !== "build" || poured.length < 2) return;
+
+    // Szukaj pasującego drinka w TheCocktailDB (asynchronicznie, nie blokuje animacji)
+    setApiDrink(null);
+    setApiSearching(true);
+    findCocktailByIngredients(poured.map((p) => p.ing.id))
+      .then((d) => { setApiDrink(d); })
+      .catch(() => {})
+      .finally(() => setApiSearching(false));
     busyRef.current = true;
     setStage("shaking");
 
@@ -2323,6 +2334,11 @@ function CocktailExperience() {
         {/* wybór szklanki — chowa się gdy startuje animacja nalewania */}
         <GlassPicker open={stage === "pickGlass" && !glassPourOpen} color={mixedColor} withIce={withIce}
           onIceChange={setWithIce} onPick={pickGlass} />
+
+        {/* Znaleziony drink z TheCocktailDB — baner nad wyborem szklanki */}
+        {stage === "pickGlass" && !glassPourOpen && (apiSearching || apiDrink) && (
+          <DrinkFound drink={apiDrink} searching={apiSearching} />
+        )}
 
         {/* mobilne koło "i" z instrukcjami (popout) */}
         <MobileInfo />
@@ -4249,6 +4265,47 @@ function GlassPicker({ open, color, withIce, onIceChange, onPick }: {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
+ * DrinkFound — baner z drinkiem znalezionym w TheCocktailDB (nazwa, zdjęcie, składniki).
+ * Etykiety w języku strony; nazwa drinka = oryginalna (nazwa własna).
+ * ──────────────────────────────────────────────────────────────────────── */
+function DrinkFound({ drink, searching }: { drink: import("./lib/cocktail-db").ApiDrink | null; searching: boolean }) {
+  const lang = (typeof window !== "undefined" && (window as any).currentLanguage) || "it";
+  const L: Record<string, { found: string; ingredients: string; searching: string; classic: string }> = {
+    it: { found: "Hai creato un classico!", ingredients: "Ingredienti ufficiali", searching: "Cerco il tuo drink...", classic: "Cocktail riconosciuto" },
+    pl: { found: "Stworzyłeś klasyka!", ingredients: "Oficjalne składniki", searching: "Szukam Twojego drinka...", classic: "Rozpoznany koktajl" },
+    en: { found: "You made a classic!", ingredients: "Official ingredients", searching: "Searching your drink...", classic: "Recognized cocktail" },
+    de: { found: "Ein Klassiker!", ingredients: "Offizielle Zutaten", searching: "Suche dein Getränk...", classic: "Erkannter Cocktail" },
+    fr: { found: "Un classique!", ingredients: "Ingrédients officiels", searching: "Recherche de ton cocktail...", classic: "Cocktail reconnu" },
+    es: { found: "¡Un clásico!", ingredients: "Ingredientes oficiales", searching: "Buscando tu trago...", classic: "Cóctel reconocido" },
+  };
+  const tr = L[lang] ?? L.it;
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div className="cx-drinkfound">
+      {searching && !drink ? (
+        <div className="cx-drinkfound-loading"><span className="cx-df-spin" /> {tr.searching}</div>
+      ) : drink ? (
+        <div className="cx-drinkfound-card">
+          {drink.thumb && <img src={drink.thumb} alt={drink.name} className="cx-df-img" loading="lazy" />}
+          <div className="cx-df-body">
+            <span className="cx-df-kicker">✨ {tr.found}</span>
+            <h4 className="cx-df-name">{drink.name}</h4>
+            <span className="cx-df-label">{tr.ingredients}</span>
+            <div className="cx-df-ingr">
+              {drink.ingredients.slice(0, 6).map((ing, i) => (
+                <span key={i} className="cx-df-pill">{ing.name}{ing.measure ? ` · ${ing.measure}` : ""}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>,
+    document.body,
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
  * GiftClaim — prezent "Odbierz swojego drinka" (gwiazdki) → klik → konfetti.
  * ──────────────────────────────────────────────────────────────────────── */
 function GiftClaim({ onClaim }: { onClaim: () => void }) {
@@ -5197,6 +5254,25 @@ function CocktailStyles() {
         background:linear-gradient(135deg, rgba(241,196,15,0.18), rgba(232,146,124,0.12)); border:1px solid rgba(241,196,15,0.4);
         font-size:12px; color:#fff; letter-spacing:0.03em; animation:cxFadeUp .4s ease; }
       .cx-recognized strong { font-family:var(--f-display,"Syne",serif); font-weight:800; letter-spacing:0.02em; }
+
+      /* DrinkFound — baner ze znalezionym drinkiem (TheCocktailDB) */
+      .cx-drinkfound { position:fixed; left:50%; top:calc(70px + env(safe-area-inset-top)); transform:translateX(-50%); z-index:60;
+        width:min(420px, 92vw); pointer-events:none; }
+      .cx-drinkfound-loading { display:flex; align-items:center; justify-content:center; gap:10px; padding:12px 20px; border-radius:999px;
+        background:rgba(14,20,30,0.92); border:1px solid rgba(255,255,255,0.14); color:#fff; font-size:13px; font-weight:600;
+        backdrop-filter:blur(10px); box-shadow:0 12px 32px rgba(0,0,0,0.4); }
+      .cx-df-spin { width:16px; height:16px; border-radius:50%; border:2px solid rgba(255,255,255,0.25); border-top-color:#fff; animation:cxSpin .8s linear infinite; }
+      @keyframes cxSpin { to { transform:rotate(360deg); } }
+      .cx-drinkfound-card { display:flex; gap:14px; padding:14px; border-radius:18px; pointer-events:auto;
+        background:linear-gradient(135deg, rgba(241,196,15,0.14), rgba(14,20,30,0.95)); border:1px solid rgba(241,196,15,0.4);
+        backdrop-filter:blur(14px); box-shadow:0 16px 44px rgba(0,0,0,0.5); animation:cxFadeUp .4s ease; }
+      .cx-df-img { width:72px; height:72px; border-radius:12px; object-fit:cover; flex-shrink:0; }
+      .cx-df-body { flex:1; min-width:0; }
+      .cx-df-kicker { font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:#f1c40f; font-weight:700; }
+      .cx-df-name { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:18px; color:#fff; margin:2px 0 6px; }
+      .cx-df-label { font-size:9px; letter-spacing:0.12em; text-transform:uppercase; color:rgba(255,255,255,0.5); }
+      .cx-df-ingr { display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; }
+      .cx-df-pill { font-size:10px; padding:3px 8px; border-radius:999px; background:rgba(255,255,255,0.1); color:rgba(255,255,255,0.85); }
 
       /* SHAKE button */
       .cx-shake { flex-shrink:0; margin-top:6px; display:inline-flex; align-items:center; justify-content:center; gap:12px; padding:18px 26px;
