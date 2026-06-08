@@ -400,10 +400,10 @@
 > przycisk **„odbierz drink"** oraz **licznik ile razy odebrano**. Ściśle powiązane z systemem QR (sekcja G).
 
 - **Do zrobienia:**
-  - [ ] Przy każdym drinku w community → przycisk **„odbierz drink" (claim)**.
-  - [ ] Widoczny **licznik odebrań** (claimed count) przy drinku.
-  - [ ] Klik „odbierz drink" → pokazuje **zdjęcie drinka + kod QR**.
-  - [ ] Barman skanuje QR / potwierdza → drink liczony jako **odebrany**, licznik **+1**.
+  - [x] Przy każdym drinku w community → przycisk **„odbierz drink" (claim)**. ✅ *(cx-cc-claim-top "Ordina questo drink" → QR)*
+  - [x] Widoczny **licznik odebrań** (claimed count) przy drinku. ✅ *(pole `claimed` w COMMUNITY, pigułka 🍸 na karcie + licznik "volte ritirato" w popout, wielojęzyczny)*
+  - [x] Klik „odbierz drink" → pokazuje **zdjęcie drinka + kod QR**. ✅ *(handleOrder → createOrder → cx-qr-overlay z PersonalizedQR)*
+  - [ ] Barman skanuje QR / potwierdza → drink liczony jako **odebrany**, licznik **+1**. *(backend G2)*
   - [ ] Auto-zapis: gdy drink jest odbierany (claimed), zapisuje się z urządzenia użytkownika.
 - 🔗 *Realizacja techniczna QR + potwierdzenie barmana → **SEKCJA G**. Tu chodzi o przycisk i licznik widoczne w community.*
 

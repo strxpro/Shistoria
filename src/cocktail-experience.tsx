@@ -519,12 +519,12 @@ const STEPS = [
 ] as const;
 
 const COMMUNITY = [
-  { name: "Cuzzo Tropicale", by: "Marco", ingr: ["rum", "arancia", "limone", "ginger"], quote: "Pronto a luglio, da bere al tramonto.", likes: 124, comments: 18, from: "#C9742E", to: "#F4D03F" },
-  { name: "Nonna Drink", by: "Sara", ingr: ["vermouth-r", "campari", "sciroppo"], quote: "Mia nonna sarebbe orgogliosa. Mirto perfetto.", likes: 98, comments: 12, from: "#8E2F3A", to: "#C8102E" },
-  { name: "Sole di Rena", by: "Luca", ingr: ["gin", "tonica", "limone"], quote: "Erba di Gallura nel bicchiere.", likes: 156, comments: 24, from: "#9FD8C8", to: "#D6EFE8" },
-  { name: "Spritz d'Estate", by: "Hannah", ingr: ["aperol", "prosecco", "soda"], quote: "Il classico che non tradisce mai.", likes: 87, comments: 9, from: "#F4612B", to: "#F7C59F" },
-  { name: "Limoncello Sour", by: "Antonio", ingr: ["limoncello", "limone", "soda"], quote: "Acido giusto, dolce al punto.", likes: 73, comments: 6, from: "#F4D03F", to: "#FFF3B0" },
-  { name: "Notte Rossa", by: "Carlos", ingr: ["campari", "vermouth-r", "arancia"], quote: "Per chi ama l'amaro elegante.", likes: 142, comments: 21, from: "#C8102E", to: "#8E2F3A" },
+  { name: "Cuzzo Tropicale", by: "Marco", ingr: ["rum", "arancia", "limone", "ginger"], quote: "Pronto a luglio, da bere al tramonto.", likes: 124, comments: 18, claimed: 42, from: "#C9742E", to: "#F4D03F" },
+  { name: "Nonna Drink", by: "Sara", ingr: ["vermouth-r", "campari", "sciroppo"], quote: "Mia nonna sarebbe orgogliosa. Mirto perfetto.", likes: 98, comments: 12, claimed: 31, from: "#8E2F3A", to: "#C8102E" },
+  { name: "Sole di Rena", by: "Luca", ingr: ["gin", "tonica", "limone"], quote: "Erba di Gallura nel bicchiere.", likes: 156, comments: 24, claimed: 67, from: "#9FD8C8", to: "#D6EFE8" },
+  { name: "Spritz d'Estate", by: "Hannah", ingr: ["aperol", "prosecco", "soda"], quote: "Il classico che non tradisce mai.", likes: 87, comments: 9, claimed: 28, from: "#F4612B", to: "#F7C59F" },
+  { name: "Limoncello Sour", by: "Antonio", ingr: ["limoncello", "limone", "soda"], quote: "Acido giusto, dolce al punto.", likes: 73, comments: 6, claimed: 19, from: "#F4D03F", to: "#FFF3B0" },
+  { name: "Notte Rossa", by: "Carlos", ingr: ["campari", "vermouth-r", "arancia"], quote: "Per chi ama l'amaro elegante.", likes: 142, comments: 21, claimed: 54, from: "#C8102E", to: "#8E2F3A" },
 ];
 
 const ALL_INGREDIENTS: Ingredient[] = [
@@ -5016,7 +5016,8 @@ function CommunityCard({ c }: { c: (typeof COMMUNITY)[number] }) {
           )}
           <div className="cx-cc-meta">
             <button className={`cx-cc-like ${liked ? "on" : ""}`} onClick={(e) => { e.stopPropagation(); setLiked((v) => !v); }}>♥ {c.likes + (liked ? 1 : 0)}</button>
-            <button className="cx-cc-cmt-btn" onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }}>\uD83D\uDCAC {c.comments}</button>
+            <button className="cx-cc-cmt-btn" onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }}>💬 {c.comments}</button>
+            <span className="cx-cc-claimed-pill" title="Volte ritirato">🍸 {(c as any).claimed ?? 0}</span>
           </div>
         </div>
       </article>
@@ -5047,8 +5048,9 @@ function CommunityCard({ c }: { c: (typeof COMMUNITY)[number] }) {
                   {alcCount === 0 ? "Analcolico" : alcCount <= 1 ? "Leggero" : alcCount <= 2 ? "Medio" : "Forte"}
                 </div>
               </div>
-              {/* Przycisk Ordina — NA GÓRZE */}
+              {/* Przycisk Ordina/Ritira — NA GÓRZE + licznik odebrań */}
               <button className="cx-cc-claim-btn cx-cc-claim-top" onClick={handleOrder}>🍸 Ordina questo drink</button>
+              <div className="cx-cc-claimed-count">🍸 {(c as any).claimed ?? 0} {(() => { const L: Record<string,string> = {it:"volte ritirato",pl:"razy odebrano",en:"times claimed",de:"mal abgeholt",fr:"fois retiré",es:"veces reclamado"}; return L[((typeof window!=="undefined"&&(window as any).currentLanguage)||"it") as keyof typeof L]??L.it; })()}</div>
               <div className="cx-cc-popout-ingr">
                 <span className="cx-cc-popout-label">Ingredienti</span>
                 <div className="cx-cc-popout-pills">
@@ -6051,6 +6053,8 @@ function CocktailStyles() {
       .cx-cc-claim-btn { padding:10px 18px; border-radius:999px; background:var(--cx-accent,#E8927C); color:#fff; font-weight:700; font-size:12px; letter-spacing:0.04em; border:none; cursor:pointer; transition:all .25s; }
       .cx-cc-claim-btn:hover { background:#d9745c; transform:translateY(-1px); }
       .cx-cc-claim-top { width:100%; margin:12px 0; padding:14px; font-size:13px; }
+      .cx-cc-claimed-count { text-align:center; font-size:12px; color:rgba(255,255,255,0.6); margin:-4px 0 10px; letter-spacing:0.02em; }
+      .cx-cc-claimed-pill { display:inline-flex; align-items:center; gap:3px; color:rgba(255,255,255,0.55); font-size:12px; }
 
       /* Strength color bar on card */
       .cx-cc-strength-bar { position:absolute; top:0; left:0; right:0; height:3px; background:var(--cc-strength,#E8927C); border-radius:3px 3px 0 0; z-index:2; }
