@@ -63,16 +63,16 @@ export default function OrderPage({ params }: { params: { id: string } }) {
 
         {!done ? (
           <button onClick={markDone} style={styles.btn}>
-            ✓ Drink preparato
+            ✓ Conferma
           </button>
         ) : (
           <div style={styles.doneBox}>
             <span style={styles.doneIco}>✓</span>
-            <span>Completato</span>
+            <span>Confermato</span>
           </div>
         )}
 
-        <p style={styles.footer}>Scansionato dal barman · {new Date(order.created_at).toLocaleString("it-IT")}</p>
+        <p style={styles.footer}>{new Date(order.created_at).toLocaleString("it-IT")}</p>
       </div>
     </div>
   );

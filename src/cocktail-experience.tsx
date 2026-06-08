@@ -1811,6 +1811,8 @@ function CocktailExperience() {
     busyRef.current = true;
     setChosenGlass(g);
     if (ice !== undefined) setWithIce(ice);
+    // Zapisz info o lodzie do window (żeby NameCard mógł odczytać)
+    if (typeof window !== "undefined") (window as any).__sh_withIce = ice !== undefined ? ice : withIce;
 
     // stary shaker (zamknięty) odjeżdża w prawo poza ekran
     const tl = gsap.timeline({
@@ -4304,9 +4306,9 @@ function NameCard({
       <div className="cx-name cx-name-qr">
         <div className="cx-qr">
           {orderUrl ? (
-            <PersonalizedQR url={orderUrl} color={color} size={108} icon="🍸" />
+            <PersonalizedQR url={orderUrl} color={color} size={140} icon="🍸" />
           ) : (
-            <div style={{ width: 108, height: 108, background: "#fff", borderRadius: 14, display: "grid", placeItems: "center" }}>
+            <div style={{ width: 140, height: 140, background: "#fff", borderRadius: 14, display: "grid", placeItems: "center" }}>
               <span style={{ fontSize: 20, opacity: 0.4 }}>⏳</span>
             </div>
           )}
@@ -4315,8 +4317,9 @@ function NameCard({
           <span className="cx-mini-kicker">Mostralo al barman</span>
           <h4>{drinkName}</h4>
           <p>di {customerName} · {poured.length} ingredienti</p>
+          <p className="cx-name-ice">{(window as any).__sh_withIce !== false ? "🧊 Con ghiaccio" : "☀️ Senza ghiaccio"}</p>
           {email.trim() && <p className="cx-name-email">📧 {email}</p>}
-          <button className="cx-btn-ghost" onClick={onReset}>↺ Zacznij od nowa</button>
+          <button className="cx-btn-ghost" onClick={onReset}>↺ Ricomincia</button>
         </div>
       </div>
     );
@@ -5180,9 +5183,9 @@ function CocktailStyles() {
       .cx-btn:not(:disabled):hover { transform:translateY(-2px); filter:brightness(1.08); }
       .cx-btn-ghost { align-self:flex-start; padding:9px 16px; border-radius:999px; border:1px solid var(--cx-stroke); color:rgba(255,255,255,0.85); font-size:12px; cursor:pointer; transition:all .3s; }
       .cx-btn-ghost:hover { border-color:var(--c-coral,#E8927C); color:#fff; }
-      .cx-name-qr { display:flex; gap:16px; align-items:center; }
-      .cx-qr { width:108px; height:108px; flex-shrink:0; background:#fff; border-radius:14px; padding:9px; box-shadow:0 12px 30px rgba(0,0,0,0.4); }
-      .cx-qr svg { width:100%; height:100%; display:block; }
+      .cx-name-qr { display:flex; flex-direction:column; gap:16px; align-items:center; text-align:center; }
+      .cx-qr { width:140px; height:140px; flex-shrink:0; background:#fff; border-radius:16px; padding:10px; box-shadow:0 12px 30px rgba(0,0,0,0.4); }
+      .cx-qr svg, .cx-qr img, .cx-qr > div { width:100%; height:100%; display:block; }
       .cx-name-info { display:flex; flex-direction:column; gap:5px; }
       .cx-name-info h4 { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:22px; margin:2px 0; letter-spacing:-0.02em; }
       .cx-name-info p { font-size:12px; color:rgba(255,255,255,0.6); margin:0 0 8px; }
