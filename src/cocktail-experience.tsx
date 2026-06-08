@@ -3712,12 +3712,31 @@ function AccordionPanel({
   const [visibleGroup, setVisibleGroup] = useState<string | null>(null);
   const [catDropOpen, setCatDropOpen] = useState(false);
   const [strDropOpen, setStrDropOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQ, setSearchQ] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null!);
   const countOf = (id: string) => Math.round(poured.find((p) => p.ing.id === id)?.ml ?? 0);
   const align = side === "right" ? "right" : "left";
   const current = groups.find((g) => g.group === active) ?? null;
   // "Wszystkie" mode: show all items from all groups
   const isAll = active === "__all__";
+
+  // Wyszukiwanie składników w TYM panelu + podpowiedź gdy w drugim panelu
+  const searchResults = useMemo(() => {
+    const q = searchQ.trim().toLowerCase();
+    if (!q) return null;
+    const inThis: { ing: Ingredient; group: string }[] = [];
+    groups.forEach((g) => g.items.forEach((it) => {
+      if (it.name.toLowerCase().includes(q)) inThis.push({ ing: it, group: g.group });
+    }));
+    // szukaj też w drugim panelu (przeciwna strona) dla podpowiedzi
+    const otherGroups = side === "right" ? MIXERS : ALCOHOLS;
+    const otherSideName = side === "right" ? "Mixer" : "Spirits";
+    let inOther = 0;
+    otherGroups.forEach((g) => g.items.forEach((it) => { if (it.name.toLowerCase().includes(q)) inOther++; }));
+    return { inThis, inOther, otherSideName };
+  }, [searchQ, groups, side]);
+
   const rawItems = isAll ? groups.flatMap((g) => g.items) : (current?.items ?? []);
   // Apply strength filter
   const items = strengthFilter === "all" ? rawItems : rawItems.filter((i) => {
@@ -3845,10 +3864,41 @@ function AccordionPanel({
             <strong>{kicker}</strong>
             <em>{side === "left" ? "Base & profumi" : "Anima del drink"}</em>
           </span>
+          <button className="cx-search-btn" onClick={() => { setSearchOpen((v) => !v); if (searchOpen) setSearchQ(""); }} aria-label="Cerca">🔍</button>
           <button className="cx-collapse" onClick={() => setCollapsed((v) => !v)} aria-label={collapsed ? "Espandi" : "Riduci"}>
             <span className={`cx-collapse-ico ${collapsed ? "is-closed" : ""}`} />
           </button>
         </div>
+
+        {/* Pasek wyszukiwania składników */}
+        {searchOpen && !collapsed && (
+          <div className="cx-search-wrap">
+            <input className="cx-search-input" autoFocus placeholder="Cerca ingrediente..." value={searchQ}
+              onChange={(e) => setSearchQ(e.target.value)} />
+            {searchResults && (
+              <div className="cx-search-results">
+                {searchResults.inThis.length > 0 ? (
+                  searchResults.inThis.map(({ ing, group }) => (
+                    <button key={ing.id} className="cx-search-item" onClick={(e) => {
+                      const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                      onPour(ing, { x: r.left + r.width / 2, y: r.top }, "tap");
+                    }}>
+                      <span className="cx-search-dot" style={{ background: ing.color }} />
+                      <span className="cx-search-name">{ing.name}</span>
+                      <span className="cx-search-grp">{group}</span>
+                    </button>
+                  ))
+                ) : searchResults.inOther > 0 ? (
+                  <div className="cx-search-hint">
+                    💡 Trovato in <strong>{searchResults.otherSideName}</strong> — cerca nell'altro pannello!
+                  </div>
+                ) : searchQ.trim() ? (
+                  <div className="cx-search-hint">Nessun risultato per "{searchQ}"</div>
+                ) : null}
+              </div>
+            )}
+          </div>
+        )}
 
         {!collapsed && !current && !isAll && (
           <div className="cx-cats">
@@ -5069,6 +5119,22 @@ function CocktailStyles() {
       .cx-menu-label strong { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:17px; letter-spacing:0.02em; color:#fff; }
       .cx-menu-label em { font-family:var(--f-serif,"Instrument Serif",serif); font-style:italic; font-size:12px; color:rgba(255,255,255,0.5); }
       .cx-collapse { width:30px; height:30px; flex-shrink:0; display:grid; place-items:center; border-radius:10px; background:rgba(255,255,255,0.05); border:1px solid var(--cx-stroke); cursor:pointer; transition:all .25s; }
+      .cx-search-btn { width:30px; height:30px; flex-shrink:0; display:grid; place-items:center; border-radius:10px; background:rgba(255,255,255,0.05); border:1px solid var(--cx-stroke); cursor:pointer; font-size:14px; transition:all .25s; }
+      .cx-search-btn:hover { background:rgba(255,255,255,0.12); }
+      .cx-search-wrap { margin-top:12px; }
+      .cx-search-input { width:100%; padding:11px 16px; border-radius:12px; box-sizing:border-box; background:rgba(255,255,255,0.06);
+        border:1px solid var(--cx-stroke); color:#fff; font-size:14px; font-family:inherit; outline:none; }
+      .cx-search-input::placeholder { color:rgba(255,255,255,0.4); }
+      .cx-search-results { margin-top:8px; display:flex; flex-direction:column; gap:4px; max-height:40vh; overflow-y:auto; }
+      .cx-search-item { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px; cursor:pointer;
+        background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); color:#fff; text-align:left; transition:all .2s; }
+      .cx-search-item:hover { background:rgba(255,255,255,0.1); }
+      .cx-search-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+      .cx-search-name { flex:1; font-size:13px; font-weight:600; }
+      .cx-search-grp { font-size:10px; opacity:0.5; text-transform:uppercase; letter-spacing:0.08em; }
+      .cx-search-hint { padding:14px; border-radius:12px; background:rgba(241,196,15,0.12); border:1px solid rgba(241,196,15,0.3);
+        color:rgba(255,255,255,0.85); font-size:13px; text-align:center; line-height:1.5; }
+      .cx-search-hint strong { color:#f1c40f; }
       .cx-collapse:hover { background:rgba(255,255,255,0.12); }
       .cx-collapse-ico { position:relative; width:12px; height:12px; }
       .cx-collapse-ico::before, .cx-collapse-ico::after { content:""; position:absolute; background:rgba(255,255,255,0.8); border-radius:2px; transition:transform .3s; }
