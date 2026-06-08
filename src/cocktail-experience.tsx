@@ -4294,6 +4294,7 @@ function NameCard({
   };
 
   const [qrOpen, setQrOpen] = useState(false);
+  const [qrFull, setQrFull] = useState(false);
 
   if (done) {
     return (
@@ -4331,7 +4332,29 @@ function NameCard({
               <h4>{drinkName}</h4>
               <p>di {customerName} · {poured.length} ingredienti · {(window as any).__sh_withIce !== false ? "🧊" : "☀️"}</p>
               {email.trim() && <p className="cx-name-email">📧 {email}</p>}
+              {/* Strzałka — otwiera QR na pełen ekran */}
+              <button className="cx-qr-expand" onClick={() => setQrFull(true)} aria-label="Schermo intero">
+                ⛶ Schermo intero
+              </button>
             </div>
+          </div>,
+          document.body,
+        )}
+
+        {/* QR fullscreen — tylko QR na całym ekranie */}
+        {qrFull && typeof document !== "undefined" && createPortal(
+          <div className="cx-qr-full" onClick={() => setQrFull(false)}>
+            <button className="cx-qr-close" onClick={() => setQrFull(false)}>×</button>
+            <div className="cx-qr-full-box" onClick={(e) => e.stopPropagation()}>
+              {orderUrl ? (
+                <PersonalizedQR url={orderUrl} color={color} size={Math.min(typeof window !== "undefined" ? window.innerWidth - 80 : 300, 360)} icon="🍸" />
+              ) : (
+                <div style={{ width: 300, height: 300, background: "#fff", borderRadius: 16, display: "grid", placeItems: "center" }}>
+                  <span style={{ fontSize: 32, opacity: 0.4 }}>⏳</span>
+                </div>
+              )}
+            </div>
+            <p className="cx-qr-full-label">{drinkName} · Mostralo al barman</p>
           </div>,
           document.body,
         )}
@@ -4721,11 +4744,21 @@ function CommunityCard({ c }: { c: (typeof COMMUNITY)[number] }) {
   const [liked, setLiked] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [popout, setPopout] = useState(false);
+  const [orderQR, setOrderQR] = useState<string | null>(null);
   const clickTimer = useRef<number | null>(null);
 
   // Kolor zakładki zależy od "mocy" (ilość alkoholi w przepisie)
   const alcCount = c.ingr.filter((id) => ALCOHOLS.some((g) => g.items.some((it) => it.id === id))).length;
   const strengthColor = alcCount === 0 ? "#9DC85A" : alcCount <= 1 ? "#F4D03F" : alcCount <= 2 ? "#E8927C" : "#C8102E";
+
+  const handleOrder = () => {
+    const ingredients = c.ingr.map(id => { const ing = ingById(id); return ing ? { id: ing.id, name: ing.name, color: ing.color, ml: ing.ml } : null; }).filter(Boolean);
+    const totalMl = ingredients.reduce((s: number, i: any) => s + (i?.ml || 0), 0);
+    createOrder({ drink_name: c.name, author_name: c.by, ingredients: ingredients as any[], total_ml: totalMl, strength_label: alcCount === 0 ? "Analcolico" : alcCount <= 1 ? "Leggero" : "Forte" })
+      .then(order => {
+        if (order?.id) setOrderQR(`${typeof window !== "undefined" ? window.location.origin : ""}/order/${order.id}`);
+      });
+  };
 
   const handleClick = () => {
     if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; return; }
@@ -4805,6 +4838,8 @@ function CommunityCard({ c }: { c: (typeof COMMUNITY)[number] }) {
                   {alcCount === 0 ? "Analcolico" : alcCount <= 1 ? "Leggero" : alcCount <= 2 ? "Medio" : "Forte"}
                 </div>
               </div>
+              {/* Przycisk Ordina — NA GÓRZE */}
+              <button className="cx-cc-claim-btn cx-cc-claim-top" onClick={handleOrder}>🍸 Ordina questo drink</button>
               <div className="cx-cc-popout-ingr">
                 <span className="cx-cc-popout-label">Ingredienti</span>
                 <div className="cx-cc-popout-pills">
@@ -4822,15 +4857,24 @@ function CommunityCard({ c }: { c: (typeof COMMUNITY)[number] }) {
               </div>
               <div className="cx-cc-popout-actions">
                 <button className={`cx-cc-like ${liked ? "on" : ""}`} onClick={() => setLiked((v) => !v)}>♥ {c.likes + (liked ? 1 : 0)}</button>
-                <button className="cx-cc-claim-btn" onClick={() => {
-                  // Genereuj mock order z danych community
-                  const ingredients = c.ingr.map(id => { const ing = ingById(id); return ing ? { id: ing.id, name: ing.name, color: ing.color, ml: ing.ml } : null; }).filter(Boolean);
-                  const totalMl = ingredients.reduce((s: number, i: any) => s + (i?.ml || 0), 0);
-                  createOrder({ drink_name: c.name, author_name: c.by, ingredients: ingredients as any[], total_ml: totalMl, strength_label: alcCount === 0 ? "Analcolico" : alcCount <= 1 ? "Leggero" : "Forte" })
-                    .then(order => { if (order?.id) window.open(`/order/${order.id}`, "_blank"); });
-                }}>🍸 Ordina questo</button>
               </div>
             </div>
+          </div>
+        </div>,
+        document.body,
+      )}
+
+      {/* QR overlay po kliknięciu Ordina */}
+      {orderQR && typeof document !== "undefined" && createPortal(
+        <div className="cx-qr-overlay" onClick={() => setOrderQR(null)}>
+          <div className="cx-qr-card" onClick={(e) => e.stopPropagation()}>
+            <button className="cx-qr-close" onClick={() => setOrderQR(null)}>×</button>
+            <span className="cx-mini-kicker">Mostralo al barman</span>
+            <div className="cx-qr-box">
+              <PersonalizedQR url={orderQR} color={c.from} size={180} icon="🍸" />
+            </div>
+            <h4 style={{ margin: "8px 0 0", color: "#fff" }}>{c.name}</h4>
+            <p style={{ opacity: 0.6, fontSize: 13, margin: 0 }}>by {c.by}</p>
           </div>
         </div>,
         document.body,
@@ -5213,6 +5257,14 @@ function CocktailStyles() {
       .cx-qr-close:hover { background:rgba(255,255,255,0.1); }
       .cx-qr-box { background:#fff; border-radius:16px; padding:12px; box-shadow:0 8px 24px rgba(0,0,0,0.3); }
       .cx-qr-box > div, .cx-qr-box img { display:block; }
+      .cx-qr-expand { margin-top:4px; padding:8px 16px; border-radius:999px; border:1px solid rgba(255,255,255,0.2); background:transparent;
+        color:rgba(255,255,255,0.85); font-size:12px; font-weight:600; cursor:pointer; transition:all .2s; }
+      .cx-qr-expand:hover { background:rgba(255,255,255,0.1); color:#fff; }
+      .cx-qr-full { position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,0.92); display:flex; flex-direction:column;
+        align-items:center; justify-content:center; gap:20px; padding:24px; animation:cxFade .25s ease; }
+      .cx-qr-full-box { background:#fff; border-radius:20px; padding:20px; box-shadow:0 20px 60px rgba(0,0,0,0.6); }
+      .cx-qr-full-box > div, .cx-qr-full-box img { display:block; }
+      .cx-qr-full-label { color:#fff; font-size:14px; font-weight:600; text-align:center; }
       .cx-qr { width:140px; height:140px; flex-shrink:0; background:#fff; border-radius:16px; padding:10px; box-shadow:0 12px 30px rgba(0,0,0,0.4); }
       .cx-qr svg, .cx-qr img, .cx-qr > div { width:100%; height:100%; display:block; }
       .cx-name-info { display:flex; flex-direction:column; gap:5px; }
@@ -5713,6 +5765,7 @@ function CocktailStyles() {
       .cx-cc-popout-actions { padding-top:16px; border-top:1px solid rgba(255,255,255,0.08); display:flex; gap:12px; flex-wrap:wrap; }
       .cx-cc-claim-btn { padding:10px 18px; border-radius:999px; background:var(--cx-accent,#E8927C); color:#fff; font-weight:700; font-size:12px; letter-spacing:0.04em; border:none; cursor:pointer; transition:all .25s; }
       .cx-cc-claim-btn:hover { background:#d9745c; transform:translateY(-1px); }
+      .cx-cc-claim-top { width:100%; margin:12px 0; padding:14px; font-size:13px; }
 
       /* Strength color bar on card */
       .cx-cc-strength-bar { position:absolute; top:0; left:0; right:0; height:3px; background:var(--cc-strength,#E8927C); border-radius:3px 3px 0 0; z-index:2; }
@@ -5722,10 +5775,11 @@ function CocktailStyles() {
       /* Share drink popout */
       .cx-share-overlay { position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.75); backdrop-filter:blur(8px);
         display:flex; align-items:center; justify-content:center; padding:24px; animation:cxFade .3s ease; }
-      .cx-share-popout { width:min(700px,92vw); max-height:85vh; border-radius:24px; overflow:hidden; position:relative;
-        background:#12171e; border:1px solid rgba(255,255,255,0.1); box-shadow:0 40px 100px rgba(0,0,0,0.6); animation:cxFadeUp .4s ease; }
+      .cx-share-popout { width:min(700px,92vw); max-height:88vh; border-radius:24px; overflow-y:auto; overflow-x:hidden; position:relative;
+        background:#12171e; border:1px solid rgba(255,255,255,0.1); box-shadow:0 40px 100px rgba(0,0,0,0.6); animation:cxFadeUp .4s ease;
+        -webkit-overflow-scrolling:touch; }
       .cx-share-form { display:grid; grid-template-columns:1fr 1fr; min-height:360px; }
-      @media (max-width:600px) { .cx-share-form { grid-template-columns:1fr; } }
+      @media (max-width:600px) { .cx-share-form { grid-template-columns:1fr; min-height:0; } .cx-share-preview { min-height:200px; } .cx-share-info { padding:20px; } .cx-share-info h3 { font-size:20px; } }
       .cx-share-preview { display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,0.3); min-height:300px; }
       .cx-share-photo { width:100%; height:100%; object-fit:cover; }
       .cx-share-upload { display:flex; flex-direction:column; align-items:center; gap:12px; padding:40px; cursor:pointer;
