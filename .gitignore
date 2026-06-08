@@ -32,6 +32,7 @@ public/*.backup.glb
 !package.json
 !package-lock.json
 !tsconfig.json
+!public/cocktails-db.json
 !next-env.d.ts
 !.kiro/**/*.json
 !.claude/**/*.json
