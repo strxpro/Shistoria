@@ -4000,9 +4000,41 @@ function AccordionPanel({
                 <button className="cx-drop-arrow" disabled={!canLeft} onClick={() => scrollBy(-1)} aria-label="Precedente">‹</button>
                 <button className="cx-drop-arrow" disabled={!canRight} onClick={() => scrollBy(1)} aria-label="Successivo">›</button>
               </div>
+              {/* Lupa wyszukiwania (mobile) */}
+              <button className={`cx-drop-search ${searchOpen ? "is-on" : ""}`} onClick={() => { setSearchOpen((v) => !v); if (searchOpen) setSearchQ(""); }} aria-label="Cerca ingrediente">🔍</button>
               {/* Krzyżyk zamykający — zawsze stały w prawym rogu */}
               <button className="cx-drop-close" onClick={closeCat} aria-label="Chiudi">×</button>
             </div>
+
+            {/* Pasek wyszukiwania składników (mobile) */}
+            {searchOpen && (
+              <div className="cx-search-wrap cx-search-wrap-mobile">
+                <input className="cx-search-input" autoFocus placeholder="Cerca ingrediente..." value={searchQ}
+                  onChange={(e) => setSearchQ(e.target.value)} />
+                {searchResults && (
+                  <div className="cx-search-results">
+                    {searchResults.inThis.length > 0 ? (
+                      searchResults.inThis.map(({ ing, group }) => (
+                        <button key={ing.id} className="cx-search-item" onClick={(e) => {
+                          const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                          onPour(ing, { x: r.left + r.width / 2, y: r.top }, "tap");
+                        }}>
+                          <span className="cx-search-dot" style={{ background: ing.color }} />
+                          <span className="cx-search-name">{ing.name}</span>
+                          <span className="cx-search-grp">{group}</span>
+                        </button>
+                      ))
+                    ) : searchResults.inOther > 0 ? (
+                      <div className="cx-search-hint">
+                        💡 Trovato in <strong>{searchResults.otherSideName}</strong> — cerca nell'altro pannello!
+                      </div>
+                    ) : searchQ.trim() ? (
+                      <div className="cx-search-hint">Nessun risultato per "{searchQ}"</div>
+                    ) : null}
+                  </div>
+                )}
+              </div>
+            )}
             <div className="cx-drawer-head">
               <button className="cx-back" onClick={closeCat}>
                 <span className="cx-back-ico">←</span> Categorie
@@ -5865,6 +5897,11 @@ function CocktailStyles() {
         .cx-drop-row { display:flex; gap:8px; margin-bottom:10px; align-items:stretch; }
         .cx-drop-row .cx-drop { flex:1 1 0; min-width:0; display:flex; }
         .cx-drop-row .cx-drop-trigger { height:44px; }
+        .cx-drop-search { flex:0 0 44px; width:44px; height:44px; border-radius:14px; display:grid; place-items:center;
+          background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); color:#fff; font-size:18px; cursor:pointer; transition:all .2s; }
+        .cx-drop-search.is-on { background:rgba(232,146,124,0.25); border-color:var(--cx-accent,#E8927C); }
+        .cx-search-wrap-mobile { display:block; margin:0 0 12px; }
+        .cx-search-wrap-mobile .cx-search-results { max-height:48vh; }
         .cx-drop-back { flex:0 0 44px; width:44px; height:44px; border-radius:14px; display:grid; place-items:center;
           background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); color:var(--cx-accent,#E8927C);
           font-size:20px; cursor:pointer; box-sizing:border-box; align-self:stretch; }

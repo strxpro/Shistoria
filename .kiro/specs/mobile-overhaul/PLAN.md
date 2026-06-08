@@ -821,8 +821,8 @@
 - [ ] QR trafia do zakładki opcji (po prawej, gdzie szklanka) — łatwy dostęp
 - [ ] Nazwy w boksach butelek mniejsze, pigułki w prawym górnym rogu
 - [ ] Szpary/luki w UI (hamburger menu, odstępy) — wyrównanie
-- [ ] Scroll-do-shakera przy wejściu z menu
-- [ ] Wyszukiwarka lupa na mobile (w drawerze)
+- [x] Scroll-do-shakera przy wejściu z menu ✅ *(onSelectSection w app.jsx — cocktail-rise ląduje w fazie hold, shaker wycentrowany)*
+- [x] Wyszukiwarka lupa na mobile (w drawerze) ✅ *(przycisk 🔍 w cx-drop-row + pasek wyszukiwania z wynikami i cross-panel hint)*
 - [ ] Nalewanie: ciecz ma trafiać do ŚRODKA szejkera (poziom rośnie) — sprawdzić po deploy
 
 ### 🔑 KONFIGURACJA make.com (do zrobienia przez właściciela):
