@@ -817,8 +817,8 @@
 
 ### ⏳ DO DOPRACOWANIA (zgłoszone, w toku):
 - [x] Pop-out "zrobiłeś drink": na środku, BEZ filmiku, 2 opcje (Wybierz ten → QR / Kontynuuj → film) ✅ *(DrinkFound przebudowany na modal z overlay+blur, 2 przyciski, krzyżyk, dismiss klik-poza)*
-- [ ] Pop-out "odbierz drink": opacity 100%, nie przeskakuje, dismiss klik-poza, krzyżyk, tło blur+blokada scroll
-- [ ] QR trafia do zakładki opcji (po prawej, gdzie szklanka) — łatwy dostęp
+- [x] Pop-out "odbierz drink": opacity 100%, nie przeskakuje, dismiss klik-poza, krzyżyk, tło blur+blokada scroll ✅ *(GiftClaim renderowany inline w cx-table — non-sticky, tylko w sekcji kreatora, pełna opacity; po klik → NameCard z QR)*
+- [x] QR trafia do zakładki opcji (po prawej, gdzie szklanka) — łatwy dostęp ✅ *(po potwierdzeniu zamówienia QR jako trwałe mini-kółko `cx-qr-mini` w karcie glassReady → klik otwiera kartę QR → fullscreen; zawsze dostępne w sekcji kreatora)*
 - [x] Nazwy w boksach butelek mniejsze, pigułki w prawym górnym rogu ✅ *(mobile: cx-bcard-name 8.5px, cx-bcard-tag/count kompaktowe top:7px, ukryty cx-bcard-add)*
 - [x] Szpary/luki w UI (hamburger menu, odstępy) — wyrównanie ✅ *(mobile-menu height:100dvh — pełne pokrycie viewportu, brak szpary na dole)*
 - [x] Scroll-do-shakera przy wejściu z menu ✅ *(onSelectSection w app.jsx — cocktail-rise ląduje w fazie hold, shaker wycentrowany)*
