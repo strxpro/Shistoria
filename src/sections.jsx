@@ -7,6 +7,68 @@ const { useState: useStateE, useEffect: useEffectE, useRef: useRefE } = React;
 
 // ─── Eventi ───────────────────────────────────────────────────────────────────
 function Eventi({ t }) {
+  const [events, setEvents] = useStateE([]);
+  const [activeIdx, setActiveIdx] = useStateE(0);
+  const intervalRef = useRefE(null);
+  const touchRef = useRefE({ startX: 0, startY: 0 });
+
+  useEffectE(() => {
+    const load = async () => {
+      try {
+        const { createClient } = await import("@supabase/supabase-js");
+        const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://slatelpipxtqveydgslc.supabase.co';
+        const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNsYXRlbHBpcHh0cXZleWRnc2xjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODcyNTQsImV4cCI6MjA5NjE2MzI1NH0.5dwE9IStThjC-krTtgg7PtEwmTnr_bQ_TEbQhgMpHdY';
+        const sb = createClient(url, key);
+        const { data } = await sb.from("events").select("*").eq("is_published", true).order("event_date", { ascending: true });
+        if (data && data.length > 0) { setEvents(data); return; }
+      } catch {}
+      // Fallback na statyczne dane
+      if (typeof window !== "undefined" && window.EVENTI_DATA && window.EVENTI_DATA.length > 0) {
+        setEvents(window.EVENTI_DATA);
+      }
+    };
+    load();
+  }, []);
+
+  // Auto-przesuwanie co 4s
+  useEffectE(() => {
+    if (events.length <= 1) return;
+    intervalRef.current = setInterval(() => {
+      setActiveIdx(i => (i + 1) % events.length);
+    }, 4000);
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+  }, [events.length]);
+
+  // Swipe na mobile
+  const onTouchStart = (e) => { touchRef.current.startX = e.touches[0].clientX; };
+  const onTouchEnd = (e) => {
+    const dx = e.changedTouches[0].clientX - touchRef.current.startX;
+    if (Math.abs(dx) < 50) return;
+    if (intervalRef.current) clearInterval(intervalRef.current); // reset timer po ręcznym swipe
+    if (dx < 0) setActiveIdx(i => (i + 1) % events.length); // swipe w lewo → następny
+    else setActiveIdx(i => (i - 1 + events.length) % events.length); // swipe w prawo → poprzedni
+  };
+
+  // Oblicz pozycję karty w karuzeli (circular, piramida)
+  const getCardStyle = (i, total) => {
+    let diff = i - activeIdx;
+    if (diff > total / 2) diff -= total;
+    if (diff < -total / 2) diff += total;
+    const absDiff = Math.abs(diff);
+    if (absDiff > 2) return { visible: false };
+    const isCenter = diff === 0;
+    const isAdj = absDiff === 1;
+    const scale = isCenter ? 1 : isAdj ? 0.82 : 0.65;
+    const opacity = isCenter ? 1 : isAdj ? 0.7 : 0.3;
+    // Przesunięcie w px (nie %), by karty zawsze wyglądały jak piramida
+    const baseShift = typeof window !== "undefined" && window.innerWidth < 768 ? 180 : 260;
+    const x = diff * (isAdj ? baseShift : baseShift * 1.8);
+    const z = isCenter ? 3 : isAdj ? 2 : 1;
+    return { visible: true, scale, opacity, x, z };
+  };
+
+  if (events.length === 0) return null;
+
   return (
     <section className="eventi" id="eventi">
       <div className="container">
@@ -16,10 +78,51 @@ function Eventi({ t }) {
           <TextClipReveal text={t("eventi.intro")} className="ev-intro" />
         </div>
 
-        <div className="ev-grid">
-          {window.EVENTI_DATA.map((e, i) => (
-            <EventCard key={i} item={e} index={i} />
+        {/* Piramidowa karuzela */}
+        <div className="ev-carousel" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+          {events.map((e, i) => {
+            const s = getCardStyle(i, events.length);
+            if (!s.visible) return null;
+            const isActive = i === activeIdx;
+            return (
+              <article key={e.id || i} className={`ev-card ${isActive ? "ev-card-active" : ""}`}
+                style={{ "--ev-x": `${s.x}px`, "--ev-s": s.scale, "--ev-o": s.opacity, "--ev-z": s.z }}
+                onClick={() => { setActiveIdx(i); if (intervalRef.current) clearInterval(intervalRef.current); }}>
+                {/* Progress indicators (Framer ReelCarousel style) — only on active */}
+                {isActive && (
+                  <div className="ev-progress">
+                    {events.map((_, pi) => (
+                      <div key={pi} className={`ev-progress-seg ${pi === activeIdx ? "active" : pi < activeIdx ? "done" : ""}`}>
+                        {pi === activeIdx && <div className="ev-progress-fill" />}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <div className="ev-card-bg" style={{ background: e.custom_colors?.bg || (e.phType === "food" ? "#2d1b0e" : e.phType === "sea" ? "#0e2840" : "#1a1040") }}>
+                  {e.image_url && <img src={e.image_url} alt="" style={{ width:"100%", height:"100%", objectFit:"cover", opacity:0.7 }} />}
+                </div>
+                <div className="ev-card-content">
+                  <span className="ev-card-tag">{e.tag || "Evento"}</span>
+                  <h4 className="ev-card-title">{e.title}</h4>
+                  <span className="ev-card-date">{e.event_date || e.date || ""}</span>
+                  {e.description && <p className="ev-card-desc">{e.description}</p>}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+
+        {/* Dots / nawigacja */}
+        <div className="ev-dots">
+          {events.map((_, i) => (
+            <button key={i} className={`ev-dot ${i === activeIdx ? "active" : ""}`} onClick={() => { setActiveIdx(i); if (intervalRef.current) clearInterval(intervalRef.current); }} aria-label={`Evento ${i + 1}`} />
           ))}
+        </div>
+
+        {/* Arrows (desktop) */}
+        <div className="ev-arrows">
+          <button className="ev-arrow ev-arrow-l" onClick={() => { setActiveIdx(i => (i - 1 + events.length) % events.length); if (intervalRef.current) clearInterval(intervalRef.current); }} aria-label="Precedente">‹</button>
+          <button className="ev-arrow ev-arrow-r" onClick={() => { setActiveIdx(i => (i + 1) % events.length); if (intervalRef.current) clearInterval(intervalRef.current); }} aria-label="Successivo">›</button>
         </div>
 
         <div className="ev-cta reveal">
@@ -27,14 +130,51 @@ function Eventi({ t }) {
         </div>
       </div>
       <style>{`
-        .eventi { background: var(--c-bg); padding: 120px 0; }
-        .ev-head { max-width: 720px; margin-bottom: 80px; }
+        .eventi { background: var(--c-bg); padding: 120px 0; overflow:hidden; }
+        .ev-head { max-width: 720px; margin-bottom: 64px; text-wrap:balance; }
         .ev-head .kicker { display: block; margin-bottom: 24px; }
-        .ev-intro { font-family: var(--f-serif); font-style: italic; font-size: clamp(20px, 2vw, 28px); line-height: 1.4; margin-top: 32px; max-width: 600px; color: var(--c-deep); }
-        .ev-grid { display: grid; grid-template-columns: 1fr; gap: 24px; }
-        @media (min-width: 768px) { .ev-grid { grid-template-columns: repeat(2, 1fr); } }
-        @media (min-width: 1024px) { .ev-grid { grid-template-columns: repeat(3, 1fr); gap: 32px; } }
-        .ev-cta { margin-top: 64px; text-align: center; }
+        .ev-head .h2 { text-wrap:balance; word-break:keep-all; }
+        .ev-intro { font-family: var(--f-serif); font-style: italic; font-size: clamp(18px, 2vw, 26px); line-height: 1.4; margin-top: 28px; max-width: 560px; color: var(--c-deep); }
+
+        .ev-carousel { position:relative; display:flex; align-items:center; justify-content:center; height:440px; overflow:visible; touch-action:pan-y; perspective:1000px; }
+        .ev-card { position:absolute; width:min(320px, 72vw); height:400px; border-radius:24px; overflow:hidden; cursor:pointer;
+          transform:translateX(var(--ev-x, 0)) scale(var(--ev-s, 1)) rotateY(calc(var(--ev-x, 0) * -0.02deg)); opacity:var(--ev-o, 1); z-index:var(--ev-z, 1);
+          transition:transform .65s cubic-bezier(.22,.9,.36,1), opacity .5s ease;
+          box-shadow:0 20px 60px rgba(0,0,0,0.3); will-change:transform,opacity; transform-style:preserve-3d; }
+        .ev-card-active { box-shadow:0 30px 80px rgba(0,0,0,0.45); }
+        .ev-card:hover { box-shadow:0 30px 80px rgba(0,0,0,0.4); }
+
+        /* Progress indicators (Framer ReelCarousel style) */
+        .ev-progress { position:absolute; top:14px; left:16px; right:16px; z-index:10; display:flex; gap:4px; }
+        .ev-progress-seg { flex:1; height:3px; border-radius:2px; background:rgba(255,255,255,0.3); overflow:hidden; }
+        .ev-progress-seg.done { background:rgba(255,255,255,0.8); }
+        .ev-progress-fill { height:100%; background:#fff; border-radius:2px; animation:evProgressFill 4s linear forwards; }
+        @keyframes evProgressFill { from { width:0; } to { width:100%; } }
+        .ev-card-bg { position:absolute; inset:0; }
+        .ev-card-bg img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+        .ev-card-content { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:flex-end; padding:28px; color:#fff;
+          background:linear-gradient(180deg, transparent 30%, rgba(0,0,0,0.75) 100%); }
+        .ev-card-tag { font-size:10px; letter-spacing:0.18em; text-transform:uppercase; color:var(--c-coral,#E8927C); margin-bottom:8px; font-weight:700; }
+        .ev-card-title { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:clamp(18px, 4vw, 24px); line-height:1.15; margin:0 0 6px; }
+        .ev-card-date { font-size:13px; opacity:0.7; font-weight:600; }
+        .ev-card-desc { font-size:12px; opacity:0.65; margin-top:8px; line-height:1.4; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+
+        .ev-dots { display:flex; justify-content:center; gap:8px; margin-top:28px; }
+        .ev-dot { width:8px; height:8px; border-radius:50%; background:rgba(14,34,48,0.2); border:none; cursor:pointer; transition:all .3s; padding:0; }
+        .ev-dot.active { background:var(--c-coral,#E8927C); transform:scale(1.4); }
+
+        .ev-arrows { display:flex; justify-content:center; gap:16px; margin-top:16px; }
+        .ev-arrow { width:40px; height:40px; border-radius:50%; border:1px solid var(--c-line,rgba(14,34,48,0.15)); background:transparent; color:var(--c-deep);
+          font-size:22px; cursor:pointer; display:grid; place-items:center; transition:all .25s; }
+        .ev-arrow:hover { background:var(--c-deep); color:#fff; border-color:var(--c-deep); }
+
+        .ev-cta { margin-top: 56px; text-align: center; }
+
+        @media (max-width:768px) {
+          .ev-carousel { height:360px; }
+          .ev-card { width:min(280px, 78vw); height:340px; }
+          .ev-arrows { display:none; }
+        }
       `}</style>
     </section>
   );
@@ -174,7 +314,7 @@ function SocialFeed({ t }) {
 
 // ─── Attrazioni ───────────────────────────────────────────────────────────────
 function Attrazioni({ t }) {
-  const places = window.ATTRAZIONI_DATA;
+  const places = (typeof window !== "undefined" && window.ATTRAZIONI_DATA) || [];
   const [selected, setSelected] = useStateE(0);
   const cats = [
     { id: "all", label: "Tutto" },
@@ -319,12 +459,35 @@ function Attrazioni({ t }) {
 
 // ─── Recensioni ───────────────────────────────────────────────────────────────
 function Recensioni({ t }) {
-  const data = window.RECENSIONI_DATA;
+  const data = (typeof window !== "undefined" && window.RECENSIONI_DATA) || [];
   const [filter, setFilter] = useStateE("all");
-  const sources = ["all", "Google", "TripAdvisor", "Facebook"];
+  const [writeOpen, setWriteOpen] = useStateE(false);
+  const [writeTab, setWriteTab] = useStateE("local"); // "local" | "google"
+  const [reviewForm, setReviewForm] = useStateE({ name: "", email: "", text: "" });
+  const [reviewSent, setReviewSent] = useStateE(false);
+  const sources = ["all", "Google", "TripAdvisor", "Locale"];
   const filtered = filter === "all" ? data : data.filter((r) => r.source === filter);
-  // duplicate for seamless marquee
   const stream = filtered.concat(filtered);
+
+  const submitReview = async (e) => {
+    e.preventDefault();
+    if (!reviewForm.name || !reviewForm.text) return;
+    try {
+      const { createClient } = await import("@supabase/supabase-js");
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://slatelpipxtqveydgslc.supabase.co';
+      const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNsYXRlbHBpcHh0cXZleWRnc2xjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODcyNTQsImV4cCI6MjA5NjE2MzI1NH0.5dwE9IStThjC-krTtgg7PtEwmTnr_bQ_TEbQhgMpHdY';
+      const sb = createClient(url, key);
+      await sb.from("reviews").insert({
+        name: reviewForm.name,
+        email: reviewForm.email || null,
+        content: reviewForm.text,
+        source: "Locale",
+        stars: 5,
+        language: (typeof window !== "undefined" && window.currentLanguage) || "it",
+      });
+    } catch (err) { console.error("Review submit error:", err); }
+    setReviewSent(true);
+  };
 
   return (
     <section className="recensioni" id="recensioni">
@@ -345,6 +508,9 @@ function Recensioni({ t }) {
               {s === "all" ? "Tutte" : s}
             </button>
           ))}
+          <button className="rec-filter rec-write-btn" onClick={() => setWriteOpen(true)}>
+            ✎ Scrivi messaggio
+          </button>
         </div>
       </div>
 
@@ -363,6 +529,40 @@ function Recensioni({ t }) {
         </div>
       </div>
 
+      {/* Popout — scrivi messaggio (2 zakładki: Locale / Google) */}
+      {writeOpen && (
+        <div className="rec-write-overlay" onClick={() => setWriteOpen(false)}>
+          <div className="rec-write-popout" onClick={(e) => e.stopPropagation()}>
+            <button className="rec-write-close" onClick={() => setWriteOpen(false)}>×</button>
+            <div className="rec-write-tabs">
+              <button className={writeTab === "local" ? "active" : ""} onClick={() => setWriteTab("local")}>✎ Locale</button>
+              <button className={writeTab === "google" ? "active" : ""} onClick={() => setWriteTab("google")}>⭐ Google</button>
+            </div>
+            {writeTab === "google" ? (
+              <div className="rec-write-google">
+                <p>Lascia una recensione su Google — ci aiuta tantissimo!</p>
+                <a href="https://g.page/r/CVK_gqHsp7TMEAE/review" target="_blank" rel="noopener" className="btn rec-google-btn">
+                  Scrivi su Google ★ →
+                </a>
+              </div>
+            ) : reviewSent ? (
+              <div className="rec-write-success">
+                <span>🎉</span>
+                <h4>Grazie per il tuo messaggio!</h4>
+                <p>Sarà visibile dopo approvazione.</p>
+              </div>
+            ) : (
+              <form className="rec-write-form" onSubmit={submitReview}>
+                <input placeholder="Il tuo nome *" value={reviewForm.name} onChange={(e) => setReviewForm(f => ({...f, name: e.target.value}))} required />
+                <input type="email" placeholder="Email (facoltativa)" value={reviewForm.email} onChange={(e) => setReviewForm(f => ({...f, email: e.target.value}))} />
+                <textarea placeholder="La tua esperienza..." rows={4} value={reviewForm.text} onChange={(e) => setReviewForm(f => ({...f, text: e.target.value}))} required />
+                <button type="submit" className="btn rec-submit-btn">Invia →</button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
       <style>{`
         .recensioni { background: linear-gradient(180deg, #EBF6FA 0%, #FFFFFF 100%); padding: 120px 0; overflow: hidden; }
         .rec-head { max-width: 720px; margin-bottom: 48px; }
@@ -371,9 +571,11 @@ function Recensioni({ t }) {
         .rec-stats div { display: flex; flex-direction: column; }
         .rec-stats span { font-family: var(--f-display); font-weight: 800; font-size: 40px; line-height: 1; color: var(--c-sky); letter-spacing: -0.03em; }
         .rec-stats label { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--c-mute); margin-top: 4px; }
-        .rec-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 64px; }
-        .rec-filter { padding: 8px 16px; border-radius: 999px; font-size: 12px; letter-spacing: 0.1em; font-weight: 500; border: 1px solid var(--c-line); color: var(--c-deep); }
+        .rec-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 64px; align-items:center; }
+        .rec-filter { padding: 8px 16px; border-radius: 999px; font-size: 12px; letter-spacing: 0.1em; font-weight: 500; border: 1px solid var(--c-line); color: var(--c-deep); cursor:pointer; transition:all .25s; background:transparent; }
         .rec-filter.active { background: var(--c-deep); color: #fff; border-color: var(--c-deep); }
+        .rec-write-btn { background:var(--c-coral); color:#fff; border-color:var(--c-coral); margin-left:auto; }
+        .rec-write-btn:hover { background:#d9745c; }
         .rec-marquee { overflow: hidden; position: relative; }
         .rec-marquee::before, .rec-marquee::after { content: ''; position: absolute; top: 0; bottom: 0; width: 120px; z-index: 2; pointer-events: none; }
         .rec-marquee::before { left: 0; background: linear-gradient(90deg, #EBF6FA 0%, transparent 100%); }
@@ -386,6 +588,22 @@ function Recensioni({ t }) {
         .rec-meta { display: flex; justify-content: space-between; padding-top: 16px; border-top: 1px solid var(--c-line); }
         .rec-name { font-family: var(--f-display); font-weight: 700; font-size: 14px; }
         .rec-source { font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--c-sky); }
+        .rec-write-overlay { position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; padding:24px; }
+        .rec-write-popout { width:min(480px,92vw); max-height:85vh; overflow-y:auto; background:#fff; border-radius:24px; padding:32px; position:relative; color:var(--c-deep); }
+        .rec-write-close { position:absolute; top:16px; right:16px; width:32px; height:32px; border-radius:50%; border:1px solid var(--c-line); background:transparent; font-size:18px; cursor:pointer; display:grid; place-items:center; }
+        .rec-write-tabs { display:flex; gap:8px; margin-bottom:24px; }
+        .rec-write-tabs button { flex:1; padding:12px; border-radius:12px; border:1px solid var(--c-line); background:transparent; font-weight:600; font-size:13px; cursor:pointer; transition:all .2s; }
+        .rec-write-tabs button.active { background:var(--c-deep); color:#fff; border-color:var(--c-deep); }
+        .rec-write-form { display:flex; flex-direction:column; gap:14px; }
+        .rec-write-form input, .rec-write-form textarea { padding:12px 16px; border-radius:12px; border:1px solid var(--c-line); font-size:14px; font-family:inherit; resize:vertical; }
+        .rec-submit-btn { background:var(--c-coral); color:#fff; align-self:flex-start; }
+        .rec-write-google { text-align:center; padding:32px 0; }
+        .rec-write-google p { margin-bottom:20px; opacity:0.7; font-size:15px; }
+        .rec-google-btn { background:var(--c-deep); color:#fff; }
+        .rec-write-success { text-align:center; padding:32px; }
+        .rec-write-success span { font-size:40px; display:block; margin-bottom:12px; }
+        .rec-write-success h4 { font-size:20px; margin:0 0 8px; }
+        @media (max-width:768px) { .rec-card { flex:0 0 300px; padding:24px; } .rec-text { font-size:15px; } }
       `}</style>
     </section>
   );
@@ -399,13 +617,44 @@ function Contatti({ t }) {
 
   const upd = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     const err = {};
     if (!form.name) err.name = true;
     if (!form.email || !form.email.includes("@")) err.email = true;
     setErrors(err);
-    if (Object.keys(err).length === 0) setSubmitted(true);
+    if (Object.keys(err).length > 0) return;
+
+    // Zapisz do Supabase (lokalna kopia)
+    try {
+      const { createClient } = await import("@supabase/supabase-js");
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://slatelpipxtqveydgslc.supabase.co';
+      const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNsYXRlbHBpcHh0cXZleWRnc2xjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODcyNTQsImV4cCI6MjA5NjE2MzI1NH0.5dwE9IStThjC-krTtgg7PtEwmTnr_bQ_TEbQhgMpHdY';
+      const sb = createClient(url, key);
+      await sb.from("contact_messages").insert({
+        name: form.name,
+        email: form.email,
+        phone: form.phone || null,
+        date: form.date || null,
+        people: form.people,
+        message: form.message || null,
+        language: form.language || (window.currentLanguage || "it"),
+      });
+    } catch (err2) { console.error("Contact save error:", err2); }
+
+    // Webhook make.com (jeśli skonfigurowany) — wysyła dane formularza do automatyzacji
+    const webhookUrl = typeof window !== "undefined" && window.__MAKECOM_CONTACT_WEBHOOK;
+    if (webhookUrl) {
+      try {
+        await fetch(webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...form, source_language: window.currentLanguage || "it", timestamp: new Date().toISOString() }),
+        });
+      } catch (err3) { console.error("Webhook error:", err3); }
+    }
+
+    setSubmitted(true);
   };
 
   return (
@@ -441,13 +690,10 @@ function Contatti({ t }) {
               </div>
             </div>
             <div className="cnt-mini-map">
-              <svg viewBox="0 0 100 60" preserveAspectRatio="xMidYMid meet" style={{ width: "100%", height: "100%" }}>
-                <rect width="100" height="60" fill="rgba(91,184,212,0.15)" />
-                <path d="M 18,12 Q 30,8 50,14 Q 65,12 78,22 Q 80,38 65,48 Q 40,52 22,42 Q 10,30 18,12 Z" fill="rgba(245,237,224,0.18)" />
-                <circle cx="44" cy="36" r="2" fill="var(--c-coral)" />
-                <circle cx="44" cy="36" r="5" fill="none" stroke="var(--c-coral)" strokeWidth="0.5" />
-                <text x="50" y="38" fontSize="3" fill="#fff">Siamo qui</text>
-              </svg>
+              <iframe
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3066.8!2d9.15!3d41.13!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x12d94b8c3d1c3af5%3A0x4cb4a7a1a282bf52!2sRena+Majore!5e0!3m2!1sit!2sit!4v1"
+                width="100%" height="100%" style={{ border: 0, borderRadius: 16 }} allowFullScreen="" loading="lazy" referrerPolicy="no-referrer-when-downgrade" title="S'Historia location"
+              />
             </div>
           </div>
 
@@ -610,7 +856,7 @@ function Footer({ t }) {
         .footer-bg { position: absolute; inset: 0; }
         .footer-content { position: relative; z-index: 1; }
         .footer-top { text-align: center; margin-bottom: 80px; }
-        .footer-name { font-family: var(--f-display); font-weight: 800; font-size: clamp(64px, 10vw, 160px); letter-spacing: -0.04em; line-height: 0.9; }
+        .footer-name { font-family: var(--f-display); font-weight: 800; font-size: clamp(48px, 10vw, 160px); letter-spacing: -0.04em; line-height: 0.9; overflow-wrap: anywhere; word-break: break-word; }
         .footer-tagline { font-family: var(--f-serif); font-style: italic; font-size: 22px; margin-top: 16px; opacity: 0.7; }
         .footer-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 32px 24px; padding-top: 48px; border-top: 1px solid rgba(255,255,255,0.1); }
         @media (min-width: 1024px) { .footer-grid { grid-template-columns: repeat(4, 1fr); gap: 48px; } }

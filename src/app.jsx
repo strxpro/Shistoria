@@ -283,11 +283,11 @@ export default function App() {
             <CocktailExperience />
           </ErrorBoundary>
         </RiseCard>
-        <Eventi t={tr} />
+        <ErrorBoundary><Eventi t={tr} /></ErrorBoundary>
         <ErrorBoundary><Attrazioni t={tr} /></ErrorBoundary>
-        <SocialFeed t={tr} />
-        <Recensioni t={tr} />
-        <Contatti t={tr} />
+        <ErrorBoundary><SocialFeed t={tr} /></ErrorBoundary>
+        <ErrorBoundary><Recensioni t={tr} /></ErrorBoundary>
+        <ErrorBoundary><Contatti t={tr} /></ErrorBoundary>
       </main>
 
       <Footer t={tr} />

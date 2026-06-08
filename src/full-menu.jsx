@@ -23,6 +23,14 @@ function MobileFullMenu() {
   const [dishPopout, setDishPopout] = useStateM(null);
   const [catSheet, setCatSheet] = useStateM(false);
   const [pillVisible, setPillVisible] = useStateM(false);
+
+  // Gdy pill categories widoczny LUB sheet otwarty → hamburger w prawo
+  useEffectM(() => {
+    if (typeof document === "undefined") return;
+    if (catSheet) document.body.dataset.cxSheet = "open";
+    else delete document.body.dataset.cxSheet;
+    return () => { delete document.body.dataset.cxSheet; };
+  }, [catSheet]);
   const catBarRef = useRefM(null);
   const sectionRef = useRefM(null);
 

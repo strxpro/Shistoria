@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 
-type Tab = "menu" | "events" | "drinks" | "orders";
+type Tab = "menu" | "events" | "drinks" | "orders" | "messages" | "reviews" | "stats";
 
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>("menu");
@@ -48,6 +48,9 @@ export default function AdminPage() {
             { id: "events", label: "Eventi", ico: "🎭" },
             { id: "drinks", label: "Drink Clienti", ico: "🍸" },
             { id: "orders", label: "Ordini QR", ico: "📱" },
+            { id: "messages", label: "Messaggi", ico: "💬" },
+            { id: "reviews", label: "Recensioni", ico: "⭐" },
+            { id: "stats", label: "Statistiche", ico: "📊" },
           ] as { id: Tab; label: string; ico: string }[]).map((t) => (
             <button
               key={t.id}
@@ -65,6 +68,9 @@ export default function AdminPage() {
         {tab === "events" && <EventsPanel />}
         {tab === "drinks" && <DrinksPanel />}
         {tab === "orders" && <OrdersPanel />}
+        {tab === "messages" && <MessagesPanel />}
+        {tab === "reviews" && <ReviewsPanel />}
+        {tab === "stats" && <StatsPanel />}
       </main>
       <AdminStyles />
     </div>
@@ -447,6 +453,206 @@ function OrdersPanel() {
   );
 }
 
+// ─── Messages Panel (formularz kontaktowy — iMessage style) ───────────────────
+function MessagesPanel() {
+  const [messages, setMessages] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [reply, setReply] = useState<{ id: string; text: string } | null>(null);
+
+  const load = async () => {
+    setLoading(true);
+    const { data } = await supabase.from("contact_messages").select("*").order("created_at", { ascending: false });
+    setMessages(data || []);
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, []);
+
+  const markRead = async (id: string) => {
+    await supabase.from("contact_messages").update({ is_read: true }).eq("id", id);
+    load();
+  };
+
+  const sendReply = async () => {
+    if (!reply) return;
+    await supabase.from("contact_messages").update({ admin_reply: reply.text, is_read: true }).eq("id", reply.id);
+    setReply(null);
+    load();
+  };
+
+  const remove = async (id: string) => {
+    if (confirm("Eliminare questo messaggio?")) {
+      await supabase.from("contact_messages").delete().eq("id", id);
+      load();
+    }
+  };
+
+  return (
+    <div className="admin-panel">
+      <header className="admin-panel-head">
+        <h1>Messaggi</h1>
+        <span className="admin-count">{messages.filter(m => !m.is_read).length} non letti</span>
+      </header>
+
+      {reply && (
+        <div className="admin-modal-overlay" onClick={() => setReply(null)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Rispondi</h3>
+            <div className="admin-form">
+              <label>Risposta (in italiano — verrà tradotta automaticamente)</label>
+              <textarea value={reply.text} onChange={(e) => setReply({ ...reply, text: e.target.value })} placeholder="Scrivi la risposta..." />
+            </div>
+            <div className="admin-modal-actions">
+              <button className="admin-btn" onClick={sendReply}>Invia risposta</button>
+              <button className="admin-btn-ghost" onClick={() => setReply(null)}>Annulla</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {loading ? <p className="admin-loading">Caricamento...</p> : (
+        <div className="admin-orders">
+          {messages.map((m) => (
+            <div key={m.id} className={`admin-order ${m.is_read ? "done" : ""}`}>
+              <div className="admin-order-info">
+                <h4>{m.name}</h4>
+                <span>{m.email} · {m.phone || "—"} · {m.people} pers. · {m.date || "—"}</span>
+                <span className="admin-order-time">{new Date(m.created_at).toLocaleString("it-IT")}</span>
+                <span style={{ fontSize: 11, opacity: 0.5 }}>🌐 {m.language}</span>
+              </div>
+              <div style={{ flex: 1, fontSize: 13, opacity: 0.8 }}>
+                {m.message || <em style={{ opacity: 0.4 }}>Nessun messaggio</em>}
+                {m.admin_reply && <p style={{ marginTop: 8, color: "#27ae60", fontWeight: 600 }}>↳ {m.admin_reply}</p>}
+              </div>
+              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                {!m.is_read && <button className="admin-btn-sm" onClick={() => markRead(m.id)}>✓</button>}
+                <button className="admin-btn-sm" onClick={() => setReply({ id: m.id, text: "" })}>↩</button>
+                <button className="admin-btn-sm admin-btn-danger" onClick={() => remove(m.id)}>✕</button>
+              </div>
+            </div>
+          ))}
+          {messages.length === 0 && <p className="admin-empty">Nessun messaggio ricevuto.</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Reviews Panel (zarządzanie recenzjami lokalnymi) ─────────────────────────
+function ReviewsPanel() {
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    setLoading(true);
+    const { data } = await supabase.from("reviews").select("*").order("created_at", { ascending: false });
+    setReviews(data || []);
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, []);
+
+  const approve = async (id: string, val: boolean) => {
+    await supabase.from("reviews").update({ is_approved: val }).eq("id", id);
+    load();
+  };
+
+  const remove = async (id: string) => {
+    if (confirm("Eliminare questa recensione?")) {
+      await supabase.from("reviews").delete().eq("id", id);
+      load();
+    }
+  };
+
+  return (
+    <div className="admin-panel">
+      <header className="admin-panel-head">
+        <h1>Recensioni Locali</h1>
+        <span className="admin-count">{reviews.filter(r => !r.is_approved).length} in attesa</span>
+      </header>
+      {loading ? <p className="admin-loading">Caricamento...</p> : (
+        <div className="admin-orders">
+          {reviews.map((r) => (
+            <div key={r.id} className={`admin-order ${r.is_approved ? "" : ""}`}>
+              <div className="admin-order-info">
+                <h4>{r.name} <span style={{ color: "#f1c40f" }}>{"★".repeat(r.stars)}</span></h4>
+                <span>{r.email || "—"} · 🌐 {r.language}</span>
+                <span className="admin-order-time">{new Date(r.created_at).toLocaleString("it-IT")}</span>
+              </div>
+              <div style={{ flex: 1, fontSize: 13, opacity: 0.8, fontStyle: "italic" }}>
+                "{r.content}"
+              </div>
+              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                <button className={`admin-btn-sm ${r.is_approved ? "admin-btn-gold" : ""}`} onClick={() => approve(r.id, !r.is_approved)}>
+                  {r.is_approved ? "★ Approvata" : "☆ Approva"}
+                </button>
+                <button className="admin-btn-sm admin-btn-danger" onClick={() => remove(r.id)}>✕</button>
+              </div>
+            </div>
+          ))}
+          {reviews.length === 0 && <p className="admin-empty">Nessuna recensione locale.</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Stats Panel (statystyki odwiedzin) ───────────────────────────────────────
+function StatsPanel() {
+  const [stats, setStats] = useState<{ orders: number; drinks: number; messages: number; reviews: number }>({ orders: 0, drinks: 0, messages: 0, reviews: 0 });
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      setLoading(true);
+      const [o, d, m, r] = await Promise.all([
+        supabase.from("drink_orders").select("id", { count: "exact", head: true }),
+        supabase.from("community_drinks").select("id", { count: "exact", head: true }),
+        supabase.from("contact_messages").select("id", { count: "exact", head: true }),
+        supabase.from("reviews").select("id", { count: "exact", head: true }),
+      ]);
+      setStats({
+        orders: o.count || 0,
+        drinks: d.count || 0,
+        messages: m.count || 0,
+        reviews: r.count || 0,
+      });
+      setLoading(false);
+    };
+    load();
+  }, []);
+
+  return (
+    <div className="admin-panel">
+      <header className="admin-panel-head">
+        <h1>Statistiche</h1>
+      </header>
+      {loading ? <p className="admin-loading">Caricamento...</p> : (
+        <div className="admin-grid">
+          <div className="admin-event-card" style={{ borderLeftColor: "#E8927C" }}>
+            <span style={{ fontSize: 36, fontWeight: 800 }}>{stats.orders}</span>
+            <h4>Ordini QR</h4>
+            <span className="admin-event-tag">drink ordinati via QR</span>
+          </div>
+          <div className="admin-event-card" style={{ borderLeftColor: "#5BB8D4" }}>
+            <span style={{ fontSize: 36, fontWeight: 800 }}>{stats.drinks}</span>
+            <h4>Drink pubblicati</h4>
+            <span className="admin-event-tag">nella community</span>
+          </div>
+          <div className="admin-event-card" style={{ borderLeftColor: "#27ae60" }}>
+            <span style={{ fontSize: 36, fontWeight: 800 }}>{stats.messages}</span>
+            <h4>Messaggi</h4>
+            <span className="admin-event-tag">formularz kontaktowy</span>
+          </div>
+          <div className="admin-event-card" style={{ borderLeftColor: "#f1c40f" }}>
+            <span style={{ fontSize: 36, fontWeight: 800 }}>{stats.reviews}</span>
+            <h4>Recensioni</h4>
+            <span className="admin-event-tag">komentarze lokalne</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Styles ───────────────────────────────────────────────────────────────────
 function AdminStyles() {
   return (
@@ -459,6 +665,18 @@ function AdminStyles() {
       .admin-login-card button { width:100%; padding:14px; border-radius:12px; background:#E8927C; color:#fff; font-weight:700; font-size:14px; border:none; cursor:pointer; }
 
       .admin { display:grid; grid-template-columns:260px 1fr; min-height:100vh; background:#0a0e14; color:#fff; font-family:system-ui; }
+      @media (max-width:768px) {
+        .admin { grid-template-columns:1fr; }
+        .admin-nav { padding:16px; border-right:none; border-bottom:1px solid rgba(255,255,255,0.08); }
+        .admin-nav nav { flex-direction:row; flex-wrap:wrap; gap:4px; }
+        .admin-nav nav button { padding:8px 12px; font-size:12px; }
+        .admin-main { padding:16px; max-height:none; }
+        .admin-panel-head { flex-direction:column; align-items:flex-start; gap:12px; }
+        .admin-panel-head h1 { font-size:22px; }
+        .admin-table { font-size:12px; }
+        .admin-grid { grid-template-columns:1fr !important; }
+        .admin-order { flex-direction:column; gap:12px; }
+      }
       .admin-nav { padding:32px 20px; background:rgba(255,255,255,0.02); border-right:1px solid rgba(255,255,255,0.08); display:flex; flex-direction:column; gap:32px; }
       .admin-logo h2 { font-size:24px; margin:0; } .admin-logo span { font-size:11px; opacity:0.5; letter-spacing:0.15em; text-transform:uppercase; }
       .admin-nav nav { display:flex; flex-direction:column; gap:4px; }

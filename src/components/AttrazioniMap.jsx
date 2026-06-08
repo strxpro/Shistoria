@@ -57,7 +57,7 @@ export default function AttrazioniMap({ places, selected, onSelect }) {
       if (typeof p.lat !== "number" || typeof p.lng !== "number") return null;
       const m = L.marker([p.lat, p.lng], { icon: makePin(i === 0 ? "★" : String(i), i === selected) }).addTo(map);
       m.on("click", () => onSelect && onSelect(i));
-      m.bindTooltip(p.name, { direction: "top", offset: [0, -28], className: "atr-leaf-tip" });
+      m.bindTooltip(i === 0 ? "📍 Siamo qui" : p.name, { direction: "top", offset: [0, -28], className: "atr-leaf-tip", permanent: i === 0 });
       return m;
     });
 
@@ -80,7 +80,7 @@ export default function AttrazioniMap({ places, selected, onSelect }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // aktualizuj ikony przy zmianie zaznaczenia + płynnie przesuń mapę do aktywnego punktu
+  // aktualizuj ikony przy zmianie zaznaczenia + płynnie przesuń mapę do aktywnego punktu + linia
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -92,6 +92,14 @@ export default function AttrazioniMap({ places, selected, onSelect }) {
     const p = places[selected];
     if (p && typeof p.lat === "number") {
       map.panTo([p.lat, p.lng], { animate: true, duration: 0.6 });
+    }
+    // Przerywana linia od restauracji (pin 0) do wybranego punktu
+    if (map._dashLine) { map.removeLayer(map._dashLine); map._dashLine = null; }
+    const home = places[0];
+    if (home && p && selected !== 0 && typeof home.lat === "number" && typeof p.lat === "number") {
+      map._dashLine = L.polyline([[home.lat, home.lng], [p.lat, p.lng]], {
+        color: C_CORAL, weight: 2, dashArray: "8, 8", opacity: 0.7,
+      }).addTo(map);
     }
   }, [selected, places]);
 

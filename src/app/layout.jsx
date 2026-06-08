@@ -3,6 +3,9 @@ import '../styles.css';
 export const metadata = {
   title: "S'Historia",
   description: "S'Historia · Ristorante & Cocktail Bar — Rena Majore, Sardegna",
+  icons: {
+    icon: "/logo.png",
+  },
 };
 
 export default function RootLayout({ children }) {

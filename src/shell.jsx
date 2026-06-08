@@ -191,6 +191,8 @@ function Preloader({ onDone, t }) {
 
   return (
     <div ref={rootRef} className="pre-root">
+      {/* Year — small date above title */}
+      <span className="pre-year">1996</span>
       {/* Main title — outlined letters that fill with wave */}
       <div className="pre-main">
         {title.split("").map((ch, i) => (
@@ -216,6 +218,13 @@ function Preloader({ onDone, t }) {
           gap: 16px;
           pointer-events: auto;
         }
+        .pre-year {
+          font-family: var(--f-display, "Syne", serif);
+          font-weight: 600; font-size: 12px; letter-spacing: 0.3em;
+          color: var(--c-coral, #E8927C); text-transform: uppercase;
+          opacity: 0; animation: preYearIn 0.8s 0.2s forwards;
+        }
+        @keyframes preYearIn { to { opacity: 0.8; } }
         .pre-main {
           display: flex;
           align-items: center;
@@ -557,11 +566,11 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
           .nav-logo-img { height:56px; clip-path:inset(10% 0% 10% 0%); transform:scale(1.5); opacity:0; }
           .nav-logo-blend { clip-path:inset(10% 0% 10% 0%) !important; transform:scale(1.5) !important; }
           .nav-logo-sub { color: var(--c-deep); }
-          .nav-left { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); justify-content: center; transition: left 0.5s cubic-bezier(.2,.85,.2,1), transform 0.5s cubic-bezier(.2,.85,.2,1); }
-          .nav-right { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); gap: 10px; transition: right 0.5s cubic-bezier(.2,.85,.2,1), transform 0.5s; }
-          /* W sekcji kreatora: flagi przesuwają się w lewo (nie nachodzą na hamburger w prawym rogu) */
-          body[data-cx-section="creator"] .nav-left { left: 16px; transform: translate(0, -50%); }
-          body[data-cx-section="creator"] .nav-right { right: auto; left: 70px; transform: translateY(-50%); }
+          .nav-left { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); justify-content: center; transition: left 0.5s cubic-bezier(.2,.85,.2,1), transform 0.5s cubic-bezier(.2,.85,.2,1), opacity 0.3s; will-change: left, transform; opacity:1; }
+          .nav-right { position: absolute; right: 18px; left: auto; top: 50%; transform: translateY(-50%); gap: 10px; transition: left 0.5s cubic-bezier(.2,.85,.2,1), right 0.5s cubic-bezier(.2,.85,.2,1), transform 0.5s cubic-bezier(.2,.85,.2,1), opacity 0.3s; will-change: left, right, transform; }
+          /* W sekcji kreatora: cały nav ukryty (hamburger widoczny osobno) */
+          body[data-cx-section="creator"] .nav { opacity:0; pointer-events:none; transition:opacity .3s; }
+          body[data-cx-section="creator"] .nav-right { }
           /* Gdy otwarta szuflada/panel kategorii: logo w lewo, flagi w lewo, hamburger już idzie w prawy-górny róg */
           body[data-cx-drawer="open"] .nav-left,
           body[data-cx-sheet="open"] .nav-left { left: 16px; transform: translate(0, -50%); }

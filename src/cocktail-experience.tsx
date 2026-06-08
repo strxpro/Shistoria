@@ -63,7 +63,7 @@ import { useGSAP } from "@gsap/react";
 
 gsap.registerPlugin(ScrollTrigger);
 
-import { supabase, getSessionId, createOrder } from "./lib/supabase";
+import { supabase, getSessionId, createOrder, publishDrink, likeDrink, addComment, claimDrink as claimDrinkApi } from "./lib/supabase";
 import { PersonalizedQR } from "./components/PersonalizedQR";
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -1185,8 +1185,14 @@ function InSceneGlassPour({ url, withIce, color, onReveal, onDone, onModelReady 
     const list = Object.values(actions).filter(Boolean) as THREE.AnimationAction[];
     list.forEach((a) => { a.time = t; });
     mixer.update(0);
+    // Re-apply liquid color — animation keyframes may override material color
+    if (liquidMesh && liquidMesh.material) {
+      const lm = liquidMesh.material as THREE.MeshStandardMaterial;
+      lm.color.set(colorRefLocal.current);
+      if (lm.emissive) lm.emissive.set(colorRefLocal.current);
+    }
     invalidate();
-  }, [actions, mixer, invalidate]);
+  }, [actions, mixer, invalidate, liquidMesh]);
 
   useEffect(() => {
     const { start, end } = withIce ? rangeFor(url).withIce : rangeFor(url).noIce;
@@ -1228,6 +1234,19 @@ function Scene({
   const { camera, gl, invalidate, pointer } = useThree();
 
   useLayoutEffect(() => { gl.localClippingEnabled = true; }, [gl]);
+
+  // Obsługa utraty kontekstu WebGL (GPU overload na mobile) — przywraca kontekst.
+  useEffect(() => {
+    const canvas = gl.domElement;
+    const onLost = (e: Event) => { e.preventDefault(); };
+    const onRestored = () => { invalidate(); };
+    canvas.addEventListener("webglcontextlost", onLost);
+    canvas.addEventListener("webglcontextrestored", onRestored);
+    return () => {
+      canvas.removeEventListener("webglcontextlost", onLost);
+      canvas.removeEventListener("webglcontextrestored", onRestored);
+    };
+  }, [gl, invalidate]);
 
   // responsywna kamera: na wąskich ekranach odsuń i poszerz FOV, by szejker się mieścił
   useEffect(() => {
@@ -1541,6 +1560,19 @@ function CocktailExperience() {
   const [drinkName, setDrinkName] = useState("");
   const [customerName, setCustomerName] = useState("");
   const busyRef = useRef(false);
+
+  // ── Historia drinków (localStorage) ──────────────────────────────────
+  // Wczytaj imię z ostatniego drinka (wygoda — user nie musi wpisywać ponownie)
+  useEffect(() => {
+    try {
+      const history = JSON.parse(localStorage.getItem("sh-my-drinks") || "[]");
+      if (history.length > 0 && customerName === "") {
+        const last = history[history.length - 1];
+        if (last.author) setCustomerName(last.author);
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const pourKey = useRef(0);
   const pourDoseRef = useRef(0); // ml nalane w bieżącym laniu (rośnie podczas trzymania)
   const gaugeApiRef = useRef<{ set: (frac: number, color?: string) => void; show: (b: boolean) => void } | null>(null);
@@ -1726,12 +1758,19 @@ function CocktailExperience() {
     if (typeof window !== "undefined" && (window as any).lenis) (window as any).lenis.stop();
     document.body.style.overflow = "hidden";
 
+    // Zapewnij widoczność szejkera + góry PRZED startem animacji
+    api.shakerRoot.visible = true;
     const top = api.shakerTop;
     top.visible = true;
     const restY = api.topRestY;
     const lift = CONFIG.shakerHeight * 0.22;
     gsap.set(top.position, { x: 0, y: restY + lift + 2.4, z: 0 });
     gsap.set(top.rotation, { x: 0, y: 0, z: 0 });
+    // Resetuj pozycję szejkera (gdyby scroll odsunął go z centrum)
+    gsap.set(api.shakerRoot.position, { x: CONFIG.shakerRest.x, y: CONFIG.shakerRest.y, z: CONFIG.shakerRest.z });
+    gsap.set(api.shakerRoot.rotation, { x: 0, y: 0, z: 0 });
+    gsap.set(api.shakerRoot.scale, { x: 1, y: 1, z: 1 });
+    api.invalidate();
 
     const tl = gsap.timeline({
       onUpdate: api.invalidate,
@@ -1746,7 +1785,7 @@ function CocktailExperience() {
       .to(api.shakerRoot.position, { y: CONFIG.shakerRest.y - 0.1, duration: 0.06, ease: "power2.out" }, 0.2)
       .to(api.shakerRoot.position, { y: CONFIG.shakerRest.y, duration: 0.35, ease: "elastic.out(1,0.4)" }, 0.26);
 
-    const jitter = gsap.timeline();
+    const jitter = gsap.timeline({ onUpdate: api.invalidate });
     for (let i = 0; i < 5; i++) jitter.to(api.shakerRoot.rotation, { z: (i % 2 === 0 ? 1 : -1) * deg(8), duration: 0.06, ease: "power1.inOut" });
     jitter.to(api.shakerRoot.rotation, { z: 0, duration: 0.08 });
     tl.add(jitter, 0.5);
@@ -1789,7 +1828,22 @@ function CocktailExperience() {
   const claimDrink = useCallback(() => {
     setConfetti((c) => c + 1);
     setClaimed(true);
-  }, []);
+    // Zapisz drink do localStorage natychmiast (żeby ShareDrinkBtn widział go)
+    try {
+      const drinks = JSON.parse(localStorage.getItem("sh-my-drinks") || "[]");
+      const entry = {
+        name: drinkName || "Senza nome",
+        author: customerName || "Anonimo",
+        ingredients: poured.map(p => ({ id: p.ing.id, name: p.ing.name, color: p.ing.color, ml: Math.round(p.ml) })),
+        ml: Math.round(poured.reduce((s, p) => s + p.ml, 0)),
+        strength: strength.label,
+        color: mixedColor,
+        saved_at: new Date().toISOString(),
+      };
+      drinks.push(entry);
+      localStorage.setItem("sh-my-drinks", JSON.stringify(drinks));
+    } catch {}
+  }, [poured, drinkName, customerName, strength.label, mixedColor]);
 
   const reset = useCallback(() => {
     const api = sceneApiRef.current;
@@ -2105,6 +2159,9 @@ function CocktailExperience() {
               </span>
             </div>
           )}
+          {poured.length > 0 && stage === "build" && (
+            <button className="cx-reset-top cx-reset-inline" onClick={reset}>↺ {typeof window !== "undefined" && (window as any).currentLanguage === "pl" ? "Od nowa" : (window as any).currentLanguage === "en" ? "Start over" : (window as any).currentLanguage === "de" ? "Neustart" : "Ricomincia"}</button>
+          )}
         </div>
 
         {/* LEWO — mixery + kroki */}
@@ -2144,9 +2201,6 @@ function CocktailExperience() {
 
         {/* PRAWO — alkohole + SHAKE */}
         <div ref={rightPanelRef} className={`cx-col cx-col-right ${pouring || stage !== "build" ? "is-pouring" : ""}`}>
-          {poured.length > 0 && stage === "build" && (
-            <button className="cx-reset-top" onClick={reset}>↺ {typeof window !== "undefined" && (window as any).currentLanguage === "pl" ? "Od nowa" : (window as any).currentLanguage === "en" ? "Start over" : (window as any).currentLanguage === "de" ? "Neustart" : "Ricomincia"}</button>
-          )}
           <AccordionPanel side="right" kicker="Spirits" sub="& alcolici" groups={ALCOHOLS}
             poured={poured} onPour={pourIngredient} onHoldAdd={holdAdd} onHoverReal={onHoverReal} disabled={stage !== "build"}
             isOpen={openSide === "right"} onOpenChange={(o) => setOpenSide(o ? "right" : null)} />
@@ -2160,7 +2214,18 @@ function CocktailExperience() {
         </div>
 
         {/* DÓŁ-ŚRODEK — prezent → formularz (pokazuje się po nalaniu) */}
-        <div ref={tableRef} className={`cx-table ${(glassPourOpen && !glassFilled) || (stage !== "glassReady" && poured.length === 0) ? "is-hidden" : ""} ${stage === "glassReady" && !claimed ? "is-gift" : ""}`}>
+        {stage === "glassReady" && typeof document !== "undefined" && createPortal(
+          <div className={`cx-table-mobile-portal ${!claimed ? "is-gift" : ""}`}>
+            {claimed ? (
+              <NameCard color={mixedColor} drinkName={drinkName} setDrinkName={setDrinkName}
+                customerName={customerName} setCustomerName={setCustomerName} poured={poured} onReset={reset} />
+            ) : (
+              <GiftClaim onClaim={claimDrink} />
+            )}
+          </div>,
+          document.body,
+        )}
+        <div ref={tableRef} className={`cx-table cx-table-desktop ${(glassPourOpen && !glassFilled) || (stage !== "glassReady" && poured.length === 0) ? "is-hidden" : ""} ${stage === "glassReady" && !claimed ? "is-gift" : ""}`}>
           {stage === "glassReady" ? (
             claimed ? (
               <NameCard color={mixedColor} drinkName={drinkName} setDrinkName={setDrinkName}
@@ -2583,8 +2648,8 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
   // szejkerem widocznym pod spodem. Szejker spoczywa w shakerRest, wlot ~górna krawędź.
   const target = useMemo(() => {
     const r = CONFIG.shakerRest;
-    // strumień wpada w SAM ŚRODEK shakera — nisko, niewidoczny (ukryty wewnątrz modelu)
-    return new THREE.Vector3(r.x, r.y - 0.4, r.z + 0.05);
+    // strumień wpada WEWNĄTRZ shakera — dalej od kamery (niższy Z) + nisko
+    return new THREE.Vector3(r.x, r.y - 0.2, r.z - 0.3);
   }, []);
 
   const liquidMat = useMemo(() => new THREE.MeshStandardMaterial({
@@ -2828,13 +2893,14 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
       }
     }
 
-    // Łuk LANIA: strumień wychodzi z szyjki i schodzi PROSTO do środka shakera.
-    // Punkt kontrolny pomiędzy neck a target (lekko w bok) — strumień NIE wynosi się nad shaker.
+    // Łuk LANIA: strumień wychodzi z szyjki i schodzi do środka shakera.
+    // Punkt kontrolny bliżej targetu (wlotu) — strumień NIE wynosi się nad shaker.
     const dx = target.x - _neck.x;
-    const midY = (_neck.y + target.y) * 0.5; // punkt kontrolny na połowie wysokości
+    const dy = target.y - _neck.y;
+    // Punkt kontrolny: 70% drogi do targetu w X, na prostej neck→target (minimalny łuk)
     _ctrl.set(
-      _neck.x + dx * 0.6,                    // przesunięty w stronę shakera
-      midY + 0.2,                             // lekko powyżej prostej (delikatny łuk w DÓŁ)
+      _neck.x + dx * 0.7,
+      _neck.y + dy * 0.65,                   // bliżej targetu — niemal prosta linia w dół
       (_neck.z + target.z) * 0.5,
     );
     fullCurve.v0.copy(_neck);
@@ -2920,7 +2986,7 @@ function PourOverlay({ req, onDone }: { req: PourReq | null; onDone: () => void 
       <Canvas
         className="cx-pour-canvas"
         frameloop="always"
-        dpr={[1, 2]}
+        dpr={[1, 1.5]}
         gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
         camera={{ position: [CONFIG.camPos.x, CONFIG.camPos.y, CONFIG.camPos.z], fov: 36 }}
       >
@@ -3169,7 +3235,7 @@ function GlassPourScene({ open, url, withIce, color, opacity, onDone }: {
   return createPortal(
     <div className={`cx-glasspour ${blur ? "is-blur" : ""}`}>
       <Canvas
-        className="cx-pour-canvas" frameloop="always" dpr={[1, 2]} shadows
+        className="cx-pour-canvas" frameloop="always" dpr={[1, 1.5]} shadows
         gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
         camera={{ position: [0, 0.5, 7], fov: 34 }}
       >
@@ -4303,16 +4369,17 @@ function ShareDrinkBtn() {
   const [open, setOpen] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  const [myDrink, setMyDrink] = useState<any>(null);
 
-  // Czytaj dane ostatniego drinka z localStorage
-  const myDrink = (() => {
-    if (typeof localStorage === "undefined") return null;
+  // Odświeżaj dane drinka z localStorage przy każdym otwarciu
+  useEffect(() => {
+    if (!open) return;
     try {
       const drinks = JSON.parse(localStorage.getItem("sh-my-drinks") || "[]");
-      if (drinks.length > 0) return drinks[drinks.length - 1];
-    } catch {}
-    return null;
-  })();
+      if (drinks.length > 0) setMyDrink(drinks[drinks.length - 1]);
+      else setMyDrink(null);
+    } catch { setMyDrink(null); }
+  }, [open]);
 
   // Sprawdź czy użytkownik już wysłał
   const alreadySent = typeof localStorage !== "undefined" && localStorage.getItem("sh-drink-shared") === "true";
@@ -4326,7 +4393,21 @@ function ShareDrinkBtn() {
     }
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
+    if (!myDrink) return;
+    try {
+      // Publikuj do Supabase
+      await publishDrink({
+        name: myDrink.name || "Senza nome",
+        author_name: myDrink.author || "Anonimo",
+        ingredients: myDrink.ingredients || [],
+        total_ml: myDrink.ml || 0,
+        strength_label: myDrink.strength || "—",
+        strength_value: 0,
+        color: myDrink.color || "#E8927C",
+        photo_url: photo || undefined,
+      });
+    } catch (e) { console.error("Publish error:", e); }
     if (typeof localStorage !== "undefined") localStorage.setItem("sh-drink-shared", "true");
     setSent(true);
   };
@@ -4401,6 +4482,7 @@ function ShareDrinkBtn() {
 }
 
 function CommunityFilters({ filter, setFilter, gridMode, setGridMode }: { filter: string; setFilter: (f: string) => void; gridMode: "single" | "grid"; setGridMode: (m: "single" | "grid") => void }) {
+  const [dropOpen, setDropOpen] = useState(false);
   const filters = [
     { id: "all", label: "Tutti" },
     { id: "popular", label: "🔥 Popolari" },
@@ -4408,12 +4490,27 @@ function CommunityFilters({ filter, setFilter, gridMode, setGridMode }: { filter
     { id: "featured", label: "⭐ In evidenza" },
     { id: "strong", label: "💪 Per forza" },
   ];
+  const activeLabel = filters.find((f) => f.id === filter)?.label ?? "Tutti";
   return (
     <div className="cx-comm-filters">
-      <div className="cx-comm-filter-row">
+      {/* Desktop: inline row */}
+      <div className="cx-comm-filter-row cx-comm-filter-desktop">
         {filters.map((f) => (
           <button key={f.id} className={`cx-comm-filter ${filter === f.id ? "active" : ""}`} onClick={() => setFilter(f.id)}>{f.label}</button>
         ))}
+      </div>
+      {/* Mobile: dropdown */}
+      <div className="cx-comm-filter-dropdown">
+        <button className="cx-comm-drop-trigger" onClick={() => setDropOpen(!dropOpen)}>
+          {activeLabel} <span className="cx-comm-drop-arrow">{dropOpen ? "▲" : "▼"}</span>
+        </button>
+        {dropOpen && (
+          <div className="cx-comm-drop-menu">
+            {filters.map((f) => (
+              <button key={f.id} className={`cx-comm-drop-item ${filter === f.id ? "active" : ""}`} onClick={() => { setFilter(f.id); setDropOpen(false); }}>{f.label}</button>
+            ))}
+          </div>
+        )}
       </div>
       <button className="cx-comm-grid-toggle" onClick={() => setGridMode(gridMode === "single" ? "grid" : "single")} aria-label="Cambia vista">
         {gridMode === "single" ? "⊞" : "▬"}
@@ -4428,7 +4525,6 @@ function CommunitySection({ sectionRef }: { sectionRef?: React.RefObject<HTMLEle
   const [loadingMore, setLoadingMore] = useState(false);
   const [commFilter, setCommFilter] = useState("all");
   const [gridMode, setGridMode] = useState<"single" | "grid">(() => {
-    if (typeof window !== "undefined" && window.innerWidth < 768) return "grid";
     return "single";
   });
 
@@ -4534,6 +4630,24 @@ function CommunitySection({ sectionRef }: { sectionRef?: React.RefObject<HTMLEle
         </div>
         {/* Filtry sortowania community */}
         <CommunityFilters filter={commFilter} setFilter={setCommFilter} gridMode={gridMode} setGridMode={setGridMode} />
+
+        {/* Drink del Mese — wyróżniony (pierwszy z koroną) */}
+        {COMMUNITY.length > 0 && (
+          <div className="cx-featured-drink">
+            <span className="cx-featured-crown">👑</span>
+            <div className="cx-featured-body">
+              <span className="cx-mini-kicker">Drink del Mese</span>
+              <h3>{COMMUNITY[0].name}</h3>
+              <p>by {COMMUNITY[0].by} · ♥ {COMMUNITY[0].likes}</p>
+            </div>
+            <svg viewBox="0 0 60 90" className="cx-featured-glass">
+              <defs><linearGradient id="feat-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={COMMUNITY[0].from} /><stop offset="100%" stopColor={COMMUNITY[0].to} /></linearGradient></defs>
+              <path d="M10 10 H50 L35 42 V68 H38 V74 H22 V68 H25 V42 Z" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" />
+              <path d="M14 13 H46 L35 38 H25 Z" fill="url(#feat-g)" />
+            </svg>
+          </div>
+        )}
+
         <div className={`cx-comm-grid ${gridMode === "grid" ? "cx-comm-grid-2col" : ""}`}>
           {[...COMMUNITY].sort((a, b) => {
             if (commFilter === "liked") return b.likes - a.likes;
@@ -4680,6 +4794,13 @@ function CommunityCard({ c }: { c: (typeof COMMUNITY)[number] }) {
               </div>
               <div className="cx-cc-popout-actions">
                 <button className={`cx-cc-like ${liked ? "on" : ""}`} onClick={() => setLiked((v) => !v)}>♥ {c.likes + (liked ? 1 : 0)}</button>
+                <button className="cx-cc-claim-btn" onClick={() => {
+                  // Genereuj mock order z danych community
+                  const ingredients = c.ingr.map(id => { const ing = ingById(id); return ing ? { id: ing.id, name: ing.name, color: ing.color, ml: ing.ml } : null; }).filter(Boolean);
+                  const totalMl = ingredients.reduce((s: number, i: any) => s + (i?.ml || 0), 0);
+                  createOrder({ drink_name: c.name, author_name: c.by, ingredients: ingredients as any[], total_ml: totalMl, strength_label: alcCount === 0 ? "Analcolico" : alcCount <= 1 ? "Leggero" : "Forte" })
+                    .then(order => { if (order?.id) window.open(`/order/${order.id}`, "_blank"); });
+                }}>🍸 Ordina questo</button>
               </div>
             </div>
           </div>
@@ -4725,7 +4846,7 @@ function CocktailStyles() {
         letter-spacing:0.05em; font-size:clamp(40px,8vw,104px); line-height:1; color:#0E2230; }
 
       .cx-scroll { position:relative; height:600vh; z-index:1; }
-      .cx-stage { position:sticky; top:0; height:100vh; width:100%; overflow:hidden; }
+      .cx-stage { position:sticky; top:0; height:100vh; height:100dvh; width:100%; overflow:hidden; }
 
       /* Wyśrodkowany tytuł */
       .cx-title { position:absolute; top:clamp(28px,5vh,60px); left:0; right:0; z-index:6; text-align:center; pointer-events:none; will-change:transform,opacity; padding:0 16px; }
@@ -4951,6 +5072,7 @@ function CocktailStyles() {
         background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); cursor:pointer; transition:all .25s;
         align-self:flex-end; }
       .cx-reset-top:hover { border-color:var(--cx-accent,#E8927C); color:#fff; background:rgba(232,146,124,0.15); }
+      .cx-reset-inline { margin-top:10px; }
 
       /* SHAKE button */
       .cx-shake { flex-shrink:0; margin-top:6px; display:inline-flex; align-items:center; justify-content:center; gap:12px; padding:18px 26px;
@@ -4991,7 +5113,7 @@ function CocktailStyles() {
       .cx-table.is-gift { background:transparent; border-color:transparent; box-shadow:none; }
 
       /* Prezent "Odbierz drinka" */
-      .cx-gift { display:flex; flex-direction:column; align-items:center; gap:14px; width:100%; padding:8px; cursor:pointer; background:none; border:none; animation:cxGiftFloat 3s ease-in-out infinite; }
+      .cx-gift { display:flex; flex-direction:column; align-items:center; gap:14px; width:100%; padding:8px; cursor:pointer; background:none; border:none; animation:cxGiftFloat 3s ease-in-out infinite; touch-action:manipulation; -webkit-tap-highlight-color:transparent; position:relative; z-index:2; }
       @keyframes cxGiftFloat { 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-6px); } }
       .cx-gift-stars { display:flex; gap:16px; color:var(--cx-accent,#E8927C); font-size:18px; }
       .cx-gift-stars span { animation:cxTwinkle 1.6s ease-in-out infinite; }
@@ -5168,6 +5290,13 @@ function CocktailStyles() {
       .cx-community::after { content:""; position:absolute; left:0; right:0; top:0; height:60vh; pointer-events:none; border-radius:2.4rem 2.4rem 0 0;
         background:linear-gradient(180deg, var(--cx-flood,#E85C3A), transparent); opacity:calc(var(--cx-spill) * 0.65); mix-blend-mode:screen; transition:opacity .2s linear; }
       .cx-comm-inner { max-width:1240px; margin:0 auto; padding:0 clamp(20px,5vw,72px); }
+      .cx-featured-drink { display:flex; align-items:center; gap:20px; padding:20px 24px; margin-bottom:24px; border-radius:20px;
+        background:linear-gradient(135deg, rgba(241,196,15,0.08), rgba(232,146,124,0.06)); border:1px solid rgba(241,196,15,0.3);
+        box-shadow:0 8px 32px rgba(241,196,15,0.1); position:relative; overflow:hidden; }
+      .cx-featured-crown { font-size:28px; flex-shrink:0; }
+      .cx-featured-body { flex:1; } .cx-featured-body h3 { margin:4px 0 2px; font-size:18px; font-weight:800; color:#fff; }
+      .cx-featured-body p { font-size:12px; opacity:0.7; margin:0; }
+      .cx-featured-glass { width:50px; height:75px; flex-shrink:0; opacity:0.8; }
       .cx-comm-head { display:flex; justify-content:center; align-items:center; text-align:center; gap:24px; padding-bottom:36px; border-bottom:1px solid rgba(255,255,255,0.16); margin-bottom:48px; flex-wrap:wrap; }
       .cx-comm-head .cx-mini-kicker { color:rgba(255,255,255,0.7); }
       .cx-comm-head h2 { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:clamp(40px,6vw,96px); line-height:0.95; letter-spacing:-0.03em; color:#fff; margin-top:14px; word-break:keep-all; overflow-wrap:normal; white-space:nowrap; }
@@ -5231,6 +5360,17 @@ function CocktailStyles() {
       .cx-comm-share-btn:hover { background:#fff; color:var(--c-deep,#1A3D52); }
       .cx-comm-filters { display:flex; gap:8px; flex-wrap:wrap; margin:20px 0; align-items:center; justify-content:space-between; }
       .cx-comm-filter-row { display:flex; gap:8px; flex-wrap:wrap; }
+      .cx-comm-filter-dropdown { display:none; position:relative; }
+      .cx-comm-drop-trigger { padding:8px 16px; border-radius:999px; font-size:12px; font-weight:700; letter-spacing:0.04em;
+        border:1px solid rgba(255,255,255,0.2); color:#fff; background:rgba(255,255,255,0.06); cursor:pointer; display:flex; align-items:center; gap:8px; }
+      .cx-comm-drop-arrow { font-size:9px; opacity:0.6; }
+      .cx-comm-drop-menu { position:absolute; top:calc(100% + 6px); left:0; min-width:160px; z-index:60; border-radius:14px;
+        background:rgba(14,20,30,0.95); border:1px solid rgba(255,255,255,0.15); backdrop-filter:blur(12px);
+        box-shadow:0 12px 32px rgba(0,0,0,0.5); padding:6px; display:flex; flex-direction:column; gap:2px; }
+      .cx-comm-drop-item { padding:10px 14px; border-radius:10px; font-size:12px; font-weight:600; text-align:left;
+        border:none; color:rgba(255,255,255,0.8); background:transparent; cursor:pointer; transition:all .2s; }
+      .cx-comm-drop-item:hover { background:rgba(255,255,255,0.08); }
+      .cx-comm-drop-item.active { background:var(--cx-accent,#E8927C); color:#fff; }
       .cx-comm-filter { padding:8px 14px; border-radius:999px; font-size:11px; font-weight:600; letter-spacing:0.04em;
         border:1px solid rgba(255,255,255,0.15); color:rgba(255,255,255,0.8); background:rgba(255,255,255,0.04); cursor:pointer; transition:all .25s; }
       .cx-comm-filter:hover { border-color:rgba(255,255,255,0.4); background:rgba(255,255,255,0.08); }
@@ -5243,7 +5383,9 @@ function CocktailStyles() {
       .cx-comm-grid .cx-cc { transition:transform .4s cubic-bezier(.2,.8,.2,1), opacity .3s ease, box-shadow .4s; }
       .cx-comm-grid-2col { grid-template-columns:repeat(2,1fr) !important; gap:16px !important; }
       @media (max-width:768px) { .cx-comm-grid { grid-template-columns:1fr; gap:14px; }
-        .cx-comm-grid-2col { grid-template-columns:repeat(2,1fr) !important; gap:12px !important; } }
+        .cx-comm-grid-2col { grid-template-columns:repeat(2,1fr) !important; gap:12px !important; }
+        .cx-comm-filter-desktop { display:none !important; }
+        .cx-comm-filter-dropdown { display:block; } }
       .cx-cc-comments-list { display:flex; flex-direction:column; gap:8px; padding:12px 0; border-top:1px solid rgba(255,255,255,0.08); margin-top:8px; }
       .cx-cc-cmt { font-size:12px; color:rgba(255,255,255,0.6); line-height:1.4; margin:0; font-style:italic; }
       .cx-cc-cmt-btn { background:none; border:none; color:rgba(255,255,255,0.55); font-size:13px; cursor:pointer; transition:color .2s; padding:0; }
@@ -5304,10 +5446,10 @@ function CocktailStyles() {
         /* SHAKE — suwak wycentrowany na dole */
         .cx-shake-desktop { display:none; }
         /* gauge nie nachodzi na FAB — niższa od FAB */
-        .cx-gauge { left:calc(50% - min(80px, 18vw)) !important; top:68% !important; height:min(24vh, 180px) !important; }
-        .cx-gauge-right { right:calc(50% - min(80px, 18vw)) !important; left:auto !important; }
-        /* przycisk reset widoczny na mobile — pod headerem, po prawej */
-        .cx-reset-top { position:fixed !important; top:calc(80px + env(safe-area-inset-top)); right:16px; z-index:42; align-self:auto !important;
+        .cx-gauge { left:50% !important; top:auto !important; bottom:calc(80px + env(safe-area-inset-bottom)) !important; height:min(16vh, 130px) !important; width:40px !important; transform:translateX(-50%) !important; }
+        .cx-gauge-right { right:50% !important; left:auto !important; transform:translateX(50%) !important; }
+        /* przycisk reset widoczny na mobile — pod strength indicator (inline) */
+        .cx-reset-top { position:static !important; margin-top:8px !important; z-index:42;
           padding:10px 16px !important; font-size:11px !important; background:rgba(14,11,14,0.8) !important; backdrop-filter:blur(8px);
           border:1px solid rgba(255,255,255,0.18) !important; box-shadow:0 6px 20px rgba(0,0,0,0.4); }
         body:not([data-cx-section="creator"]) .cx-reset-top { display:none !important; }
@@ -5435,13 +5577,15 @@ function CocktailStyles() {
         .cx-drop-cnt { margin-left:auto; font-size:11px; opacity:0.55; }
 
         /* tabela "nel bicchiere" — na mobile zastąpiona pionowym paskiem warstw (LayerBar) */
-        /* ALE: prezent/QR (glassReady) jest w tabeli → musi być widoczny na mobile */
+        /* ALE: prezent/QR (glassReady) w portalu na mobile */
         .cx-table { display:none !important; }
-        .cx-table.is-gift { display:block !important; position:fixed !important; left:50% !important; bottom:calc(24px + env(safe-area-inset-bottom)) !important; width:min(360px, 88vw) !important; z-index:50 !important; }
+        .cx-table-desktop { display:none !important; }
+        .cx-table-mobile-portal { position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom)); width:min(360px, 88vw); z-index:9990; transform:translateX(-50%); pointer-events:auto; text-align:center; color:#fff; }
+        .cx-table-mobile-portal.is-gift { background:transparent; }
 
-        /* LayerBar — pionowy pasek warstw po lewej */
-        .cx-layerbar { position:fixed; left:14px; top:50%; transform:translateY(-50%); z-index:43;
-          display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:auto; }
+        /* LayerBar — pionowy pasek warstw po lewej — NIŻEJ żeby nie nachodzić na FAB */
+        .cx-layerbar { position:fixed; left:14px; top:auto; bottom:calc(140px + env(safe-area-inset-bottom)); transform:none; z-index:43;
+          display:flex; flex-direction:column; align-items:center; gap:8px; pointer-events:auto; max-height:min(30vh, 240px); }
         body[data-cx-pouring] .cx-layerbar, body[data-cx-scrolling] .cx-layerbar,
         body:not([data-cx-section="creator"]) .cx-layerbar { opacity:0; visibility:hidden; pointer-events:none; transition:opacity .3s, visibility .3s; }
         .cx-layerbar-track { position:relative; width:30px; height:min(46vh,360px); border-radius:16px;
@@ -5498,6 +5642,12 @@ function CocktailStyles() {
       @media (prefers-reduced-motion: reduce){
         .cx-popout, .cx-shake, .cx-cat, .cx-cc { transition:none; }
       }
+
+      /* Desktop: portal ukryty, cx-table-desktop widoczny */
+      @media (min-width:769px) {
+        .cx-table-mobile-portal { display:none !important; }
+        .cx-table-desktop { display:block !important; }
+      }
     
       /* Popout overlay (Instagram-style) */
       .cx-cc-popout-overlay { position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.75); backdrop-filter:blur(8px);
@@ -5519,7 +5669,9 @@ function CocktailStyles() {
       .cx-cc-popout-label { display:block; font-size:10px; letter-spacing:0.2em; text-transform:uppercase; color:rgba(255,255,255,0.5); margin-bottom:10px; }
       .cx-cc-popout-pills { display:flex; flex-wrap:wrap; gap:6px; }
       .cx-cc-popout-comments { display:flex; flex-direction:column; gap:8px; padding-top:16px; border-top:1px solid rgba(255,255,255,0.08); }
-      .cx-cc-popout-actions { padding-top:16px; border-top:1px solid rgba(255,255,255,0.08); }
+      .cx-cc-popout-actions { padding-top:16px; border-top:1px solid rgba(255,255,255,0.08); display:flex; gap:12px; flex-wrap:wrap; }
+      .cx-cc-claim-btn { padding:10px 18px; border-radius:999px; background:var(--cx-accent,#E8927C); color:#fff; font-weight:700; font-size:12px; letter-spacing:0.04em; border:none; cursor:pointer; transition:all .25s; }
+      .cx-cc-claim-btn:hover { background:#d9745c; transform:translateY(-1px); }
 
       /* Strength color bar on card */
       .cx-cc-strength-bar { position:absolute; top:0; left:0; right:0; height:3px; background:var(--cc-strength,#E8927C); border-radius:3px 3px 0 0; z-index:2; }
