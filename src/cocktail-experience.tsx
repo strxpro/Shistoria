@@ -584,6 +584,42 @@ function strengthBg(v: number, extreme = false): string {
   return `#${out.getHexString()}`;
 }
 
+/* ──────────────────────────────────────────────────────────────────────────
+ * Rozpoznawanie znanych koktajli — jeśli skład pasuje do klasyka, zwróć nazwę.
+ * Dopasowanie luźne: wszystkie KLUCZOWE składniki obecne (kategorie/id).
+ * ──────────────────────────────────────────────────────────────────────── */
+const KNOWN_COCKTAILS: { name: string; needs: string[][]; max?: number }[] = [
+  // needs = lista grup; każda grupa to alternatywy (OR); wszystkie grupy muszą być spełnione (AND)
+  { name: "Gin Tonic", needs: [["gin", "gin-botanist", "gin-tanqueray", "gin-mare", "gin-pink", "gin-bombay"], ["tonica", "tonica-prem"]], max: 2 },
+  { name: "Cuba Libre", needs: [["rum", "rum-bianco", "rum-don-papa", "rum-kraken"], ["coca-cola", "coca-zero"], ["lime", "limone"]], max: 3 },
+  { name: "Mojito", needs: [["rum", "rum-bianco"], ["menta"], ["lime"], ["soda", "sciroppo"]] },
+  { name: "Negroni", needs: [["gin", "gin-bombay"], ["campari"], ["vermouth-r"]], max: 3 },
+  { name: "Americano", needs: [["campari"], ["vermouth-r"], ["soda"]], max: 3 },
+  { name: "Aperol Spritz", needs: [["aperol"], ["prosecco"], ["soda"]], max: 3 },
+  { name: "Margarita", needs: [["tequila", "tequila-1800", "tequila-dobel"], ["cointreau"], ["lime", "limone"]] },
+  { name: "Tequila Sunrise", needs: [["tequila", "tequila-1800"], ["arancia"], ["granatina"]] },
+  { name: "Screwdriver", needs: [["vodka", "vodka-beluga"], ["arancia"]], max: 2 },
+  { name: "Moscow Mule", needs: [["vodka", "vodka-beluga"], ["ginger"], ["lime"]] },
+  { name: "Cosmopolitan", needs: [["vodka"], ["cointreau"], ["cranberry"], ["lime", "limone"]] },
+  { name: "Vodka Lemon", needs: [["vodka"], ["lemonsoda", "limone"]], max: 2 },
+  { name: "Long Island", needs: [["vodka"], ["gin", "gin-bombay"], ["rum", "rum-bianco"], ["tequila"], ["cola", "coca-cola"]] },
+  { name: "Whisky Cola", needs: [["whisky-high-comm", "jack-daniels", "jameson", "bourbon"], ["cola", "coca-cola", "coca-zero"]], max: 2 },
+  { name: "Dark & Stormy", needs: [["rum-kraken", "rum"], ["ginger"], ["lime"]] },
+  { name: "Garibaldi", needs: [["campari"], ["arancia"]], max: 2 },
+];
+
+function recognizeCocktail(poured: { ing: Ingredient; ml: number }[]): string | null {
+  if (poured.length < 2) return null;
+  const ids = new Set(poured.map((p) => p.ing.id));
+  for (const c of KNOWN_COCKTAILS) {
+    if (c.max && poured.length > c.max) continue;
+    const ok = c.needs.every((group) => group.some((id) => ids.has(id)));
+    if (ok && poured.length >= c.needs.length) return c.name;
+  }
+  return null;
+}
+
+
 /* deterministyczna pseudo-macierz QR */
 function qrMatrix(seed: string, size = 21): boolean[][] {
   let h = 2166136261;
@@ -1598,6 +1634,7 @@ function CocktailExperience() {
   );
   const totalMl = useMemo(() => Math.round(poured.reduce((s, p) => s + p.ml, 0)), [poured]);
   const strength = useMemo(() => strengthOf(poured), [poured]);
+  const recognized = useMemo(() => recognizeCocktail(poured), [poured]);
 
   const stageRef = useRef<Stage>("build");
   const colorRef = useRef(mixedColor);
@@ -2172,6 +2209,11 @@ function CocktailExperience() {
                       <span key={i} className={`cx-drop ${i < strength.drops ? "on" : ""}`} />
                     ))}
               </span>
+            </div>
+          )}
+          {recognized && stage === "build" && (
+            <div className="cx-recognized" aria-label={`Riconosciuto: ${recognized}`}>
+              ✨ <strong>{recognized}</strong>
             </div>
           )}
           {poured.length > 0 && stage === "build" && (
@@ -5145,6 +5187,10 @@ function CocktailStyles() {
         align-self:flex-end; }
       .cx-reset-top:hover { border-color:var(--cx-accent,#E8927C); color:#fff; background:rgba(232,146,124,0.15); }
       .cx-reset-inline { margin-top:10px; }
+      .cx-recognized { display:inline-flex; align-items:center; gap:6px; margin-top:10px; padding:7px 16px; border-radius:999px;
+        background:linear-gradient(135deg, rgba(241,196,15,0.18), rgba(232,146,124,0.12)); border:1px solid rgba(241,196,15,0.4);
+        font-size:12px; color:#fff; letter-spacing:0.03em; animation:cxFadeUp .4s ease; }
+      .cx-recognized strong { font-family:var(--f-display,"Syne",serif); font-weight:800; letter-spacing:0.02em; }
 
       /* SHAKE button */
       .cx-shake { flex-shrink:0; margin-top:6px; display:inline-flex; align-items:center; justify-content:center; gap:12px; padding:18px 26px;

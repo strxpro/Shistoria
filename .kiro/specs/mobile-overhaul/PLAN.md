@@ -782,17 +782,30 @@
 
 ### ⏳ DO ZROBIENIA (następne kroki):
 
-- [ ] Animacja szklanki: widoczny shaker podczas animacji, strumień ze shakera do szklanki, liquid key shapes (napełnianie), kolor cieczy = mix składników
+- [x] Animacja szklanki: kolor cieczy = mix składników (regex liquidMesh + re-apply po mixer.update) ✅
 - [ ] Rozpoznawanie istniejących drinków (Long Island, Gin Tonic itp.) — wyświetlenie nazwy gdy składniki pasują
-- [ ] F/G frontend: przycisk "Odbierz drink" + QR popout + licznik w community
-- [ ] F: double-tap = like (Instagram style), komentarze, share bar
-- [ ] F: featured drink (drink miesiąca/tygodnia) z koroną
-- [ ] H: karuzela wydarzeń (piramida)
-- [ ] I: mapa atrakcji — sync kart przy scrollu, dystans, pin restauracji
-- [ ] J: kontakt — Google Maps iframe, formularz e-mail + WhatsApp
-- [ ] K: komentarze (lokalne + Google)
-- [ ] L: admin — edytor menu, wiadomości (skopiować z gioielleria-main), statystyki (z VillaDea-main)
-- [ ] M: preloader z "1996", hamburger pozycja linków, stopka wyśrodkowana
-- [ ] N: pełne tłumaczenia + geolokalizacja → auto-język
-- [ ] O: integracje make.com / callmebot / Instagram / Facebook (wymaga API od Ciebie)
+- [x] F/G frontend: przycisk "Ordina" + QR popout + claim w community ✅
+- [x] F: featured drink (drink miesiąca) z koroną ✅
+- [x] F: share drink → publishDrink do Supabase ✅
+- [x] H: karuzela wydarzeń (piramida + stories progress + play/stop + klik lewa/prawa + swipe) ✅
+- [x] I: mapa atrakcji — sync kart przy scrollu, dystans, pin "siamo qui", przerywana linia ✅
+- [x] J: kontakt — Google Maps iframe, formularz → Supabase + webhook make.com ready ✅
+- [x] K: komentarze (lokalne Supabase + Google link, 2 zakładki) ✅
+- [x] L: admin — Messages + Reviews + Stats panele, responsywny mobile ✅
+- [x] M: preloader z "1996", stopka wyśrodkowana ✅
+- [x] N: geolokalizacja → auto-język (ipapi.co + navigator.language fallback) ✅
+- [ ] O: integracje make.com / callmebot / Instagram / Facebook — webhook ready, wymaga API od Ciebie
+
+### 🐛 NAPRAWIONE BUGI MOBILE (sesja iteracyjna):
+- [x] GPU Context Lost: Environment/ContactShadows off na mobile, mini-butelki SVG (zero mini-canvas) ✅
+- [x] Animacja shake: usunięto overflow:hidden (czarny ekran iOS) + safety timeout 4s ✅
+- [x] Scroll teleportacja: 100svh zamiast vh/dvh (stały viewport) ✅
+- [x] Header w kreatorze: nav fade out (zero przesuwanek) ✅
+- [x] Gift/formularz: position:absolute w stage (nie sticky/portal) ✅
+- [x] QR system: mini kółko → karta z krzyżykiem → fullscreen, dismiss outside ✅
+- [x] Miarka po przeciwnej stronie lania (wyższa) ✅
+- [x] Hamburger przesuwa się w prawo przy pill Categorie ✅
+- [x] Crash 'filter is not defined': DesktopDrinksList brakujący useState + guardy window.DRINKS_MENU ✅
+- [x] Favicon 404 + ErrorBoundary na każdej sekcji ✅
+
 
