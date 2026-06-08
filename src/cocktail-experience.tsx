@@ -2316,7 +2316,7 @@ function MiniBottleModel({ id, name, color, hovered, playing, sustaining }: { id
       // Skip arrays of materials and non-standard materials
       if (!mat || Array.isArray(mesh.material) || !(mat as any).isMeshStandardMaterial) return;
       // Ciecz → kolor trunku; szkło → przezroczyste; etykieta bez tekstury → proceduralna.
-      if (inList(mesh.name, model.liquid)) { mesh.material = liquidMat; liquidMeshRef.current = mesh; }
+      if (inList(mesh.name, model.liquid) || /liquid|liguid/i.test(mesh.name)) { mesh.material = liquidMat; liquidMeshRef.current = mesh; }
       else if (model.metalBody && inList(mesh.name, model.glass)) {
         // PUSZKA: korpus dostaje pełnokolorową owijkę (kolor napoju + nazwa)
         labelFound = true;
@@ -3326,7 +3326,7 @@ function LazyBottle3D({ id, name, color, shape, ml, real }: { id: string; name: 
  * HoldTimer — circular progress indicator (2 seconds) around bottle card.
  * When user holds for 2s, triggers pouring. Shows thick ring timer.
  * ──────────────────────────────────────────────────────────────────────── */
-const HOLD_DURATION = 2000; // ms
+const HOLD_DURATION = 1200; // ms — po tym czasie zaczyna lać (szybsze na mobile)
 
 /* Wielojęzyczny napis nalewania (wg window.currentLanguage) */
 function getPourLabel(): string {
