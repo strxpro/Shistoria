@@ -9,6 +9,7 @@ const { useState: useStateE, useEffect: useEffectE, useRef: useRefE } = React;
 function Eventi({ t }) {
   const [events, setEvents] = useStateE([]);
   const [activeIdx, setActiveIdx] = useStateE(0);
+  const [playing, setPlaying] = useStateE(true);
   const intervalRef = useRefE(null);
   const touchRef = useRefE({ startX: 0, startY: 0 });
 
@@ -22,7 +23,6 @@ function Eventi({ t }) {
         const { data } = await sb.from("events").select("*").eq("is_published", true).order("event_date", { ascending: true });
         if (data && data.length > 0) { setEvents(data); return; }
       } catch {}
-      // Fallback na statyczne dane
       if (typeof window !== "undefined" && window.EVENTI_DATA && window.EVENTI_DATA.length > 0) {
         setEvents(window.EVENTI_DATA);
       }
@@ -30,26 +30,34 @@ function Eventi({ t }) {
     load();
   }, []);
 
-  // Auto-przesuwanie co 4s
+  // Auto-przesuwanie co 4s (tylko gdy playing)
   useEffectE(() => {
-    if (events.length <= 1) return;
+    if (events.length <= 1 || !playing) return;
     intervalRef.current = setInterval(() => {
       setActiveIdx(i => (i + 1) % events.length);
     }, 4000);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [events.length]);
+  }, [events.length, playing]);
+
+  const goNext = () => setActiveIdx(i => (i + 1) % events.length);
+  const goPrev = () => setActiveIdx(i => (i - 1 + events.length) % events.length);
 
   // Swipe na mobile
   const onTouchStart = (e) => { touchRef.current.startX = e.touches[0].clientX; };
   const onTouchEnd = (e) => {
     const dx = e.changedTouches[0].clientX - touchRef.current.startX;
-    if (Math.abs(dx) < 50) return;
-    if (intervalRef.current) clearInterval(intervalRef.current); // reset timer po ręcznym swipe
-    if (dx < 0) setActiveIdx(i => (i + 1) % events.length); // swipe w lewo → następny
-    else setActiveIdx(i => (i - 1 + events.length) % events.length); // swipe w prawo → poprzedni
+    if (Math.abs(dx) < 40) return;
+    if (dx < 0) goNext(); else goPrev();
   };
 
-  // Oblicz pozycję karty w karuzeli (circular, piramida)
+  // Klik w lewą/prawą połowę karuzeli = prev/next (jak Instagram stories)
+  const onCarouselClick = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    if (x < rect.width / 2) goPrev(); else goNext();
+  };
+
+  // Pozycja karty (circular piramida)
   const getCardStyle = (i, total) => {
     let diff = i - activeIdx;
     if (diff > total / 2) diff -= total;
@@ -58,11 +66,10 @@ function Eventi({ t }) {
     if (absDiff > 2) return { visible: false };
     const isCenter = diff === 0;
     const isAdj = absDiff === 1;
-    const scale = isCenter ? 1 : isAdj ? 0.82 : 0.65;
-    const opacity = isCenter ? 1 : isAdj ? 0.7 : 0.3;
-    // Przesunięcie w px (nie %), by karty zawsze wyglądały jak piramida
-    const baseShift = typeof window !== "undefined" && window.innerWidth < 768 ? 180 : 260;
-    const x = diff * (isAdj ? baseShift : baseShift * 1.8);
+    const scale = isCenter ? 1 : isAdj ? 0.85 : 0.68;
+    const opacity = isCenter ? 1 : isAdj ? 0.78 : 0.4;
+    const baseShift = typeof window !== "undefined" && window.innerWidth < 768 ? 200 : 320;
+    const x = diff * (isAdj ? baseShift : baseShift * 1.7);
     const z = isCenter ? 3 : isAdj ? 2 : 1;
     return { visible: true, scale, opacity, x, z };
   };
@@ -78,8 +85,13 @@ function Eventi({ t }) {
           <TextClipReveal text={t("eventi.intro")} className="ev-intro" />
         </div>
 
-        {/* Piramidowa karuzela */}
-        <div className="ev-carousel" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+        {/* Piramidowa karuzela — klik lewa/prawa = nawigacja */}
+        <div className="ev-carousel" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} onClick={onCarouselClick}>
+          {/* Play/Stop w rogu */}
+          <button className="ev-playstop" onClick={(e) => { e.stopPropagation(); setPlaying(p => !p); }} aria-label={playing ? "Pausa" : "Play"}>
+            {playing ? "❚❚" : "▶"}
+          </button>
+
           {events.map((e, i) => {
             const s = getCardStyle(i, events.length);
             if (!s.visible) return null;
@@ -87,13 +99,14 @@ function Eventi({ t }) {
             return (
               <article key={e.id || i} className={`ev-card ${isActive ? "ev-card-active" : ""}`}
                 style={{ "--ev-x": `${s.x}px`, "--ev-s": s.scale, "--ev-o": s.opacity, "--ev-z": s.z }}
-                onClick={() => { setActiveIdx(i); if (intervalRef.current) clearInterval(intervalRef.current); }}>
-                {/* Progress indicators (Framer ReelCarousel style) — only on active */}
+                onClick={(ev) => { ev.stopPropagation(); setActiveIdx(i); }}>
+                {/* Progress indicators (stories style) — tylko na aktywnej */}
                 {isActive && (
                   <div className="ev-progress">
                     {events.map((_, pi) => (
                       <div key={pi} className={`ev-progress-seg ${pi === activeIdx ? "active" : pi < activeIdx ? "done" : ""}`}>
-                        {pi === activeIdx && <div className="ev-progress-fill" />}
+                        {pi === activeIdx && playing && <div className="ev-progress-fill" />}
+                        {pi === activeIdx && !playing && <div className="ev-progress-fill" style={{ animationPlayState: "paused", width: "30%" }} />}
                       </div>
                     ))}
                   </div>
@@ -112,17 +125,17 @@ function Eventi({ t }) {
           })}
         </div>
 
-        {/* Dots / nawigacja */}
+        {/* Dots */}
         <div className="ev-dots">
           {events.map((_, i) => (
-            <button key={i} className={`ev-dot ${i === activeIdx ? "active" : ""}`} onClick={() => { setActiveIdx(i); if (intervalRef.current) clearInterval(intervalRef.current); }} aria-label={`Evento ${i + 1}`} />
+            <button key={i} className={`ev-dot ${i === activeIdx ? "active" : ""}`} onClick={() => setActiveIdx(i)} aria-label={`Evento ${i + 1}`} />
           ))}
         </div>
 
         {/* Arrows (desktop) */}
         <div className="ev-arrows">
-          <button className="ev-arrow ev-arrow-l" onClick={() => { setActiveIdx(i => (i - 1 + events.length) % events.length); if (intervalRef.current) clearInterval(intervalRef.current); }} aria-label="Precedente">‹</button>
-          <button className="ev-arrow ev-arrow-r" onClick={() => { setActiveIdx(i => (i + 1) % events.length); if (intervalRef.current) clearInterval(intervalRef.current); }} aria-label="Successivo">›</button>
+          <button className="ev-arrow ev-arrow-l" onClick={goPrev} aria-label="Precedente">‹</button>
+          <button className="ev-arrow ev-arrow-r" onClick={goNext} aria-label="Successivo">›</button>
         </div>
 
         <div className="ev-cta reveal">
@@ -136,12 +149,16 @@ function Eventi({ t }) {
         .ev-head .h2 { text-wrap:balance; word-break:keep-all; }
         .ev-intro { font-family: var(--f-serif); font-style: italic; font-size: clamp(18px, 2vw, 26px); line-height: 1.4; margin-top: 28px; max-width: 560px; color: var(--c-deep); }
 
-        .ev-carousel { position:relative; display:flex; align-items:center; justify-content:center; height:min(520px, 78vh); overflow:visible; touch-action:pan-y; perspective:1000px; }
-        .ev-card { position:absolute; width:min(320px, 70vw); aspect-ratio:9/16; border-radius:24px; overflow:hidden; cursor:pointer;
+        .ev-carousel { position:relative; display:flex; align-items:center; justify-content:center; height:min(600px, 82vh); overflow:visible; touch-action:pan-y; perspective:1000px; cursor:pointer; }
+        .ev-card { position:absolute; width:min(380px, 78vw); aspect-ratio:9/16; border-radius:24px; overflow:hidden; cursor:pointer;
           transform:translateX(var(--ev-x, 0)) scale(var(--ev-s, 1)) rotateY(calc(var(--ev-x, 0) * -0.015deg)); opacity:var(--ev-o, 1); z-index:var(--ev-z, 1);
           transition:transform .65s cubic-bezier(.22,.9,.36,1), opacity .5s ease;
           box-shadow:0 20px 60px rgba(0,0,0,0.3); will-change:transform,opacity; transform-style:preserve-3d; }
         .ev-card-active { box-shadow:0 30px 80px rgba(0,0,0,0.45); }
+        .ev-playstop { position:absolute; top:0; right:0; z-index:20; width:40px; height:40px; border-radius:50%; border:none;
+          background:rgba(0,0,0,0.5); color:#fff; font-size:13px; cursor:pointer; display:grid; place-items:center; backdrop-filter:blur(6px);
+          transition:background .2s; }
+        .ev-playstop:hover { background:rgba(0,0,0,0.75); }
         .ev-card:hover { box-shadow:0 30px 80px rgba(0,0,0,0.4); }
 
         /* Progress indicators (Framer ReelCarousel style) */
@@ -171,8 +188,8 @@ function Eventi({ t }) {
         .ev-cta { margin-top: 56px; text-align: center; }
 
         @media (max-width:768px) {
-          .ev-carousel { height:min(440px, 72vh); }
-          .ev-card { width:min(260px, 70vw); }
+          .ev-carousel { height:min(560px, 80vh); }
+          .ev-card { width:min(300px, 80vw); }
           .ev-arrows { display:none; }
         }
       `}</style>
