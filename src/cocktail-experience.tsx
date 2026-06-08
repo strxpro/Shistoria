@@ -2624,18 +2624,22 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
       }
       else if (!model.metalBody && inList(mesh.name, model.glass)) {
         glassRef.current = mesh;
-        mesh.material = glassMat; // przezroczyste szkło — widać kolor cieczy
+        mesh.material = glassMat;
       }
       else if (inList(mesh.name, model.cork)) corkRef.current = mesh;
       else if (inList(mesh.name, model.label)) {
         const lm = new THREE.MeshStandardMaterial({
           color: "#ffffff",
           map: makeLabelTexture(ingById(id)?.name ?? id, color, labelFor(id)),
-          roughness: 0.6,
-          metalness: 0,
-          side: THREE.DoubleSide,
+          roughness: 0.6, metalness: 0, side: THREE.DoubleSide,
         });
         mesh.material = lm;
+      }
+      // FALLBACK: puszka metalBody — nierozpoznany mesh (nie liquid/cork) → nałóż owijkę
+      else if (model.metalBody && !inList(mesh.name, model.liquid) && !inList(mesh.name, model.cork)) {
+        mesh.material = new THREE.MeshStandardMaterial({
+          color: "#ffffff", map: makeCanTexture(ingById(id)?.name ?? id, color), roughness: 0.32, metalness: 0.5,
+        });
       }
     });
     // poza zamknięta + dosadzenie korka PRZED normalizacją (inaczej unoszący się
@@ -2802,12 +2806,22 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
     if (head - tail <= 0.005 || !neckRef.current) { s.visible = false; return; }
     s.visible = true;
     neckRef.current.getWorldPosition(_neck);
+    // Korekta: jeśli neck jest daleko od pozycji butelki (przechylona puszka), 
+    // użyj pozycji outer + offset w kierunku shakera (bardziej realistyczne na mobile)
+    if (outer.current) {
+      const ox = outer.current.position.x;
+      const oy = outer.current.position.y;
+      // Jeśli neck jest zbyt daleko od outer (>2 jedn.) — resetuj do pozycji bliżej otworu
+      if (Math.abs(_neck.x - ox) > 2.0 || Math.abs(_neck.y - oy) > 2.5) {
+        _neck.set(ox + (side === "left" ? 0.3 : -0.3), oy - 0.4, outer.current.position.z);
+      }
+    }
 
-    // Łuk LANIA: strumień wychodzi z szyjki, łukiem schodzi nad wlot i WPADA pionowo
-    // do środka szejkera (kończy się w głębi — wizualnie "do dna", niewidoczny w środku).
+    // Łuk LANIA: strumień wychodzi z szyjki, łukiem schodzi i WPADA
+    // do środka szejkera (kończy się w głębi — wizualnie "do dna").
     const dx = target.x - _neck.x; // znak = kierunek lania
     _ctrl.set(
-      _neck.x + dx * 0.4,                    // mniejsze wybrzuszenie — bardziej pionowy zrzut
+      _neck.x + dx * 0.5,                    // łagodniejszy łuk
       _neck.y + Math.abs(dx) * 0.10 + 0.08,  // delikatny łuk
       (_neck.z + target.z) * 0.5,
     );
@@ -5010,6 +5024,7 @@ function CocktailStyles() {
       /* Kinowy overlay nalewania — blur tła TYLKO podczas otwierania; potem przezroczyste,
          żeby było widać szejker pod spodem i strumień wpadał do jego wnętrza. */
       .cx-pour-overlay { position:fixed; inset:0; z-index:80; pointer-events:none;
+        -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; touch-action:none;
         background:transparent; transition:background .5s ease, backdrop-filter .5s ease;
         animation:cxPourIn .3s ease both; }
       .cx-pour-overlay.is-blur { background:rgba(8,6,9,0.46); backdrop-filter:blur(16px) saturate(1.1); -webkit-backdrop-filter:blur(16px) saturate(1.1); }
