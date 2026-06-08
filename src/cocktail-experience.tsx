@@ -2780,8 +2780,9 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
   useFrame(() => {
     invalidate();
     
-    // Ruch butelki w przeciwną stronę niż myszka podczas lania
-    if (pouringRef.current && outer.current) {
+    // Ruch butelki — NA MOBILE wyłączony (strumień musi być stabilny i przyklejony do szyjki)
+    const isMob2 = typeof window !== "undefined" && window.innerWidth < 768;
+    if (pouringRef.current && outer.current && !isMob2) {
       const offX = 1.2;
       let targetPosX = target.x - pointer.x * 1.5;
       targetPosX = THREE.MathUtils.clamp(targetPosX, target.x - offX, target.x + offX);
@@ -3255,7 +3256,7 @@ function shapeFor(ing: Ingredient): "wine" | "spirit" | "can" | "round" {
  * ──────────────────────────────────────────────────────────────────────── */
 // Globalny tracker aktywnych kontekstów 3D na mobile (max 3 jednocześnie — limit iOS)
 const _active3D: Set<string> = typeof window !== "undefined" ? ((window as any).__sh3d || ((window as any).__sh3d = new Set())) : new Set();
-const MAX_MOBILE_3D = 3;
+const MAX_MOBILE_3D = 4;
 
 function LazyBottle3D({ id, name, color, shape, ml, real }: { id: string; name: string; color: string; shape: "wine" | "spirit" | "can" | "round"; ml: number; real: boolean }) {
   const ref = useRef<HTMLDivElement>(null!);
@@ -5251,9 +5252,9 @@ function CocktailStyles() {
 
         /* SHAKE — suwak wycentrowany na dole */
         .cx-shake-desktop { display:none; }
-        /* gauge nie nachodzi na FAB — przesunięta jeszcze bliżej środka */
-        .cx-gauge { left:calc(50% - min(100px, 24vw)) !important; top:44% !important; }
-        .cx-gauge-right { right:calc(50% - min(100px, 24vw)) !important; left:auto !important; }
+        /* gauge nie nachodzi na FAB — przesunięta do środka (między FAB a shakerem) */
+        .cx-gauge { left:calc(50% - min(80px, 18vw)) !important; top:44% !important; }
+        .cx-gauge-right { right:calc(50% - min(80px, 18vw)) !important; left:auto !important; }
         .cx-slide-wrap { display:block; position:fixed; left:50%; bottom:calc(72px + env(safe-area-inset-bottom));
           transform:translateX(-50%); width:min(70vw,290px); z-index:41; pointer-events:auto; }
         .cx-slide { position:relative; width:100%; height:60px; border-radius:999px; overflow:hidden;
