@@ -2819,12 +2819,13 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
       }
     }
 
-    // Łuk LANIA: strumień wychodzi z szyjki, łukiem schodzi i WPADA
-    // do środka szejkera (kończy się w głębi — wizualnie "do dna").
-    const dx = target.x - _neck.x; // znak = kierunek lania
+    // Łuk LANIA: strumień wychodzi z szyjki i schodzi PROSTO do środka shakera.
+    // Punkt kontrolny pomiędzy neck a target (lekko w bok) — strumień NIE wynosi się nad shaker.
+    const dx = target.x - _neck.x;
+    const midY = (_neck.y + target.y) * 0.5; // punkt kontrolny na połowie wysokości
     _ctrl.set(
-      _neck.x + dx * 0.5,                    // łagodniejszy łuk
-      _neck.y + Math.abs(dx) * 0.10 + 0.08,  // delikatny łuk
+      _neck.x + dx * 0.6,                    // przesunięty w stronę shakera
+      midY + 0.2,                             // lekko powyżej prostej (delikatny łuk w DÓŁ)
       (_neck.z + target.z) * 0.5,
     );
     fullCurve.v0.copy(_neck);
