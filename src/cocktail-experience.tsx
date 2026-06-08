@@ -1836,7 +1836,9 @@ function CocktailExperience() {
       // wspólna poza wlotu shakera: k=0 → daleko z prawej (mały), k=1 → spoczynek.
       const flyInPose = (k: number) => {
         k = clamp01(k);
-        api.shakerRoot.visible = true;
+        // NIE ustawiaj visible jeśli szklanka jest aktywna (glassReady/pickGlass/inSceneGlass)
+        const glassAct = !!inSceneGlassRef.current || stageRef.current === "glassReady" || stageRef.current === "pickGlass";
+        if (!glassAct) api.shakerRoot.visible = true;
         api.shakerRoot.scale.setScalar(lerp(CONFIG.shakerEnterFrom.s, 1, k));
         api.shakerRoot.position.x = lerp(CONFIG.shakerEnterFrom.x, CONFIG.shakerRest.x, k);
         api.shakerRoot.position.y = lerp(CONFIG.shakerEnterFrom.y, CONFIG.shakerRest.y, k);
@@ -5398,7 +5400,9 @@ function CocktailStyles() {
         .cx-drop-cnt { margin-left:auto; font-size:11px; opacity:0.55; }
 
         /* tabela "nel bicchiere" — na mobile zastąpiona pionowym paskiem warstw (LayerBar) */
+        /* ALE: prezent/QR (glassReady) jest w tabeli → musi być widoczny na mobile */
         .cx-table { display:none !important; }
+        .cx-table.is-gift { display:block !important; position:fixed !important; left:50% !important; bottom:calc(24px + env(safe-area-inset-bottom)) !important; width:min(360px, 88vw) !important; z-index:50 !important; }
 
         /* LayerBar — pionowy pasek warstw po lewej */
         .cx-layerbar { position:fixed; left:14px; top:50%; transform:translateY(-50%); z-index:43;
