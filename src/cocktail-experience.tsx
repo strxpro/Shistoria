@@ -741,12 +741,16 @@ function makeCanTexture(name: string, color: string): THREE.CanvasTexture {
   ctx.fillStyle = g; ctx.fillRect(0, 0, 1024, 512);
   // pasy akcentu góra/dół
   ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.fillRect(0, 70, 1024, 10); ctx.fillRect(0, 432, 1024, 10);
-  // nazwa — wyśrodkowana, jedna kopia (bez powtórzeń)
+  // nazwa — wyśrodkowana, jedna kopia, dopasowany rozmiar
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  ctx.font = "800 64px Georgia, serif";
-  ctx.lineWidth = 7; ctx.strokeStyle = "rgba(0,0,0,0.5)";
-  ctx.fillStyle = "#ffffff";
   const up = name.toUpperCase();
+  // Dopasuj rozmiar fontu do długości tekstu
+  const maxW = 900;
+  let fontSize = 64;
+  ctx.font = `800 ${fontSize}px Georgia, serif`;
+  while (ctx.measureText(up).width > maxW && fontSize > 28) { fontSize -= 4; ctx.font = `800 ${fontSize}px Georgia, serif`; }
+  ctx.lineWidth = 6; ctx.strokeStyle = "rgba(0,0,0,0.5)";
+  ctx.fillStyle = "#ffffff";
   ctx.strokeText(up, 512, 256); ctx.fillText(up, 512, 256);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
@@ -3278,7 +3282,7 @@ function shapeFor(ing: Ingredient): "wine" | "spirit" | "can" | "round" {
  * ──────────────────────────────────────────────────────────────────────── */
 // Globalny tracker aktywnych kontekstów 3D na mobile (max 3 jednocześnie — limit iOS)
 const _active3D: Set<string> = typeof window !== "undefined" ? ((window as any).__sh3d || ((window as any).__sh3d = new Set())) : new Set();
-const MAX_MOBILE_3D = 4;
+const MAX_MOBILE_3D = 2;
 
 function LazyBottle3D({ id, name, color, shape, ml, real }: { id: string; name: string; color: string; shape: "wine" | "spirit" | "can" | "round"; ml: number; real: boolean }) {
   const ref = useRef<HTMLDivElement>(null!);
