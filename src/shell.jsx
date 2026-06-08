@@ -558,7 +558,10 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
           .nav-logo-blend { clip-path:inset(10% 0% 10% 0%) !important; transform:scale(1.5) !important; }
           .nav-logo-sub { color: var(--c-deep); }
           .nav-left { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); justify-content: center; transition: left 0.5s cubic-bezier(.2,.85,.2,1), transform 0.5s cubic-bezier(.2,.85,.2,1); }
-          .nav-right { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); gap: 10px; transition: right 0.5s cubic-bezier(.2,.85,.2,1); }
+          .nav-right { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); gap: 10px; transition: right 0.5s cubic-bezier(.2,.85,.2,1), transform 0.5s; }
+          /* W sekcji kreatora: flagi przesuwają się w lewo (nie nachodzą na hamburger w prawym rogu) */
+          body[data-cx-section="creator"] .nav-left { left: 16px; transform: translate(0, -50%); }
+          body[data-cx-section="creator"] .nav-right { right: auto; left: 70px; transform: translateY(-50%); }
           /* Gdy otwarta szuflada/panel kategorii: logo w lewo, flagi w lewo, hamburger już idzie w prawy-górny róg */
           body[data-cx-drawer="open"] .nav-left,
           body[data-cx-sheet="open"] .nav-left { left: 16px; transform: translate(0, -50%); }
