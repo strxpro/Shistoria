@@ -2963,86 +2963,9 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
 
     const s = streamRef.current;
     if (!s) return;
-    const head = headRef.current.v, tail = tailRef.current.v;
-    if (head - tail <= 0.005 || !neckRef.current) { s.visible = false; return; }
-    s.visible = true;
-    neckRef.current.getWorldPosition(_neck);
-    // Korekta: jeśli neck jest daleko od pozycji butelki (przechylona puszka), 
-    // użyj pozycji outer + offset w kierunku shakera (bardziej realistyczne na mobile)
-    if (outer.current) {
-      const ox = outer.current.position.x;
-      const oy = outer.current.position.y;
-      // Jeśli neck jest zbyt daleko od outer (>1.2 jedn.) — resetuj do pozycji bliżej otworu
-      if (Math.abs(_neck.x - ox) > 1.2 || Math.abs(_neck.y - oy) > 1.8) {
-        _neck.set(ox + (side === "left" ? 0.4 : -0.4), oy - 0.3, outer.current.position.z);
-      }
-    }
-
-    // Łuk LANIA: strumień wychodzi z szyjki i schodzi do środka shakera.
-    // Punkt kontrolny bliżej targetu (wlotu) — strumień NIE wynosi się nad shaker.
-    const dx = target.x - _neck.x;
-    const dy = target.y - _neck.y;
-    // Punkt kontrolny: 70% drogi do targetu w X, na prostej neck→target (minimalny łuk)
-    _ctrl.set(
-      _neck.x + dx * 0.7,
-      _neck.y + dy * 0.65,                   // bliżej targetu — niemal prosta linia w dół
-      (_neck.z + target.z) * 0.5,
-    );
-    fullCurve.v0.copy(_neck);
-    fullCurve.v1.copy(_ctrl);
-    fullCurve.v2.copy(target);
-
-    // Próbkuj widoczny odcinek
-    const n = _pts.length - 1;
-    for (let i = 0; i <= n; i++) {
-      const t = tail + (head - tail) * (i / n);
-      fullCurve.getPoint(t, _pts[i]);
-    }
-    const sub = new THREE.CatmullRomCurve3(_pts, false, "catmullrom", 0.5);
-
-    // Zwężający się strumień 3D: grubszy u góry (szyjka) → cieńszy na dole (wlot)
-    const segCount = 24;
-    const radialSegs = 10;
-    const positions: number[] = [];
-    const normals: number[] = [];
-    const uvArr: number[] = [];
-    const indices: number[] = [];
-    const segPts = sub.getPoints(segCount);
-    for (let si = 0; si <= segCount; si++) {
-      const taper = si / segCount;
-      const radius = lerp(0.065, 0.025, smooth(taper));
-      const pt = segPts[si];
-      const next = segPts[Math.min(si + 1, segCount)];
-      const prev = segPts[Math.max(si - 1, 0)];
-      const tang = new THREE.Vector3().subVectors(next, prev).normalize();
-      const up = Math.abs(tang.y) > 0.99 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
-      const biN = new THREE.Vector3().crossVectors(tang, up).normalize();
-      const n2 = new THREE.Vector3().crossVectors(biN, tang).normalize();
-      for (let ri = 0; ri <= radialSegs; ri++) {
-        const angle = (ri / radialSegs) * Math.PI * 2;
-        const cos = Math.cos(angle), sin = Math.sin(angle);
-        const nx = biN.x * cos + n2.x * sin;
-        const ny = biN.y * cos + n2.y * sin;
-        const nz = biN.z * cos + n2.z * sin;
-        positions.push(pt.x + nx * radius, pt.y + ny * radius, pt.z + nz * radius);
-        normals.push(nx, ny, nz);
-        uvArr.push(ri / radialSegs, taper);
-      }
-    }
-    for (let si = 0; si < segCount; si++) {
-      for (let ri = 0; ri < radialSegs; ri++) {
-        const a = si * (radialSegs + 1) + ri;
-        const b = a + radialSegs + 1;
-        indices.push(a, b, a + 1, b, b + 1, a + 1);
-      }
-    }
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-    geo.setAttribute("normal", new THREE.Float32BufferAttribute(normals, 3));
-    geo.setAttribute("uv", new THREE.Float32BufferAttribute(uvArr, 2));
-    geo.setIndex(indices);
-    if (s.geometry) s.geometry.dispose();
-    s.geometry = geo;
+    // Strumień Bezier UKRYTY — user nie chce widzieć strumienia nad szejkerem.
+    // Napełnianie szejkera (ciecz rośnie w środku) prowadzi efekt shakerFill.
+    s.visible = false;
   });
 
   return (
@@ -3954,9 +3877,10 @@ function AccordionPanel({
       </div>
 
       {!collapsed && (current || isAll) && typeof document !== "undefined" && createPortal(
-        <div className="cx-drawer-wrap" data-side={side}>
+        <div className="cx-drawer-wrap" data-side={side} onClick={(e) => { if (e.target === e.currentTarget) closeCat(); }}>
           <div className="cx-drawer-backdrop" onClick={closeCat} aria-hidden="true" />
           <div className="cx-drawer" role="dialog" aria-label={isAll ? "Tutti" : current!.group}
+            onClick={(e) => e.stopPropagation()}
             onTouchStart={(e) => { (e.currentTarget as any)._sy = e.touches[0].clientY; }}
             onTouchMove={(e) => {
               const el = e.currentTarget as any;
@@ -5202,7 +5126,7 @@ function CocktailStyles() {
       .cx-back-ico { font-size:16px; }
 
       /* Drawer kategorii — SZEROKI pasek na dole sceny (4 butelki widoczne) */
-      .cx-drawer-wrap { position:fixed; inset:0; z-index:60; pointer-events:none; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
+      .cx-drawer-wrap { position:fixed; inset:0; z-index:60; pointer-events:auto; -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; }
       .cx-drawer-backdrop { position:absolute; inset:0; background:rgba(8,6,9,0.55); backdrop-filter:blur(3px);
         pointer-events:auto; animation:cxFade .35s ease; }
       @keyframes cxFade { from { opacity:0; } to { opacity:1; } }
