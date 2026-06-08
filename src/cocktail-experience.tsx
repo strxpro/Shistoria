@@ -741,19 +741,19 @@ function makeCanTexture(name: string, color: string): THREE.CanvasTexture {
   ctx.fillStyle = g; ctx.fillRect(0, 0, 1024, 512);
   // pasy akcentu góra/dół
   ctx.fillStyle = "rgba(255,255,255,0.85)"; ctx.fillRect(0, 70, 1024, 10); ctx.fillRect(0, 432, 1024, 10);
-  // nazwa — wyśrodkowana, duża, biała z obwódką (powtórzona 2x wokół puszki)
+  // nazwa — wyśrodkowana, jedna kopia (bez powtórzeń)
   ctx.textAlign = "center"; ctx.textBaseline = "middle";
-  const draw = (cx: number) => {
-    ctx.font = "800 72px Georgia, serif";
-    ctx.lineWidth = 8; ctx.strokeStyle = "rgba(0,0,0,0.45)";
-    ctx.fillStyle = "#ffffff";
-    const up = name.toUpperCase();
-    ctx.strokeText(up, cx, 256); ctx.fillText(up, cx, 256);
-  };
-  draw(256); draw(768);
+  ctx.font = "800 64px Georgia, serif";
+  ctx.lineWidth = 7; ctx.strokeStyle = "rgba(0,0,0,0.5)";
+  ctx.fillStyle = "#ffffff";
+  const up = name.toUpperCase();
+  ctx.strokeText(up, 512, 256); ctx.fillText(up, 512, 256);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.flipY = false;
+  t.wrapS = THREE.ClampToEdgeWrapping;
+  t.wrapT = THREE.ClampToEdgeWrapping;
+  t.repeat.set(1, 1);
   _canTexCache.set(key, t);
   return t;
 }
@@ -2141,7 +2141,7 @@ function CocktailExperience() {
         {/* PRAWO — alkohole + SHAKE */}
         <div ref={rightPanelRef} className={`cx-col cx-col-right ${pouring || stage !== "build" ? "is-pouring" : ""}`}>
           {poured.length > 0 && stage === "build" && (
-            <button className="cx-reset-top" onClick={reset}>↺ Zacznij od nowa</button>
+            <button className="cx-reset-top" onClick={reset}>↺ {typeof window !== "undefined" && (window as any).currentLanguage === "pl" ? "Od nowa" : (window as any).currentLanguage === "en" ? "Start over" : (window as any).currentLanguage === "de" ? "Neustart" : "Ricomincia"}</button>
           )}
           <AccordionPanel side="right" kicker="Spirits" sub="& alcolici" groups={ALCOHOLS}
             poured={poured} onPour={pourIngredient} onHoldAdd={holdAdd} onHoverReal={onHoverReal} disabled={stage !== "build"}
@@ -5302,9 +5302,9 @@ function CocktailStyles() {
         /* gauge nie nachodzi na FAB — niższa od FAB */
         .cx-gauge { left:calc(50% - min(80px, 18vw)) !important; top:68% !important; height:min(24vh, 180px) !important; }
         .cx-gauge-right { right:calc(50% - min(80px, 18vw)) !important; left:auto !important; }
-        /* przycisk reset widoczny na mobile — góra-prawo */
-        .cx-reset-top { position:fixed !important; top:calc(16px + env(safe-area-inset-top)); right:16px; z-index:42; align-self:auto !important;
-          padding:10px 16px !important; font-size:11px !important; background:rgba(14,11,14,0.75) !important; backdrop-filter:blur(8px);
+        /* przycisk reset widoczny na mobile — pod headerem, po prawej */
+        .cx-reset-top { position:fixed !important; top:calc(80px + env(safe-area-inset-top)); right:16px; z-index:42; align-self:auto !important;
+          padding:10px 16px !important; font-size:11px !important; background:rgba(14,11,14,0.8) !important; backdrop-filter:blur(8px);
           border:1px solid rgba(255,255,255,0.18) !important; box-shadow:0 6px 20px rgba(0,0,0,0.4); }
         body:not([data-cx-section="creator"]) .cx-reset-top { display:none !important; }
         .cx-slide-wrap { display:block; position:fixed; left:50%; bottom:calc(72px + env(safe-area-inset-bottom));
