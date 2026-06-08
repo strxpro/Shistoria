@@ -1556,7 +1556,7 @@ function CocktailExperience() {
   const mixedColor = useMemo(
     () => mixColorsWeighted(poured), [poured],
   );
-  const totalMl = useMemo(() => poured.reduce((s, p) => s + p.ml, 0), [poured]);
+  const totalMl = useMemo(() => Math.round(poured.reduce((s, p) => s + p.ml, 0)), [poured]);
   const strength = useMemo(() => strengthOf(poured), [poured]);
 
   const stageRef = useRef<Stage>("build");
@@ -5267,8 +5267,8 @@ function CocktailStyles() {
 
         /* SHAKE — suwak wycentrowany na dole */
         .cx-shake-desktop { display:none; }
-        /* gauge nie nachodzi na FAB — przesunięta do środka (między FAB a shakerem) */
-        .cx-gauge { left:calc(50% - min(80px, 18vw)) !important; top:44% !important; }
+        /* gauge nie nachodzi na FAB — niższa, bliżej środka */
+        .cx-gauge { left:calc(50% - min(80px, 18vw)) !important; top:50% !important; height:min(32vh, 240px) !important; }
         .cx-gauge-right { right:calc(50% - min(80px, 18vw)) !important; left:auto !important; }
         .cx-slide-wrap { display:block; position:fixed; left:50%; bottom:calc(72px + env(safe-area-inset-bottom));
           transform:translateX(-50%); width:min(70vw,290px); z-index:41; pointer-events:auto; }
