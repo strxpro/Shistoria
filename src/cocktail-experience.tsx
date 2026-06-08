@@ -1754,9 +1754,8 @@ function CocktailExperience() {
     busyRef.current = true;
     setStage("shaking");
 
-    // Zablokuj scroll strony podczas animacji shake
+    // Zablokuj scroll strony podczas animacji shake (ale NIE overflow — to powoduje czarny ekran na iOS)
     if (typeof window !== "undefined" && (window as any).lenis) (window as any).lenis.stop();
-    document.body.style.overflow = "hidden";
 
     // Zapewnij widoczność szejkera + góry PRZED startem animacji
     api.shakerRoot.visible = true;
@@ -1772,13 +1771,20 @@ function CocktailExperience() {
     gsap.set(api.shakerRoot.scale, { x: 1, y: 1, z: 1 });
     api.invalidate();
 
+    // Safety timeout — jeśli animacja nie skończy się w 4s, przejdź dalej
+    const safety = setTimeout(() => {
+      if (stageRef.current === "shaking") {
+        busyRef.current = false; setStage("pickGlass"); api.invalidate();
+        if (typeof window !== "undefined" && (window as any).lenis) (window as any).lenis.start();
+      }
+    }, 4000);
+
     const tl = gsap.timeline({
       onUpdate: api.invalidate,
       onComplete: () => {
+        clearTimeout(safety);
         busyRef.current = false; setStage("pickGlass"); api.invalidate();
-        // Odblokuj scroll po zakończeniu animacji
         if (typeof window !== "undefined" && (window as any).lenis) (window as any).lenis.start();
-        document.body.style.overflow = "";
       },
     });
     tl.to(top.position, { y: restY, duration: 0.2, ease: "power4.in" }, 0)
@@ -5446,9 +5452,9 @@ function CocktailStyles() {
 
         /* SHAKE — suwak wycentrowany na dole */
         .cx-shake-desktop { display:none; }
-        /* gauge nie nachodzi na FAB — niższa od FAB */
-        .cx-gauge { left:50% !important; top:auto !important; bottom:calc(80px + env(safe-area-inset-bottom)) !important; height:min(16vh, 130px) !important; width:40px !important; transform:translateX(-50%) !important; }
-        .cx-gauge-right { right:50% !important; left:auto !important; transform:translateX(50%) !important; }
+        /* gauge — po PRZECIWNEJ stronie lania, wyższa */
+        .cx-gauge { left:16px !important; right:auto !important; top:50% !important; bottom:auto !important; height:min(28vh, 200px) !important; width:36px !important; transform:translateY(-50%) !important; }
+        .cx-gauge-right { left:auto !important; right:16px !important; transform:translateY(-50%) !important; }
         /* przycisk reset widoczny na mobile — pod strength indicator (inline) */
         .cx-reset-top { position:static !important; margin-top:8px !important; z-index:42;
           padding:10px 16px !important; font-size:11px !important; background:rgba(14,11,14,0.8) !important; backdrop-filter:blur(8px);
