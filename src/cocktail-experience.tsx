@@ -1545,7 +1545,9 @@ function Scene({
       <Suspense fallback={null}>
         <Environment preset="city" />
       </Suspense>
-      <ContactShadows position={[0, -3.48, 0]} opacity={0.55} scale={14} blur={2.2} far={6} color="#000" />
+      {typeof window !== "undefined" && window.innerWidth >= 768 && (
+        <ContactShadows position={[0, -3.48, 0]} opacity={0.55} scale={14} blur={2.2} far={6} color="#000" />
+      )}
     </>
   );
 }
@@ -2302,7 +2304,7 @@ function CocktailExperience() {
         {/* Canvas */}
         <div className="cx-canvas">
           {inView && (
-            <Canvas frameloop={isMobileDevice ? "always" : "demand"} shadows dpr={isMobileDevice ? [1, 1.5] : [1, 2]}
+            <Canvas frameloop={isMobileDevice ? "always" : "demand"} shadows={!isMobileDevice} dpr={isMobileDevice ? [1, 1.5] : [1, 2]}
               gl={{ antialias: true, alpha: true, powerPreference: "high-performance", failIfMajorPerformanceCaveat: false }}
               camera={{ position: [CONFIG.camPos.x, CONFIG.camPos.y, CONFIG.camPos.z], fov: 36 }}>
               <Scene initialColor={mixedColor} onReady={onSceneReady}
