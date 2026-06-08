@@ -136,9 +136,9 @@ function Eventi({ t }) {
         .ev-head .h2 { text-wrap:balance; word-break:keep-all; }
         .ev-intro { font-family: var(--f-serif); font-style: italic; font-size: clamp(18px, 2vw, 26px); line-height: 1.4; margin-top: 28px; max-width: 560px; color: var(--c-deep); }
 
-        .ev-carousel { position:relative; display:flex; align-items:center; justify-content:center; height:440px; overflow:visible; touch-action:pan-y; perspective:1000px; }
-        .ev-card { position:absolute; width:min(320px, 72vw); height:400px; border-radius:24px; overflow:hidden; cursor:pointer;
-          transform:translateX(var(--ev-x, 0)) scale(var(--ev-s, 1)) rotateY(calc(var(--ev-x, 0) * -0.02deg)); opacity:var(--ev-o, 1); z-index:var(--ev-z, 1);
+        .ev-carousel { position:relative; display:flex; align-items:center; justify-content:center; height:min(520px, 78vh); overflow:visible; touch-action:pan-y; perspective:1000px; }
+        .ev-card { position:absolute; width:min(320px, 70vw); aspect-ratio:9/16; border-radius:24px; overflow:hidden; cursor:pointer;
+          transform:translateX(var(--ev-x, 0)) scale(var(--ev-s, 1)) rotateY(calc(var(--ev-x, 0) * -0.015deg)); opacity:var(--ev-o, 1); z-index:var(--ev-z, 1);
           transition:transform .65s cubic-bezier(.22,.9,.36,1), opacity .5s ease;
           box-shadow:0 20px 60px rgba(0,0,0,0.3); will-change:transform,opacity; transform-style:preserve-3d; }
         .ev-card-active { box-shadow:0 30px 80px rgba(0,0,0,0.45); }
@@ -171,8 +171,8 @@ function Eventi({ t }) {
         .ev-cta { margin-top: 56px; text-align: center; }
 
         @media (max-width:768px) {
-          .ev-carousel { height:360px; }
-          .ev-card { width:min(280px, 78vw); height:340px; }
+          .ev-carousel { height:min(440px, 72vh); }
+          .ev-card { width:min(260px, 70vw); }
           .ev-arrows { display:none; }
         }
       `}</style>

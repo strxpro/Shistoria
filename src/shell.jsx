@@ -642,9 +642,9 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
             box-shadow: 0 8px 30px rgba(0,0,0,0.4);
             z-index: 2100;
           }
-          /* Gdy otwarta szuflada butelek LUB panel kategorii (FAB) — hamburger płynnie na górę po prawej */
+          /* Gdy otwarta szuflada butelek LUB panel kategorii (FAB) — hamburger przesuwa się w prawo */
           body[data-cx-drawer="open"] .hamburger-mobile,
-          body[data-cx-sheet="open"] .hamburger-mobile { right: 16px; top: calc(16px + env(safe-area-inset-top)); bottom: auto; transform:none; }
+          body[data-cx-sheet="open"] .hamburger-mobile { right: 16px; transform: none; }
           body[data-cx-section="creator"] .hamburger-mobile:not(.open) { right: 16px; transform:none; }
           /* Podczas wjazdu/wyjazdu sekcji kreatora (neon pop) — hamburger znika */
           body[data-cx-scrolling] .hamburger-mobile { opacity: 0; visibility: hidden; pointer-events: none; }
