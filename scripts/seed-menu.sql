@@ -6,6 +6,7 @@
 -- Pobierz ID kategorii
 DO $$
 DECLARE
+  cat_aperitivo uuid;
   cat_antipasti uuid;
   cat_primi uuid;
   cat_secondi uuid;
@@ -13,6 +14,7 @@ DECLARE
   cat_pizze uuid;
   cat_dolci uuid;
 BEGIN
+  SELECT id INTO cat_aperitivo FROM menu_categories WHERE name_it = 'Aperitivo';
   SELECT id INTO cat_antipasti FROM menu_categories WHERE name_it = 'Antipasti';
   SELECT id INTO cat_primi FROM menu_categories WHERE name_it = 'Primi';
   SELECT id INTO cat_secondi FROM menu_categories WHERE name_it = 'Secondi';
@@ -20,17 +22,39 @@ BEGIN
   SELECT id INTO cat_pizze FROM menu_categories WHERE name_it = 'Pizze';
   SELECT id INTO cat_dolci FROM menu_categories WHERE name_it = 'Dolci';
 
+  -- Jeśli brakuje kategorii Aperitivo — stwórz
+  IF cat_aperitivo IS NULL THEN
+    INSERT INTO menu_categories (name_it, name_pl, name_en, name_de, name_fr, name_es, icon, sort_order)
+    VALUES ('Aperitivo', 'Aperitif', 'Aperitivo', 'Aperitif', 'Apéritif', 'Aperitivo', '🍸', 0)
+    RETURNING id INTO cat_aperitivo;
+  END IF;
+
+  -- ═══ APERITIVO ═══
+  INSERT INTO menu_items (category_id, original_name, price, ingredients_it, sort_order) VALUES
+    (cat_aperitivo, 'Spritz', 6.00, 'Aperol, Prosecco, Soda', 1),
+    (cat_aperitivo, 'Moscow Mule', 7.00, 'Vodka, Ginger Beer, Lime', 2),
+    (cat_aperitivo, 'Mojito', 7.00, 'Rum, Menta, Lime, Zucchero, Soda', 3),
+    (cat_aperitivo, 'Americano', 7.00, 'Campari, Vermouth Rosso, Soda', 4),
+    (cat_aperitivo, 'Dark N'' Stormy', 8.00, 'Rum Scuro, Ginger Beer, Lime', 5),
+    (cat_aperitivo, 'Margarita', 7.00, 'Tequila, Triple Sec, Lime', 6),
+    (cat_aperitivo, 'Daiquiri', 7.00, 'Rum, Lime, Zucchero', 7),
+    (cat_aperitivo, 'Negroni', 7.00, 'Campari, Vermouth Rosso, Gin', 8),
+    (cat_aperitivo, 'Caipiroska', 6.00, 'Vodka, Lime, Zucchero', 9),
+    (cat_aperitivo, 'Caipirina', 6.00, 'Cachaca, Lime, Zucchero', 10),
+    (cat_aperitivo, 'El Diablo', 8.00, 'Tequila, Crème de Cassis', 11),
+    (cat_aperitivo, 'Piña Colada', 9.00, 'Rum, Ananas, Cocco, Lime', 12);
+
   -- ═══ ANTIPASTI ═══
-  INSERT INTO menu_items (category_id, original_name, price, ingredients_it, allergens, sort_order) VALUES
-    (cat_antipasti, 'Tagliere di salumi sardi', 15.00, NULL, NULL, 1),
-    (cat_antipasti, 'Tagliere di formaggi', 14.00, NULL, '7', 2),
-    (cat_antipasti, 'Insalata di polpo e patate', 16.00, NULL, '1·4·14', 3),
-    (cat_antipasti, 'Cozze alla marinara', 15.00, NULL, '14', 4),
-    (cat_antipasti, 'Misti mare cruditè', 30.00, NULL, '2·4·14', 5),
-    (cat_antipasti, 'Insalatona estiva', 18.00, 'Tonno / calamaro / salmone', '4·7·13', 6),
-    (cat_antipasti, 'Polpette di mare', 16.00, NULL, '1·2·3·4·6·11', 7),
-    (cat_antipasti, 'Antipasto del giorno', 18.00, NULL, NULL, 8),
-    (cat_antipasti, 'Degustazione 5 antipasti mare', 30.00, NULL, NULL, 9);
+  INSERT INTO menu_items (category_id, original_name, price, ingredients_it, allergens, is_featured, sort_order) VALUES
+    (cat_antipasti, 'Tagliere di salumi sardi', 15.00, NULL, NULL, false, 1),
+    (cat_antipasti, 'Tagliere di formaggi', 14.00, NULL, '7', false, 2),
+    (cat_antipasti, 'Insalata di polpo e patate', 16.00, NULL, '1·4·14', false, 3),
+    (cat_antipasti, 'Cozze alla marinara', 15.00, NULL, '14', false, 4),
+    (cat_antipasti, 'Misti mare cruditè', 30.00, NULL, '2·4·14', false, 5),
+    (cat_antipasti, 'Insalatona estiva', 18.00, 'Tonno / calamaro / salmone', '4·7·13', false, 6),
+    (cat_antipasti, 'Polpette di mare', 16.00, NULL, '1·2·3·4·6·11', false, 7),
+    (cat_antipasti, 'Antipasto del giorno', 18.00, NULL, NULL, false, 8),
+    (cat_antipasti, 'Degustazione 5 antipasti mare', 30.00, NULL, NULL, true, 9);
 
   -- ═══ PRIMI ═══
   INSERT INTO menu_items (category_id, original_name, price, ingredients_it, allergens, is_featured, sort_order) VALUES
@@ -87,5 +111,15 @@ BEGIN
     (cat_pizze, 'S''Historia', 16.00, 'Pomodoro, mozzarella, gamberi, funghi freschi, bottarga', '1·2·4·7', true, 20),
     (cat_pizze, 'Don Giovanni', 16.00, 'Mozzarella, burrata, crudo, pomodorini, granella di mandorle', '5·7', false, 21),
     (cat_pizze, 'Frutti di mare', 18.00, 'Pomodoro, mozzarella, frutti di mare', '1·2·4·7', false, 22);
+
+  -- ═══ DOLCI ═══
+  INSERT INTO menu_items (category_id, original_name, price, ingredients_it, sort_order) VALUES
+    (cat_dolci, 'Tiramisù della casa', 7.00, 'Mascarpone sardo, caffè espresso', 1),
+    (cat_dolci, 'Panna cotta', 6.00, 'Panna, vaniglia, frutti di bosco', 2),
+    (cat_dolci, 'Semifreddo al torrone', 7.00, 'Torrone sardo, miele, mandorle', 3),
+    (cat_dolci, 'Seadas', 8.00, 'Formaggio fresco, miele di corbezzolo', 4),
+    (cat_dolci, 'Gelato artigianale', 5.00, '2 gusti a scelta', 5),
+    (cat_dolci, 'Sorbetto al limone', 5.00, 'Limone fresco, zucchero', 6),
+    (cat_dolci, 'Caffè e dolcetto', 4.00, 'Espresso con piccola pasticceria sarda', 7);
 
 END $$;
