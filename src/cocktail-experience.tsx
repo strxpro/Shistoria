@@ -4293,27 +4293,49 @@ function NameCard({
     } catch (e) { console.error("Order creation failed:", e); }
   };
 
+  const [qrOpen, setQrOpen] = useState(false);
+
   if (done) {
     return (
-      <div className="cx-name cx-name-qr">
-        <div className="cx-qr">
-          {orderUrl ? (
-            <PersonalizedQR url={orderUrl} color={color} size={140} icon="🍸" />
-          ) : (
-            <div style={{ width: 140, height: 140, background: "#fff", borderRadius: 14, display: "grid", placeItems: "center" }}>
-              <span style={{ fontSize: 20, opacity: 0.4 }}>⏳</span>
-            </div>
-          )}
-        </div>
-        <div className="cx-name-info">
-          <span className="cx-mini-kicker">Mostralo al barman</span>
-          <h4>{drinkName}</h4>
-          <p>di {customerName} · {poured.length} ingredienti</p>
-          <p className="cx-name-ice">{(window as any).__sh_withIce !== false ? "🧊 Con ghiaccio" : "☀️ Senza ghiaccio"}</p>
-          {email.trim() && <p className="cx-name-email">📧 {email}</p>}
+      <>
+        {/* Mini przycisk QR (kółko) — zawsze widoczny po wysłaniu */}
+        <div className="cx-name cx-name-done">
+          <div className="cx-name-info">
+            <span className="cx-mini-kicker">Ordine confermato ✓</span>
+            <h4>{drinkName}</h4>
+            <p>di {customerName} · {poured.length} ingredienti</p>
+            <p className="cx-name-ice">{(window as any).__sh_withIce !== false ? "🧊 Con ghiaccio" : "☀️ Senza ghiaccio"}</p>
+          </div>
+          {/* Kółko QR — klik otwiera kartę */}
+          <button className="cx-qr-mini" onClick={() => setQrOpen(true)} aria-label="Mostra QR">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/></svg>
+          </button>
           <button className="cx-btn-ghost" onClick={onReset}>↺ Ricomincia</button>
         </div>
-      </div>
+
+        {/* Karta QR — overlay z animacją */}
+        {qrOpen && typeof document !== "undefined" && createPortal(
+          <div className="cx-qr-overlay" onClick={() => setQrOpen(false)}>
+            <div className="cx-qr-card" onClick={(e) => e.stopPropagation()}>
+              <button className="cx-qr-close" onClick={() => setQrOpen(false)}>×</button>
+              <span className="cx-mini-kicker">Mostralo al barman</span>
+              <div className="cx-qr-box">
+                {orderUrl ? (
+                  <PersonalizedQR url={orderUrl} color={color} size={180} icon="🍸" />
+                ) : (
+                  <div style={{ width: 180, height: 180, background: "#fff", borderRadius: 16, display: "grid", placeItems: "center" }}>
+                    <span style={{ fontSize: 24, opacity: 0.4 }}>⏳</span>
+                  </div>
+                )}
+              </div>
+              <h4>{drinkName}</h4>
+              <p>di {customerName} · {poured.length} ingredienti · {(window as any).__sh_withIce !== false ? "🧊" : "☀️"}</p>
+              {email.trim() && <p className="cx-name-email">📧 {email}</p>}
+            </div>
+          </div>,
+          document.body,
+        )}
+      </>
     );
   }
   return (
@@ -5176,6 +5198,21 @@ function CocktailStyles() {
       .cx-btn-ghost { align-self:flex-start; padding:9px 16px; border-radius:999px; border:1px solid var(--cx-stroke); color:rgba(255,255,255,0.85); font-size:12px; cursor:pointer; transition:all .3s; }
       .cx-btn-ghost:hover { border-color:var(--c-coral,#E8927C); color:#fff; }
       .cx-name-qr { display:flex; flex-direction:column; gap:16px; align-items:center; text-align:center; }
+      .cx-name-done { display:flex; flex-direction:column; gap:12px; align-items:center; text-align:center; }
+      .cx-qr-mini { width:56px; height:56px; border-radius:50%; background:var(--cx-accent,#E8927C); border:none; color:#fff; cursor:pointer;
+        display:grid; place-items:center; box-shadow:0 8px 24px rgba(232,146,124,0.4); transition:transform .3s, box-shadow .3s; }
+      .cx-qr-mini:hover { transform:scale(1.1); box-shadow:0 12px 32px rgba(232,146,124,0.6); }
+      .cx-qr-mini svg { width:28px; height:28px; }
+      .cx-qr-overlay { position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.7); backdrop-filter:blur(6px);
+        display:flex; align-items:center; justify-content:center; padding:24px; animation:cxFade .25s ease; }
+      .cx-qr-card { position:relative; width:min(340px, 88vw); background:#12171e; border:1px solid rgba(255,255,255,0.12); border-radius:24px;
+        padding:32px 24px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:12px; color:#fff;
+        box-shadow:0 40px 80px rgba(0,0,0,0.5); animation:cxFadeUp .35s cubic-bezier(.2,.8,.2,1); }
+      .cx-qr-close { position:absolute; top:14px; right:14px; width:32px; height:32px; border-radius:50%; border:1px solid rgba(255,255,255,0.15);
+        background:transparent; color:#fff; font-size:18px; cursor:pointer; display:grid; place-items:center; transition:all .2s; }
+      .cx-qr-close:hover { background:rgba(255,255,255,0.1); }
+      .cx-qr-box { background:#fff; border-radius:16px; padding:12px; box-shadow:0 8px 24px rgba(0,0,0,0.3); }
+      .cx-qr-box > div, .cx-qr-box img { display:block; }
       .cx-qr { width:140px; height:140px; flex-shrink:0; background:#fff; border-radius:16px; padding:10px; box-shadow:0 12px 30px rgba(0,0,0,0.4); }
       .cx-qr svg, .cx-qr img, .cx-qr > div { width:100%; height:100%; display:block; }
       .cx-name-info { display:flex; flex-direction:column; gap:5px; }
