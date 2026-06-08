@@ -27,10 +27,10 @@ function MobileFullMenu() {
   // Gdy pill categories widoczny LUB sheet otwarty → hamburger w prawo
   useEffectM(() => {
     if (typeof document === "undefined") return;
-    if (catSheet) document.body.dataset.cxSheet = "open";
+    if (catSheet || pillVisible) document.body.dataset.cxSheet = "open";
     else delete document.body.dataset.cxSheet;
     return () => { delete document.body.dataset.cxSheet; };
-  }, [catSheet]);
+  }, [catSheet, pillVisible]);
   const catBarRef = useRefM(null);
   const sectionRef = useRefM(null);
 

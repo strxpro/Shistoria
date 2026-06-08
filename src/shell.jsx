@@ -568,9 +568,12 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
           .nav-logo-sub { color: var(--c-deep); }
           .nav-left { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); justify-content: center; transition: left 0.5s cubic-bezier(.2,.85,.2,1), transform 0.5s cubic-bezier(.2,.85,.2,1), opacity 0.3s; will-change: left, transform; opacity:1; }
           .nav-right { position: absolute; right: 18px; left: auto; top: 50%; transform: translateY(-50%); gap: 10px; transition: left 0.5s cubic-bezier(.2,.85,.2,1), right 0.5s cubic-bezier(.2,.85,.2,1), transform 0.5s cubic-bezier(.2,.85,.2,1), opacity 0.3s; will-change: left, right, transform; }
-          /* W sekcji kreatora: cały nav ukryty (hamburger widoczny osobno) */
-          body[data-cx-section="creator"] .nav { opacity:0; pointer-events:none; transition:opacity .3s; }
-          body[data-cx-section="creator"] .nav-right { }
+          /* W sekcji kreatora: nav ukryty ALE flaga języka WIDOCZNA */
+          body[data-cx-section="creator"] .nav { pointer-events:none; }
+          body[data-cx-section="creator"] .nav-left { opacity:0; }
+          body[data-cx-section="creator"] .nav-bg { opacity:0; }
+          body[data-cx-section="creator"] .nav-center { opacity:0; }
+          body[data-cx-section="creator"] .nav-right { pointer-events:auto; opacity:1; }
           /* Gdy otwarta szuflada/panel kategorii: logo w lewo, flagi w lewo, hamburger już idzie w prawy-górny róg */
           body[data-cx-drawer="open"] .nav-left,
           body[data-cx-sheet="open"] .nav-left { left: 16px; transform: translate(0, -50%); }
