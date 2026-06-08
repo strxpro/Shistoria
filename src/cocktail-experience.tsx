@@ -1504,12 +1504,15 @@ function Scene({
           />
         )}
       </Suspense>
-      {/* Environment (HDR) — przywrócone też na mobile (crash był od złych modeli z Supabase,
-          nie od HDR). Daje realistyczne odbicia metalu/szkła. */}
-      <Suspense fallback={null}>
-        <Environment preset="city" />
-      </Suspense>
-      <ContactShadows position={[0, -3.48, 0]} opacity={0.55} scale={14} blur={2.2} far={6} color="#000" />
+      {/* Environment (HDR) — TYLKO desktop (na mobile GPU nie daje rady → Context Lost) */}
+      {typeof window !== "undefined" && window.innerWidth >= 768 && (
+        <Suspense fallback={null}>
+          <Environment preset="city" />
+        </Suspense>
+      )}
+      {typeof window !== "undefined" && window.innerWidth >= 768 && (
+        <ContactShadows position={[0, -3.48, 0]} opacity={0.55} scale={14} blur={2.2} far={6} color="#000" />
+      )}
     </>
   );
 }
@@ -2225,19 +2228,8 @@ function CocktailExperience() {
           </div>
         </div>
 
-        {/* DÓŁ-ŚRODEK — prezent → formularz (pokazuje się po nalaniu) */}
-        {stage === "glassReady" && typeof document !== "undefined" && createPortal(
-          <div className={`cx-table-mobile-portal ${!claimed ? "is-gift" : ""}`}>
-            {claimed ? (
-              <NameCard color={mixedColor} drinkName={drinkName} setDrinkName={setDrinkName}
-                customerName={customerName} setCustomerName={setCustomerName} poured={poured} onReset={reset} />
-            ) : (
-              <GiftClaim onClaim={claimDrink} />
-            )}
-          </div>,
-          document.body,
-        )}
-        <div ref={tableRef} className={`cx-table cx-table-desktop ${(glassPourOpen && !glassFilled) || (stage !== "glassReady" && poured.length === 0) ? "is-hidden" : ""} ${stage === "glassReady" && !claimed ? "is-gift" : ""}`}>
+        {/* DÓŁ-ŚRODEK — prezent → formularz (wewnątrz sticky-stage, NIE portal/sticky) */}
+        <div ref={tableRef} className={`cx-table ${(glassPourOpen && !glassFilled) || (stage !== "glassReady" && poured.length === 0) ? "is-hidden" : ""} ${stage === "glassReady" && !claimed ? "is-gift" : ""}`}>
           {stage === "glassReady" ? (
             claimed ? (
               <NameCard color={mixedColor} drinkName={drinkName} setDrinkName={setDrinkName}
@@ -4860,7 +4852,7 @@ function CocktailStyles() {
         letter-spacing:0.05em; font-size:clamp(40px,8vw,104px); line-height:1; color:#0E2230; }
 
       .cx-scroll { position:relative; height:600vh; z-index:1; }
-      .cx-stage { position:sticky; top:0; height:100vh; height:100dvh; width:100%; overflow:hidden; }
+      .cx-stage { position:sticky; top:0; height:100vh; height:100svh; width:100%; overflow:hidden; }
 
       /* Wyśrodkowany tytuł */
       .cx-title { position:absolute; top:clamp(28px,5vh,60px); left:0; right:0; z-index:6; text-align:center; pointer-events:none; will-change:transform,opacity; padding:0 16px; }
@@ -5590,16 +5582,11 @@ function CocktailStyles() {
         .cx-drop-opt.active { background:rgba(232,146,124,0.16); color:#fff; }
         .cx-drop-cnt { margin-left:auto; font-size:11px; opacity:0.55; }
 
-        /* tabela "nel bicchiere" — na mobile zastąpiona pionowym paskiem warstw (LayerBar) */
-        /* ALE: prezent/QR (glassReady) w portalu na mobile */
-        .cx-table { display:none !important; }
-        .cx-table-desktop { display:none !important; }
-        .cx-table-mobile-portal { position:fixed; inset:0; z-index:9990; display:flex; flex-direction:column; align-items:center; justify-content:flex-end;
-          padding:16px 16px calc(24px + env(safe-area-inset-bottom)); pointer-events:none; color:#fff; }
-        .cx-table-mobile-portal > * { pointer-events:auto; width:min(380px, 92vw); max-height:70vh; overflow-y:auto; border-radius:22px;
-          background:rgba(12,20,30,0.95); border:1px solid rgba(255,255,255,0.1); backdrop-filter:blur(16px); padding:20px; box-shadow:0 24px 64px rgba(0,0,0,0.5); }
-        .cx-table-mobile-portal.is-gift { justify-content:center; }
-        .cx-table-mobile-portal.is-gift > * { background:transparent; border:none; box-shadow:none; backdrop-filter:none; overflow:visible; padding:0; }
+        /* tabela "nel bicchiere" — na mobile: absolute wewnątrz sticky-stage (NIE fixed/portal) */
+        .cx-table { position:absolute !important; left:50% !important; bottom:calc(20px + env(safe-area-inset-bottom)) !important;
+          transform:translateX(-50%) !important; width:min(360px, 90vw) !important; z-index:50 !important; pointer-events:auto !important; display:block !important; }
+        .cx-table.is-hidden { opacity:0 !important; pointer-events:none !important; transform:translateX(-50%) translateY(20px) !important; }
+        .cx-table.is-gift { background:transparent !important; border-color:transparent !important; box-shadow:none !important; }
 
         /* LayerBar — pionowy pasek warstw po lewej — NIŻEJ żeby nie nachodzić na FAB */
         .cx-layerbar { position:fixed; left:14px; top:auto; bottom:calc(140px + env(safe-area-inset-bottom)); transform:none; z-index:43;
@@ -5661,10 +5648,9 @@ function CocktailStyles() {
         .cx-popout, .cx-shake, .cx-cat, .cx-cc { transition:none; }
       }
 
-      /* Desktop: portal ukryty, cx-table-desktop widoczny */
+      /* Desktop: cx-table normalne (absolute w sticky-stage) */
       @media (min-width:769px) {
-        .cx-table-mobile-portal { display:none !important; }
-        .cx-table-desktop { display:block !important; }
+        .cx-table { position:absolute !important; display:block !important; }
       }
     
       /* Popout overlay (Instagram-style) */
