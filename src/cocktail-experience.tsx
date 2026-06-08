@@ -5675,11 +5675,12 @@ function CocktailStyles() {
         .cx-drawer-tab { padding:6px 10px; font-size:10px; }
 
         /* Rozwijane listy na mobile zamiast przewijanych pigułek */
-        .cx-drop-row { display:flex; gap:8px; margin-bottom:10px; align-items:center; }
-        .cx-drop-row .cx-drop { flex:1 1 0; min-width:0; }
-        .cx-drop-back { flex:0 0 auto; width:44px; height:44px; border-radius:14px; display:grid; place-items:center;
+        .cx-drop-row { display:flex; gap:8px; margin-bottom:10px; align-items:stretch; }
+        .cx-drop-row .cx-drop { flex:1 1 0; min-width:0; display:flex; }
+        .cx-drop-row .cx-drop-trigger { height:44px; }
+        .cx-drop-back { flex:0 0 44px; width:44px; height:44px; border-radius:14px; display:grid; place-items:center;
           background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); color:var(--cx-accent,#E8927C);
-          font-size:20px; cursor:pointer; box-sizing:border-box; }
+          font-size:20px; cursor:pointer; box-sizing:border-box; align-self:stretch; }
         .cx-drop-arrows { display:none; }
         .cx-drop-arrow { width:34px; height:42px; border-radius:11px; display:grid; place-items:center;
           background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); color:#fff; font-size:18px; cursor:pointer; transition:opacity .2s; }
