@@ -24,6 +24,17 @@ function makePin(label, active) {
   });
 }
 
+// Dystans Haversine w km między dwoma punktami lat/lng
+function haversineKm(a, b) {
+  const R = 6371;
+  const dLat = ((b[0] - a[0]) * Math.PI) / 180;
+  const dLng = ((b[1] - a[1]) * Math.PI) / 180;
+  const lat1 = (a[0] * Math.PI) / 180;
+  const lat2 = (b[0] * Math.PI) / 180;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
 export default function AttrazioniMap({ places, selected, onSelect }) {
   const elRef = useRef(null);
   const mapRef = useRef(null);
@@ -41,13 +52,12 @@ export default function AttrazioniMap({ places, selected, onSelect }) {
       zoomControl: false,
       scrollWheelZoom: false,
       dragging: true,
-      attributionControl: true,
+      attributionControl: false, // ukryta atrybucja Leaflet (to "p" w prawym dolnym rogu)
     });
     mapRef.current = map;
 
     // Kafelki CARTO Voyager — jasne, eleganckie, pasują do palety; darmowe (OSM data).
     L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-      attribution: '&copy; OpenStreetMap, &copy; CARTO',
       maxZoom: 19,
       subdomains: "abcd",
     }).addTo(map);
@@ -80,7 +90,7 @@ export default function AttrazioniMap({ places, selected, onSelect }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // aktualizuj ikony przy zmianie zaznaczenia + płynnie przesuń mapę do aktywnego punktu + linia
+  // aktualizuj ikony przy zmianie zaznaczenia + płynnie przesuń mapę + linia + dystans
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -90,16 +100,38 @@ export default function AttrazioniMap({ places, selected, onSelect }) {
       if (i === selected) m.setZIndexOffset(1000); else m.setZIndexOffset(0);
     });
     const p = places[selected];
-    if (p && typeof p.lat === "number") {
-      map.panTo([p.lat, p.lng], { animate: true, duration: 0.6 });
-    }
-    // Przerywana linia od restauracji (pin 0) do wybranego punktu
+
+    // Sprzątanie poprzedniej linii + etykiety dystansu
     if (map._dashLine) { map.removeLayer(map._dashLine); map._dashLine = null; }
+    if (map._distLabel) { map.removeLayer(map._distLabel); map._distLabel = null; }
+
     const home = places[0];
+    // Linia ZAWSZE od restauracji (pin 0) do wybranego punktu
     if (home && p && selected !== 0 && typeof home.lat === "number" && typeof p.lat === "number") {
-      map._dashLine = L.polyline([[home.lat, home.lng], [p.lat, p.lng]], {
-        color: C_CORAL, weight: 2, dashArray: "8, 8", opacity: 0.7,
+      const from = [home.lat, home.lng];
+      const to = [p.lat, p.lng];
+      map._dashLine = L.polyline([from, to], {
+        color: C_CORAL, weight: 2.5, dashArray: "8, 8", opacity: 0.85,
       }).addTo(map);
+
+      // Etykieta dystansu w km na środku linii
+      const mid = [(from[0] + to[0]) / 2, (from[1] + to[1]) / 2];
+      const km = haversineKm(from, to);
+      const kmText = km < 1 ? `${Math.round(km * 1000)} m` : `${km.toFixed(1)} km`;
+      map._distLabel = L.marker(mid, {
+        icon: L.divIcon({
+          className: "atr-leaf-dist-wrap",
+          html: `<div class="atr-leaf-dist">${kmText}</div>`,
+          iconSize: [60, 24],
+          iconAnchor: [30, 12],
+        }),
+        interactive: false,
+      }).addTo(map);
+
+      // Dopasuj widok by oba punkty (dom + cel) były widoczne
+      map.fitBounds([from, to], { padding: [60, 60], maxZoom: 12, animate: true });
+    } else if (p && typeof p.lat === "number") {
+      map.panTo([p.lat, p.lng], { animate: true, duration: 0.6 });
     }
   }, [selected, places]);
 

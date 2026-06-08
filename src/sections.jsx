@@ -442,7 +442,7 @@ function Attrazioni({ t }) {
         .atr-map-bg { position: relative; aspect-ratio: 4/3; border-radius: 20px; overflow: hidden; background: #D8ECF3; box-shadow: 0 24px 80px rgba(26,61,82,0.12); }
         /* Leaflet map */
         .atr-leaf { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; background: #D8ECF3; }
-        .atr-leaf .leaflet-control-attribution { font-size: 9px; background: rgba(255,255,255,0.7); }
+        .atr-leaf .leaflet-control-attribution { display: none !important; }
         .atr-leaf-pin-wrap { background: none !important; border: none !important; }
         .atr-leaf-pin { position: relative; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: var(--pin-bg, #5BB8D4); border: 2px solid #fff; box-shadow: 0 4px 14px rgba(26,61,82,0.4); display: flex; align-items: center; justify-content: center; transition: transform .25s; }
         .atr-leaf-pin span { transform: rotate(45deg); color: #fff; font-family: var(--f-display); font-weight: 800; font-size: 12px; }
@@ -450,6 +450,9 @@ function Attrazioni({ t }) {
         @keyframes atrPinPop { from { transform: rotate(-45deg) scale(0.6); } to { transform: rotate(-45deg) scale(1); } }
         .atr-leaf-tip { background: var(--c-deep, #1A3D52); color: #fff; border: none; border-radius: 8px; font-family: var(--f-body); font-size: 11px; font-weight: 600; padding: 4px 10px; box-shadow: 0 6px 20px rgba(0,0,0,0.25); }
         .atr-leaf-tip::before { border-top-color: var(--c-deep, #1A3D52); }
+        /* Etykieta dystansu na środku przerywanej linii */
+        .atr-leaf-dist-wrap { background: none !important; border: none !important; }
+        .atr-leaf-dist { display: inline-block; background: var(--c-coral, #E8927C); color: #fff; font-family: var(--f-display, "Syne", sans-serif); font-weight: 800; font-size: 11px; letter-spacing: 0.04em; padding: 4px 10px; border-radius: 999px; box-shadow: 0 4px 14px rgba(232,146,124,0.5); white-space: nowrap; text-align: center; }
         .atr-map-svg { width: 100%; height: 100%; display: block; }
         .atr-pin { position: absolute; transform: translate(-50%, -100%); width: 32px; height: 32px; border-radius: 50%; background: var(--c-sky); color: #fff; font-family: var(--f-display); font-weight: 800; font-size: 12px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(26,61,82,0.3); transition: all 0.3s; border: 2px solid #fff; }
         .atr-pin:hover, .atr-pin.active { background: var(--c-coral); transform: translate(-50%, -100%) scale(1.2); z-index: 2; }
