@@ -708,9 +708,10 @@ function MobileDrinksList({ dark = true }) {
   const [filter, setFilter] = useStateM("cocktails");
   const lang = typeof window !== "undefined" ? window.currentLanguage : "it";
   const conv = (p) => (typeof window !== "undefined" && window.convertPriceExtra ? window.convertPriceExtra(p, lang) : "");
+  const drinksMenu = (typeof window !== "undefined" && window.DRINKS_MENU) || { items: [], filters: [] };
   const items = useMemoM(
-    () => window.DRINKS_MENU.items.filter((i) => i.cat === filter),
-    [filter]
+    () => drinksMenu.items.filter((i) => i.cat === filter),
+    [filter, drinksMenu.items]
   );
   const withPhoto = DRINKS_WITH_PHOTO.has(filter);
 
@@ -718,8 +719,8 @@ function MobileDrinksList({ dark = true }) {
     <div className={`mdr ${dark ? "mdr-dark" : ""}`}>
       {/* pasek filtrów — przewijany palcem */}
       <div className="mdr-filters">
-        {window.DRINKS_MENU.filters.filter((f) => f.id !== "all").map((f) => {
-          const count = window.DRINKS_MENU.items.filter((i) => i.cat === f.id).length;
+        {drinksMenu.filters.filter((f) => f.id !== "all").map((f) => {
+          const count = drinksMenu.items.filter((i) => i.cat === f.id).length;
           if (count === 0) return null;
           return (
             <button key={f.id} className={`mdr-filter ${filter === f.id ? "active" : ""}`} onClick={() => setFilter(f.id)}>
@@ -799,10 +800,12 @@ function MobileDrinksList({ dark = true }) {
 
 // ─── DESKTOP drinks list ──────────────────────────────────────────────────────
 function DesktopDrinksList({ dark = true }) {
+  const [filter, setFilter] = useStateM("all");
   const trackRef = useRefM(null);
+  const drinksMenu = (typeof window !== "undefined" && window.DRINKS_MENU) || { items: [], filters: [] };
   const items = useMemoM(
-    () => filter === "all" ? window.DRINKS_MENU.items : window.DRINKS_MENU.items.filter((i) => i.cat === filter),
-    [filter]
+    () => filter === "all" ? drinksMenu.items : drinksMenu.items.filter((i) => i.cat === filter),
+    [filter, drinksMenu.items]
   );
 
   // Drag scroll
@@ -824,16 +827,16 @@ function DesktopDrinksList({ dark = true }) {
     return (
       <div className={`drinks ${dark ? "drinks-dark" : ""}`}>
         <div className="drinks-filters">
-          {window.DRINKS_MENU.filters.map((f) => (
+          {drinksMenu.filters.map((f) => (
             <button key={f.id} className={`drinks-filter ${filter === f.id ? "active" : ""}`} onClick={() => setFilter(f.id)}>
               {f.label}
-              <span className="drinks-filter-num">{f.id === "all" ? window.DRINKS_MENU.items.length : window.DRINKS_MENU.items.filter((i) => i.cat === f.id).length}</span>
+              <span className="drinks-filter-num">{f.id === "all" ? drinksMenu.items.length : drinksMenu.items.filter((i) => i.cat === f.id).length}</span>
             </button>
           ))}
         </div>
         <div className="drinks-allsegments">
-          {window.DRINKS_MENU.filters.filter((f) => f.id !== "all").map((f) => {
-            const catItems = window.DRINKS_MENU.items.filter((i) => i.cat === f.id);
+          {drinksMenu.filters.filter((f) => f.id !== "all").map((f) => {
+            const catItems = drinksMenu.items.filter((i) => i.cat === f.id);
             if (catItems.length === 0) return null;
             return <DrinksCategorySection key={f.id} label={f.label} items={catItems} dark={dark} />;
           })}
@@ -846,10 +849,10 @@ function DesktopDrinksList({ dark = true }) {
   return (
     <div className={`drinks ${dark ? "drinks-dark" : ""}`}>
       <div className="drinks-filters">
-        {window.DRINKS_MENU.filters.map((f) => (
+        {drinksMenu.filters.map((f) => (
           <button key={f.id} className={`drinks-filter ${filter === f.id ? "active" : ""}`} onClick={() => setFilter(f.id)}>
             {f.label}
-            <span className="drinks-filter-num">{f.id === "all" ? window.DRINKS_MENU.items.length : window.DRINKS_MENU.items.filter((i) => i.cat === f.id).length}</span>
+            <span className="drinks-filter-num">{f.id === "all" ? drinksMenu.items.length : drinksMenu.items.filter((i) => i.cat === f.id).length}</span>
           </button>
         ))}
       </div>
