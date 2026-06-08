@@ -5,6 +5,22 @@ import { SplitReveal } from "./shell";
 import { motion } from "framer-motion";
 const { useState: useStateM, useEffect: useEffectM, useRef: useRefM, useMemo: useMemoM } = React;
 
+// Legenda alergenów UE (1-14) — wielojęzyczna
+const ALLERGEN_LEGEND = {
+  it: { 1:"Glutine", 2:"Crostacei", 3:"Uova", 4:"Pesce", 5:"Arachidi", 6:"Soia", 7:"Latte", 8:"Frutta a guscio", 9:"Sedano", 10:"Senape", 11:"Sesamo", 12:"Solfiti", 13:"Lupini", 14:"Molluschi" },
+  en: { 1:"Gluten", 2:"Crustaceans", 3:"Eggs", 4:"Fish", 5:"Peanuts", 6:"Soy", 7:"Milk", 8:"Tree nuts", 9:"Celery", 10:"Mustard", 11:"Sesame", 12:"Sulphites", 13:"Lupin", 14:"Molluscs" },
+  pl: { 1:"Gluten", 2:"Skorupiaki", 3:"Jaja", 4:"Ryby", 5:"Orzeszki ziemne", 6:"Soja", 7:"Mleko", 8:"Orzechy", 9:"Seler", 10:"Gorczyca", 11:"Sezam", 12:"Siarczyny", 13:"Łubin", 14:"Mięczaki" },
+  de: { 1:"Gluten", 2:"Krebstiere", 3:"Eier", 4:"Fisch", 5:"Erdnüsse", 6:"Soja", 7:"Milch", 8:"Schalenfrüchte", 9:"Sellerie", 10:"Senf", 11:"Sesam", 12:"Sulfite", 13:"Lupinen", 14:"Weichtiere" },
+  fr: { 1:"Gluten", 2:"Crustacés", 3:"Œufs", 4:"Poisson", 5:"Arachides", 6:"Soja", 7:"Lait", 8:"Fruits à coque", 9:"Céleri", 10:"Moutarde", 11:"Sésame", 12:"Sulfites", 13:"Lupin", 14:"Mollusques" },
+  es: { 1:"Gluten", 2:"Crustáceos", 3:"Huevos", 4:"Pescado", 5:"Cacahuetes", 6:"Soja", 7:"Leche", 8:"Frutos de cáscara", 9:"Apio", 10:"Mostaza", 11:"Sésamo", 12:"Sulfitos", 13:"Altramuces", 14:"Moluscos" },
+};
+// Parsuj string alergenów ("1·7", "1, 7", "1-7") → tablica liczb
+function parseAllergens(str) {
+  if (!str) return [];
+  return String(str).split(/[^0-9]+/).map((s) => parseInt(s, 10)).filter((n) => n >= 1 && n <= 14);
+}
+const allergenTitle = { it:"Allergeni", en:"Allergens", pl:"Alergeny", de:"Allergene", fr:"Allergènes", es:"Alérgenos" };
+
 // ─── Full categorized menu ───────────────────────────────────────────────────
 function FullMenu() {
   const [isMobile, setIsMobile] = useStateM(typeof window !== "undefined" && window.innerWidth < 768);
@@ -23,6 +39,7 @@ function MobileFullMenu() {
   const [dishPopout, setDishPopout] = useStateM(null);
   const [catSheet, setCatSheet] = useStateM(false);
   const [pillVisible, setPillVisible] = useStateM(false);
+  const [allergenInfo, setAllergenInfo] = useStateM(null); // {nums:[...]} → popout legendy
   const sheetTouch = useRefM(null);
 
   // Gdy pill categories widoczny LUB sheet otwarty → hamburger w prawo
@@ -123,7 +140,7 @@ function MobileFullMenu() {
                       <span className="mfm-item-name">
                         {it.name}
                         {it.featured && <span className="mfm-star">★</span>}
-                        {it.allergen && <span className="mfm-allergen">({it.allergen})</span>}
+                        {it.allergen && <span className="mfm-allergen" onClick={(e) => { e.stopPropagation(); setAllergenInfo({ nums: parseAllergens(it.allergen), raw: it.allergen }); }}>({it.allergen})</span>}
                       </span>
                       <span className="mfm-item-price">
                         <span className="mfm-price-eur">{it.price}</span>
@@ -202,12 +219,31 @@ function MobileFullMenu() {
               {dishPopout.desc && <p className="mfm-pop-desc">{dishPopout.desc}</p>}
               <div className="mfm-pop-foot">
                 <span className="mfm-pop-price">{dishPopout.price}{conv(dishPopout.price) && <span className="mfm-price-conv"> {conv(dishPopout.price)}</span>}</span>
-                {dishPopout.allergen && <span className="mfm-pop-allergen">Allergeni: {dishPopout.allergen}</span>}
+                {dishPopout.allergen && <span className="mfm-pop-allergen" onClick={() => setAllergenInfo({ nums: parseAllergens(dishPopout.allergen), raw: dishPopout.allergen })}>Allergeni: {dishPopout.allergen}</span>}
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* popout legendy alergenów — klik w numer alergenu */}
+      {allergenInfo && (() => {
+        const aLang = (typeof window !== "undefined" && window.currentLanguage) || "it";
+        const legend = ALLERGEN_LEGEND[aLang] || ALLERGEN_LEGEND.it;
+        return (
+          <div className="mfm-allergen-overlay" onClick={() => setAllergenInfo(null)}>
+            <div className="mfm-allergen-pop" onClick={(e) => e.stopPropagation()}>
+              <button className="mfm-pop-close mfm-allergen-close" onClick={() => setAllergenInfo(null)}>×</button>
+              <span className="mfm-allergen-title">{allergenTitle[aLang] || allergenTitle.it}</span>
+              <ul className="mfm-allergen-list">
+                {allergenInfo.nums.length > 0 ? allergenInfo.nums.map((n) => (
+                  <li key={n}><span className="mfm-allergen-num">{n}</span> {legend[n] || "—"}</li>
+                )) : <li>—</li>}
+              </ul>
+            </div>
+          </div>
+        );
+      })()}
 
       <style>{`
         .mfm { background: var(--c-bg); padding: 80px 0 80px; overflow-x: hidden; width: 100%; box-sizing: border-box; }
@@ -238,7 +274,14 @@ function MobileFullMenu() {
         .mfm-item-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
         .mfm-item-name { font-family: var(--f-display); font-weight: 700; font-size: 16px; color: var(--c-deep); line-height: 1.25; overflow-wrap: anywhere; word-break: break-word; min-width: 0; flex: 1; }
         .mfm-star { color: var(--c-coral); font-size: 13px; margin-left: 4px; }
-        .mfm-allergen { font-family: var(--f-body); font-size: 10px; font-weight: 400; color: var(--c-mute); margin-left: 5px; letter-spacing: 0.03em; white-space: nowrap; }
+        .mfm-allergen { font-family: var(--f-body); font-size: 10px; font-weight: 400; color: var(--c-mute); margin-left: 5px; letter-spacing: 0.03em; white-space: nowrap; text-decoration: underline dotted; cursor: pointer; }
+        .mfm-allergen-overlay { position: fixed; inset: 0; z-index: 120; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(14,34,48,0.5); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+        .mfm-allergen-pop { position: relative; width: min(320px, 90vw); background: #fff; border-radius: 18px; padding: 24px; box-shadow: 0 30px 70px rgba(0,0,0,0.3); }
+        .mfm-allergen-close { position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; border-radius: 50%; border: none; background: var(--c-bg); color: var(--c-deep); font-size: 18px; cursor: pointer; }
+        .mfm-allergen-title { display: block; font-family: var(--f-display); font-weight: 800; font-size: 18px; color: var(--c-deep); margin-bottom: 14px; }
+        .mfm-allergen-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+        .mfm-allergen-list li { display: flex; align-items: center; gap: 10px; font-family: var(--f-body); font-size: 14px; color: var(--c-deep); }
+        .mfm-allergen-num { flex: 0 0 26px; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; background: var(--c-deep); color: #fff; font-weight: 700; font-size: 12px; }
         .mfm-item-price { display: flex; flex-direction: column; align-items: flex-end; flex: 0 0 auto; text-align: right; }
         .mfm-price-eur { font-family: var(--f-display); font-weight: 700; font-size: 15px; color: var(--c-sky); white-space: nowrap; }
         .mfm-price-conv { font-family: var(--f-body); font-weight: 400; font-size: 10px; color: var(--c-mute); white-space: nowrap; margin-top: 1px; }

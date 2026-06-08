@@ -196,7 +196,7 @@
 - **Do zrobienia:**
   - [x] Dodać **ceny dań**. (są w `menu-data.js` przy każdej pozycji)
   - [ ] Przeliczenie waluty → **od nowej linii, mniejszą czcionką, w nawiasach**.
-  - [ ] Kliknięcie **numeru alergenu** → pokazuje, którego składnika dotyczy. ⏳ *(do zrobienia — wymaga mapy alergenów)*
+  - [x] Kliknięcie **numeru alergenu** → pokazuje, którego składnika dotyczy. ✅ *(MobileFullMenu: klik w `(alergeny)` lub w stopce popout dania → modal z legendą UE 1-14 w języku strony, ALLERGEN_LEGEND + parseAllergens)*
   - [x] Przeliczenie waluty → **od nowej linii, mniejszą czcionką, w nawiasach**. (nowy `convertPriceExtra` → `(≈28 zł)` pod ceną EUR, klasa `.fmenu-row-price-conv`)
 
 > 📌 **Tura poprawek (zgłoszone):**
