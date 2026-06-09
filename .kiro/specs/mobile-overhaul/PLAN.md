@@ -310,12 +310,10 @@
 ## 🟠 E6. Interakcja z shakerem (obrót tła) + blokada zaznaczania
 - **Cel:** jak w starej (działającej) wersji — przeciągasz, obraca się **tło**, shaker stoi.
 - **Do zrobienia:**
-  - [ ] Przeciąganie palcem → obraca się **tło/pomieszczenie**, shaker **stoi w miejscu**.
-  - [ ] Po puszczeniu → widok **wraca na miejsce** (inercja + elastyczny powrót).
-  - [ ] ❌ **Blokada zaznaczania tekstu/strony przy przytrzymaniu** (long-press) — szczególnie podczas
-        **przytrzymania, by nalewać** na telefonie. Przytrzymanie do nalewania NIE może uruchamiać
-        zaznaczania strony / menu kopiowania (`user-select: none`, `-webkit-user-select: none`,
-        `-webkit-touch-callout: none`, `touch-action` na elementach kreatora i przyciskach pour).
+  - [ ] Przeciąganie palcem → obraca się **tło/pomieszczenie**, shaker **stoi w miejscu**. *(grab-to-spin — wymaga testu na urządzeniu)*
+  - [ ] Po puszczeniu → widok **wraca na miejsce** (inercja + elastyczny powrót). *(drag.idle inertia — test)*
+  - [x] ❌ **Blokada zaznaczania tekstu/strony przy przytrzymaniu** (long-press) — szczególnie podczas
+        **przytrzymania, by nalewać** ✅ *(user-select:none + touch-callout:none + touch-action:manipulation na .cx-bcard; globalny guard selectstart+contextmenu gdy pouring)*
 
 ## 🟠 E7. Animacja shakera (otwieranie/zamykanie/wstrząsanie)
 - **Cel:** jak na desktopie.
