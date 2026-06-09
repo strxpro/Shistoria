@@ -43,12 +43,13 @@ function MobileFullMenu() {
   const sheetTouch = useRefM(null);
 
   // Gdy pill categories widoczny LUB sheet otwarty → hamburger w prawo
+  // Header NIE rusza się od samego pillVisible — tylko gdy sheet faktycznie otwarty
   useEffectM(() => {
     if (typeof document === "undefined") return;
-    if (catSheet || pillVisible) document.body.dataset.cxSheet = "open";
+    if (catSheet) document.body.dataset.cxSheet = "open";
     else delete document.body.dataset.cxSheet;
     return () => { delete document.body.dataset.cxSheet; };
-  }, [catSheet, pillVisible]);
+  }, [catSheet]);
   const catBarRef = useRefM(null);
   const sectionRef = useRefM(null);
 
