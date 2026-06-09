@@ -4708,14 +4708,20 @@ function ShareDrinkBtn() {
   const [photo, setPhoto] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   const [myDrink, setMyDrink] = useState<any>(null);
+  const [editName, setEditName] = useState("");
+  const [editAuthor, setEditAuthor] = useState("");
 
-  // Odświeżaj dane drinka z localStorage przy każdym otwarciu
+  // Odświeżaj dane drinka z localStorage przy każdym otwarciu + auto-wypełnij pola edycji
   useEffect(() => {
     if (!open) return;
     try {
       const drinks = JSON.parse(localStorage.getItem("sh-my-drinks") || "[]");
-      if (drinks.length > 0) setMyDrink(drinks[drinks.length - 1]);
-      else setMyDrink(null);
+      if (drinks.length > 0) {
+        const d = drinks[drinks.length - 1];
+        setMyDrink(d);
+        setEditName(d.name || "");
+        setEditAuthor(d.author || "");
+      } else setMyDrink(null);
     } catch { setMyDrink(null); }
   }, [open]);
 
@@ -4733,11 +4739,13 @@ function ShareDrinkBtn() {
 
   const handleSend = async () => {
     if (!myDrink) return;
+    const finalName = editName.trim() || myDrink.name || "Senza nome";
+    const finalAuthor = editAuthor.trim() || myDrink.author || "Anonimo";
     try {
       // Publikuj do Supabase
       await publishDrink({
-        name: myDrink.name || "Senza nome",
-        author_name: myDrink.author || "Anonimo",
+        name: finalName,
+        author_name: finalAuthor,
         ingredients: myDrink.ingredients || [],
         total_ml: myDrink.ml || 0,
         strength_label: myDrink.strength || "—",
@@ -4751,8 +4759,8 @@ function ShareDrinkBtn() {
       try {
         const { sendDrinkShared } = await import("./lib/make-webhooks");
         await sendDrinkShared({
-          drink_name: myDrink.name || "Senza nome",
-          author_name: myDrink.author || "Anonimo",
+          drink_name: finalName,
+          author_name: finalAuthor,
           author_email: myDrink.email,
           ingredients: myDrink.ingredients || [],
           lang: (typeof window !== "undefined" && (window as any).currentLanguage) || "it",
@@ -4797,16 +4805,28 @@ function ShareDrinkBtn() {
                 </div>
                 <div className="cx-share-info">
                   <span className="cx-mini-kicker">Anteprima live</span>
-                  <h3>{myDrink?.name || "Il tuo drink"}</h3>
-                  {myDrink && (
-                    <div className="cx-share-details">
-                      <p><strong>{myDrink.author}</strong> · {myDrink.ml}ml · {myDrink.strength}</p>
-                      <div className="cx-share-pills">
-                        {(myDrink.ingredients || []).slice(0, 6).map((ing: any, i: number) => (
-                          <span key={i} className="cx-cc-pill"><span style={{background: ing.color}} />{ing.name}</span>
-                        ))}
+                  {myDrink ? (
+                    <>
+                      <label className="cx-share-edit">
+                        <span className="cx-share-edit-ico">✏️</span>
+                        <input className="cx-share-edit-name" value={editName} onChange={(e) => setEditName(e.target.value)}
+                          placeholder="Nome del drink" maxLength={40} />
+                      </label>
+                      <div className="cx-share-details">
+                        <label className="cx-share-edit cx-share-edit-author">
+                          <span className="cx-share-edit-ico">✏️</span>
+                          <input value={editAuthor} onChange={(e) => setEditAuthor(e.target.value)} placeholder="Il tuo nome" maxLength={30} />
+                          <span className="cx-share-meta">· {myDrink.ml}ml · {myDrink.strength}</span>
+                        </label>
+                        <div className="cx-share-pills">
+                          {(myDrink.ingredients || []).slice(0, 6).map((ing: any, i: number) => (
+                            <span key={i} className="cx-cc-pill"><span style={{background: ing.color}} />{ing.name}</span>
+                          ))}
+                        </div>
                       </div>
-                    </div>
+                    </>
+                  ) : (
+                    <h3>Il tuo drink</h3>
                   )}
                   {!myDrink && (
                     <div className="cx-share-nodrink">
@@ -6189,6 +6209,14 @@ function CocktailStyles() {
       .cx-share-info { padding:28px; display:flex; flex-direction:column; gap:14px; min-width:0; box-sizing:border-box; }
       .cx-share-info h3 { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:24px; color:#fff; margin:0; overflow-wrap:anywhere; word-break:break-word; }
       .cx-share-details p { overflow-wrap:anywhere; word-break:break-word; }
+      .cx-share-edit { display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14);
+        border-radius:12px; padding:8px 12px; margin:2px 0; }
+      .cx-share-edit-ico { font-size:13px; opacity:0.7; flex-shrink:0; }
+      .cx-share-edit input { flex:1; min-width:0; background:none; border:none; outline:none; color:#fff; font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:20px; }
+      .cx-share-edit-author input { font-family:var(--f-body); font-weight:600; font-size:14px; }
+      .cx-share-edit input::placeholder { color:rgba(255,255,255,0.4); }
+      .cx-share-edit-author { padding:6px 10px; }
+      .cx-share-meta { font-size:13px; color:rgba(255,255,255,0.6); white-space:nowrap; flex-shrink:0; }
       .cx-share-pills { display:flex; flex-wrap:wrap; gap:6px; min-width:0; }
       .cx-share-pills .cx-cc-pill { max-width:100%; overflow:hidden; text-overflow:ellipsis; }
       .cx-share-hint { font-size:13px; color:rgba(255,255,255,0.6); line-height:1.5; }
