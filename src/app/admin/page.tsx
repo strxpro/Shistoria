@@ -175,6 +175,24 @@ function MenuPanel() {
     }
   };
 
+  // Upload zdjęcia pozycji menu → Supabase Storage (bucket "assets")
+  const [uploading, setUploading] = useState(false);
+  const handleImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop() || "jpg";
+      const path = `menu/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error } = await supabase.storage.from("assets").upload(path, file, { upsert: true });
+      if (!error) {
+        const { data } = supabase.storage.from("assets").getPublicUrl(path);
+        setEditItem((prev: any) => ({ ...prev, image_url: data.publicUrl }));
+      } else { alert("Errore upload: " + error.message); }
+    } catch (e2) { console.error(e2); }
+    setUploading(false);
+  };
+
   return (
     <div className="admin-panel">
       <header className="admin-panel-head">
@@ -199,8 +217,28 @@ function MenuPanel() {
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
             <h3>{editItem.id ? "Modifica" : "Nuovo piatto"}</h3>
             <div className="admin-form">
+              <label>Foto del piatto</label>
+              <div className="menu-img-upload">
+                {editItem.image_url ? (
+                  <div className="menu-img-preview">
+                    <img src={editItem.image_url} alt="" />
+                    <button type="button" onClick={() => setEditItem({ ...editItem, image_url: null })}>✕</button>
+                  </div>
+                ) : (
+                  <label className="menu-img-drop">
+                    {uploading ? "Caricamento..." : "📷 Carica foto"}
+                    <input type="file" accept="image/*" hidden onChange={handleImage} />
+                  </label>
+                )}
+              </div>
               <label>Categoria</label>
               <input value={editItem.category} onChange={(e) => setEditItem({ ...editItem, category: e.target.value })} placeholder="es. Antipasti, Primi..." />
+              <label>Sezione</label>
+              <select value={editItem.section || "ristorante"} onChange={(e) => setEditItem({ ...editItem, section: e.target.value })} className="menu-sel">
+                <option value="ristorante">🍽 Ristorante</option>
+                <option value="bar">🍸 Bar</option>
+                <option value="dolci">🍰 Dolci</option>
+              </select>
               <label>Nome</label>
               <input value={editItem.name} onChange={(e) => setEditItem({ ...editItem, name: e.target.value })} placeholder="Nome del piatto" />
               <label>Prezzo</label>
@@ -224,10 +262,11 @@ function MenuPanel() {
       {loading ? <p className="admin-loading">Caricamento...</p> : (
         <div className="admin-table">
           <table>
-            <thead><tr><th>Categoria</th><th>Nome</th><th>Prezzo</th><th>Allergeni</th><th></th></tr></thead>
+            <thead><tr><th>Foto</th><th>Categoria</th><th>Nome</th><th>Prezzo</th><th>Allergeni</th><th></th></tr></thead>
             <tbody>
               {filtered.map((it) => (
                 <tr key={it.id}>
+                  <td>{it.image_url ? <img src={it.image_url} alt="" className="menu-thumb" /> : <span className="menu-thumb menu-thumb-ph">🍽</span>}</td>
                   <td>{it.category}</td>
                   <td><strong>{it.name}</strong>{it.is_featured && <span className="admin-badge">★</span>}</td>
                   <td>{it.price}</td>
@@ -1029,7 +1068,17 @@ function AdminStyles() {
       .amsg-input textarea:focus { border-color:#E8927C; }
       @media (max-width:768px) { .amsg-chat { grid-template-columns:1fr; height:auto; } .amsg-list { flex-direction:row; overflow-x:auto; border-right:none; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:8px; } .amsg-thread { flex-direction:column; min-width:80px; } .amsg-thread-preview { display:none; } .amsg-conv { height:60vh; } }
       .admin-badge { display:inline-block; margin-left:8px; color:#f1c40f; }
-      /* ── Orari (godziny) ── */
+      /* ── Menu zdjęcia ── */
+      .menu-thumb { width:48px; height:48px; border-radius:8px; object-fit:cover; display:block; }
+      .menu-thumb-ph { display:grid; place-items:center; background:rgba(255,255,255,0.05); font-size:20px; opacity:0.5; }
+      .menu-img-upload { margin-bottom:8px; }
+      .menu-img-drop { display:flex; align-items:center; justify-content:center; height:120px; border:2px dashed rgba(255,255,255,0.18); border-radius:12px; cursor:pointer; color:rgba(255,255,255,0.6); font-size:14px; transition:all .2s; }
+      .menu-img-drop:hover { border-color:#E8927C; color:#fff; }
+      .menu-img-preview { position:relative; width:120px; height:120px; }
+      .menu-img-preview img { width:100%; height:100%; object-fit:cover; border-radius:12px; }
+      .menu-img-preview button { position:absolute; top:6px; right:6px; width:26px; height:26px; border-radius:50%; border:none; background:rgba(0,0,0,0.6); color:#fff; cursor:pointer; }
+      .menu-sel { padding:11px 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.05); color:#fff; font-size:14px; }
+      .menu-sel option { background:#12171e; }
       .hours-rows { display:flex; flex-direction:column; gap:10px; }
       .hours-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
       .hours-day, .hours-time { flex:1; min-width:140px; padding:11px 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.05); color:#fff; font-size:14px; }
