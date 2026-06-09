@@ -5745,8 +5745,8 @@ function CocktailStyles() {
         display:flex; flex-direction:column; align-items:center; gap:14px; text-align:center;
         transform:translate(-50%,-50%) scale(.86); transition:opacity .25s ease; will-change:transform,opacity; }
       .cx-scrollpop-label { font-family:var(--f-display,sans-serif); font-weight:800;
-        font-size:clamp(30px,6.5vw,78px); letter-spacing:.04em; text-transform:uppercase; line-height:1; color:#eafdff;
-        max-width:92vw; overflow-wrap:anywhere; word-break:break-word; padding:0 12px; box-sizing:border-box;
+        font-size:clamp(26px,6vw,78px); letter-spacing:.04em; text-transform:uppercase; line-height:1; color:#eafdff;
+        white-space:nowrap; max-width:96vw; box-sizing:border-box;
         text-shadow:0 0 6px #5BE1FF, 0 0 18px #5BE1FF, 0 0 42px rgba(91,225,255,.8);
         transition:filter .6s ease, transform .6s ease, opacity .4s ease; }
       .cx-scrollpop-label[data-morphing] { filter:blur(8px); transform:scale(0.92); opacity:0.4; }

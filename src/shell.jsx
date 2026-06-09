@@ -570,10 +570,8 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
           .nav-left { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); justify-content: center; transition: left 0.4s cubic-bezier(.2,.85,.2,1), transform 0.4s cubic-bezier(.2,.85,.2,1), opacity 0.3s; will-change: left, transform, opacity; opacity:1; }
           /* Flagi: domyślnie po prawej */
           .nav-right { position: absolute; right: 18px; left: auto; top: 50%; transform: translateY(-50%); gap: 10px; transition: opacity 0.3s; will-change: opacity; }
-          /* W sekcji kreatora: ukryj tylko wnętrze nav (logo/flagi), hamburger zostaje widoczny */
-          body[data-cx-section="creator"] .nav-inner { opacity:0; pointer-events:none; transition:opacity .3s; }
+          /* W sekcji kreatora: header WIDOCZNY (logo + flagi), tylko tło nav schowane */
           body[data-cx-section="creator"] .nav-bg { opacity:0; }
-          body[data-cx-section="creator"] .nav-logo-blend { opacity:0 !important; }
           /* Gdy otwarta szuflada/panel kategorii: logo w lewo, flagi zwinięte (hamburger w prawym górnym rogu) */
           body[data-cx-drawer="open"] .nav-left,
           body[data-cx-sheet="open"] .nav-left { left: 16px; transform: translate(0, -50%); }
