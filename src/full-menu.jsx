@@ -488,6 +488,25 @@ function DesktopFullMenu() {
   const [ratios, setRatios] = useStateM({});
   const sectionRef = useRefM(null);
   const [navCollapsed, setNavCollapsed] = useStateM(false);
+  // ─ system polubień (wspólny z mobile) ─
+  const [likesMap, setLikesMap] = useStateM({});
+  const [likedSet, setLikedSet] = useStateM(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("sh-menu-liked") || "[]")); } catch { return new Set(); }
+  });
+  const [burstKey, setBurstKey] = useStateM(null);
+  useEffectM(() => { let a = true; getMenuLikes().then((m) => { if (a) setLikesMap(m); }).catch(() => {}); return () => { a = false; }; }, []);
+  const itemKey = (it) => String(it.name || "").trim().toLowerCase();
+  const getLikes = (it) => (likesMap[itemKey(it)]?.likes || 0);
+  const isLiked = (it) => { const id = likesMap[itemKey(it)]?.id; return id ? likedSet.has(id) : false; };
+  const trName = (it) => { const lg = (typeof window !== "undefined" && window.currentLanguage) || "it"; if (lg === "it") return it.name; const r = likesMap[itemKey(it)]; return (r?.name_i18n && r.name_i18n[lg]) || it.name; };
+  const toggleLike = async (it) => {
+    const k = itemKey(it); const rec = likesMap[k]; if (!rec?.id) return;
+    const was = likedSet.has(rec.id); const delta = was ? -1 : 1;
+    setLikedSet((p) => { const n = new Set(p); if (was) n.delete(rec.id); else n.add(rec.id); return n; });
+    setLikesMap((p) => ({ ...p, [k]: { ...p[k], likes: Math.max(0, (p[k]?.likes || 0) + delta) } }));
+    if (!was) { setBurstKey(k); setTimeout(() => setBurstKey((c) => (c === k ? null : c)), 650); }
+    await toggleMenuLike(rec.id);
+  };
   const [catPopout, setCatPopout] = useStateM(false);
   const [dishPopout, setDishPopout] = useStateM(null);
   const [pillVisible, setPillVisible] = useStateM(false);
@@ -709,7 +728,7 @@ function DesktopFullMenu() {
                   <span className="fmenu-cat-line" />
                 </header>
                 <ul className="fmenu-list">
-                  {cat.items.map((it, i) => (
+                  {cat.items.slice().sort((a, b) => getLikes(b) - getLikes(a)).map((it, i) => (
                     <motion.li 
                       key={i} 
                       className={`fmenu-row ${it.featured ? "featured" : ""}`}
@@ -719,16 +738,23 @@ function DesktopFullMenu() {
                       transition={{ duration: 0.6, delay: i * 0.05, ease: "easeOut" }}
                     >
                       {/* Miniatura zdjęcia dania (placeholder do czasu prawdziwych zdjęć) — klik otwiera podgląd */}
-                      <div className="fmenu-row-thumb" onClick={(e) => { e.stopPropagation(); setDishPopout({ ...it, icon: cat.icon }); }}>
+                      <div className="fmenu-row-thumb"
+                        onClick={(e) => { e.stopPropagation(); setDishPopout({ ...it, icon: cat.icon }); }}
+                        onDoubleClick={(e) => { e.stopPropagation(); toggleLike(it); }}>
                         {it.img ? (
                           <img src={it.img} alt="" loading="lazy" />
                         ) : (
                           <span className="fmenu-row-thumb-ph">{cat.icon}</span>
                         )}
+                        {burstKey === itemKey(it) && <span className="fmenu-row-burst"><HeartIcon filled /></span>}
+                        <button className={`fmenu-row-like ${isLiked(it) ? "is-liked" : ""}`} onClick={(e) => { e.stopPropagation(); toggleLike(it); }} aria-label="Mi piace">
+                          <HeartIcon filled={isLiked(it)} />
+                          {getLikes(it) > 0 && <span>{getLikes(it)}</span>}
+                        </button>
                       </div>
                       <div className="fmenu-row-main">
                         <h4 className="fmenu-row-name">
-                          {it.name}
+                          {trName(it)}
                           {it.featured && <span className="fmenu-row-star">★</span>}
                           {it.allergen && <span className="fmenu-row-allergen">({it.allergen})</span>}
                         </h4>
@@ -863,6 +889,11 @@ function DesktopFullMenu() {
         .fmenu-row.featured .fmenu-row-thumb { width: 88px; height: 88px; border-radius: 18px; }
         .fmenu-row:hover .fmenu-row-thumb { transform: scale(1.06); box-shadow: 0 10px 30px rgba(26,61,82,0.16); }
         .fmenu-row-thumb img { width: 100%; height: 100%; object-fit: cover; }
+        .fmenu-row-like { position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 3px; padding: 2px 7px; border-radius: 999px; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); border: none; cursor: pointer; color: #fff; font-size: 11px; font-weight: 700; line-height: 1; z-index: 3; }
+        .fmenu-row-like svg { font-size: 12px; display: block; }
+        .fmenu-row-burst { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 4; }
+        .fmenu-row-burst svg { font-size: 40px; color: #FE2C55; animation: fmenuHeartPop .6s cubic-bezier(.17,.89,.32,1.28); }
+        @keyframes fmenuHeartPop { 0% { transform: scale(0) rotate(-15deg); opacity: 0; } 35% { transform: scale(1.25) rotate(6deg); opacity: 1; } 70% { transform: scale(0.95); } 100% { transform: scale(1.05); opacity: 0; } }
         .fmenu-row-thumb-ph { font-size: 26px; opacity: 0.4; filter: grayscale(0.2); }
         .fmenu-row.featured .fmenu-row-thumb-ph { font-size: 36px; }
         .fmenu-row-main { min-width: 0; }
