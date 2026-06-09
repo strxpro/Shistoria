@@ -870,6 +870,10 @@
 
 </div>
 
+> [!TIP]
+> ### 👉 SZYBKI START: otwórz **`CHECKLISTA_KONFIGURACJI.md`**
+> To uporządkowana lista krok-po-kroku WSZYSTKIEGO co musisz zrobić (SQL, Vercel, e-maile, WhatsApp, IMAP, social) + co już gotowe. Odhaczasz `[ ]`.
+
 > [!IMPORTANT]
 > Ta sekcja podsumowuje **co jest zrobione w kodzie**, **co wymaga konfiguracji od Ciebie** (SQL / make.com / Vercel),
 > oraz **co zostało do zrobienia**. Aktualizowana po każdej turze.
