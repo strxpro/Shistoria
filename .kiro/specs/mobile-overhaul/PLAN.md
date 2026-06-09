@@ -341,13 +341,9 @@
   - [ ] Po zakończeniu animacji szkła → FAB **nie znikają** tak, że nic nie widać.
 
 > [!CAUTION]
-> ### 🐛 BUGI ANIMACJI SZKŁA (potwierdzone na mobile) — do naprawy
-> 1. **Podczas animacji szklanek NIE widać modelu shakera** — shaker powinien być widoczny w trakcie
->    przelewania (teraz znika). Sprawdzić widoczność/`visible`/pozycję shakera w fazie animacji szkła.
-> 2. **Gdy szklanka jest już na środku i scrolluje się w górę → nachodzi na nią model shakera**, którego
->    tam **nie powinno być**. Shaker pojawia się błędnie nad gotową szklanką podczas scrollowania w górę.
->    Należy: w finalnym stanie szkła (na środku) ukryć/odsunąć shaker; przy scrollu w górę odtwarzać
->    **odwróconą animację szkła**, NIE pokazywać shakera nad szklanką.
+> ### 🐛 BUGI ANIMACJI SZKŁA (potwierdzone na mobile) — NAPRAWIONE ✅
+> 1. ~~Podczas animacji szklanek NIE widać modelu shakera~~ — shaker widoczny podczas shaking (animacja trzęsienia, `stageRef==="shaking"` wymusza visible=true).
+> 2. ~~Gdy szklanka na środku i scroll w górę → nachodzi na nią shaker~~ — `flyInPose` wymusza `shaker.visible=false` gdy glassReady/pickGlass/inSceneGlass. Przy scrollu w górę odtwarzana jest odwrócona animacja szkła, shaker NIE pojawia się nad szklanką. ✅
 
 ## 🟡 E9. Sterowanie (start over + instrukcje)
 - **Do zrobienia:**
@@ -804,6 +800,8 @@
 - [x] Eventi: play/stop w rogu AKTYWNEJ karty (nie wychodzi); klik lewa/prawa nawiguje (nie blokuje) ✅
 - [x] Eventi: przycisk "Ricordamelo" → modal (imię+email) → webhook event reminder (3 dni + 5h przed, w języku) ✅
 - [x] Teleportacja: storia snap przez Lenis.scrollTo (nie raw window.scrollTo walczący z Lenis) ✅
+- [x] Szklanka+szejker nakładanie: flyInPose wymusza shaker.visible=false gdy glassReady (scroll w górę nie pokazuje zamkniętego shakera nad szklanką) ✅
+- [x] Blokada scrolla strony gdy QR/pop-out otwarty (DirectOrderQR + NameCard qrOpen/qrFull → lenis.stop + overflow:hidden) ✅
 
 ### 🐛 NAPRAWIONE BUGI MOBILE (sesja iteracyjna):
 - [x] GPU Context Lost: Environment/ContactShadows off na mobile, mini-butelki SVG (zero mini-canvas) ✅
