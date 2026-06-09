@@ -3,6 +3,13 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 import { translateToAll } from "../../lib/translate";
+import dynamic from "next/dynamic";
+
+// Prawdziwy globus 3D (WebGL) — ładowany tylko w przeglądarce (bez SSR)
+const StatsGlobe = dynamic(() => import("../../components/StatsGlobe"), {
+  ssr: false,
+  loading: () => <div className="stats-globe-loading">🌍</div>,
+});
 
 type Tab = "menu" | "events" | "drinks" | "orders" | "messages" | "reviews" | "stats" | "hours";
 
@@ -1176,68 +1183,7 @@ function HoursPanel() {
   );
 }
 
-// ─── Globo leggero (SVG, senza dipendenze pesanti) ────────────────────────────
-// Mostra i paesi dei visitatori come punti su una sfera rotante (proiezione ortografica).
-const COUNTRY_COORDS: Record<string, [number, number]> = {
-  IT: [41.9, 12.5], PL: [52.0, 19.0], DE: [51.0, 9.0], FR: [46.0, 2.0], ES: [40.0, -4.0],
-  GB: [54.0, -2.0], US: [38.0, -97.0], NL: [52.1, 5.3], BE: [50.5, 4.5], CH: [46.8, 8.2],
-  AT: [47.5, 14.5], CZ: [49.8, 15.5], RU: [61.5, 105.0], UA: [48.4, 31.2], RO: [45.9, 24.9],
-  PT: [39.4, -8.2], SE: [60.1, 18.6], NO: [60.5, 8.5], DK: [56.3, 9.5], FI: [64.0, 26.0],
-  IE: [53.4, -8.2], GR: [39.1, 21.8], HR: [45.1, 15.2], HU: [47.2, 19.5], SK: [48.7, 19.7],
-  CA: [56.1, -106.3], BR: [-14.2, -51.9], AU: [-25.3, 133.8], JP: [36.2, 138.3], CN: [35.9, 104.2],
-  IN: [20.6, 78.9], MX: [23.6, -102.6], AR: [-38.4, -63.6], ZA: [-30.6, 22.9], EG: [26.8, 30.8],
-  TR: [38.9, 35.2], AE: [23.4, 53.8], MA: [31.8, -7.1], TN: [33.9, 9.5], SI: [46.2, 14.8],
-};
-function MiniGlobe({ countries }: { countries: { code: string; name: string; count: number }[] }) {
-  const [rot, setRot] = useState(0);
-  useEffect(() => {
-    let raf = 0; let last = performance.now();
-    const tick = (now: number) => { const dt = now - last; last = now; setRot((r) => (r + dt * 0.012) % 360); raf = requestAnimationFrame(tick); };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, []);
-  const R = 90, cx = 100, cy = 100;
-  const maxC = Math.max(1, ...countries.map((c) => c.count));
-  const meridians = [0, 30, 60, 90, 120, 150].map((deg) => {
-    const rad = ((deg + rot) % 180) * Math.PI / 180;
-    const rx = Math.abs(R * Math.cos(rad));
-    return <ellipse key={deg} cx={cx} cy={cy} rx={rx} ry={R} fill="none" stroke="rgba(91,184,212,0.18)" strokeWidth={1} />;
-  });
-  const parallels = [-60, -30, 0, 30, 60].map((lat) => {
-    const y = cy - R * Math.sin(lat * Math.PI / 180);
-    const rx = R * Math.cos(lat * Math.PI / 180);
-    return <ellipse key={lat} cx={cx} cy={y} rx={rx} ry={rx * 0.18} fill="none" stroke="rgba(91,184,212,0.12)" strokeWidth={1} />;
-  });
-  const pins = countries.map((c) => {
-    const co = COUNTRY_COORDS[c.code?.toUpperCase()];
-    if (!co) return null;
-    const [lat, lon] = co;
-    const lonR = (lon + rot) * Math.PI / 180;
-    const latR = lat * Math.PI / 180;
-    const x = Math.cos(latR) * Math.sin(lonR);
-    const z = Math.cos(latR) * Math.cos(lonR);
-    const y = Math.sin(latR);
-    if (z < 0) return null;
-    const px = cx + R * x, py = cy - R * y;
-    const size = 2.5 + (c.count / maxC) * 5;
-    const op = 0.45 + z * 0.55;
-    return <circle key={c.code} cx={px} cy={py} r={size} fill="#E8927C" opacity={op}><title>{c.name}: {c.count}</title></circle>;
-  });
-  return (
-    <svg viewBox="0 0 200 200" className="stats-globe-svg">
-      <defs>
-        <radialGradient id="globeGrad" cx="38%" cy="34%" r="75%">
-          <stop offset="0%" stopColor="#163243" />
-          <stop offset="70%" stopColor="#0c1d28" />
-          <stop offset="100%" stopColor="#060f16" />
-        </radialGradient>
-      </defs>
-      <circle cx={cx} cy={cy} r={R} fill="url(#globeGrad)" stroke="rgba(91,184,212,0.35)" strokeWidth={1.5} />
-      {parallels}{meridians}{pins}
-      <circle cx={cx} cy={cy} r={R} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={6} />
-    </svg>
-  );
-}
+// ─── Globo 3D (WebGL) — komponent w src/components/StatsGlobe.tsx ─────────────
 
 function StatsPanel() {
   const [loading, setLoading] = useState(true);
@@ -1334,7 +1280,7 @@ function StatsPanel() {
             <h3>Da dove arrivano i visitatori</h3>
             {byCountry.length === 0 ? <p className="admin-empty">Nessun dato per questo periodo.</p> : (
               <div className="stats-geo">
-                <div className="stats-globe"><MiniGlobe countries={byCountry} /></div>
+                <div className="stats-globe"><StatsGlobe countries={byCountry} /></div>
                 <div className="stats-countries">
                   {byCountry.map((c) => (
                     <button key={c.code} className="stats-country" onClick={() => setPopCountry(c.code)}>
@@ -1542,9 +1488,11 @@ function AdminStyles() {
       .stats-countries { display:flex; flex-direction:column; gap:8px; }
       .stats-geo { display:flex; gap:24px; align-items:flex-start; }
       .stats-geo .stats-countries { flex:1; }
-      .stats-globe { flex:0 0 220px; max-width:220px; }
+      .stats-globe { flex:0 0 320px; max-width:320px; }
       .stats-globe-svg { width:100%; height:auto; display:block; filter:drop-shadow(0 10px 30px rgba(0,0,0,0.4)); }
-      @media (max-width:768px) { .stats-geo { flex-direction:column; align-items:center; } .stats-globe { flex:0 0 auto; width:200px; } .stats-geo .stats-countries { width:100%; } }
+      .stats-globe-loading { width:100%; aspect-ratio:1/1; max-width:320px; margin:0 auto; display:grid; place-items:center; font-size:48px; opacity:0.4; animation:globeSpin 3s linear infinite; }
+      @keyframes globeSpin { to { transform:rotate(360deg); } }
+      @media (max-width:768px) { .stats-geo { flex-direction:column; align-items:center; } .stats-globe { flex:0 0 auto; width:260px; } .stats-geo .stats-countries { width:100%; } }
       .stats-country { display:flex; align-items:center; gap:12px; padding:8px 12px; border-radius:12px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); cursor:pointer; transition:all .2s; width:100%; text-align:left; color:#fff; }
       .stats-country:hover { background:rgba(232,146,124,0.1); border-color:rgba(232,146,124,0.3); }
       .stats-country-flag { font-size:22px; flex-shrink:0; }
