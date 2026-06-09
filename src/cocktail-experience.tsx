@@ -6111,10 +6111,11 @@ function CocktailStyles() {
         .cx-drop.is-open .cx-drop-list { max-height:240px; opacity:1; visibility:visible; transform:none; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
         .cx-drop-opt { display:flex; align-items:center; gap:10px; width:100%; padding:12px 14px; cursor:pointer;
           color:rgba(255,255,255,0.82); background:none; border:none; border-bottom:1px solid rgba(255,255,255,0.06);
-          font-family:var(--f-display,"Syne",serif); font-weight:700; font-size:13px; text-align:left; }
+          font-family:var(--f-display,"Syne",serif); font-weight:700; font-size:13px; text-align:left;
+          white-space:normal; overflow-wrap:anywhere; word-break:break-word; line-height:1.25; }
         .cx-drop-opt:last-child { border-bottom:none; }
         .cx-drop-opt.active { background:rgba(232,146,124,0.16); color:#fff; }
-        .cx-drop-cnt { margin-left:auto; font-size:11px; opacity:0.55; }
+        .cx-drop-cnt { margin-left:auto; font-size:11px; opacity:0.55; flex-shrink:0; }
 
         /* tabela "nel bicchiere" — na mobile UKRYTA podczas build (jest LayerBar) */
         /* Widoczna TYLKO w glassReady (prezent/formularz/QR) */
