@@ -194,29 +194,39 @@ Strona wysyła do make.com gotowe pola (wystarczy je wstawić):
 
 <div align="center">
 
-# 🟡 SEKCJA D — DRINK DEL MESE (mail do wszystkich)
+# 🟡 SEKCJA D — DRINK DEL MESE / SETTIMANA (mail do wszystkich)
 
-**Efekt: ogłaszasz zwycięzcę → on dostaje mail „wygrałeś + darmowy drink", reszta „sprawdź zwycięski drink".**
+**Efekt: zwycięzca dostaje mail „wygrałeś + darmowy drink" W SWOIM JĘZYKU, reszta „sprawdź zwycięski drink" KAŻDY W SWOIM JĘZYKU.**
 
 </div>
+
+> [!NOTE]
+> ### ✅ Maile GOTOWE w kodzie — make.com tylko wysyła (nic nie tłumaczysz)
+> Strona wysyła: `winner_email` + `winner_email_subject` + `winner_email_html` (zwycięzca w jego języku) oraz `recipients` — lista gdzie KAŻDY ma `email`, `email_subject`, `email_html` (gotowy mail w języku tej osoby).
 
 ### KROK D1 — webhook
 1. Nowy scenariusz → **Webhooks → Custom webhook** → nazwij `shistoria-winner`
 2. Skopiuj URL → Vercel: `NEXT_PUBLIC_MAKE_WINNER_WEBHOOK` → Redeploy
-
-Strona wysyła: `winner_drink`, `winner_author`, `winner_email`, `recipients` (lista `[{email,name,lang}]`), `link`.
+3. **Run once** → w adminie kliknij „👑 Ogłoś", żeby make poznał pola
 
 ### KROK D2 — Router (2 ścieżki)
-1. Dodaj **„Router"** po webhooku.
-2. **Ścieżka A (zwycięzca):** Email → Send an email:
-   - To: `winner_email`
-   - Treść: „🏆 Complimenti! Il tuo drink **{{winner_drink}}** è il Drink del Mese! Vieni a ritirare un drink gratuito."
-3. **Ścieżka B (reszta):** dodaj **„Iterator"** → źródło `recipients` → potem Email:
-   - To: `{{recipients.email}}`
-   - Treść w języku `{{recipients.lang}}`: „🍸 Drink del Mese: **{{winner_drink}}** di {{winner_author}}. Vienilo a provare!"
+**Ścieżka A — ZWYCIĘZCA:** Email → Send an email:
+- **To:** `winner_email` · **Subject:** `winner_email_subject` · **Content type:** `HTML` · **Content:** `winner_email_html`
+
+**Ścieżka B — POZOSTALI:** dodaj **Iterator** → Array: `recipients` → potem Email:
+- **To:** `{{recipients.email}}` · **Subject:** `{{recipients.email_subject}}` · **Content type:** `HTML` · **Content:** `{{recipients.email_html}}`
+
+> Zero pisania treści — każdy dostaje ładny mail w swoim języku.
 
 ### KROK D3 — test
-W panelu admin (Drink Clienti) kliknij **„👑 Ogłoś"** → sprawdź maile.
+Admin (Drink Clienti) → wybierz **tydzień**/**miesiąc** → **„👑 Ogłoś"** → sprawdź maile.
+
+> [!IMPORTANT]
+> ### ⚠️ ŻEBY MAILE SIĘ NIE MIESZAŁY (drinki ≠ eventy ≠ rezerwacje)
+> Każdy typ ma OSOBNY webhook i scenariusz: Rezerwacje → CONTACT (SEKCJA A), Drink → WINNER (ta sekcja), Eventy → EVENT (SEKCJA E). To różne adresy URL → mail o drinku nigdy nie trafi do eventów.
+
+### 🗓️ Czy „Drink Tygodnia" wysyła się sam co tydzień?
+Teraz ogłaszasz **ręcznie** „👑 Ogłoś" (drink liczy się automatycznie, Ty klikasz wyślij). Po pełną automatykę co tydzień dorobię endpoint `/api/announce-winner` + cron — poproś.
 
 ✅ **GOTOWE — sekcja D skończona.**
 
