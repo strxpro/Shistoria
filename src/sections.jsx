@@ -560,13 +560,36 @@ function Attrazioni({ t }) {
 
 // ─── Recensioni ───────────────────────────────────────────────────────────────
 function Recensioni({ t }) {
-  const data = (typeof window !== "undefined" && window.RECENSIONI_DATA) || [];
+  const staticData = (typeof window !== "undefined" && window.RECENSIONI_DATA) || [];
+  const [dbReviews, setDbReviews] = useStateE([]);
   const [filter, setFilter] = useStateE("all");
   const [writeOpen, setWriteOpen] = useStateE(false);
   const [writeTab, setWriteTab] = useStateE("local"); // "local" | "google"
   const [reviewForm, setReviewForm] = useStateE({ name: "", email: "", text: "" });
   const [reviewSent, setReviewSent] = useStateE(false);
   const sources = ["all", "Google", "TripAdvisor", "Locale"];
+
+  // Wczytaj zatwierdzone recenzje z DB (dodane przez gości, zatwierdzone w adminie) + realtime
+  useEffectE(() => {
+    let ch;
+    (async () => {
+      try {
+        const { createClient } = await import("@supabase/supabase-js");
+        const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://slatelpipxtqveydgslc.supabase.co';
+        const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNsYXRlbHBpcHh0cXZleWRnc2xjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODcyNTQsImV4cCI6MjA5NjE2MzI1NH0.5dwE9IStThjC-krTtgg7PtEwmTnr_bQ_TEbQhgMpHdY';
+        const sb = createClient(url, key);
+        const fetchR = async () => {
+          const { data } = await sb.from("reviews").select("*").eq("is_approved", true).order("created_at", { ascending: false });
+          if (data) setDbReviews(data.map((r) => ({ name: r.name, text: r.content, source: r.source || "Locale", stars: r.stars || 5 })));
+        };
+        await fetchR();
+        ch = sb.channel("reviews_rt").on("postgres_changes", { event: "*", schema: "public", table: "reviews" }, fetchR).subscribe();
+      } catch { /* ignore — fallback statyczne */ }
+    })();
+    return () => { try { ch?.unsubscribe?.(); } catch {} };
+  }, []);
+
+  const data = dbReviews.length > 0 ? [...dbReviews, ...staticData] : staticData;
   const filtered = filter === "all" ? data : data.filter((r) => r.source === filter);
   const stream = filtered.concat(filtered);
 

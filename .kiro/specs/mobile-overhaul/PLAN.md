@@ -546,24 +546,22 @@
 > 🔵 Link Google: `https://g.page/r/CVK_gqHsp7TMEAE/review`
 
 ## 🔵 K1. System komentarzy (lokalne + Google)
-- **Do zrobienia:**
-  - [ ] Połączyć recenzje **Google / TripAdvisor**.
-  - [ ] Zastąpić komentarze **Facebook** lokalnym systemem.
-  - [ ] „scrivi messaggio" → popout z **2 zakładkami** (locale / google).
+- [x] „scrivi messaggio" → popout z **2 zakładkami** (locale / google). ✅
+- [x] Zastąpić komentarze **Facebook** lokalnym systemem (DB `reviews`). ✅
+- [ ] Połączyć recenzje **Google / TripAdvisor** (API — wymaga konfiguracji; na razie link Google).
 
 ## 🟢 K2. Zakładka lokalna
-- **Do zrobienia:**
-  - [ ] Upload **maks. 2 obrazów** (skompresowane, zapis w DB).
-  - [ ] Pola: **nazwa, e-mail, treść**.
-  - [ ] Zapis **bez przeładowania** strony.
+- [x] Pola: **nazwa, e-mail, treść**. ✅
+- [x] Zapis **bez przeładowania** strony (insert do `reviews`, realtime). ✅
+- [x] Recenzje zatwierdzone w adminie pokazują się na froncie **na żywo** (realtime channel). ✅
+  - [ ] Upload maks. 2 obrazów (skompresowane) — opcjonalne, do dodania.
 
 ## 🔵 K3. Zakładka Google
-- **Do zrobienia:**
-  - [ ] Link do recenzji Google: `https://g.page/r/CVK_gqHsp7TMEAE/review`.
+- [x] Link do recenzji Google: `https://g.page/r/CVK_gqHsp7TMEAE/review`. ✅
 
 ## 🟢 K4. Komentarze w adminie + e-mail
-- **Do zrobienia:**
-  - [ ] Komentarze lokalne w **DB** + zarządzanie w adminie (**usuń / edytuj**), **auto-tłumaczenie**.
+- [x] Komentarze lokalne w **DB** + zarządzanie w adminie (**approva / usuń**). ✅ *(ReviewsPanel)*
+  - [ ] Auto-tłumaczenie treści recenzji (opcjonalne).
   - [ ] Po komentarzu lokalnym → **e-mail (make.com)** do klienta w jego języku.
 
 > 📎 *Odpowiada wymaganiu: 33.*
