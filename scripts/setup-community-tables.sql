@@ -74,8 +74,13 @@ CREATE TABLE IF NOT EXISTS events (
   is_published boolean DEFAULT true,
   share_instagram boolean DEFAULT false,
   share_facebook boolean DEFAULT false,
+  posted boolean DEFAULT false,         -- czy już opublikowano na social (make.com ustawia po publikacji)
   created_at timestamptz DEFAULT now()
 );
+-- Jeśli tabela już istnieje:
+ALTER TABLE events ADD COLUMN IF NOT EXISTS posted boolean DEFAULT false;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS share_facebook boolean DEFAULT false;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS image_url text;
 
 -- ─── RPC Functions ────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION increment_likes(drink_uuid uuid)

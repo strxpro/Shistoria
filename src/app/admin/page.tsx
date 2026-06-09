@@ -326,7 +326,7 @@ function EventsPanel() {
   useEffect(() => { load(); }, []);
 
   const openNew = () => { setEditEvt({ title: "", description: "", event_date: "", tag: "", template: "jazz", custom_colors: TEMPLATES[0].colors }); setStep("edit"); };
-  const openEdit = (evt: any) => { setEditEvt(evt); setStep("edit"); };
+  const openEdit = (evt: any) => { setEditEvt({ ...evt, shareInstagram: !!evt.share_instagram, shareFacebook: !!evt.share_facebook }); setStep("edit"); };
   const close = () => { setEditEvt(null); setStep("edit"); };
 
   const handleImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -346,7 +346,9 @@ function EventsPanel() {
   };
 
   const save = async (evt: any) => {
-    const payload = { ...evt, is_published: true };
+    // mapuj camelCase z formularza na kolumny DB + usuń pola spoza schematu
+    const { shareInstagram, shareFacebook, ...rest } = evt;
+    const payload: any = { ...rest, is_published: true, share_instagram: !!shareInstagram, share_facebook: !!shareFacebook, posted: false };
     if (evt.id) {
       await supabase.from("events").update(payload).eq("id", evt.id);
     } else {
