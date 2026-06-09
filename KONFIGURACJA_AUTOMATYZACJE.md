@@ -2,7 +2,22 @@
 
 Ten plik tłumaczy konfigurację 4 automatyzacji. Wszystkie używają **make.com** + **Supabase** (tabele wgrywasz z `scripts/`).
 
-> **Najpierw wgraj SQL:** Supabase → SQL Editor → wklej i uruchom: `scripts/setup-analytics-tables.sql` (statystyki + godziny) oraz `scripts/setup-community-tables.sql` (drinki/eventy — jeśli jeszcze nie).
+> **Najpierw wgraj SQL:** Supabase → SQL Editor → wklej i uruchom: `scripts/setup-analytics-tables.sql` (statystyki + godziny + chiusura straordinaria) oraz `scripts/setup-community-tables.sql` (drinki/eventy — jeśli jeszcze nie) oraz `scripts/setup-menu-tables.sql` (menu + system polubień dań).
+
+> [!IMPORTANT]
+> ### 🆕 Aktualizacja bazy (uruchom ponownie te skrypty, jeśli baza już istnieje):
+> - **`scripts/setup-menu-tables.sql`** — dodaje kolumnę `likes` do `menu_items` + funkcję `increment_menu_like()` (serduszka przy daniach). Skrypt usuwa i tworzy tabelę od nowa (`DROP TABLE`), więc jeśli masz już ręcznie dodane pozycje menu, zrób najpierw eksport albo dodaj tylko brakujące kolumny ręcznie:
+>   ```sql
+>   ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS likes integer DEFAULT 0;
+>   CREATE OR REPLACE FUNCTION increment_menu_like(item_id uuid)
+>   RETURNS void LANGUAGE sql AS $$
+>     UPDATE menu_items SET likes = COALESCE(likes, 0) + 1 WHERE id = item_id;
+>   $$;
+>   ```
+> - **`scripts/setup-analytics-tables.sql`** — dodaje kolumnę `closed_dates` do `opening_hours` (chiusura straordinaria — zamykanie pojedynczych dni). Bezpieczne do ponownego uruchomienia (`ADD COLUMN IF NOT EXISTS`). Albo ręcznie:
+>   ```sql
+>   ALTER TABLE opening_hours ADD COLUMN IF NOT EXISTS closed_dates jsonb DEFAULT '[]'::jsonb;
+>   ```
 
 ---
 
