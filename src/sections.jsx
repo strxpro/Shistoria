@@ -850,6 +850,29 @@ function Contatti({ t }) {
   // Godziny do wyboru (wg godzin otwarcia restauracji)
   const TIME_SLOTS = ["12:00","12:30","13:00","13:30","14:00","14:30","19:00","19:30","20:00","20:30","21:00","21:30","22:00","22:30","23:00"];
 
+  // Godziny otwarcia z DB (edytowalne z admina, zmiana NA ŻYWO)
+  const [hours, setHours] = useStateE([
+    { day: "Lun — Dom", time: "12:00 — 14:30 · 19:00 — 23:00", closed: false },
+    { day: "Martedì", time: "chiuso", closed: true },
+  ]);
+  const [slots, setSlots] = useStateE(TIME_SLOTS);
+  useEffectE(() => {
+    let ch;
+    (async () => {
+      try {
+        const { createClient } = await import("@supabase/supabase-js");
+        const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://slatelpipxtqveydgslc.supabase.co';
+        const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNsYXRlbHBpcHh0cXZleWRnc2xjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODcyNTQsImV4cCI6MjA5NjE2MzI1NH0.5dwE9IStThjC-krTtgg7PtEwmTnr_bQ_TEbQhgMpHdY';
+        const sb = createClient(url, key);
+        const apply = (d) => { if (d?.hours?.length) setHours(d.hours); if (d?.time_slots?.length) setSlots(d.time_slots); };
+        const { data } = await sb.from("opening_hours").select("*").eq("id", 1).single();
+        apply(data);
+        ch = sb.channel("opening_hours_rt").on("postgres_changes", { event: "*", schema: "public", table: "opening_hours" }, (p) => apply(p.new)).subscribe();
+      } catch { /* ignore — fallback domyślne godziny */ }
+    })();
+    return () => { try { ch?.unsubscribe?.(); } catch {} };
+  }, []);
+
   const upd = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   const submit = async (e) => {
@@ -936,8 +959,9 @@ function Contatti({ t }) {
             <div className="cnt-info-block">
               <span className="kicker" style={{ color: "rgba(255,255,255,0.5)" }}>{t("contatti.hoursTitle")}</span>
               <div className="cnt-hours">
-                <div><span>Lun — Dom</span><span>12:00 — 14:30 · 19:00 — 23:00</span></div>
-                <div><span>Martedì</span><span style={{ color: "var(--c-coral)" }}>chiuso</span></div>
+                {hours.map((h, i) => (
+                  <div key={i}><span>{h.day}</span><span style={h.closed ? { color: "var(--c-coral)" } : undefined}>{h.time}</span></div>
+                ))}
               </div>
             </div>
             <div className="cnt-mini-map">
@@ -986,7 +1010,7 @@ function Contatti({ t }) {
                   </div>
                   <div className="field">
                     <label>{t("contatti.fields.time") || "Ora"}</label>
-                    <CustomTimePicker value={form.time} onChange={(v) => setForm((f) => ({ ...f, time: v }))} slots={TIME_SLOTS} lang={(typeof window !== "undefined" && window.currentLanguage) || "it"} />
+                    <CustomTimePicker value={form.time} onChange={(v) => setForm((f) => ({ ...f, time: v }))} slots={slots} lang={(typeof window !== "undefined" && window.currentLanguage) || "it"} />
                   </div>
                   <div className="field">
                     <label>{t("contatti.fields.people")}</label>

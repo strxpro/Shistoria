@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
 
-type Tab = "menu" | "events" | "drinks" | "orders" | "messages" | "reviews" | "stats";
+type Tab = "menu" | "events" | "drinks" | "orders" | "messages" | "reviews" | "stats" | "hours";
 
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>("menu");
@@ -55,6 +55,7 @@ export default function AdminPage() {
             { id: "orders", label: "Ordini QR", ico: "📱" },
             { id: "messages", label: "Messaggi", ico: "💬" },
             { id: "reviews", label: "Recensioni", ico: "⭐" },
+            { id: "hours", label: "Orari", ico: "🕐" },
             { id: "stats", label: "Statistiche", ico: "📊" },
           ] as { id: Tab; label: string; ico: string }[]).map((t) => (
             <button
@@ -76,6 +77,7 @@ export default function AdminPage() {
         {tab === "orders" && <OrdersPanel />}
         {tab === "messages" && <MessagesPanel />}
         {tab === "reviews" && <ReviewsPanel />}
+        {tab === "hours" && <HoursPanel />}
         {tab === "stats" && <StatsPanel />}
       </main>
       <AdminStyles />
@@ -729,6 +731,65 @@ function ReviewsPanel() {
 }
 
 // ─── Stats Panel (statystyki odwiedzin) ───────────────────────────────────────
+// ─── Hours Panel (edytor godzin otwarcia — zmiana NA ŻYWO) ───────────────────
+function HoursPanel() {
+  const [rows, setRows] = useState<{ day: string; time: string; closed: boolean }[]>([]);
+  const [slots, setSlots] = useState<string[]>([]);
+  const [slotsText, setSlotsText] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [saved, setSaved] = useState(false);
+
+  const load = async () => {
+    setLoading(true);
+    const { data } = await supabase.from("opening_hours").select("*").eq("id", 1).single();
+    setRows(data?.hours || [{ day: "Lun — Dom", time: "12:00 — 14:30 · 19:00 — 23:00", closed: false }, { day: "Martedì", time: "chiuso", closed: true }]);
+    const sl = data?.time_slots || ["12:00","12:30","13:00","13:30","14:00","14:30","19:00","19:30","20:00","20:30","21:00","21:30","22:00","22:30","23:00"];
+    setSlots(sl); setSlotsText(sl.join(", "));
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, []);
+
+  const save = async () => {
+    const time_slots = slotsText.split(",").map((s) => s.trim()).filter(Boolean);
+    await supabase.from("opening_hours").upsert({ id: 1, hours: rows, time_slots, updated_at: new Date().toISOString() });
+    setSlots(time_slots);
+    setSaved(true); setTimeout(() => setSaved(false), 2500);
+  };
+
+  const updRow = (i: number, k: string, v: any) => setRows((r) => r.map((row, idx) => idx === i ? { ...row, [k]: v } : row));
+  const addRow = () => setRows((r) => [...r, { day: "", time: "", closed: false }]);
+  const delRow = (i: number) => setRows((r) => r.filter((_, idx) => idx !== i));
+
+  if (loading) return <div className="admin-panel"><p className="admin-loading">Caricamento...</p></div>;
+
+  return (
+    <div className="admin-panel">
+      <header className="admin-panel-head">
+        <h1>Orari di apertura</h1>
+        <button className="admin-btn" onClick={save}>{saved ? "✓ Salvato — aggiornato sul sito" : "Salva e pubblica →"}</button>
+      </header>
+      <p style={{ opacity: 0.6, fontSize: 13, marginTop: -16, marginBottom: 24 }}>Le modifiche appaiono sul sito <strong>in tempo reale</strong>, senza ricaricare la pagina.</p>
+
+      <div className="hours-rows">
+        {rows.map((row, i) => (
+          <div key={i} className="hours-row">
+            <input className="hours-day" value={row.day} placeholder="Giorni (es. Lun — Dom)" onChange={(e) => updRow(i, "day", e.target.value)} />
+            <input className="hours-time" value={row.time} placeholder="Orario (es. 12:00 — 14:30)" onChange={(e) => updRow(i, "time", e.target.value)} />
+            <label className="hours-closed"><input type="checkbox" checked={row.closed} onChange={(e) => updRow(i, "closed", e.target.checked)} /> Chiuso</label>
+            <button className="admin-btn-sm admin-btn-danger" onClick={() => delRow(i)}>✕</button>
+          </div>
+        ))}
+        <button className="admin-btn-ghost" onClick={addRow}>+ Aggiungi riga</button>
+      </div>
+
+      <div style={{ marginTop: 28 }}>
+        <label style={{ display: "block", fontSize: 13, opacity: 0.6, marginBottom: 8 }}>Orari prenotabili (separati da virgola — usati nel form di prenotazione)</label>
+        <textarea className="hours-slots" rows={2} value={slotsText} onChange={(e) => setSlotsText(e.target.value)} placeholder="12:00, 12:30, 19:00, ..." />
+      </div>
+    </div>
+  );
+}
+
 function StatsPanel() {
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<"today" | "week" | "month" | "prevmonth" | "all">("month");
@@ -968,7 +1029,12 @@ function AdminStyles() {
       .amsg-input textarea:focus { border-color:#E8927C; }
       @media (max-width:768px) { .amsg-chat { grid-template-columns:1fr; height:auto; } .amsg-list { flex-direction:row; overflow-x:auto; border-right:none; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:8px; } .amsg-thread { flex-direction:column; min-width:80px; } .amsg-thread-preview { display:none; } .amsg-conv { height:60vh; } }
       .admin-badge { display:inline-block; margin-left:8px; color:#f1c40f; }
-      /* ── Statistiche interattive ── */
+      /* ── Orari (godziny) ── */
+      .hours-rows { display:flex; flex-direction:column; gap:10px; }
+      .hours-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+      .hours-day, .hours-time { flex:1; min-width:140px; padding:11px 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.05); color:#fff; font-size:14px; }
+      .hours-closed { display:flex; align-items:center; gap:6px; font-size:13px; color:rgba(255,255,255,0.7); white-space:nowrap; }
+      .hours-slots { width:100%; box-sizing:border-box; padding:12px 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.05); color:#fff; font-size:14px; font-family:inherit; }
       .stats-range { display:flex; gap:6px; flex-wrap:wrap; }
       .stats-range button { padding:8px 14px; border-radius:999px; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.04); color:rgba(255,255,255,0.7); font-size:12px; cursor:pointer; transition:all .2s; }
       .stats-range button:hover { background:rgba(232,146,124,0.15); color:#fff; }
