@@ -4737,6 +4737,7 @@ function DbDrinkCard({ d }: { d: any }) {
   const [likes, setLikes] = useState(d.likes || 0);
   const [popout, setPopout] = useState(false);
   const [orderQR, setOrderQR] = useState<string | null>(null);
+  const [burst, setBurst] = useState(false); // serce po double-tap
   const clickTimer = useRef<number | null>(null);
   const strengthColor = d.strength_value > 0.3 ? "#C8102E" : d.strength_value > 0.15 ? "#E8927C" : "#F4D03F";
 
@@ -4745,11 +4746,19 @@ function DbDrinkCard({ d }: { d: any }) {
     setLiked(true); setLikes((n: number) => n + 1);
     try { await likeDrink(d.id); } catch {}
   };
+  const showBurst = () => { setBurst(true); setTimeout(() => setBurst(false), 650); };
   const handleClick = () => {
     if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; return; }
     clickTimer.current = window.setTimeout(() => { clickTimer.current = null; setPopout(true); }, 280);
   };
-  const handleDbl = (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation(); if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; } doLike(); };
+  const handleDbl = (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation(); if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; } showBurst(); doLike(); };
+  // dotyk: wykryj double-tap palcem
+  const lastTap = useRef(0);
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    const now = Date.now();
+    if (now - lastTap.current < 320) { e.preventDefault(); if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; } showBurst(); doLike(); }
+    lastTap.current = now;
+  };
   const handleOrder = async () => {
     try {
       const order = await createOrder({ drink_id: d.id, drink_name: d.name, author_name: d.author_name, ingredients: d.ingredients || [], total_ml: d.total_ml || 0, strength_label: d.strength_label || "—" });
@@ -4759,9 +4768,10 @@ function DbDrinkCard({ d }: { d: any }) {
 
   return (
     <>
-      <article className="cx-cc" onClick={handleClick} onDoubleClick={handleDbl} style={{ "--cc-strength": strengthColor } as React.CSSProperties}>
+      <article className="cx-cc" onClick={handleClick} onDoubleClick={handleDbl} onTouchEnd={handleTouchEnd} style={{ "--cc-strength": strengthColor } as React.CSSProperties}>
         <div className="cx-cc-strength-bar" />
         <span className="cx-cc-heart-corner">♥</span>
+        {burst && <span className="cx-cc-burst" aria-hidden="true">❤️</span>}
         <div className="cx-cc-vis" style={{ background: `radial-gradient(120% 90% at 30% 10%, ${d.color}22, transparent 60%)` }}>
           <span className="cx-cc-by">by {d.author_name}</span>
           {d.photo_url && <img src={d.photo_url} style={{ width: "70%", height: "82%", objectFit: "cover", borderRadius: 12 }} alt={d.name} />}
@@ -5482,7 +5492,7 @@ function CocktailStyles() {
       .cx-search-btn:hover { background:rgba(255,255,255,0.12); }
       .cx-search-wrap { margin-top:12px; }
       .cx-search-input { width:100%; padding:11px 16px; border-radius:12px; box-sizing:border-box; background:rgba(255,255,255,0.06);
-        border:1px solid var(--cx-stroke); color:#fff; font-size:14px; font-family:inherit; outline:none; }
+        border:1px solid var(--cx-stroke); color:#fff; font-size:16px; font-family:inherit; outline:none; }
       .cx-search-input::placeholder { color:rgba(255,255,255,0.4); }
       .cx-search-results { margin-top:8px; display:flex; flex-direction:column; gap:4px; max-height:40vh; overflow-y:auto; }
       .cx-search-item { display:flex; align-items:center; gap:10px; padding:10px 12px; border-radius:10px; cursor:pointer;
@@ -6344,13 +6354,16 @@ function CocktailStyles() {
       /* Popout overlay (Instagram-style) */
       .cx-cc-popout-overlay { position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.75); backdrop-filter:blur(8px);
         display:flex; align-items:center; justify-content:center; padding:24px; animation:cxFade .3s ease; }
-      .cx-cc-popout { display:grid; grid-template-columns:1fr 1fr; width:min(900px,92vw); max-height:85vh; border-radius:24px; overflow:hidden;
+      .cx-cc-popout { position:relative; display:grid; grid-template-columns:1fr 1fr; width:min(900px,92vw); max-height:85vh; border-radius:24px; overflow:hidden;
         background:#12171e; border:1px solid rgba(255,255,255,0.1); box-shadow:0 40px 100px rgba(0,0,0,0.6); animation:cxFadeUp .4s ease; }
       @media (max-width:768px) { .cx-cc-popout { grid-template-columns:1fr; max-height:92vh; overflow-y:auto; } }
-      .cx-cc-popout-close { position:absolute; top:16px; right:16px; z-index:2; width:40px; height:40px; border-radius:50%;
-        background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.15); color:#fff; font-size:20px;
-        display:grid; place-items:center; cursor:pointer; transition:all .25s; }
+      .cx-cc-popout-close { position:absolute; top:16px; right:16px; z-index:5; width:40px; height:40px; border-radius:50%;
+        background:rgba(0,0,0,0.55); border:1px solid rgba(255,255,255,0.3); color:#fff; font-size:22px;
+        display:grid; place-items:center; cursor:pointer; transition:all .25s; backdrop-filter:blur(6px); }
       .cx-cc-popout-close:hover { background:#fff; color:#000; }
+      .cx-cc-burst { position:absolute; inset:0; display:grid; place-items:center; z-index:4; pointer-events:none; font-size:80px;
+        animation:ccBurst .65s cubic-bezier(.17,.89,.32,1.28); filter:drop-shadow(0 4px 14px rgba(0,0,0,0.5)); }
+      @keyframes ccBurst { 0%{transform:scale(0) rotate(-15deg);opacity:0;} 35%{transform:scale(1.2) rotate(6deg);opacity:1;} 70%{transform:scale(0.95);} 100%{transform:scale(1.05);opacity:0;} }
       .cx-cc-popout-left { display:flex; align-items:center; justify-content:center; padding:40px; background:rgba(0,0,0,0.3); }
       .cx-cc-popout-glass { width:80%; max-width:200px; filter:drop-shadow(0 20px 40px rgba(0,0,0,0.5)); }
       .cx-cc-popout-right { padding:32px; display:flex; flex-direction:column; gap:20px; overflow-y:auto; scrollbar-width:none; -ms-overflow-style:none; }
