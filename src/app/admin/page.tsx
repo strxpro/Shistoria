@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabase";
+import { translateToAll } from "../../lib/translate";
 
 type Tab = "menu" | "events" | "drinks" | "orders" | "messages" | "reviews" | "stats" | "hours";
 
@@ -92,6 +93,7 @@ function MenuPanel() {
   const [editItem, setEditItem] = useState<any>(null);
   const [section, setSection] = useState<"ristorante" | "bar" | "all">("all");
   const [sortByLikes, setSortByLikes] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -170,11 +172,22 @@ function MenuPanel() {
   })).slice().sort((a, b) => sortByLikes ? (b.likes || 0) - (a.likes || 0) : (a.sort_order || 0) - (b.sort_order || 0));
 
   const save = async (item: any) => {
+    setSaving(true);
+    // Auto-tłumaczenie nazwy i opisu na wszystkie języki (IT = oryginał)
+    try {
+      const [nameTr, descTr] = await Promise.all([
+        item.name ? translateToAll(item.name) : Promise.resolve(null),
+        item.description ? translateToAll(item.description) : Promise.resolve(null),
+      ]);
+      if (nameTr) item.name_i18n = nameTr;
+      if (descTr) item.desc_i18n = descTr;
+    } catch { /* tłumaczenie opcjonalne — zapisz mimo błędu */ }
     if (item.id) {
       await supabase.from("menu_items").update(item).eq("id", item.id);
     } else {
       await supabase.from("menu_items").insert(item);
     }
+    setSaving(false);
     setEditItem(null);
     load();
   };
@@ -264,7 +277,7 @@ function MenuPanel() {
               </div>
             </div>
             <div className="admin-modal-actions">
-              <button className="admin-btn" onClick={() => save(editItem)}>Salva</button>
+              <button className="admin-btn" onClick={() => save(editItem)} disabled={saving}>{saving ? "Traduzione e salvataggio..." : "Salva"}</button>
               <button className="admin-btn-ghost" onClick={() => setEditItem(null)}>Annulla</button>
             </div>
           </div>

@@ -18,9 +18,13 @@ CREATE TABLE menu_items (
   is_featured boolean DEFAULT false,
   is_published boolean DEFAULT true,
   likes integer DEFAULT 0,             -- liczba polubień (serduszko na daniu)
+  name_i18n jsonb DEFAULT '{}'::jsonb, -- tłumaczenia nazwy {pl,en,de,fr,es}
+  desc_i18n jsonb DEFAULT '{}'::jsonb, -- tłumaczenia opisu {pl,en,de,fr,es}
   sort_order integer DEFAULT 0,
   updated_at timestamptz DEFAULT now()
 );
+ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS name_i18n jsonb DEFAULT '{}'::jsonb;
+ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS desc_i18n jsonb DEFAULT '{}'::jsonb;
 
 -- Funkcja inkrementacji/dekrementacji polubień dania (atomowa, delta ±1)
 CREATE OR REPLACE FUNCTION increment_menu_like(item_id uuid, delta integer DEFAULT 1)

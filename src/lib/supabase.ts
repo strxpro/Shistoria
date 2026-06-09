@@ -240,10 +240,10 @@ export async function likeMenuItem(itemId: string): Promise<boolean> {
 }
 
 // Mapa polubień menu po nazwie pozycji (front używa statycznego FULL_MENU, łączymy po name).
-export async function getMenuLikes(): Promise<Record<string, { id: string; likes: number }>> {
-  const { data } = await supabase.from('menu_items').select('id,name,likes');
-  const map: Record<string, { id: string; likes: number }> = {};
-  (data || []).forEach((r: any) => { if (r.name) map[String(r.name).trim().toLowerCase()] = { id: r.id, likes: r.likes || 0 }; });
+export async function getMenuLikes(): Promise<Record<string, { id: string; likes: number; name_i18n?: any; desc_i18n?: any }>> {
+  const { data } = await supabase.from('menu_items').select('id,name,likes,name_i18n,desc_i18n');
+  const map: Record<string, { id: string; likes: number; name_i18n?: any; desc_i18n?: any }> = {};
+  (data || []).forEach((r: any) => { if (r.name) map[String(r.name).trim().toLowerCase()] = { id: r.id, likes: r.likes || 0, name_i18n: r.name_i18n, desc_i18n: r.desc_i18n }; });
   return map;
 }
 

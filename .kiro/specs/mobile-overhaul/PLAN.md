@@ -589,7 +589,7 @@
   - [x] Dodawanie / edycja / usuwanie pozycji menu. ✅ *(MenuPanel: tabela z miniaturami, modal edycji, upload zdjęć do Storage bucket `assets`, auto-seed z `window.FULL_MENU`/`DRINKS_MENU`, „Reimporta dal sito")*
   - [x] Pozycje ze strony widoczne w adminie + zdjęcia edytowalne (przygotowane pod auto-import z Google). ✅
   - [x] Sticky przycisk **Salva** zawsze widoczny przy przewijaniu formularza + modal mobile-friendly (bottom-sheet). ✅
-  - [ ] Zapis pozycji → **auto-tłumaczenie na wszystkie języki**. *(do zrobienia — wymaga PDF/translate pipeline)*
+  - [ ] Zapis pozycji → **auto-tłumaczenie na wszystkie języki**. ✅ *(MenuPanel.save → translateToAll dla name+description, zapis do `name_i18n`/`desc_i18n`; front MobileFullMenu pokazuje tłumaczenia wg języka strony, IT=oryginał)*
 
 ## 🟢 L1b. System polubień dań (NOWE)
 - **Zrobione:**

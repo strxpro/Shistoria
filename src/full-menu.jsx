@@ -68,6 +68,19 @@ function MobileFullMenu() {
   // klucz pozycji = nazwa znormalizowana
   const itemKey = (it) => String(it.name || "").trim().toLowerCase();
   const getLikes = (it) => (likesMap[itemKey(it)]?.likes || 0);
+  // tłumaczenia z DB (jeśli admin zapisał) — IT zostaje oryginał
+  const trName = (it) => {
+    const lg = (typeof window !== "undefined" && window.currentLanguage) || "it";
+    if (lg === "it") return it.name;
+    const rec = likesMap[itemKey(it)];
+    return (rec?.name_i18n && rec.name_i18n[lg]) || it.name;
+  };
+  const trDesc = (it) => {
+    const lg = (typeof window !== "undefined" && window.currentLanguage) || "it";
+    if (lg === "it") return it.desc;
+    const rec = likesMap[itemKey(it)];
+    return (rec?.desc_i18n && rec.desc_i18n[lg]) || it.desc;
+  };
   const isLiked = (it) => {
     const id = likesMap[itemKey(it)]?.id;
     return id ? likedSet.has(id) : false;
@@ -178,7 +191,7 @@ function MobileFullMenu() {
                     {it.img ? <img src={it.img} alt="" loading="lazy" /> : <span className="mfm-top-ph">{it.icon}</span>}
                     <span className="mfm-top-badge"><HeartIcon filled /> {it._l}</span>
                   </div>
-                  <span className="mfm-top-name">{it.name}</span>
+                  <span className="mfm-top-name">{trName(it)}</span>
                 </button>
               ))}
             </div>
@@ -224,7 +237,7 @@ function MobileFullMenu() {
                   <div className="mfm-item-main">
                     <div className="mfm-item-top">
                       <span className="mfm-item-name">
-                        {it.name}
+                        {trName(it)}
                         {it.featured && <span className="mfm-star">★</span>}
                         {it.allergen && <span className="mfm-allergen" onClick={(e) => { e.stopPropagation(); setAllergenInfo({ nums: parseAllergens(it.allergen), raw: it.allergen }); }}>({it.allergen})</span>}
                       </span>
@@ -234,7 +247,7 @@ function MobileFullMenu() {
                         {it.note && <span className="mfm-price-note">/ {it.note}</span>}
                       </span>
                     </div>
-                    {it.desc && <p className="mfm-item-desc">{it.desc}</p>}
+                    {it.desc && <p className="mfm-item-desc">{trDesc(it)}</p>}
                   </div>
                 </li>
               ))}
@@ -310,8 +323,8 @@ function MobileFullMenu() {
               </button>
             </div>
             <div className="mfm-pop-body">
-              <h3>{dishPopout.name}{dishPopout.featured && <span className="mfm-star"> ★</span>}</h3>
-              {dishPopout.desc && <p className="mfm-pop-desc">{dishPopout.desc}</p>}
+              <h3>{trName(dishPopout)}{dishPopout.featured && <span className="mfm-star"> ★</span>}</h3>
+              {dishPopout.desc && <p className="mfm-pop-desc">{trDesc(dishPopout)}</p>}
               <div className="mfm-pop-foot">
                 <span className="mfm-pop-price">{dishPopout.price}{conv(dishPopout.price) && <span className="mfm-price-conv"> {conv(dishPopout.price)}</span>}</span>
                 {dishPopout.allergen && <span className="mfm-pop-allergen" onClick={() => setAllergenInfo({ nums: parseAllergens(dishPopout.allergen), raw: dishPopout.allergen })}>Allergeni: {dishPopout.allergen}</span>}
