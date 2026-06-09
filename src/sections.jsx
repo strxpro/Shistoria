@@ -714,6 +714,7 @@ function Recensioni({ t }) {
 function Contatti({ t }) {
   const [form, setForm] = useStateE({ firstName: "", lastName: "", email: "", phone: "", date: "", time: "", people: 2, message: "" });
   const [submitted, setSubmitted] = useStateE(false);
+  const [sending, setSending] = useStateE(false);
   const [errors, setErrors] = useStateE({});
 
   // Godziny do wyboru (wg godzin otwarcia restauracji)
@@ -730,6 +731,7 @@ function Contatti({ t }) {
     setErrors(err);
     if (Object.keys(err).length > 0) return;
 
+    setSending(true);
     const lang = (typeof window !== "undefined" && window.currentLanguage) || "it";
     const fullName = `${form.firstName} ${form.lastName}`.trim();
 
@@ -765,7 +767,16 @@ function Contatti({ t }) {
       } catch (err4) { console.error("WhatsApp error:", err4); }
     }
 
+    // Krótka animacja "wypełnienia" przycisku przed pokazaniem toast
+    await new Promise((r) => setTimeout(r, 700));
+    setSending(false);
     setSubmitted(true);
+  };
+
+  const resetForm = () => {
+    setForm({ firstName: "", lastName: "", email: "", phone: "", date: "", time: "", people: 2, message: "" });
+    setSubmitted(false);
+    setErrors({});
   };
 
   return (
@@ -812,9 +823,13 @@ function Contatti({ t }) {
           <div className="cnt-form-wrap">
             {submitted ? (
               <div className="cnt-success">
+                <button className="cnt-success-close" onClick={resetForm} aria-label="Chiudi">×</button>
                 <div className="cnt-success-icon">✦</div>
                 <h3>{t("contatti.success")}</h3>
                 <p>Ti scriveremo entro 24 ore per confermare.</p>
+                <button className="cnt-success-again" onClick={resetForm}>
+                  {({ it: "Nuova richiesta", pl: "Nowa prośba", en: "New request", de: "Neue Anfrage", fr: "Nouvelle demande", es: "Nueva solicitud" })[(typeof window !== "undefined" && window.currentLanguage) || "it"]}
+                </button>
               </div>
             ) : (
               <form className="cnt-form" onSubmit={submit}>
@@ -860,7 +875,16 @@ function Contatti({ t }) {
                     <textarea rows={3} value={form.message} onChange={upd("message")} placeholder="Allergie, occasione speciale, richieste..." />
                   </div>
                 </div>
-                <button type="submit" className="btn cnt-submit">{t("contatti.submit")} <span className="arrow">→</span></button>
+                <button type="submit" className={`btn cnt-submit ${sending ? "is-sending" : ""}`} disabled={sending}>
+                  <span className="cnt-submit-fill" aria-hidden="true" />
+                  <span className="cnt-submit-label">
+                    {sending ? (
+                      <span className="cnt-dots"><span></span><span></span><span></span></span>
+                    ) : (
+                      <>{t("contatti.submit")} <span className="arrow">→</span></>
+                    )}
+                  </span>
+                </button>
               </form>
             )}
           </div>
@@ -907,9 +931,23 @@ function Contatti({ t }) {
         .stepper button { width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 16px; }
         .stepper button:hover { background: var(--c-sky); border-color: var(--c-sky); }
         .stepper span { font-family: var(--f-display); font-weight: 700; font-size: 22px; min-width: 32px; text-align: center; }
-        .cnt-submit { margin-top: 32px; background: var(--c-coral); color: #fff; }
+        .cnt-submit { margin-top: 32px; background: var(--c-coral); color: #fff; position: relative; overflow: hidden; }
         .cnt-submit:hover { background: var(--c-sky); }
-        .cnt-success { background: rgba(91,184,212,0.1); border: 1px solid var(--c-sky); border-radius: 24px; padding: 80px 40px; text-align: center; }
+        .cnt-submit.is-sending { pointer-events: none; }
+        .cnt-submit-fill { position: absolute; left: 0; bottom: 0; width: 100%; height: 0; background: var(--c-sky); z-index: 0; transition: height .7s cubic-bezier(.2,.8,.2,1); }
+        .cnt-submit.is-sending .cnt-submit-fill { height: 100%; }
+        .cnt-submit-label { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 8px; }
+        .cnt-dots { display: inline-flex; gap: 5px; align-items: center; }
+        .cnt-dots span { width: 7px; height: 7px; border-radius: 50%; background: #fff; animation: cntBounce 1s infinite ease-in-out; }
+        .cnt-dots span:nth-child(2) { animation-delay: .15s; }
+        .cnt-dots span:nth-child(3) { animation-delay: .3s; }
+        @keyframes cntBounce { 0%,80%,100% { transform: translateY(0); opacity: .5; } 40% { transform: translateY(-7px); opacity: 1; } }
+        .cnt-success { position: relative; background: rgba(91,184,212,0.1); border: 1px solid var(--c-sky); border-radius: 24px; padding: 80px 40px; text-align: center; animation: cntToastIn .4s cubic-bezier(.2,.9,.3,1); }
+        @keyframes cntToastIn { from { opacity: 0; transform: translateY(16px) scale(.97); } to { opacity: 1; transform: none; } }
+        .cnt-success-close { position: absolute; top: 16px; right: 16px; width: 38px; height: 38px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.25); color: #fff; font-size: 22px; cursor: pointer; display: grid; place-items: center; transition: all .2s; }
+        .cnt-success-close:hover { background: var(--c-coral); border-color: transparent; }
+        .cnt-success-again { margin-top: 24px; padding: 12px 26px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.25); background: transparent; color: #fff; font-family: var(--f-body); font-size: 14px; font-weight: 600; cursor: pointer; transition: all .2s; }
+        .cnt-success-again:hover { background: var(--c-coral); border-color: transparent; }
         .cnt-success-icon { font-size: 64px; color: var(--c-coral); margin-bottom: 24px; }
         .cnt-success h3 { font-family: var(--f-display); font-weight: 800; font-size: 32px; letter-spacing: -0.02em; }
         .cnt-success p { font-family: var(--f-serif); font-style: italic; opacity: 0.7; margin-top: 8px; font-size: 18px; }

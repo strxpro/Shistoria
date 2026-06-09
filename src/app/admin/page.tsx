@@ -487,18 +487,21 @@ function OrdersPanel() {
 }
 
 // ─── Messages Panel (chat stile WhatsApp — raggruppato per email) ─────────────
-// Tłumaczenie na włoski (darmowy endpoint Google Translate) — cache w pamięci.
+// Tłumaczenie na włoski (darmowy endpoint Google Translate) — AUTO-wykrywanie języka źródłowego.
 const _trCache: Record<string, string> = {};
-async function toItalian(text: string, srcLang: string): Promise<string> {
-  if (!text || srcLang === "it") return text;
-  const key = `${srcLang}:${text}`;
-  if (_trCache[key]) return _trCache[key];
+async function toItalian(text: string): Promise<string> {
+  if (!text) return text;
+  if (_trCache[text]) return _trCache[text];
   try {
-    const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${srcLang || "auto"}&tl=it&dt=t&q=${encodeURIComponent(text)}`);
+    // sl=auto → Google sam wykrywa język wiadomości, tl=it → zawsze włoski
+    const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=it&dt=t&q=${encodeURIComponent(text)}`);
     const j = await r.json();
+    const detected = j?.[2]; // wykryty język źródłowy
     const out = (j?.[0] || []).map((s: any) => s[0]).join("");
-    _trCache[key] = out || text;
-    return out || text;
+    // jeśli wykryto włoski — nie pokazuj tłumaczenia (to samo)
+    const final = detected === "it" ? text : (out || text);
+    _trCache[text] = final;
+    return final;
   } catch { return text; }
 }
 
@@ -532,13 +535,13 @@ function MessagesPanel() {
 
   const activeThread = threads.find((t) => t.email === activeEmail) || threads[0] || null;
 
-  // Tłumacz wiadomości klienta (nie-IT) na włoski do wyświetlenia
+  // Tłumacz KAŻDĄ wiadomość klienta na włoski (auto-wykrywanie języka źródłowego)
   useEffect(() => {
     if (!activeThread) return;
     activeThread.msgs.forEach(async (m: any) => {
-      if (m.message && m.language && m.language !== "it" && !trMap[m.id]) {
-        const it = await toItalian(m.message, m.language);
-        setTrMap((prev) => ({ ...prev, [m.id]: it }));
+      if (m.message && !trMap[m.id]) {
+        const it = await toItalian(m.message);
+        if (it && it !== m.message) setTrMap((prev) => ({ ...prev, [m.id]: it }));
       }
     });
   }, [activeThread, trMap]);
@@ -620,8 +623,8 @@ function MessagesPanel() {
                       {m.message && (
                         <div className="amsg-bubble amsg-in">
                           <p>{m.message}</p>
-                          {m.language && m.language !== "it" && (
-                            <p className="amsg-tr">🇮🇹 {trMap[m.id] || "..."}</p>
+                          {trMap[m.id] && (
+                            <p className="amsg-tr">🇮🇹 {trMap[m.id]}</p>
                           )}
                           <span className="amsg-time">{new Date(m.created_at).toLocaleString("it-IT")}</span>
                         </div>
