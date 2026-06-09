@@ -302,10 +302,10 @@
 
 ## 🟠 E5. Przyciski FAB i wskaźniki
 - **Do zrobienia:**
-  - [ ] Przyciski FAB **wyżej**.
-  - [ ] Lewy wskaźnik (gauge) **nie nakłada się** na FAB, umieszczony **niżej**.
-  - [ ] Gdy pojawiają się **napisy neonowe** → FAB **znikają**.
-  - [ ] Napisy neonowe **zawsze responsywne**, nigdy poza ekranem.
+  - [x] Przyciski FAB **wyżej**. ✅ *(top:32%)*
+  - [x] Lewy wskaźnik (gauge) **nie nakłada się** na FAB, umieszczony **niżej**. ✅ *(gauge top:58%, FAB top:32% — rozdzielone)*
+  - [x] Gdy pojawiają się **napisy neonowe** → FAB **znikają**. ✅ *(data-cx-scrolling chowa FAB podczas pop)*
+  - [x] Napisy neonowe **zawsze responsywne**, nigdy poza ekranem. ✅ *(clamp font + max-width:92vw + overflow-wrap)*
 
 ## 🟠 E6. Interakcja z shakerem (obrót tła) + blokada zaznaczania
 - **Cel:** jak w starej (działającej) wersji — przeciągasz, obraca się **tło**, shaker stoi.
