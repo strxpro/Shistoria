@@ -584,8 +584,19 @@
 
 ## 🟢 L1. Edytor pełnego menu
 - **Do zrobienia:**
-  - [ ] Dodawanie / edycja / usuwanie pozycji menu.
-  - [ ] Zapis pozycji → **auto-tłumaczenie na wszystkie języki**.
+  - [x] Dodawanie / edycja / usuwanie pozycji menu. ✅ *(MenuPanel: tabela z miniaturami, modal edycji, upload zdjęć do Storage bucket `assets`, auto-seed z `window.FULL_MENU`/`DRINKS_MENU`, „Reimporta dal sito")*
+  - [x] Pozycje ze strony widoczne w adminie + zdjęcia edytowalne (przygotowane pod auto-import z Google). ✅
+  - [x] Sticky przycisk **Salva** zawsze widoczny przy przewijaniu formularza + modal mobile-friendly (bottom-sheet). ✅
+  - [ ] Zapis pozycji → **auto-tłumaczenie na wszystkie języki**. *(do zrobienia — wymaga PDF/translate pipeline)*
+
+## 🟢 L1b. System polubień dań (NOWE)
+- **Zrobione:**
+  - [x] Klik/double-tap w zdjęcie dania → **serduszko** (animacja Instagram). ✅
+  - [x] Mały licznik ❤ na miniaturze + pełny przycisk lajka w popout dania. ✅
+  - [x] Polubienie → danie wędruje **na górę swojej kategorii** dynamicznie (sort wg likes). ✅
+  - [x] 1 polub./urządzenie/danie (localStorage guard) + atomowy `increment_menu_like` RPC. ✅
+  - [x] Admin: kolumna ❤️ w tabeli menu + filtr **„Più popolari"**. ✅
+  - 📂 `src/full-menu.jsx`, `src/lib/supabase.ts` (likeMenuItem/getMenuLikes), `scripts/setup-menu-tables.sql` (kolumna `likes` + RPC)
 
 ## 🔵 L2. Wiadomości (admin ↔ klient) — *skopiować z gioielleria-main*
 - **Do zrobienia:**
@@ -595,7 +606,14 @@
 
 ## 🔵 L3. Statystyki — *skopiować z VillaDea-main*
 - **Do zrobienia:**
-  - [ ] Statystyki: liczba odwiedzających, **skąd** pochodzą, **które sekcje** odwiedzają.
+  - [x] Statystyki: liczba odwiedzających, **skąd** pochodzą, **które sekcje** odwiedzają. ✅ *(StatsPanel: kraje z intensywnością, źródła, czas, sekcje, KPI, zakresy dat)*
+
+## 🟢 L4. Orari + chiusura straordinaria (NOWE)
+- **Zrobione:**
+  - [x] Edytor godzin otwarcia → zmiana **na żywo** na stronie (Supabase realtime). ✅
+  - [x] **Chiusura straordinaria** — zamknięcie konkretnego dnia jednym klikiem (oggi/domani/wybór daty). ✅
+  - [x] Zamknięte daty **blokowane w kalendarzu** rezerwacji + lista chipów z usuwaniem. ✅
+  - 📂 `src/app/admin/page.tsx` (HoursPanel), `src/sections.jsx` (CustomDatePicker), `scripts/setup-analytics-tables.sql` (`closed_dates`)
 
 > 📎 *Odpowiada wymaganiom: 34, 35, 36.*
 > 🔗 *L1 łączy się z **C/D (menu)** i **N (tłumaczenia)**. L2 z **O (make.com)**. Wszystko z **G (panel barmana QR)**.*
