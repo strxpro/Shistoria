@@ -5055,6 +5055,36 @@ function CommunitySection({ sectionRef }: { sectionRef?: React.RefObject<HTMLEle
     setLoadingMore(false);
   };
 
+  // Drink del Mese / della Settimana — liczony z DB (średnia like + claimed×2; tydzień: świeże ×1.5)
+  const [featured, setFeatured] = useState<any>(null);
+  const [featuredPeriod, setFeaturedPeriod] = useState<"week" | "month">("week");
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const { data } = await supabase.from("community_drinks").select("*").eq("is_published", true).order("created_at", { ascending: false }).limit(60);
+        if (!alive || !data || data.length === 0) return;
+        const now = Date.now();
+        const WEEK = 7 * 864e5, MONTH = 30 * 864e5;
+        const score = (d: any, period: "week" | "month") => {
+          const likes = d.likes || 0;
+          const claimed = d.claimed_count || d.claimed || 0;
+          const ageMs = now - new Date(d.created_at || now).getTime();
+          let s = likes + claimed * 2;
+          if (period === "week" && ageMs < WEEK) s *= 1.5; // świeże w tygodniu mają bonus
+          return s;
+        };
+        // wybór okresu: jeśli są świeże drinki z tygodnia → tydzień, inaczej miesiąc
+        const freshWeek = data.filter((d) => now - new Date(d.created_at || now).getTime() < WEEK);
+        const period: "week" | "month" = freshWeek.length >= 2 ? "week" : "month";
+        const pool = period === "week" ? (freshWeek.length ? freshWeek : data) : data.filter((d) => now - new Date(d.created_at || now).getTime() < MONTH);
+        const best = (pool.length ? pool : data).slice().sort((a, b) => score(b, period) - score(a, period))[0];
+        if (alive && best) { setFeatured(best); setFeaturedPeriod(period); }
+      } catch (e) { /* ignore */ }
+    })();
+    return () => { alive = false; };
+  }, []);
+
 
   // tytuł w języku strony (z window.currentLanguage); fallback do IT
   const heading = useMemo(() => {
@@ -5143,22 +5173,44 @@ function CommunitySection({ sectionRef }: { sectionRef?: React.RefObject<HTMLEle
         {/* Filtry sortowania community */}
         <CommunityFilters filter={commFilter} setFilter={setCommFilter} gridMode={gridMode} setGridMode={setGridMode} />
 
-        {/* Drink del Mese — wyróżniony (pierwszy z koroną) */}
-        {COMMUNITY.length > 0 && (
-          <div className="cx-featured-drink">
-            <span className="cx-featured-crown">👑</span>
-            <div className="cx-featured-body">
-              <span className="cx-mini-kicker">Drink del Mese</span>
-              <h3>{COMMUNITY[0].name}</h3>
-              <p>by {COMMUNITY[0].by} · ♥ {COMMUNITY[0].likes}</p>
+        {/* Drink del Mese / della Settimana — wyróżniony z koroną (z DB jeśli dostępny) */}
+        {(featured || COMMUNITY.length > 0) && (() => {
+          const lang = ((typeof window !== "undefined" && (window as any).currentLanguage) || "it") as string;
+          const LBL: Record<string, { week: string; month: string }> = {
+            it: { week: "Drink della Settimana", month: "Drink del Mese" },
+            pl: { week: "Drink Tygodnia", month: "Drink Miesiąca" },
+            en: { week: "Drink of the Week", month: "Drink of the Month" },
+            de: { week: "Drink der Woche", month: "Drink des Monats" },
+            fr: { week: "Cocktail de la Semaine", month: "Cocktail du Mois" },
+            es: { week: "Drink de la Semana", month: "Drink del Mes" },
+          };
+          const lbl = (LBL[lang] || LBL.it)[featured ? featuredPeriod : "month"];
+          const f = featured;
+          const name = f ? f.name : COMMUNITY[0].name;
+          const by = f ? (f.author_name || f.by || "—") : COMMUNITY[0].by;
+          const likes = f ? (f.likes || 0) : COMMUNITY[0].likes;
+          const claimed = f ? (f.claimed_count || f.claimed || 0) : 0;
+          const photo = f ? f.photo_url : null;
+          return (
+            <div className="cx-featured-drink">
+              <span className="cx-featured-crown">👑</span>
+              {photo ? (
+                <img src={photo} alt={name} className="cx-featured-photo" />
+              ) : (
+                <svg viewBox="0 0 60 90" className="cx-featured-glass">
+                  <defs><linearGradient id="feat-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={(COMMUNITY[0]?.from) || "#E8927C"} /><stop offset="100%" stopColor={(COMMUNITY[0]?.to) || "#5BB8D4"} /></linearGradient></defs>
+                  <path d="M10 10 H50 L35 42 V68 H38 V74 H22 V68 H25 V42 Z" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" />
+                  <path d="M14 13 H46 L35 38 H25 Z" fill="url(#feat-g)" />
+                </svg>
+              )}
+              <div className="cx-featured-body">
+                <span className="cx-mini-kicker">{lbl}</span>
+                <h3>{name}</h3>
+                <p>by {by} · ♥ {likes}{claimed > 0 ? ` · 🍸 ${claimed}` : ""}</p>
+              </div>
             </div>
-            <svg viewBox="0 0 60 90" className="cx-featured-glass">
-              <defs><linearGradient id="feat-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={COMMUNITY[0].from} /><stop offset="100%" stopColor={COMMUNITY[0].to} /></linearGradient></defs>
-              <path d="M10 10 H50 L35 42 V68 H38 V74 H22 V68 H25 V42 Z" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" />
-              <path d="M14 13 H46 L35 38 H25 Z" fill="url(#feat-g)" />
-            </svg>
-          </div>
-        )}
+          );
+        })()}
 
         <div className={`cx-comm-grid ${gridMode === "grid" ? "cx-comm-grid-2col" : ""}`}>
           {[...COMMUNITY].sort((a, b) => {
@@ -5920,6 +5972,7 @@ function CocktailStyles() {
       .cx-featured-body { flex:1; } .cx-featured-body h3 { margin:4px 0 2px; font-size:18px; font-weight:800; color:#fff; }
       .cx-featured-body p { font-size:12px; opacity:0.7; margin:0; }
       .cx-featured-glass { width:50px; height:75px; flex-shrink:0; opacity:0.8; }
+      .cx-featured-photo { width:64px; height:64px; flex-shrink:0; border-radius:14px; object-fit:cover; border:2px solid rgba(241,196,15,0.5); box-shadow:0 6px 20px rgba(0,0,0,0.4); }
       .cx-comm-head { display:flex; justify-content:center; align-items:center; text-align:center; gap:24px; padding-bottom:36px; border-bottom:1px solid rgba(255,255,255,0.16); margin-bottom:48px; flex-wrap:wrap; }
       .cx-comm-head .cx-mini-kicker { color:rgba(255,255,255,0.7); }
       .cx-comm-head h2 { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:clamp(40px,6vw,96px); line-height:0.95; letter-spacing:-0.03em; color:#fff; margin-top:14px; word-break:keep-all; overflow-wrap:normal; white-space:nowrap; }

@@ -408,11 +408,13 @@
   - [x] „scopri altri drink" → doładowuje **4 kolejne** drinki. ✅ *(loadMoreDrinks: range offset..offset+3, append bez duplikatów, ukrycie przycisku gdy noMore)*
 
 ## 🟢 F5. Featured drink (drink miesiąca / tygodnia)
-- **Do zrobienia:**
-  - [ ] Góra community: **wyróżniony drink** wyśrodkowany, z **koroną 👑** i oryginalną ramką.
-  - [ ] „drink miesiąca" = **najwięcej polubień + najwięcej zamówień** (średnia).
-  - [ ] Obsługa **drinków tygodnia**.
-  - [ ] **Filtr**.
+- **Zrobione:**
+  - [x] Góra community: **wyróżniony drink** z **koroną 👑** i ramką (zdjęcie jeśli jest, inaczej ilustracja szkła). ✅
+  - [x] „drink miesiąca/tygodnia" = **średnia polubień + zamówień** (likes + claimed×2). ✅
+  - [x] Obsługa **drinków tygodnia** (świeże z 7 dni mają bonus ×1.5; auto-wybór tydzień/miesiąc). ✅
+  - [x] Etykieta wielojęzyczna (Drink della Settimana / del Mese). ✅
+  - 📂 `src/cocktail-experience.tsx` (CommunitySection — featured z DB `community_drinks`)
+  - [ ] Filtr ręczny tydzień/miesiąc na froncie (na razie auto). *(opcjonalne)*
 
 > 📎 *Odpowiada wymaganiom: 23, 24, 25, 26, 27, 28.*
 > 🔗 *F1 łączy się z **E8/E9 (kreator)**. F2 (kopiuj link) łączy się z **G (QR/link otwiera drink)**. F3 (claim) łączy się z **G (QR + potwierdzenie barmana)**. F5 (wygrana) łączy się z **O1 (auto-email do twórców)**.*
@@ -860,3 +862,101 @@
 
 
 
+
+
+---
+
+<div align="center">
+
+# 📋 STAN PRAC — DZIENNIK SESJI (najnowsze na górze)
+
+</div>
+
+> [!IMPORTANT]
+> Ta sekcja podsumowuje **co jest zrobione w kodzie**, **co wymaga konfiguracji od Ciebie** (SQL / make.com / Vercel),
+> oraz **co zostało do zrobienia**. Aktualizowana po każdej turze.
+
+## 🗄️ SQL DO URUCHOMIENIA W SUPABASE (SQL Editor) — WAŻNE
+Bez tego nowe funkcje nie zadziałają (reszta strony działa normalnie):
+
+```sql
+-- 1) Polubienia dań (menu)
+ALTER TABLE menu_items ADD COLUMN IF NOT EXISTS likes integer DEFAULT 0;
+CREATE OR REPLACE FUNCTION increment_menu_like(item_id uuid, delta integer DEFAULT 1)
+RETURNS void LANGUAGE sql AS $$
+  UPDATE menu_items SET likes = GREATEST(0, COALESCE(likes,0)+delta) WHERE id = item_id;
+$$;
+
+-- 2) Chiusura straordinaria (orari)
+ALTER TABLE opening_hours ADD COLUMN IF NOT EXISTS closed_dates jsonb DEFAULT '[]'::jsonb;
+
+-- 3) Eventi — social + kontrola publikacji
+ALTER TABLE events ADD COLUMN IF NOT EXISTS posted boolean DEFAULT false;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS share_facebook boolean DEFAULT false;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS image_url text;
+```
+
+> Pełne skrypty: `scripts/setup-menu-tables.sql`, `scripts/setup-analytics-tables.sql`, `scripts/setup-community-tables.sql`.
+> Bucket Storage **`assets`** (public) musi istnieć — używany do zdjęć menu i eventów.
+
+---
+
+## ✅ ZROBIONE W KODZIE (ta sesja)
+
+### 🍽 Menu — system polubień dań (`src/full-menu.jsx`, `src/lib/supabase.ts`)
+- Serce **TikTok-style** (SVG `#FE2C55`, nie emoji), wypełnione gdy polubione.
+- **Mały** licznik serc w rogu zdjęcia (nie na całym ekranie).
+- **Toggle** — polub / cofnij polubienie (1/urządzenie/danie, `localStorage` + `increment_menu_like(delta)`).
+- **Burst** (animacja serca) tylko w obrębie miniatury / zdjęcia popout.
+- **Double-tap** w zdjęcie (lista i popout) = polubienie.
+- Dania z większą liczbą serc **wyżej** w kategorii.
+- Sekcja **„I più amati"** na górze menu — pozioma karuzela top dań, klik → szczegóły.
+
+### 🍽 Admin → Menu (`src/app/admin/page.tsx` MenuPanel)
+- Tabela pozycji z miniaturami, upload zdjęć do Storage `assets`, auto-seed z `window.FULL_MENU`/`DRINKS_MENU`.
+- **Sticky przycisk Salva** + modal mobile (bottom-sheet), tabela scroll poziomy.
+- Kolumna ❤️ + filtr **„Più popolari"**.
+
+### 🕐 Admin → Orari (HoursPanel) + `src/sections.jsx`
+- Edytor godzin (realtime na stronę).
+- **Chiusura straordinaria** — zamknięcie dnia 1 klikiem (oggi / domani / data), chipy z usuwaniem.
+- Zamknięte dni **blokowane w kalendarzu** rezerwacji.
+
+### 🎭 Admin → Eventi (EventsPanel)
+- **6 szablonów** koloru (tło + akcent), **upload zdjęcia**.
+- Krok **Anteprima** — podgląd na telefonie i komputerze przed zapisem.
+- Checkboxy **Instagram Story / Facebook Post** → zapis `share_instagram`/`share_facebook` w DB.
+
+### 🎞 Eventi (strona, `src/sections.jsx`)
+- Przycisk **play/stop** przeniesiony na dół karty (nie nachodzi na progress bar).
+
+### 🧭 Nawigacja (`src/shell.jsx` + `src/full-menu.jsx`)
+- Hamburger przesuwa się w prawo gdy widać pasek kategorii menu (`data-cx-menucat`), **bez blokady scrolla**.
+
+### 📊 Admin → Statystyki (StatsPanel)
+- **Globus SVG** (lekki, bez maplibre) — obrót + pinezki krajów + intensywność.
+
+---
+
+## 🔵 DO PODŁĄCZENIA PRZEZ CIEBIE (konfiguracja, nie kod)
+
+| # | Co | Gdzie | Plik z instrukcją |
+|:-:|:---|:------|:------------------|
+| 1 | **SQL** (kolumny likes / closed_dates / posted) | Supabase SQL Editor | (sekcja wyżej) |
+| 2 | **Bucket `assets`** public (zdjęcia menu/eventi) | Supabase Storage | `scripts/setup-menu-tables.sql` |
+| 3 | **make.com — rezerwacje** (email właściciel IT + klient w jego języku + WhatsApp) | make.com | `MAKE_SETUP.md`, `KONFIGURACJA_AUTOMATYZACJE.md` |
+| 4 | **WhatsApp callmebot** (numer 48665626101, apikey 2990681) | make.com HTTP (parametry) | `KONFIGURACJA_AUTOMATYZACJE.md` |
+| 5 | **IMAP** (odpowiedzi klientów → admin Messaggi) — OVH `ssl0.ovh.net:993` TLS, `info@shistoria.it` | make.com | `KONFIGURACJA_AUTOMATYZACJE.md` |
+| 6 | **Instagram/Facebook auto-post** wydarzeń | make.com + Meta API | `SOCIAL_AUTOPOST.md` |
+| 7 | **Vercel env** (opcjonalnie usunąć `NEXT_PUBLIC_MODELS_URL` jeśli modele z /public) | Vercel | — |
+
+---
+
+## ⏳ DO ZROBIENIA (kolejka)
+- [ ] **PDF import menu** → auto-ekstrakcja pozycji + auto-tłumaczenie na 6 języków (uwaga: miejsce na dysku).
+- [ ] **Auto-tłumaczenie pozycji menu** przy zapisie (L1).
+- [ ] **Featured drink miesiąca/tygodnia** na froncie community (F5 — korona 👑, ramka).
+- [ ] **Google Business / TripAdvisor sync** (menu/godziny → wizytówka Google) — wymaga Google Business Profile API.
+- [ ] **Auto-pobieranie zdjęć dań z wizytówki Google**.
+- [ ] Sekcja N — pełne tłumaczenia + geolokalizacja (fundament).
+- [ ] Kreator 3D — pozostałe punkty E4/E6/E7/E8 (pour, grab-spin, shaker, szkło) do testów na urządzeniu.
