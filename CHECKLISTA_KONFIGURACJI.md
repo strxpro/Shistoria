@@ -145,6 +145,10 @@ Webhook (CONTACT)
 
 </div>
 
+> [!TIP]
+> ### 👉 SZYBSZA, DARMOWA OPCJA (bez make.com): otwórz **`IMAP_CRON_SETUP.md`**
+> Endpoint `/api/check-mail` już jest w kodzie. Dodajesz dane skrzynki w Vercel + zakładasz cron.org (co minutę wywołuje endpoint). Działa prawie real-time, bez make.com. To zalecana droga.
+
 > [!IMPORTANT]
 > Twoja poczta `info@shistoria.it` jest na **OVH** (nie Gmail). Dane:
 > - **Host IMAP:** `ssl0.ovh.net`
