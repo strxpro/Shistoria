@@ -267,6 +267,18 @@ function StoriaArc({ data }) {
       const startY = window.scrollY;
       const dist = targetY - startY;
       if (Math.abs(dist) < 2) { snapping = false; return; }
+      // Jeśli Lenis aktywny — użyj jego scrollTo (inaczej rAF window.scrollTo walczy z Lenis → teleportacja)
+      if (typeof window !== "undefined" && window.lenis) {
+        snapping = true;
+        window.lenis.scrollTo(Math.round(targetY), {
+          duration: Math.min(0.7, 0.3 + Math.abs(dist) * 0.001),
+          easing: (x) => 1 - Math.pow(1 - x, 3),
+          onComplete: () => { snapping = false; },
+        });
+        // fallback gdyby onComplete nie odpalił
+        setTimeout(() => { snapping = false; }, 900);
+        return;
+      }
       const dur = Math.min(620, 260 + Math.abs(dist) * 0.9); // dłuższy dystans = trochę dłużej, ale płynnie
       const t0 = performance.now();
       snapping = true;
