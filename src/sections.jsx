@@ -493,7 +493,7 @@ function Attrazioni({ t }) {
                 </button>
               );
             })}
-            <a href="https://www.google.com/maps/place/Rena+Majore,+Santa+Teresa+Gallura+SS,+Italia" target="_blank" rel="noopener" className="btn atr-directions">
+            <a href="https://www.google.com/maps/place/Via+Delfino,+07020+Rena+Majore+OT,+Italia" target="_blank" rel="noopener" className="btn atr-directions">
               ◎ {t("attrazioni.directions")} <span className="arrow">→</span>
             </a>
           </div>
@@ -1141,8 +1141,8 @@ function Footer({ t }) {
           <div>
             <span className="kicker">{t("footer.contact")}</span>
             <ul>
-              <li>Via Rena Majore</li>
-              <li>07028 Santa Teresa Gallura</li>
+              <li>Via Delfino</li>
+              <li>07020 Rena Majore (OT)</li>
               <li>{t("contatti.phone")}</li>
               <li>{t("contatti.email")}</li>
             </ul>

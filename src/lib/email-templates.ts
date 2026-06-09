@@ -74,7 +74,7 @@ function shell(innerHtml: string): string {
     <!-- Footer -->
     <div style="text-align:center;padding:24px;background:#0a1822;color:${BRAND.muted};font-size:12px;line-height:1.7;">
       <a href="${BRAND.site}" style="color:${BRAND.sky};text-decoration:none;font-weight:600;">www.shistoria.it</a><br>
-      Via Rena Majore · Santa Teresa Gallura, Sardegna<br>
+      Via Delfino · 07020 Rena Majore (OT), Sardegna<br>
       <span style="opacity:0.6;">info@shistoria.it · +39 0789 000 000</span>
     </div>
   </div></body></html>`;
@@ -139,6 +139,10 @@ export function ownerWhatsAppText(v: ReservationVars): string {
     `👥 ${v.people ?? "?"} persone`,
     `📞 ${v.phone || "—"}`,
     `✉️ ${v.email}`,
-    (v.messageIt || v.message) ? `💬 ${v.messageIt || v.message}` : "",
+    (v.messageIt || v.message)
+      ? (v.lang !== "it" && v.message && v.messageIt && v.messageIt !== v.message
+          ? `💬 ${v.messageIt}\n   (${v.lang.toUpperCase()}: ${v.message})`
+          : `💬 ${v.messageIt || v.message}`)
+      : "",
   ].filter(Boolean).join("\n");
 }

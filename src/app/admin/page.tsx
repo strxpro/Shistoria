@@ -9,10 +9,13 @@ export default function AdminPage() {
   const [tab, setTab] = useState<Tab>("menu");
   const [authed, setAuthed] = useState(false);
   const [pin, setPin] = useState("");
+  const [pinErr, setPinErr] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
 
   // Prosty PIN do admina (w produkcji zastąpić Supabase Auth)
   const checkPin = () => {
-    if (pin === "shistoria2026") setAuthed(true);
+    if (pin === "shistoria2026") { setAuthed(true); setPinErr(false); }
+    else { setPinErr(true); setPin(""); }
   };
 
   if (!authed) {
@@ -25,9 +28,11 @@ export default function AdminPage() {
             type="password"
             placeholder="PIN di accesso"
             value={pin}
-            onChange={(e) => setPin(e.target.value)}
+            className={pinErr ? "pin-err" : ""}
+            onChange={(e) => { setPin(e.target.value); setPinErr(false); }}
             onKeyDown={(e) => e.key === "Enter" && checkPin()}
           />
+          {pinErr && <span className="admin-pin-error">⚠ PIN errato. Riprova.</span>}
           <button onClick={checkPin}>Entra →</button>
         </div>
         <AdminStyles />
@@ -37,7 +42,7 @@ export default function AdminPage() {
 
   return (
     <div className="admin">
-      <aside className="admin-nav">
+      <aside className={`admin-nav ${navOpen ? "is-open" : ""}`}>
         <div className="admin-logo">
           <h2>S'Historia</h2>
           <span>Admin Panel</span>
@@ -55,14 +60,15 @@ export default function AdminPage() {
             <button
               key={t.id}
               className={tab === t.id ? "active" : ""}
-              onClick={() => setTab(t.id)}
+              onClick={() => { setTab(t.id); setNavOpen(false); }}
             >
               <span className="admin-nav-ico">{t.ico}</span>
-              {t.label}
+              <span className="admin-nav-label">{t.label}</span>
             </button>
           ))}
         </nav>
       </aside>
+      <button className="admin-nav-toggle" onClick={() => setNavOpen((o) => !o)} aria-label="Menu">{navOpen ? "✕" : "☰"}</button>
       <main className="admin-main">
         {tab === "menu" && <MenuPanel />}
         {tab === "events" && <EventsPanel />}
@@ -521,6 +527,17 @@ function MessagesPanel() {
   };
   useEffect(() => { load(); }, []);
 
+  // Realtime — nowe/zmienione wiadomości pojawiają się BEZ odświeżania strony
+  useEffect(() => {
+    const ch = supabase
+      .channel("contact_messages_rt")
+      .on("postgres_changes", { event: "*", schema: "public", table: "contact_messages" }, () => { load(); })
+      .subscribe();
+    // fallback polling co 15s (gdyby realtime nie był włączony w Supabase)
+    const poll = setInterval(load, 15000);
+    return () => { supabase.removeChannel(ch); clearInterval(poll); };
+  }, []);
+
   // Grupuj po emailu → wątki (konwersacje)
   const threads = React.useMemo(() => {
     const map: Record<string, any[]> = {};
@@ -779,26 +796,35 @@ function AdminStyles() {
       .admin-login-card p { opacity:0.6; margin:0 0 32px; }
       .admin-login-card input { width:100%; padding:14px 18px; border-radius:12px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.05); color:#fff; font-size:16px; margin-bottom:16px; }
       .admin-login-card button { width:100%; padding:14px; border-radius:12px; background:#E8927C; color:#fff; font-weight:700; font-size:14px; border:none; cursor:pointer; }
+      .admin-login-card input.pin-err { border-color:#e74c3c; animation:adminShake .3s; }
+      @keyframes adminShake { 0%,100%{ transform:translateX(0);} 25%{ transform:translateX(-5px);} 75%{ transform:translateX(5px);} }
+      .admin-pin-error { display:block; color:#e74c3c; font-size:13px; font-weight:600; margin:-6px 0 14px; }
 
       .admin { display:grid; grid-template-columns:260px 1fr; min-height:100vh; background:#0a0e14; color:#fff; font-family:system-ui; }
+      .admin-nav-toggle { display:none; }
       @media (max-width:768px) {
         .admin { grid-template-columns:1fr; }
-        .admin-nav { padding:16px; border-right:none; border-bottom:1px solid rgba(255,255,255,0.08); }
-        .admin-nav nav { flex-direction:row; flex-wrap:wrap; gap:4px; }
-        .admin-nav nav button { padding:8px 12px; font-size:12px; }
-        .admin-main { padding:16px; max-height:none; }
+        /* nav jako wysuwany drawer z lewej */
+        .admin-nav { position:fixed; top:0; left:0; bottom:0; width:260px; z-index:200; transform:translateX(-100%);
+          transition:transform .3s cubic-bezier(.2,.8,.2,1); border-right:1px solid rgba(255,255,255,0.1); border-bottom:none; padding:24px 18px; overflow-y:auto; }
+        .admin-nav.is-open { transform:translateX(0); box-shadow:0 0 60px rgba(0,0,0,0.6); }
+        .admin-nav nav { flex-direction:column; gap:6px; }
+        .admin-nav nav button { padding:14px 16px; font-size:15px; }
+        .admin-nav-toggle { display:flex; align-items:center; justify-content:center; position:fixed; top:14px; left:14px; z-index:210;
+          width:46px; height:46px; border-radius:14px; background:#E8927C; color:#fff; border:none; font-size:20px; cursor:pointer; box-shadow:0 6px 20px rgba(0,0,0,0.4); }
+        .admin-main { padding:70px 16px 16px; max-height:none; }
         .admin-panel-head { flex-direction:column; align-items:flex-start; gap:12px; }
         .admin-panel-head h1 { font-size:22px; }
         .admin-table { font-size:12px; }
         .admin-grid { grid-template-columns:1fr !important; }
         .admin-order { flex-direction:column; gap:12px; }
       }
-      .admin-nav { padding:32px 20px; background:rgba(255,255,255,0.02); border-right:1px solid rgba(255,255,255,0.08); display:flex; flex-direction:column; gap:32px; }
-      .admin-logo h2 { font-size:24px; margin:0; } .admin-logo span { font-size:11px; opacity:0.5; letter-spacing:0.15em; text-transform:uppercase; }
-      .admin-nav nav { display:flex; flex-direction:column; gap:4px; }
-      .admin-nav nav button { display:flex; align-items:center; gap:12px; padding:12px 16px; border-radius:12px; background:none; border:none; color:rgba(255,255,255,0.7); font-size:14px; cursor:pointer; transition:all .2s; text-align:left; width:100%; }
-      .admin-nav nav button:hover { background:rgba(255,255,255,0.06); color:#fff; }
-      .admin-nav nav button.active { background:rgba(232,146,124,0.15); color:#E8927C; font-weight:600; }
+      .admin-nav { padding:32px 20px; background:rgba(255,255,255,0.04); border-right:1px solid rgba(255,255,255,0.1); display:flex; flex-direction:column; gap:32px; }
+      .admin-logo h2 { font-size:24px; margin:0; color:#fff; } .admin-logo span { font-size:11px; opacity:0.55; letter-spacing:0.15em; text-transform:uppercase; }
+      .admin-nav nav { display:flex; flex-direction:column; gap:6px; }
+      .admin-nav nav button { display:flex; align-items:center; gap:13px; padding:13px 16px; border-radius:13px; background:rgba(255,255,255,0.03); border:1px solid transparent; color:rgba(255,255,255,0.82); font-size:14px; cursor:pointer; transition:all .2s; text-align:left; width:100%; }
+      .admin-nav nav button:hover { background:rgba(232,146,124,0.12); border-color:rgba(232,146,124,0.25); color:#fff; transform:translateX(3px); }
+      .admin-nav nav button.active { background:linear-gradient(135deg, rgba(232,146,124,0.28), rgba(91,184,212,0.15)); border-color:rgba(232,146,124,0.5); color:#fff; font-weight:700; box-shadow:0 4px 16px rgba(232,146,124,0.2); }
       .admin-nav-ico { font-size:18px; }
       .admin-main { padding:32px 40px; overflow-y:auto; max-height:100vh; }
       .admin-panel-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:32px; }
