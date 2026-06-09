@@ -1623,6 +1623,7 @@ function CocktailExperience() {
   const [glassPourOpen, setGlassPourOpen] = useState(false);
   const [glassFilled, setGlassFilled] = useState(false); // szklanka zostaje napełniona na środku
   const [claimed, setClaimed] = useState(false);
+  const [directOrder, setDirectOrder] = useState<null | { name: string; orderId?: string }>(null); // "Wybierz ten" → QR bez formularza
   const [confetti, setConfetti] = useState(0);
   const [drinkName, setDrinkName] = useState("");
   const [customerName, setCustomerName] = useState("");
@@ -1938,7 +1939,7 @@ function CocktailExperience() {
   const reset = useCallback(() => {
     const api = sceneApiRef.current;
     setPoured([]); setChosenGlass(null); setDrinkName(""); setCustomerName(""); setStage("build");
-    setGlassPourOpen(false); setGlassFilled(false); setClaimed(false); setConfetti(0);
+    setGlassPourOpen(false); setGlassFilled(false); setClaimed(false); setConfetti(0); setDirectOrder(null);
     inSceneGlassRef.current = null;
     // Safety: odblokuj scroll (mógł zostać zablokowany przez doShake)
     if (typeof window !== "undefined" && (window as any).lenis) (window as any).lenis.start();
@@ -2311,7 +2312,9 @@ function CocktailExperience() {
         {/* DÓŁ-ŚRODEK — prezent → formularz (wewnątrz sticky-stage, NIE portal/sticky) */}
         <div ref={tableRef} className={`cx-table ${(glassPourOpen && !glassFilled) || (stage !== "glassReady" && poured.length === 0) ? "is-hidden" : ""} ${stage === "glassReady" && !claimed ? "is-gift" : ""} ${stage === "glassReady" && claimed ? "cx-table-glassready" : ""}`}>
           {stage === "glassReady" ? (
-            claimed ? (
+            directOrder ? (
+              <DirectOrderQR name={directOrder.name} orderId={directOrder.orderId} color={mixedColor} onReset={reset} />
+            ) : claimed ? (
               <NameCard color={mixedColor} drinkName={drinkName} setDrinkName={setDrinkName}
                 customerName={customerName} setCustomerName={setCustomerName} poured={poured} onReset={reset} />
             ) : (
@@ -2368,7 +2371,7 @@ function CocktailExperience() {
           <DrinkFound drink={apiDrink} searching={false}
             onOrderNow={async () => {
               setDrinkChoiceOpen(false);
-              // Stwórz order od razu → pokaż QR
+              // "Wybierz ten" → twórz order, oznacz directOrder; potem wybór szkła → QR (bez formularza)
               try {
                 const order = await createOrder({
                   drink_name: apiDrink.name,
@@ -2377,14 +2380,10 @@ function CocktailExperience() {
                   total_ml: totalMl,
                   strength_label: strength.label,
                 });
-                if (order?.id) {
-                  setChosenGlass(GLASSES[0]);
-                  setGlassFilled(true);
-                  setStage("glassReady");
-                  setClaimed(true);
-                  (window as any).__sh_orderId = order.id;
-                }
-              } catch (e) { console.error(e); }
+                setDirectOrder({ name: apiDrink.name, orderId: order?.id });
+                if (order?.id) (window as any).__sh_orderId = order.id;
+              } catch (e) { console.error(e); setDirectOrder({ name: apiDrink.name }); }
+              // przejdź do wyboru szkła (stage już pickGlass) — po nalaniu pokaże się QR
             }}
             onContinue={() => setDrinkChoiceOpen(false)}
           />
@@ -4458,6 +4457,55 @@ function Confetti({ fireKey }: { fireKey: number }) {
         } as React.CSSProperties} />
       ))}
     </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * DirectOrderQR — "Wybierz ten" → od razu QR (bez formularza nazwy/imienia).
+ * Krzyżyk zamyka (→ reset). Tło blur, blokada scrolla strony gdy otwarty.
+ * ──────────────────────────────────────────────────────────────────────── */
+function DirectOrderQR({ name, orderId, color, onReset }: { name: string; orderId?: string; color: string; onReset: () => void }) {
+  const orderUrl = orderId ? `${typeof window !== "undefined" ? window.location.origin : ""}/order/${orderId}` : "";
+  const [full, setFull] = useState(false);
+  const lang = (typeof window !== "undefined" && (window as any).currentLanguage) || "it";
+  const tr = ({
+    it: { show: "Mostralo al barman", full: "⛶ Schermo intero" },
+    pl: { show: "Pokaż barmanowi", full: "⛶ Pełny ekran" },
+    en: { show: "Show it to the barman", full: "⛶ Fullscreen" },
+    de: { show: "Zeig es dem Barkeeper", full: "⛶ Vollbild" },
+    fr: { show: "Montre-le au barman", full: "⛶ Plein écran" },
+    es: { show: "Muéstralo al barman", full: "⛶ Pantalla completa" },
+  } as Record<string, { show: string; full: string }>)[lang] ?? { show: "Mostralo al barman", full: "⛶ Schermo intero" };
+
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="cx-qr-overlay" onClick={onReset}>
+      <div className="cx-qr-card" onClick={(e) => e.stopPropagation()}>
+        <button className="cx-qr-close" onClick={onReset}>×</button>
+        <span className="cx-mini-kicker">{tr.show}</span>
+        <div className="cx-qr-box">
+          {orderUrl ? (
+            <PersonalizedQR url={orderUrl} color={color} size={200} icon="🍸" />
+          ) : (
+            <div style={{ width: 200, height: 200, background: "#fff", borderRadius: 16, display: "grid", placeItems: "center" }}>
+              <span style={{ fontSize: 28, opacity: 0.4 }}>⏳</span>
+            </div>
+          )}
+        </div>
+        <h4 style={{ margin: "8px 0 0", color: "#fff" }}>{name}</h4>
+        <button className="cx-qr-expand" onClick={() => setFull(true)}>{tr.full}</button>
+      </div>
+      {full && (
+        <div className="cx-qr-full" onClick={(e) => { e.stopPropagation(); setFull(false); }}>
+          <button className="cx-qr-close" onClick={() => setFull(false)}>×</button>
+          <div className="cx-qr-full-box" onClick={(e) => e.stopPropagation()}>
+            {orderUrl && <PersonalizedQR url={orderUrl} color={color} size={Math.min(typeof window !== "undefined" ? window.innerWidth - 80 : 300, 360)} icon="🍸" />}
+          </div>
+          <p className="cx-qr-full-label">{name} · {tr.show}</p>
+        </div>
+      )}
+    </div>,
+    document.body,
   );
 }
 
