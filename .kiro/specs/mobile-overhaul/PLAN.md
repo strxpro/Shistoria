@@ -374,11 +374,11 @@
 
 ## 🟢 F1. Zapis i przejęcie drinka
 - **Do zrobienia:**
-  - [ ] Przejęcie drinka (claim) → **automatyczny zapis** drinka z urządzenia.
-  - [ ] „pochwal się / share" → **auto-wypełnienie** nazwy, składników, zdjęcia.
-  - [ ] Popout share: pola wstępnie wypełnione z **ikonami ołówka** (edycja).
-  - [ ] Brak drinka → link **„non hai ancora creato un drink? Crea ora"**.
-  - [ ] Udostępnienie → zapis do **DB ze zdjęciem** + dodanie do community.
+  - [x] Przejęcie drinka (claim) → **automatyczny zapis** drinka z urządzenia. ✅ *(claimDrink → localStorage sh-my-drinks)*
+  - [x] „pochwal się / share" → **auto-wypełnienie** nazwy, składników, zdjęcia. ✅ *(ShareDrinkBtn czyta ostatni drink z localStorage)*
+  - [x] Popout share: pola wstępnie wypełnione z **ikonami ołówka** (edycja). ✅ *(editName/editAuthor z ✏️, cx-share-edit)*
+  - [x] Brak drinka → link **„non hai ancora creato un drink? Crea ora"**. ✅ *(cx-share-nodrink → scroll do kreatora)*
+  - [x] Udostępnienie → zapis do **DB ze zdjęciem** + dodanie do community. ✅ *(publishDrink z photo_url)*
 
 ## 🟢 F2. Interakcje (like / komentarz / share)
 - **Do zrobienia:**
