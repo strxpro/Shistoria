@@ -58,19 +58,23 @@ function row(label: string, value?: string | number): string {
 }
 
 function shell(innerHtml: string): string {
-  return `<!doctype html><html><body style="margin:0;padding:0;background:${BRAND.deep};">
-  <div style="max-width:560px;margin:0 auto;padding:24px;font-family:'Helvetica Neue',Arial,sans-serif;">
-    <div style="text-align:center;padding:24px 0 8px;">
-      <div style="font-size:30px;font-weight:800;letter-spacing:-0.5px;color:${BRAND.cream};">S'Historia</div>
-      <div style="font-size:11px;letter-spacing:3px;text-transform:uppercase;color:${BRAND.coral};margin-top:6px;">${BRAND.tagline}</div>
+  return `<!doctype html><html><body style="margin:0;padding:0;background:#0a1822;">
+  <div style="max-width:580px;margin:0 auto;padding:0;font-family:'Helvetica Neue',Arial,sans-serif;">
+    <!-- Header z logo -->
+    <div style="text-align:center;padding:36px 24px 20px;background:linear-gradient(180deg,#0E222F,#0a1822);">
+      <img src="${BRAND.site}/logo.png" alt="S'Historia" width="120" style="display:inline-block;max-width:120px;height:auto;filter:brightness(0) invert(1);" />
+      <div style="font-size:11px;letter-spacing:4px;text-transform:uppercase;color:${BRAND.coral};margin-top:14px;">${BRAND.tagline}</div>
     </div>
-    <div style="height:2px;background:linear-gradient(90deg,transparent,${BRAND.coral},transparent);margin:12px 0 20px;"></div>
-    <div style="background:${BRAND.card};border:1px solid rgba(255,255,255,0.08);border-radius:18px;padding:28px;">
+    <div style="height:3px;background:linear-gradient(90deg,transparent,${BRAND.coral},${BRAND.sky},transparent);"></div>
+    <!-- Body -->
+    <div style="background:${BRAND.card};padding:34px 30px;">
       ${innerHtml}
     </div>
-    <div style="text-align:center;padding:20px 0;color:${BRAND.muted};font-size:12px;">
-      <a href="${BRAND.site}" style="color:${BRAND.sky};text-decoration:none;">www.shistoria.it</a>
-      &nbsp;·&nbsp; Santa Teresa Gallura
+    <!-- Footer -->
+    <div style="text-align:center;padding:24px;background:#0a1822;color:${BRAND.muted};font-size:12px;line-height:1.7;">
+      <a href="${BRAND.site}" style="color:${BRAND.sky};text-decoration:none;font-weight:600;">www.shistoria.it</a><br>
+      Via Rena Majore · Santa Teresa Gallura, Sardegna<br>
+      <span style="opacity:0.6;">info@shistoria.it · +39 0789 000 000</span>
     </div>
   </div></body></html>`;
 }

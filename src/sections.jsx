@@ -710,6 +710,94 @@ function Recensioni({ t }) {
   );
 }
 
+// ─── Custom Date Picker (stylizowany pod stronę, wielojęzyczny) ───────────────
+function CustomDatePicker({ value, onChange, lang }) {
+  const [open, setOpen] = useStateE(false);
+  const [view, setView] = useStateE(() => { const d = value ? new Date(value) : new Date(); return { y: d.getFullYear(), m: d.getMonth() }; });
+  const wrapRef = useRefE(null);
+
+  useEffectE(() => {
+    if (!open) return;
+    const onDown = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [open]);
+
+  const L = lang || "it";
+  const MONTHS = {
+    it: ["Gennaio","Febbraio","Marzo","Aprile","Maggio","Giugno","Luglio","Agosto","Settembre","Ottobre","Novembre","Dicembre"],
+    pl: ["Styczeń","Luty","Marzec","Kwiecień","Maj","Czerwiec","Lipiec","Sierpień","Wrzesień","Październik","Listopad","Grudzień"],
+    en: ["January","February","March","April","May","June","July","August","September","October","November","December"],
+    de: ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"],
+    fr: ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"],
+    es: ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"],
+  };
+  const DOW = {
+    it: ["Lun","Mar","Mer","Gio","Ven","Sab","Dom"], pl: ["Pon","Wt","Śr","Czw","Pt","Sob","Nd"],
+    en: ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"], de: ["Mo","Di","Mi","Do","Fr","Sa","So"],
+    fr: ["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"], es: ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"],
+  };
+  const months = MONTHS[L] || MONTHS.it;
+  const dow = DOW[L] || DOW.it;
+  const PLACEHOLDER = { it: "Seleziona data", pl: "Wybierz datę", en: "Select date", de: "Datum wählen", fr: "Choisir une date", es: "Elegir fecha" }[L];
+
+  const firstDay = new Date(view.y, view.m, 1);
+  const startOffset = (firstDay.getDay() + 6) % 7; // poniedziałek = 0
+  const daysInMonth = new Date(view.y, view.m + 1, 0).getDate();
+  const today = new Date(); today.setHours(0,0,0,0);
+  const selectedStr = value || "";
+
+  const cells = [];
+  for (let i = 0; i < startOffset; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  const pick = (d) => {
+    const mm = String(view.m + 1).padStart(2, "0");
+    const dd = String(d).padStart(2, "0");
+    onChange(`${view.y}-${mm}-${dd}`);
+    setOpen(false);
+  };
+  const fmt = (s) => { if (!s) return PLACEHOLDER; const [y,m,d] = s.split("-"); return `${d}.${m}.${y}`; };
+  const prevMonth = () => setView((v) => v.m === 0 ? { y: v.y - 1, m: 11 } : { y: v.y, m: v.m - 1 });
+  const nextMonth = () => setView((v) => v.m === 11 ? { y: v.y + 1, m: 0 } : { y: v.y, m: v.m + 1 });
+
+  return (
+    <div className="cdp" ref={wrapRef}>
+      <button type="button" className={`cdp-trigger ${value ? "has-val" : ""}`} onClick={() => setOpen((o) => !o)}>
+        <span>{fmt(value)}</span>
+        <span className="cdp-cal-ico">📅</span>
+      </button>
+      {open && (
+        <div className="cdp-pop">
+          <div className="cdp-head">
+            <button type="button" className="cdp-nav" onClick={prevMonth}>‹</button>
+            <span className="cdp-month">{months[view.m]} {view.y}</span>
+            <button type="button" className="cdp-nav" onClick={nextMonth}>›</button>
+          </div>
+          <div className="cdp-dow">{dow.map((d) => <span key={d}>{d}</span>)}</div>
+          <div className="cdp-grid">
+            {cells.map((d, i) => {
+              if (d === null) return <span key={i} className="cdp-empty" />;
+              const ds = `${view.y}-${String(view.m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+              const cellDate = new Date(view.y, view.m, d);
+              const isPast = cellDate < today;
+              const isSel = ds === selectedStr;
+              const isTue = cellDate.getDay() === 2; // wtorek zamknięte
+              return (
+                <button type="button" key={i} disabled={isPast || isTue}
+                  className={`cdp-day ${isSel ? "sel" : ""} ${isPast ? "past" : ""} ${isTue ? "closed" : ""}`}
+                  onClick={() => pick(d)} title={isTue ? "Martedì · chiuso" : ""}>
+                  {d}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Contatti ─────────────────────────────────────────────────────────────────
 function Contatti({ t }) {
   const [form, setForm] = useStateE({ firstName: "", lastName: "", email: "", phone: "", date: "", time: "", people: 2, message: "" });
@@ -851,7 +939,7 @@ function Contatti({ t }) {
                   </div>
                   <div className="field">
                     <label>{t("contatti.fields.date")}</label>
-                    <input type="date" lang={(typeof window !== "undefined" && window.currentLanguage) || "it"} value={form.date} onChange={upd("date")} className="cnt-date" />
+                    <CustomDatePicker value={form.date} onChange={(v) => setForm((f) => ({ ...f, date: v }))} lang={(typeof window !== "undefined" && window.currentLanguage) || "it"} />
                   </div>
                   <div className="field">
                     <label>{t("contatti.fields.time") || "Ora"}</label>
@@ -920,6 +1008,30 @@ function Contatti({ t }) {
           font-family: var(--f-body); font-size: 15px; padding: 12px 14px; outline: none; transition: border-color .25s, background .25s; color-scheme: dark; }
         .cnt-date:hover, .cnt-date:focus { border-color: var(--c-coral, #E8927C); background: rgba(232,146,124,0.08); }
         .cnt-date::-webkit-calendar-picker-indicator { filter: invert(1) sepia(1) saturate(4) hue-rotate(-20deg); cursor: pointer; opacity: 0.8; }
+        /* Custom date picker */
+        .cdp { position: relative; }
+        .cdp-trigger { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; background: rgba(255,255,255,0.04);
+          border: 1px solid rgba(255,255,255,0.16); border-radius: 12px; color: rgba(255,255,255,0.45); font-family: var(--f-body); font-size: 15px;
+          padding: 12px 14px; cursor: pointer; transition: border-color .25s, background .25s; }
+        .cdp-trigger.has-val { color: #fff; }
+        .cdp-trigger:hover { border-color: var(--c-coral, #E8927C); background: rgba(232,146,124,0.08); }
+        .cdp-cal-ico { font-size: 16px; opacity: 0.8; }
+        .cdp-pop { position: absolute; z-index: 50; top: calc(100% + 8px); left: 0; width: 300px; max-width: 90vw; background: #0c1f2b;
+          border: 1px solid rgba(255,255,255,0.14); border-radius: 16px; padding: 16px; box-shadow: 0 24px 60px rgba(0,0,0,0.5); animation: cdpIn .2s ease; }
+        @keyframes cdpIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+        .cdp-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+        .cdp-month { font-family: var(--f-display); font-weight: 800; font-size: 15px; color: #fff; }
+        .cdp-nav { width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.14); background: none; color: #fff; font-size: 18px; cursor: pointer; transition: all .2s; }
+        .cdp-nav:hover { background: var(--c-coral, #E8927C); border-color: transparent; }
+        .cdp-dow { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; margin-bottom: 6px; }
+        .cdp-dow span { text-align: center; font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; color: rgba(255,255,255,0.4); padding: 4px 0; }
+        .cdp-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+        .cdp-empty { aspect-ratio: 1; }
+        .cdp-day { aspect-ratio: 1; border: none; background: none; color: #fff; font-size: 13px; border-radius: 9px; cursor: pointer; transition: all .15s; display: grid; place-items: center; }
+        .cdp-day:hover:not(:disabled) { background: rgba(232,146,124,0.25); }
+        .cdp-day.sel { background: var(--c-coral, #E8927C); color: #1a1014; font-weight: 800; }
+        .cdp-day.past { opacity: 0.25; cursor: not-allowed; }
+        .cdp-day.closed { opacity: 0.3; cursor: not-allowed; text-decoration: line-through; color: var(--c-coral, #E8927C); }
         .cnt-whatsapp { display: flex; align-items: center; gap: 12px; cursor: pointer; padding: 8px 0; }
         .cnt-whatsapp input { position: absolute; opacity: 0; width: 0; height: 0; }
         .cnt-wa-box { width: 24px; height: 24px; flex-shrink: 0; border-radius: 7px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.04); position: relative; transition: all .2s; }
