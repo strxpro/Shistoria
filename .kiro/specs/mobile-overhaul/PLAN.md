@@ -953,9 +953,9 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS image_url text;
 ---
 
 ## ⏳ DO ZROBIENIA (kolejka)
-- [ ] **PDF import menu** → auto-ekstrakcja pozycji + auto-tłumaczenie na 6 języków (uwaga: miejsce na dysku).
-- [ ] **Auto-tłumaczenie pozycji menu** przy zapisie (L1).
-- [ ] **Featured drink miesiąca/tygodnia** na froncie community (F5 — korona 👑, ramka).
+- [x] **PDF import menu** → auto-ekstrakcja pozycji + auto-tłumaczenie na 6 języków. ✅ *(MenuPanel: „Importa PDF" — pdf.js z CDN bez bundlowania, parsowanie nazwa+cena+kategoria, edytowalna anteprima, zapis z tłumaczeniem)*
+- [x] **Auto-tłumaczenie pozycji menu** przy zapisie (L1). ✅
+- [x] **Featured drink miesiąca/tygodnia** na froncie community (F5). ✅
 - [ ] **Google Business / TripAdvisor sync** (menu/godziny → wizytówka Google) — wymaga Google Business Profile API.
 - [ ] **Auto-pobieranie zdjęć dań z wizytówki Google**.
 - [ ] Sekcja N — pełne tłumaczenia + geolokalizacja (fundament).

@@ -199,6 +199,110 @@ function MenuPanel() {
     }
   };
 
+  // ── Import z PDF (pdf.js ładowany z CDN — bez bundlowania, oszczędza miejsce) ──
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfMsg, setPdfMsg] = useState("");
+  const [pdfPreview, setPdfPreview] = useState<any[] | null>(null);
+
+  const loadPdfJs = (): Promise<any> => new Promise((resolve, reject) => {
+    const w = window as any;
+    if (w.pdfjsLib) return resolve(w.pdfjsLib);
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+    s.onload = () => {
+      const lib = (window as any).pdfjsLib;
+      if (lib) { lib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"; resolve(lib); }
+      else reject(new Error("pdf.js non caricato"));
+    };
+    s.onerror = () => reject(new Error("Impossibile caricare pdf.js (rete)"));
+    document.head.appendChild(s);
+  });
+
+  // Parsuj wiersze tekstu z PDF → pozycje menu (nazwa + cena + ewentualnie opis)
+  const parseMenuLines = (lines: string[]): any[] => {
+    const items: any[] = [];
+    let currentCat = "";
+    const priceRe = /(\d{1,3}[.,]\d{2})\s*€?|€\s*(\d{1,3}[.,]\d{2})/;
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (!line) continue;
+      const m = line.match(priceRe);
+      if (m) {
+        const price = (m[1] || m[2] || "").replace(".", ",");
+        const name = line.replace(priceRe, "").replace(/[.·•\-–—\s]+$/, "").trim();
+        if (name && name.length > 1) items.push({ section: "ristorante", category: currentCat || "Menu", name, price: price ? `${price} €` : "", description: "" });
+      } else if (line.length < 32 && /^[A-ZÀ-Ü0-9][A-Za-zÀ-ü'\s&]+$/.test(line) && !line.includes(",")) {
+        // krótka linia bez ceny, dużymi literami → nagłówek kategorii
+        currentCat = line;
+      } else if (items.length > 0 && line.length > 3) {
+        // dłuższa linia po pozycji → opis ostatniej
+        const last = items[items.length - 1];
+        last.description = (last.description ? last.description + " " : "") + line;
+      }
+    }
+    return items;
+  };
+
+  const handlePdf = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // reset, by ten sam plik dało się wgrać ponownie
+    if (!file) return;
+    setPdfBusy(true); setPdfMsg("Lettura del PDF...");
+    try {
+      const pdfjsLib = await loadPdfJs();
+      const buf = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+      const allLines: string[] = [];
+      for (let p = 1; p <= pdf.numPages; p++) {
+        const page = await pdf.getPage(p);
+        const tc = await page.getTextContent();
+        // grupuj itemy po Y (wiersze)
+        const rows: Record<number, string[]> = {};
+        for (const it of tc.items as any[]) {
+          const y = Math.round(it.transform[5]);
+          (rows[y] = rows[y] || []).push(it.str);
+        }
+        Object.keys(rows).map(Number).sort((a, b) => b - a).forEach((y) => allLines.push(rows[y].join(" ")));
+      }
+      const parsed = parseMenuLines(allLines);
+      if (parsed.length === 0) { setPdfMsg("Nessuna voce riconosciuta. Prova un PDF con prezzi (es. 12,00 €)."); setPdfBusy(false); return; }
+      setPdfPreview(parsed);
+      setPdfMsg(`Trovate ${parsed.length} voci. Controlla e conferma.`);
+    } catch (err: any) {
+      setPdfMsg("Errore: " + (err?.message || "PDF non leggibile"));
+    }
+    setPdfBusy(false);
+  };
+
+  // Zatwierdź import z PDF → tłumaczenie + zapis do DB
+  const confirmPdfImport = async () => {
+    if (!pdfPreview) return;
+    setPdfBusy(true); setPdfMsg("Traduzione e salvataggio...");
+    try {
+      let i = 0;
+      for (const it of pdfPreview) {
+        setPdfMsg(`Salvataggio ${++i}/${pdfPreview.length}...`);
+        const payload: any = { ...it, sort_order: 5000 + i };
+        try {
+          const [nameTr, descTr] = await Promise.all([
+            it.name ? translateToAll(it.name) : Promise.resolve(null),
+            it.description ? translateToAll(it.description) : Promise.resolve(null),
+          ]);
+          if (nameTr) payload.name_i18n = nameTr;
+          if (descTr) payload.desc_i18n = descTr;
+        } catch { /* tłumaczenie opcjonalne */ }
+        await supabase.from("menu_items").insert(payload);
+      }
+      setPdfMsg(`✓ Importate ${pdfPreview.length} voci.`);
+      setPdfPreview(null);
+      load();
+      setTimeout(() => setPdfMsg(""), 3000);
+    } catch (err: any) {
+      setPdfMsg("Errore salvataggio: " + (err?.message || ""));
+    }
+    setPdfBusy(false);
+  };
+
   // Upload zdjęcia pozycji menu → Supabase Storage (bucket "assets")
   const [uploading, setUploading] = useState(false);
   const handleImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -230,12 +334,42 @@ function MenuPanel() {
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           <button className={`admin-btn-sm ${sortByLikes ? "admin-btn-gold" : ""}`} onClick={() => setSortByLikes((v) => !v)}>❤️ Più popolari</button>
+          <label className="admin-btn-ghost" style={{ cursor: "pointer", display: "inline-flex", alignItems: "center" }}>
+            📄 Importa PDF
+            <input type="file" accept="application/pdf" hidden onChange={handlePdf} disabled={pdfBusy} />
+          </label>
           <button className="admin-btn-ghost" onClick={() => importMenu(false)}>🔄 Reimporta dal sito</button>
           <button className="admin-btn" onClick={() => setEditItem({ section: "ristorante", category: "", name: "", price: "", description: "" })}>
             + Aggiungi piatto
           </button>
         </div>
       </header>
+
+      {pdfMsg && !pdfPreview && <p style={{ textAlign: "center", fontWeight: 600, opacity: 0.85 }}>{pdfMsg}</p>}
+
+      {/* Anteprima import PDF */}
+      {pdfPreview && (
+        <div className="admin-modal-overlay" onClick={() => !pdfBusy && setPdfPreview(null)}>
+          <div className="admin-modal admin-modal-wide" onClick={(e) => e.stopPropagation()}>
+            <h3>Anteprima import PDF</h3>
+            <p style={{ opacity: 0.7, fontSize: 13, marginTop: -12 }}>{pdfMsg}</p>
+            <div className="pdf-preview-list">
+              {pdfPreview.map((it, i) => (
+                <div key={i} className="pdf-preview-row">
+                  <input value={it.category} onChange={(e) => setPdfPreview((p) => p!.map((x, xi) => xi === i ? { ...x, category: e.target.value } : x))} placeholder="Categoria" className="pdf-prev-cat" />
+                  <input value={it.name} onChange={(e) => setPdfPreview((p) => p!.map((x, xi) => xi === i ? { ...x, name: e.target.value } : x))} placeholder="Nome" className="pdf-prev-name" />
+                  <input value={it.price} onChange={(e) => setPdfPreview((p) => p!.map((x, xi) => xi === i ? { ...x, price: e.target.value } : x))} placeholder="Prezzo" className="pdf-prev-price" />
+                  <button className="admin-btn-sm admin-btn-danger" onClick={() => setPdfPreview((p) => p!.filter((_, xi) => xi !== i))}>✕</button>
+                </div>
+              ))}
+            </div>
+            <div className="admin-modal-actions">
+              <button className="admin-btn" onClick={confirmPdfImport} disabled={pdfBusy}>{pdfBusy ? pdfMsg : `✓ Importa ${pdfPreview.length} voci (con traduzione)`}</button>
+              <button className="admin-btn-ghost" onClick={() => setPdfPreview(null)} disabled={pdfBusy}>Annulla</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {editItem && (
         <div className="admin-modal-overlay" onClick={() => setEditItem(null)}>
@@ -1363,6 +1497,11 @@ function AdminStyles() {
       .menu-sel { padding:11px 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.05); color:#fff; font-size:14px; }
       .menu-sel option { background:#12171e; }
       .menu-likes-badge { display:inline-block; padding:2px 8px; border-radius:999px; background:rgba(232,146,124,0.15); color:#E8927C; font-size:12px; font-weight:700; white-space:nowrap; }
+      .pdf-preview-list { display:flex; flex-direction:column; gap:8px; max-height:50vh; overflow-y:auto; margin:8px 0; }
+      .pdf-preview-row { display:flex; gap:8px; align-items:center; }
+      .pdf-prev-cat { width:110px; flex-shrink:0; padding:8px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04); color:#fff; font-size:12px; }
+      .pdf-prev-name { flex:1; min-width:0; padding:8px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04); color:#fff; font-size:13px; }
+      .pdf-prev-price { width:80px; flex-shrink:0; padding:8px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04); color:#fff; font-size:12px; }
       /* ── Ordini QR filtr + kod ── */
       .ord-filter { display:flex; gap:4px; background:rgba(255,255,255,0.04); border-radius:999px; padding:3px; }
       .ord-filter button { padding:7px 14px; border-radius:999px; border:none; background:none; color:rgba(255,255,255,0.6); font-size:12px; cursor:pointer; transition:all .2s; }
