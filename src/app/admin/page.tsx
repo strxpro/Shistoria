@@ -860,6 +860,7 @@ function HoursPanel() {
   const [rows, setRows] = useState<{ day: string; time: string; closed: boolean }[]>([]);
   const [slots, setSlots] = useState<string[]>([]);
   const [slotsText, setSlotsText] = useState("");
+  const [closedDates, setClosedDates] = useState<string[]>([]); // YYYY-MM-DD chiusure straordinarie
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
 
@@ -869,15 +870,25 @@ function HoursPanel() {
     setRows(data?.hours || [{ day: "Lun — Dom", time: "12:00 — 14:30 · 19:00 — 23:00", closed: false }, { day: "Martedì", time: "chiuso", closed: true }]);
     const sl = data?.time_slots || ["12:00","12:30","13:00","13:30","14:00","14:30","19:00","19:30","20:00","20:30","21:00","21:30","22:00","22:30","23:00"];
     setSlots(sl); setSlotsText(sl.join(", "));
+    setClosedDates(data?.closed_dates || []);
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
 
   const save = async () => {
     const time_slots = slotsText.split(",").map((s) => s.trim()).filter(Boolean);
-    await supabase.from("opening_hours").upsert({ id: 1, hours: rows, time_slots, updated_at: new Date().toISOString() });
+    await supabase.from("opening_hours").upsert({ id: 1, hours: rows, time_slots, closed_dates: closedDates, updated_at: new Date().toISOString() });
     setSlots(time_slots);
     setSaved(true); setTimeout(() => setSaved(false), 2500);
+  };
+
+  // Chiusura straordinaria — zamknij dany dzień jednym klikiem (zapis natychmiast → realtime na stronie)
+  const fmtDate = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const toggleClosedDate = async (dateStr: string) => {
+    const next = closedDates.includes(dateStr) ? closedDates.filter((d) => d !== dateStr) : [...closedDates, dateStr].sort();
+    setClosedDates(next);
+    const time_slots = slotsText.split(",").map((s) => s.trim()).filter(Boolean);
+    await supabase.from("opening_hours").upsert({ id: 1, hours: rows, time_slots, closed_dates: next, updated_at: new Date().toISOString() });
   };
 
   const updRow = (i: number, k: string, v: any) => setRows((r) => r.map((row, idx) => idx === i ? { ...row, [k]: v } : row));
@@ -909,6 +920,40 @@ function HoursPanel() {
       <div style={{ marginTop: 28 }}>
         <label style={{ display: "block", fontSize: 13, opacity: 0.6, marginBottom: 8 }}>Orari prenotabili (separati da virgola — usati nel form di prenotazione)</label>
         <textarea className="hours-slots" rows={2} value={slotsText} onChange={(e) => setSlotsText(e.target.value)} placeholder="12:00, 12:30, 19:00, ..." />
+      </div>
+
+      {/* Chiusura straordinaria — zamknij konkretny dzień jednym klikiem */}
+      <div style={{ marginTop: 32 }}>
+        <h2 style={{ fontSize: 18, margin: "0 0 6px" }}>Chiusura straordinaria</h2>
+        <p style={{ opacity: 0.6, fontSize: 13, margin: "0 0 14px" }}>Chiudi un giorno specifico con un clic. Appare subito sul sito (in tempo reale).</p>
+        <div className="hours-quick">
+          {(() => {
+            const today = new Date();
+            const tomorrow = new Date(); tomorrow.setDate(today.getDate() + 1);
+            const tToday = fmtDate(today), tTom = fmtDate(tomorrow);
+            return (
+              <>
+                <button className={`hours-quick-btn ${closedDates.includes(tToday) ? "is-closed" : ""}`} onClick={() => toggleClosedDate(tToday)}>
+                  {closedDates.includes(tToday) ? "✓ Oggi chiuso" : "Chiudi oggi"}
+                </button>
+                <button className={`hours-quick-btn ${closedDates.includes(tTom) ? "is-closed" : ""}`} onClick={() => toggleClosedDate(tTom)}>
+                  {closedDates.includes(tTom) ? "✓ Domani chiuso" : "Chiudi domani"}
+                </button>
+                <input type="date" className="hours-date-input" onChange={(e) => { if (e.target.value) toggleClosedDate(e.target.value); }} />
+              </>
+            );
+          })()}
+        </div>
+        {closedDates.length > 0 && (
+          <div className="hours-closed-list">
+            {closedDates.map((d) => (
+              <span key={d} className="hours-closed-chip">
+                {new Date(d + "T00:00:00").toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" })}
+                <button onClick={() => toggleClosedDate(d)}>✕</button>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -1188,6 +1233,14 @@ function AdminStyles() {
       .hours-day, .hours-time { flex:1; min-width:140px; padding:11px 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.05); color:#fff; font-size:14px; }
       .hours-closed { display:flex; align-items:center; gap:6px; font-size:13px; color:rgba(255,255,255,0.7); white-space:nowrap; }
       .hours-slots { width:100%; box-sizing:border-box; padding:12px 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.05); color:#fff; font-size:14px; font-family:inherit; }
+      .hours-quick { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+      .hours-quick-btn { padding:11px 18px; border-radius:12px; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.05); color:#fff; font-size:14px; font-weight:600; cursor:pointer; transition:all .2s; }
+      .hours-quick-btn:hover { background:rgba(255,255,255,0.1); }
+      .hours-quick-btn.is-closed { background:rgba(231,76,60,0.2); border-color:rgba(231,76,60,0.5); color:#ff9d92; }
+      .hours-date-input { padding:10px 14px; border-radius:12px; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.05); color:#fff; font-size:14px; color-scheme:dark; }
+      .hours-closed-list { display:flex; gap:8px; flex-wrap:wrap; margin-top:14px; }
+      .hours-closed-chip { display:inline-flex; align-items:center; gap:8px; padding:6px 8px 6px 14px; border-radius:999px; background:rgba(231,76,60,0.15); border:1px solid rgba(231,76,60,0.35); color:#ff9d92; font-size:13px; font-weight:600; }
+      .hours-closed-chip button { width:22px; height:22px; border-radius:50%; border:none; background:rgba(0,0,0,0.3); color:#fff; cursor:pointer; font-size:12px; }
       .stats-range { display:flex; gap:6px; flex-wrap:wrap; }
       .stats-range button { padding:8px 14px; border-radius:999px; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.04); color:rgba(255,255,255,0.7); font-size:12px; cursor:pointer; transition:all .2s; }
       .stats-range button:hover { background:rgba(232,146,124,0.15); color:#fff; }

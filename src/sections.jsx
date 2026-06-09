@@ -753,7 +753,7 @@ function CustomTimePicker({ value, onChange, slots, lang }) {
 }
 
 // ─── Custom Date Picker (stylizowany pod stronę, wielojęzyczny) ───────────────
-function CustomDatePicker({ value, onChange, lang }) {
+function CustomDatePicker({ value, onChange, lang, closedDates = [] }) {
   const [open, setOpen] = useStateE(false);
   const [view, setView] = useStateE(() => { const d = value ? new Date(value) : new Date(); return { y: d.getFullYear(), m: d.getMonth() }; });
   const wrapRef = useRefE(null);
@@ -825,10 +825,12 @@ function CustomDatePicker({ value, onChange, lang }) {
               const isPast = cellDate < today;
               const isSel = ds === selectedStr;
               const isTue = cellDate.getDay() === 2; // wtorek zamknięte
+              const isClosedDate = closedDates.includes(ds); // chiusura straordinaria
+              const blocked = isPast || isTue || isClosedDate;
               return (
-                <button type="button" key={i} disabled={isPast || isTue}
-                  className={`cdp-day ${isSel ? "sel" : ""} ${isPast ? "past" : ""} ${isTue ? "closed" : ""}`}
-                  onClick={() => pick(d)} title={isTue ? "Martedì · chiuso" : ""}>
+                <button type="button" key={i} disabled={blocked}
+                  className={`cdp-day ${isSel ? "sel" : ""} ${isPast ? "past" : ""} ${(isTue || isClosedDate) ? "closed" : ""}`}
+                  onClick={() => pick(d)} title={isClosedDate ? "Chiuso (chiusura straordinaria)" : isTue ? "Martedì · chiuso" : ""}>
                   {d}
                 </button>
               );
@@ -856,6 +858,7 @@ function Contatti({ t }) {
     { day: "Martedì", time: "chiuso", closed: true },
   ]);
   const [slots, setSlots] = useStateE(TIME_SLOTS);
+  const [closedDates, setClosedDates] = useStateE([]); // chiusure straordinarie z admina
   useEffectE(() => {
     let ch;
     (async () => {
@@ -864,7 +867,7 @@ function Contatti({ t }) {
         const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://slatelpipxtqveydgslc.supabase.co';
         const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNsYXRlbHBpcHh0cXZleWRnc2xjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODcyNTQsImV4cCI6MjA5NjE2MzI1NH0.5dwE9IStThjC-krTtgg7PtEwmTnr_bQ_TEbQhgMpHdY';
         const sb = createClient(url, key);
-        const apply = (d) => { if (d?.hours?.length) setHours(d.hours); if (d?.time_slots?.length) setSlots(d.time_slots); };
+        const apply = (d) => { if (d?.hours?.length) setHours(d.hours); if (d?.time_slots?.length) setSlots(d.time_slots); setClosedDates(d?.closed_dates || []); };
         const { data } = await sb.from("opening_hours").select("*").eq("id", 1).single();
         apply(data);
         ch = sb.channel("opening_hours_rt").on("postgres_changes", { event: "*", schema: "public", table: "opening_hours" }, (p) => apply(p.new)).subscribe();
@@ -1006,7 +1009,7 @@ function Contatti({ t }) {
                   </div>
                   <div className="field">
                     <label>{t("contatti.fields.date")}</label>
-                    <CustomDatePicker value={form.date} onChange={(v) => setForm((f) => ({ ...f, date: v }))} lang={(typeof window !== "undefined" && window.currentLanguage) || "it"} />
+                    <CustomDatePicker value={form.date} onChange={(v) => setForm((f) => ({ ...f, date: v }))} lang={(typeof window !== "undefined" && window.currentLanguage) || "it"} closedDates={closedDates} />
                   </div>
                   <div className="field">
                     <label>{t("contatti.fields.time") || "Ora"}</label>

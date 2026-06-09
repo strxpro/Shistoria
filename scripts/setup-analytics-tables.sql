@@ -38,9 +38,12 @@ CREATE TABLE IF NOT EXISTS opening_hours (
   id integer PRIMARY KEY DEFAULT 1,
   hours jsonb NOT NULL DEFAULT '[]'::jsonb, -- [{day:"Lun-Dom", time:"12:00–14:30 · 19:00–23:00", closed:false}, ...]
   time_slots jsonb DEFAULT '[]'::jsonb,     -- ["12:00","12:30",...] dla formularza
+  closed_dates jsonb DEFAULT '[]'::jsonb,   -- ["2026-06-10",...] chiusure straordinarie (zamknięcia jednorazowe)
   updated_at timestamptz DEFAULT now(),
   CONSTRAINT single_row CHECK (id = 1)
 );
+-- Jeśli tabela już istnieje, dodaj kolumnę
+ALTER TABLE opening_hours ADD COLUMN IF NOT EXISTS closed_dates jsonb DEFAULT '[]'::jsonb;
 -- Domyślne godziny
 INSERT INTO opening_hours (id, hours, time_slots)
 VALUES (1,
