@@ -936,7 +936,7 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS image_url text;
 - Hamburger przesuwa się w prawo gdy widać pasek kategorii menu (`data-cx-menucat`), **bez blokady scrolla**.
 
 ### 📊 Admin → Statystyki (StatsPanel)
-- **Globus SVG** (lekki, bez maplibre) — obrót + pinezki krajów + intensywność.
+- **Globus 3D (WebGL/three.js)** — prawdziwa tekstura mapy Ziemi, obraca się automatycznie + można chwycić i obracać (OrbitControls), pinezki krajów jako świecące słupki wg liczby wizyt. Ładowany dynamicznie (ssr:false).
 
 ---
 

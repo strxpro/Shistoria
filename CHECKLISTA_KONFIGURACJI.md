@@ -93,6 +93,10 @@ Dodaj każdą zmienną (Production + Preview), potem **Redeploy**.
 
 </div>
 
+> [!TIP]
+> ### 👉 PEŁNA INSTRUKCJA KROK PO KROKU: otwórz **`EMAILE_KROK_PO_KROKU.md`**
+> Tam masz każdy klik rozpisany (sekcja A = maile rezerwacji, sekcja B = WhatsApp, C = IMAP, D = drink del mese, E = eventy). Ze spisem treści „od której sekcji zacząć".
+
 > [!NOTE]
 > ### ✅ CO JUŻ DZIAŁA W KODZIE (nic nie musisz pisać):
 > Strona wysyła do make.com **gotowe** pola — Ty tylko je mapujesz:
@@ -275,6 +279,44 @@ Email → Watch emails (połączenie IMAP OVH powyżej, folder INBOX)
 <div align="center">
 
 **📌 Pliki z pełnymi instrukcjami:**
-`KONFIGURACJA_AUTOMATYZACJE.md` · `MAKE_SETUP.md` · `SOCIAL_AUTOPOST.md` · `PLAN.md`
+`EMAILE_KROK_PO_KROKU.md` · `KONFIGURACJA_AUTOMATYZACJE.md` · `MAKE_SETUP.md` · `SOCIAL_AUTOPOST.md` · `PLAN.md`
 
 </div>
+
+---
+
+<div align="center">
+
+# 🗂️ DO ZROBIENIA — OD KTÓREJ LINIJKI CZYTAĆ
+
+**Mapa: co chcesz zrobić → który plik i która sekcja.**
+
+</div>
+
+> [!IMPORTANT]
+> ### Kolejność zalecana (od góry):
+>
+> **1. 🔴 BAZA DANYCH** → ten plik, **KROK 1** (na górze). Skopiuj blok SQL do Supabase.
+>
+> **2. 🔴 VERCEL (klucze)** → ten plik, **KROK 2**. Dodaj zmienne, zrób Redeploy.
+>
+> **3. 🔴 MAILE Z REZERWACJI** → plik **`EMAILE_KROK_PO_KROKU.md`**, **SEKCJA A** (od „SEKCJA A — MAILE Z FORMULARZA REZERWACJI").
+>
+> **4. 🔴 WHATSAPP** → plik **`EMAILE_KROK_PO_KROKU.md`**, **SEKCJA B** (od „SEKCJA B — WHATSAPP PRZY REZERWACJI").
+>
+> **5. 🟡 IMAP (odpowiedzi klientów)** → plik **`EMAILE_KROK_PO_KROKU.md`**, **SEKCJA C**.
+>
+> **6. 🟡 DRINK DEL MESE** → plik **`EMAILE_KROK_PO_KROKU.md`**, **SEKCJA D**.
+>
+> **7. 🟡 PRZYPOMNIENIA O EVENTACH** → plik **`EMAILE_KROK_PO_KROKU.md`**, **SEKCJA E**.
+>
+> **8. 🟡 INSTAGRAM / FACEBOOK** → plik **`SOCIAL_AUTOPOST.md`** (cały, od góry).
+
+### Czego NIE musisz robić (gotowe w kodzie):
+Wszystko z sekcji „✅ CO JUŻ JEST GOTOWE W KODZIE" wyżej — menu, polubienia, import PDF, drinki, eventi, orari, recensioni, statystyki (z **globusem 3D**), auto-język, formularz. To działa po wykonaniu kroków 1-2.
+
+### Pozostaje na przyszłość (wymaga zewnętrznych API, można pominąć teraz):
+- Google Business / TripAdvisor sync (Google Business Profile API)
+- Auto-pobieranie zdjęć dań z Google
+- Upload zdjęć do recenzji
+
