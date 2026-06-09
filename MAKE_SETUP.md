@@ -97,97 +97,40 @@ W make.com pola dostępne jako: `{{1.name}}`, `{{1.email}}`, `{{1.phone}}`, `{{1
 
 ---
 
-## ✉️ KROK 4 — E-maile (GOTOWE do skopiuj-wklej)
+## ✉️ KROK 4 — E-maile (SUPER PROSTE — gotowy HTML z aplikacji)
 
-Po webhooku dodaj **Router** (Flow Control → Router), z 2 gałęziami:
+> 🎉 **NIE musisz wpisywać żadnego HTML!** Aplikacja **pre-renderuje** całe ładne, stylizowane e-maile (marka S'Historia: granat + coral) i wysyła je w webhooku jako gotowe pola. W make.com mapujesz tylko **2 pola na e-mail**: temat + treść.
 
-### GAŁĄŹ A — e-mail do WŁAŚCICIELA (zawsze po włosku)
+Webhook wysyła te gotowe pola:
+| Pole | Co zawiera |
+|---|---|
+| `email_subject_client` | temat maila do klienta (w jego języku) |
+| `email_html_client` | **pełny HTML** maila do klienta (gotowy) |
+| `email_subject_owner` | temat maila do właściciela (po włosku) |
+| `email_html_owner` | **pełny HTML** maila do właściciela (po włosku) |
+| `whatsapp_text_owner` | gotowa treść WhatsApp do właściciela (po włosku) |
 
-Moduł **Email → Send an email**:
+### MODUŁ E-mail do KLIENTA
+Dodaj **Email → Send an email**:
+- **To:** `{{1.email}}`
+- **Subject:** `{{1.email_subject_client}}`
+- **Content Type:** HTML
+- **Content:** `{{1.email_html_client}}`  ← wklej tylko to jedno pole
+
+### MODUŁ E-mail do WŁAŚCICIELA (zawsze po włosku)
+Dodaj kolejny **Email → Send an email**:
 - **To:** `info@shistoria.it` (Twój adres)
-- **Subject (wklej):**
-```
-🍽️ Nuova prenotazione — {{1.name}} ({{1.people}} pers.)
-```
-- **Content (HTML, wklej):**
-```html
-<h2>Nuova prenotazione da S'Historia</h2>
-<p><strong>Nome:</strong> {{1.name}}</p>
-<p><strong>Email:</strong> {{1.email}}</p>
-<p><strong>Telefono:</strong> {{1.phone}}</p>
-<p><strong>Data richiesta:</strong> {{1.date}}</p>
-<p><strong>Persone:</strong> {{1.people}}</p>
-<p><strong>Messaggio:</strong> {{1.message}}</p>
-<hr>
-<p><em>Lingua del cliente: {{1.lang}}</em></p>
-<p>Rispondi al cliente in: {{1.lang}}</p>
-```
+- **Subject:** `{{1.email_subject_owner}}`
+- **Content Type:** HTML
+- **Content:** `{{1.email_html_owner}}`
 
-### GAŁĄŹ B — e-mail do KLIENTA (w jego języku)
-
-Dodaj **Router** wewnątrz tej gałęzi z filtrem po `{{1.lang}}` (jedna ścieżka na język). Albo jeden moduł e-mail i ręcznie dobierz treść. Gotowe treści poniżej:
-
-**To:** `{{1.email}}`
-
-#### 🇮🇹 lang = it
-- Subject: `Grazie per la tua richiesta — S'Historia`
-```html
-<h2>Ciao {{1.name}},</h2>
-<p>Grazie per averci contattato! Abbiamo ricevuto la tua richiesta di prenotazione per <strong>{{1.people}} persone</strong> il <strong>{{1.date}}</strong>.</p>
-<p>Ti confermeremo al più presto. Per modifiche chiamaci: <a href="tel:+390000000000">+39 000 000 000</a></p>
-<p>A presto,<br>Il team di S'Historia 🍸</p>
-```
-
-#### 🇵🇱 lang = pl
-- Subject: `Dziękujemy za wiadomość — S'Historia`
-```html
-<h2>Cześć {{1.name}},</h2>
-<p>Dziękujemy za kontakt! Otrzymaliśmy Twoją rezerwację na <strong>{{1.people}} osób</strong> w dniu <strong>{{1.date}}</strong>.</p>
-<p>Wkrótce potwierdzimy. W razie zmian zadzwoń: <a href="tel:+390000000000">+39 000 000 000</a></p>
-<p>Do zobaczenia,<br>Zespół S'Historia 🍸</p>
-```
-
-#### 🇬🇧 lang = en
-- Subject: `Thanks for your request — S'Historia`
-```html
-<h2>Hi {{1.name}},</h2>
-<p>Thanks for reaching out! We received your booking request for <strong>{{1.people}} people</strong> on <strong>{{1.date}}</strong>.</p>
-<p>We'll confirm shortly. To make changes call us: <a href="tel:+390000000000">+39 000 000 000</a></p>
-<p>See you soon,<br>The S'Historia team 🍸</p>
-```
-
-#### 🇩🇪 lang = de
-- Subject: `Danke für deine Anfrage — S'Historia`
-```html
-<h2>Hallo {{1.name}},</h2>
-<p>Danke für deine Nachricht! Wir haben deine Reservierung für <strong>{{1.people}} Personen</strong> am <strong>{{1.date}}</strong> erhalten.</p>
-<p>Wir bestätigen in Kürze. Für Änderungen ruf uns an: <a href="tel:+390000000000">+39 000 000 000</a></p>
-<p>Bis bald,<br>Dein S'Historia Team 🍸</p>
-```
-
-#### 🇫🇷 lang = fr
-- Subject: `Merci pour votre demande — S'Historia`
-```html
-<h2>Bonjour {{1.name}},</h2>
-<p>Merci de nous avoir contactés ! Nous avons reçu votre réservation pour <strong>{{1.people}} personnes</strong> le <strong>{{1.date}}</strong>.</p>
-<p>Nous confirmerons bientôt. Pour modifier, appelez-nous : <a href="tel:+390000000000">+39 000 000 000</a></p>
-<p>À bientôt,<br>L'équipe S'Historia 🍸</p>
-```
-
-#### 🇪🇸 lang = es
-- Subject: `Gracias por tu solicitud — S'Historia`
-```html
-<h2>Hola {{1.name}},</h2>
-<p>¡Gracias por contactarnos! Recibimos tu reserva para <strong>{{1.people}} personas</strong> el <strong>{{1.date}}</strong>.</p>
-<p>Te confirmaremos pronto. Para cambios llámanos: <a href="tel:+390000000000">+39 000 000 000</a></p>
-<p>Hasta pronto,<br>El equipo de S'Historia 🍸</p>
-```
-
-> 🔧 Zamień `+390000000000` i `info@shistoria.it` na swoje prawdziwe dane.
+> To wszystko. Maile są już ładne, kolorowe, z logo i danymi rezerwacji. Klient dostaje od razu potwierdzenie "skontaktujemy się najszybciej jak to możliwe" w swoim języku, Ty dostajesz powiadomienie po włosku.
 
 ---
 
-## 📱 KROK 5 — WhatsApp do właściciela (callmebot, darmowe)
+## 📱 KROK 5 — WhatsApp do właściciela (callmebot, darmowe) — ZAWSZE po włosku
+
+> Powiadomienie WhatsApp przychodzi **zawsze** do właściciela, po włosku. Aplikacja wysyła gotową treść w polu `whatsapp_text_owner`.
 
 1. Zapisz kontakt **+34 644 51 95 23** w telefonie.
 2. Wyślij mu WhatsApp: `I allow callmebot to send me messages`.
@@ -195,9 +138,10 @@ Dodaj **Router** wewnątrz tej gałęzi z filtrem po `{{1.lang}}` (jedna ścież
 4. W make.com dodaj moduł **HTTP → Make a request**:
    - **URL (wklej, podmień TWOJ_NUMER i TWOJ_APIKEY):**
 ```
-https://api.callmebot.com/whatsapp.php?phone=TWOJ_NUMER&text=Nuova%20prenotazione:%20{{1.name}}%20-%20{{1.people}}%20pers%20-%20{{1.date}}%20-%20{{1.phone}}%20({{1.lang}})&apikey=TWOJ_APIKEY
+https://api.callmebot.com/whatsapp.php?phone=TWOJ_NUMER&text={{1.whatsapp_text_owner}}&apikey=TWOJ_APIKEY
 ```
    - **Method:** GET
+   - make.com sam zakoduje treść (spacje, nowe linie).
 
 ---
 
