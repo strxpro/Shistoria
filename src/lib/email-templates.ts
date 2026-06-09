@@ -146,3 +146,115 @@ export function ownerWhatsAppText(v: ReservationVars): string {
       : "",
   ].filter(Boolean).join("\n");
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+ * DRINK DEL MESE / SETTIMANA — e-maile w języku odbiorcy
+ * - winner: gratulacje + darmowy drink
+ * - others: ogłoszenie zwycięzcy + zaproszenie żeby sprawdzić
+ * ════════════════════════════════════════════════════════════════════════ */
+export interface WinnerVars {
+  winnerDrink: string;
+  winnerAuthor: string;
+  recipientName?: string;
+  period: "month" | "week";
+  lang: Lang;
+  link?: string;
+}
+
+const WINNER_T: Record<Lang, {
+  // dla zwycięzcy
+  winSubjMonth: string; winSubjWeek: string; winHi: string; winCongrats: (d: string) => string; winGift: string; winCta: string;
+  // dla pozostałych
+  othSubjMonth: string; othSubjWeek: string; othHi: string; othBody: (d: string, a: string) => string; othCta: string;
+  periodMonth: string; periodWeek: string;
+}> = {
+  it: {
+    winSubjMonth: "🏆 Hai vinto il Drink del Mese!", winSubjWeek: "🏆 Hai vinto il Drink della Settimana!",
+    winHi: "Complimenti", winCongrats: (d) => `Il tuo drink <strong>${d}</strong> ha vinto! La community lo ha amato.`,
+    winGift: "Vieni a trovarci e ritira un <strong>drink GRATUITO</strong> a tua scelta, offerto dalla casa. 🍸",
+    winCta: "Vedi il tuo drink",
+    othSubjMonth: "🍸 Il Drink del Mese è stato scelto!", othSubjWeek: "🍸 Il Drink della Settimana è stato scelto!",
+    othHi: "Ciao", othBody: (d, a) => `Il vincitore è <strong>${d}</strong> di ${a}. Vienilo a provare da S'Historia!`,
+    othCta: "Scopri il drink", periodMonth: "del Mese", periodWeek: "della Settimana",
+  },
+  pl: {
+    winSubjMonth: "🏆 Wygrałeś Drink Miesiąca!", winSubjWeek: "🏆 Wygrałeś Drink Tygodnia!",
+    winHi: "Gratulacje", winCongrats: (d) => `Twój drink <strong>${d}</strong> wygrał! Społeczność go pokochała.`,
+    winGift: "Wpadnij do nas i odbierz <strong>DARMOWY drink</strong> do wyboru, na koszt lokalu. 🍸",
+    winCta: "Zobacz swój drink",
+    othSubjMonth: "🍸 Wybrano Drink Miesiąca!", othSubjWeek: "🍸 Wybrano Drink Tygodnia!",
+    othHi: "Cześć", othBody: (d, a) => `Zwycięzcą jest <strong>${d}</strong> autorstwa ${a}. Przyjdź spróbować w S'Historia!`,
+    othCta: "Zobacz drink", periodMonth: "Miesiąca", periodWeek: "Tygodnia",
+  },
+  en: {
+    winSubjMonth: "🏆 You won Drink of the Month!", winSubjWeek: "🏆 You won Drink of the Week!",
+    winHi: "Congratulations", winCongrats: (d) => `Your drink <strong>${d}</strong> won! The community loved it.`,
+    winGift: "Come visit us and claim a <strong>FREE drink</strong> of your choice, on the house. 🍸",
+    winCta: "See your drink",
+    othSubjMonth: "🍸 Drink of the Month has been chosen!", othSubjWeek: "🍸 Drink of the Week has been chosen!",
+    othHi: "Hi", othBody: (d, a) => `The winner is <strong>${d}</strong> by ${a}. Come try it at S'Historia!`,
+    othCta: "Discover the drink", periodMonth: "of the Month", periodWeek: "of the Week",
+  },
+  de: {
+    winSubjMonth: "🏆 Du hast den Drink des Monats gewonnen!", winSubjWeek: "🏆 Du hast den Drink der Woche gewonnen!",
+    winHi: "Herzlichen Glückwunsch", winCongrats: (d) => `Dein Drink <strong>${d}</strong> hat gewonnen! Die Community liebt ihn.`,
+    winGift: "Besuch uns und hol dir einen <strong>GRATIS-Drink</strong> deiner Wahl, aufs Haus. 🍸",
+    winCta: "Deinen Drink ansehen",
+    othSubjMonth: "🍸 Der Drink des Monats steht fest!", othSubjWeek: "🍸 Der Drink der Woche steht fest!",
+    othHi: "Hallo", othBody: (d, a) => `Der Gewinner ist <strong>${d}</strong> von ${a}. Probier ihn bei S'Historia!`,
+    othCta: "Drink entdecken", periodMonth: "des Monats", periodWeek: "der Woche",
+  },
+  fr: {
+    winSubjMonth: "🏆 Tu as gagné le Cocktail du Mois !", winSubjWeek: "🏆 Tu as gagné le Cocktail de la Semaine !",
+    winHi: "Félicitations", winCongrats: (d) => `Ton cocktail <strong>${d}</strong> a gagné ! La communauté l'a adoré.`,
+    winGift: "Viens nous voir et récupère un <strong>cocktail GRATUIT</strong> de ton choix, offert par la maison. 🍸",
+    winCta: "Voir ton cocktail",
+    othSubjMonth: "🍸 Le Cocktail du Mois est choisi !", othSubjWeek: "🍸 Le Cocktail de la Semaine est choisi !",
+    othHi: "Bonjour", othBody: (d, a) => `Le gagnant est <strong>${d}</strong> de ${a}. Viens le goûter chez S'Historia !`,
+    othCta: "Découvrir le cocktail", periodMonth: "du Mois", periodWeek: "de la Semaine",
+  },
+  es: {
+    winSubjMonth: "🏆 ¡Ganaste el Drink del Mes!", winSubjWeek: "🏆 ¡Ganaste el Drink de la Semana!",
+    winHi: "Felicidades", winCongrats: (d) => `¡Tu drink <strong>${d}</strong> ganó! A la comunidad le encantó.`,
+    winGift: "Ven a vernos y recoge un <strong>drink GRATIS</strong> a tu elección, cortesía de la casa. 🍸",
+    winCta: "Ver tu drink",
+    othSubjMonth: "🍸 ¡Se eligió el Drink del Mes!", othSubjWeek: "🍸 ¡Se eligió el Drink de la Semana!",
+    othHi: "Hola", othBody: (d, a) => `El ganador es <strong>${d}</strong> de ${a}. ¡Ven a probarlo en S'Historia!`,
+    othCta: "Descubre el drink", periodMonth: "del Mes", periodWeek: "de la Semana",
+  },
+};
+
+function ctaButton(label: string, link: string): string {
+  return `<div style="text-align:center;margin:26px 0 8px;">
+    <a href="${link}" style="display:inline-block;background:${BRAND.coral};color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:14px 28px;border-radius:999px;">${label} →</a>
+  </div>`;
+}
+
+/** E-mail do ZWYCIĘZCY drinka — w jego języku. */
+export function winnerEmailHTML(v: WinnerVars): { subject: string; html: string } {
+  const tr = WINNER_T[v.lang] ?? WINNER_T.it;
+  const link = v.link || `${BRAND.site}/#ready-drinks`;
+  const subject = v.period === "week" ? tr.winSubjWeek : tr.winSubjMonth;
+  const inner = `
+    <div style="text-align:center;font-size:46px;margin-bottom:6px;">👑</div>
+    <h1 style="margin:0 0 6px;font-size:24px;color:${BRAND.cream};text-align:center;">${tr.winHi}${v.recipientName ? `, ${v.recipientName}` : ""}!</h1>
+    <p style="margin:14px 0;font-size:16px;color:${BRAND.cream};line-height:1.6;text-align:center;">${tr.winCongrats(v.winnerDrink)}</p>
+    <div style="background:rgba(241,196,15,0.12);border:1px solid rgba(241,196,15,0.4);border-radius:14px;padding:18px;margin:18px 0;text-align:center;color:${BRAND.cream};font-size:15px;line-height:1.6;">${tr.winGift}</div>
+    ${ctaButton(tr.winCta, link)}
+  `;
+  return { subject, html: shell(inner) };
+}
+
+/** E-mail do POZOSTAŁYCH twórców — w ich języku (ogłoszenie + zaproszenie). */
+export function winnerOthersEmailHTML(v: WinnerVars): { subject: string; html: string } {
+  const tr = WINNER_T[v.lang] ?? WINNER_T.it;
+  const link = v.link || `${BRAND.site}/#ready-drinks`;
+  const subject = v.period === "week" ? tr.othSubjWeek : tr.othSubjMonth;
+  const inner = `
+    <div style="text-align:center;font-size:40px;margin-bottom:6px;">🍸</div>
+    <h1 style="margin:0 0 6px;font-size:22px;color:${BRAND.cream};text-align:center;">${tr.othHi}${v.recipientName ? `, ${v.recipientName}` : ""}!</h1>
+    <p style="margin:14px 0;font-size:15px;color:${BRAND.cream};line-height:1.6;text-align:center;">${tr.othBody(v.winnerDrink, v.winnerAuthor)}</p>
+    ${ctaButton(tr.othCta, link)}
+  `;
+  return { subject, html: shell(inner) };
+}

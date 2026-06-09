@@ -123,18 +123,35 @@ export async function sendDrinkShared(data: {
  * make.com: pętla po liście emaili, każdy email w języku odbiorcy.
  */
 export async function announceWinner(data: {
-  winner_drink: string; winner_author: string; winner_email?: string;
+  winner_drink: string; winner_author: string; winner_email?: string; winner_lang?: string;
   recipients: { email: string; name: string; lang: string }[];
   period: "month" | "week";
 }): Promise<boolean> {
+  const { winnerEmailHTML, winnerOthersEmailHTML } = await import("./email-templates");
+  const norm = (l?: string) => (["it","pl","en","de","fr","es"].includes(l || "") ? l : "it") as import("./email-templates").Lang;
+  const link = typeof window !== "undefined" ? `${window.location.origin}/#ready-drinks` : "https://www.shistoria.it/#ready-drinks";
+  // E-mail zwycięzcy — w JEGO języku
+  const winLang = norm(data.winner_lang);
+  const winnerMail = winnerEmailHTML({ winnerDrink: data.winner_drink, winnerAuthor: data.winner_author, period: data.period, lang: winLang, link });
+  // E-maile pozostałych — każdy z gotowym HTML w SWOIM języku (make.com tylko iteruje i wysyła)
+  const recipients = data.recipients.map((r) => {
+    const lang = norm(r.lang);
+    const m = winnerOthersEmailHTML({ winnerDrink: data.winner_drink, winnerAuthor: data.winner_author, recipientName: r.name, period: data.period, lang, link });
+    return { email: r.email, name: r.name, lang, email_subject: m.subject, email_html: m.html };
+  });
   return send("winner", {
     type: "winner_announcement",
     period: data.period,
     winner_drink: data.winner_drink,
     winner_author: data.winner_author,
     winner_email: data.winner_email || "",
-    recipients: data.recipients, // make.com iteruje, każdy w swoim języku
-    link: typeof window !== "undefined" ? `${window.location.origin}/#ready-drinks` : "https://www.shistoria.it/#ready-drinks",
+    winner_lang: winLang,
+    // ── GOTOWE treści zwycięzcy (make.com mapuje tylko te pola) ──
+    winner_email_subject: winnerMail.subject,
+    winner_email_html: winnerMail.html,
+    // ── lista pozostałych, każdy z GOTOWYM mailem w swoim języku ──
+    recipients, // [{ email, name, lang, email_subject, email_html }]
+    link,
   });
 }
 

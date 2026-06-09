@@ -700,7 +700,7 @@ function DrinksPanel() {
       .filter((r, i, arr) => arr.findIndex((x) => x.email === r.email) === i);
     try {
       const { announceWinner } = await import("../../lib/make-webhooks");
-      await announceWinner({ winner_drink: winner.name, winner_author: winner.author_name, winner_email: winner.author_email, recipients, period });
+      await announceWinner({ winner_drink: winner.name, winner_author: winner.author_name, winner_email: winner.author_email, winner_lang: winner.language || "it", recipients, period });
       alert(`Ogłoszono "${winner.name}"! E-mail wysłany do ${recipients.length} twórców (+ zwycięzca osobno).`);
     } catch (e) { console.error(e); alert("Drink oznaczony, ale e-mail nie wyszedł (sprawdź make.com)."); }
     load();
