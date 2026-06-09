@@ -116,9 +116,11 @@ export async function createOrder(drink: {
   total_ml: number;
   strength_label: string;
 }) {
+  // 4-znakowy kod odbioru (ważny 15 min) — alternatywa dla skanu QR
+  const code = Array.from({ length: 4 }, () => "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"[Math.floor(Math.random() * 32)]).join("");
   const { data, error } = await supabase
     .from('drink_orders')
-    .insert(drink)
+    .insert({ ...drink, pickup_code: code })
     .select()
     .single();
   

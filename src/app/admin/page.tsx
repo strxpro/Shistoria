@@ -94,19 +94,28 @@ function MenuPanel() {
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase.from("menu_items").select("*").order("sort_order");
+    let { data } = await supabase.from("menu_items").select("*").order("sort_order");
+    // Auto-seed z menu-data jeśli baza pusta — żeby od razu widzieć pozycje ze strony
+    if (!data || data.length === 0) {
+      await importMenu(true);
+      const res = await supabase.from("menu_items").select("*").order("sort_order");
+      data = res.data;
+    }
     setItems(data || []);
     setLoading(false);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, []);
 
-  // Import menu attuale dalla pagina
-  const importMenu = async () => {
-    if (!confirm("Importare il menu attuale nella base dati? Questo sovrascriverà i dati esistenti.")) return;
-    setLoading(true);
-    // Cancella tutto
-    await supabase.from("menu_items").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    
+  // Import menu attuale dalla pagina (silent = bez confirm, do auto-seed)
+  const importMenu = async (silent = false) => {
+    if (!silent && !confirm("Importare il menu attuale nella base dati? Questo sovrascriverà i dati esistenti.")) return;
+    if (!silent) setLoading(true);
+    if (!silent) await supabase.from("menu_items").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    // Załaduj menu-data client-side (ustawia window.FULL_MENU / DRINKS_MENU)
+    if (typeof window !== "undefined" && !(window as any).FULL_MENU) {
+      // @ts-ignore — menu-data.js to skrypt ustawiający window.*, nie moduł ES
+      try { await import("../../menu-data.js"); } catch {}
+    }
     // Importa menu ristorante (da window.FULL_MENU - data.js)
     const ristoranteItems: any[] = [];
     const FULL_MENU = (window as any).FULL_MENU || [];
@@ -120,6 +129,7 @@ function MenuPanel() {
           description: item.desc || null,
           allergens: item.allergen || null,
           note: item.note || null,
+          image_url: item.img || null,
           is_featured: item.featured || false,
           sort_order: catIdx * 100 + itemIdx,
         });
@@ -150,7 +160,7 @@ function MenuPanel() {
         await supabase.from("menu_items").insert(allItems.slice(i, i + 100));
       }
     }
-    load();
+    if (!silent) load();
   };
 
   const filtered = section === "all" ? items : items.filter((it) => {
@@ -205,8 +215,8 @@ function MenuPanel() {
           ))}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          {items.length === 0 && <button className="admin-btn" onClick={importMenu}>📥 Importa menu attuale</button>}
-          <button className="admin-btn" onClick={() => setEditItem({ category: "", name: "", price: "", description: "" })}>
+          <button className="admin-btn-ghost" onClick={() => importMenu(false)}>🔄 Reimporta dal sito</button>
+          <button className="admin-btn" onClick={() => setEditItem({ section: "ristorante", category: "", name: "", price: "", description: "" })}>
             + Aggiungi piatto
           </button>
         </div>
@@ -395,6 +405,7 @@ function EventsPanel() {
 function DrinksPanel() {
   const [drinks, setDrinks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [period, setPeriod] = useState<"week" | "month">("month");
 
   const load = async () => {
     setLoading(true);
@@ -403,79 +414,97 @@ function DrinksPanel() {
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const ch = supabase.channel("drinks_rt").on("postgres_changes", { event: "*", schema: "public", table: "community_drinks" }, () => load()).subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
 
-  const toggleMonth = async (id: string, current: boolean) => {
-    await supabase.from("community_drinks").update({ is_drink_of_month: !current }).eq("id", id);
-    load();
+  // Score = średnia z lajków + zamówień (claimed). Drinki z tygodnia mają wyższą wagę.
+  const scoreOf = (d: any) => {
+    const ageDays = (Date.now() - new Date(d.created_at).getTime()) / 86400000;
+    const base = (d.likes || 0) + (d.claimed_count || 0) * 2; // zamówienia ważą podwójnie
+    if (period === "week") {
+      // tydzień: świeższe = wyższa szansa (bonus dla ostatnich 7 dni)
+      const weekBonus = ageDays <= 7 ? 1.5 : 0.5;
+      return base * weekBonus;
+    }
+    return base; // miesiąc: czysta średnia
   };
+  const ranked = [...drinks].sort((a, b) => scoreOf(b) - scoreOf(a));
 
-  // Ogłoś Drink del Mese — wybiera drink z najwięcej polubień (śr. likes+claimed)
-  // i wysyła e-mail do WSZYSTKICH twórców (każdy w swoim języku przez make.com).
-  const announceWinnerOfMonth = async () => {
-    if (drinks.length === 0) { alert("Brak drinków."); return; }
-    // Wybierz zwycięzcę: najwyższy score = likes + claimed_count
-    const winner = [...drinks].sort((a, b) => ((b.likes || 0) + (b.claimed_count || 0)) - ((a.likes || 0) + (a.claimed_count || 0)))[0];
-    if (!confirm(`Ogłosić "${winner.name}" jako Drink del Mese i wysłać e-mail do wszystkich twórców?`)) return;
-    // Oznacz zwycięzcę
+  const announceWinner_ = async () => {
+    if (ranked.length === 0) { alert("Brak drinków."); return; }
+    const winner = ranked[0];
+    const label = period === "week" ? "Drink della Settimana" : "Drink del Mese";
+    if (!confirm(`Ogłosić "${winner.name}" jako ${label} i wysłać e-mail do wszystkich twórców?`)) return;
     await supabase.from("community_drinks").update({ is_drink_of_month: false }).neq("id", "00000000-0000-0000-0000-000000000000");
     await supabase.from("community_drinks").update({ is_drink_of_month: true }).eq("id", winner.id);
-    // Zbierz unikalne emaile twórców
     const recipients = drinks
-      .filter((d) => d.author_email)
+      .filter((d) => d.author_email && d.id !== winner.id)
       .map((d) => ({ email: d.author_email, name: d.author_name || "Anonimo", lang: d.language || "it" }))
       .filter((r, i, arr) => arr.findIndex((x) => x.email === r.email) === i);
     try {
       const { announceWinner } = await import("../../lib/make-webhooks");
-      await announceWinner({
-        winner_drink: winner.name,
-        winner_author: winner.author_name,
-        winner_email: winner.author_email,
-        recipients,
-        period: "month",
-      });
-      alert(`Ogłoszono "${winner.name}"! E-mail wysłany do ${recipients.length} twórców.`);
-    } catch (e) {
-      console.error(e);
-      alert("Drink oznaczony, ale e-mail nie wyszedł (sprawdź konfigurację make.com).");
-    }
+      await announceWinner({ winner_drink: winner.name, winner_author: winner.author_name, winner_email: winner.author_email, recipients, period });
+      alert(`Ogłoszono "${winner.name}"! E-mail wysłany do ${recipients.length} twórców (+ zwycięzca osobno).`);
+    } catch (e) { console.error(e); alert("Drink oznaczony, ale e-mail nie wyszedł (sprawdź make.com)."); }
     load();
   };
 
   const remove = async (id: string) => {
-    if (confirm("Eliminare questo drink?")) {
-      await supabase.from("community_drinks").delete().eq("id", id);
-      load();
-    }
+    if (confirm("Eliminare questo drink?")) { await supabase.from("community_drinks").delete().eq("id", id); load(); }
   };
 
   return (
     <div className="admin-panel">
       <header className="admin-panel-head">
         <h1>Drink dei Clienti</h1>
-        <button className="admin-btn" onClick={announceWinnerOfMonth}>👑 Ogłoś Drink del Mese</button>
-        <span className="admin-count">{drinks.length} creazioni</span>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <div className="ord-filter">
+            {([["week","Settimana"],["month","Mese"]] as const).map(([id, lbl]) => (
+              <button key={id} className={period === id ? "active" : ""} onClick={() => setPeriod(id)}>{lbl}</button>
+            ))}
+          </div>
+          <button className="admin-btn" onClick={announceWinner_}>👑 Ogłoś {period === "week" ? "Drink Settimana" : "Drink Mese"}</button>
+        </div>
       </header>
 
       {loading ? <p className="admin-loading">Caricamento...</p> : (
-        <div className="admin-grid">
-          {drinks.map((d) => (
-            <div key={d.id} className={`admin-drink-card ${d.is_drink_of_month ? "is-month" : ""}`}>
-              {d.photo_url && <img src={d.photo_url} alt={d.name} className="admin-drink-photo" />}
-              <div className="admin-drink-info">
-                <h4>{d.name}</h4>
-                <span>di {d.author_name} · {d.total_ml}ml · {d.strength_label}</span>
-                <span>♥ {d.likes}</span>
-              </div>
-              <div className="admin-drink-actions">
-                <button className={`admin-btn-sm ${d.is_drink_of_month ? "admin-btn-gold" : ""}`} onClick={() => toggleMonth(d.id, d.is_drink_of_month)}>
-                  {d.is_drink_of_month ? "★ Drink del Mese" : "☆ Nomina"}
-                </button>
-                <button className="admin-btn-sm admin-btn-danger" onClick={() => remove(d.id)}>✕</button>
-              </div>
+        <>
+          {/* Ranking top 3 */}
+          {ranked.length > 0 && (
+            <div className="drk-ranking">
+              {ranked.slice(0, 3).map((d, i) => (
+                <div key={d.id} className={`drk-rank drk-rank-${i+1}`}>
+                  <span className="drk-rank-pos">{["🥇","🥈","🥉"][i]}</span>
+                  <span className="drk-rank-name">{d.name}</span>
+                  <span className="drk-rank-by">di {d.author_name}</span>
+                  <span className="drk-rank-score">♥{d.likes||0} · 🍸{d.claimed_count||0}</span>
+                </div>
+              ))}
             </div>
-          ))}
-          {drinks.length === 0 && <p className="admin-empty">Nessun drink pubblicato ancora.</p>}
-        </div>
+          )}
+          <div className="admin-grid">
+            {ranked.map((d, i) => (
+              <div key={d.id} className={`admin-drink-card ${d.is_drink_of_month ? "is-month" : ""}`}>
+                {d.photo_url && <img src={d.photo_url} alt={d.name} className="admin-drink-photo" />}
+                <div className="admin-drink-info">
+                  <h4>#{i+1} {d.name}{d.is_drink_of_month && <span className="admin-badge">👑</span>}</h4>
+                  <span>di {d.author_name} · {d.total_ml}ml · {d.strength_label}</span>
+                  <span>♥ {d.likes||0} · 💬 {d.comments||0} · 🍸 {d.claimed_count||0} ritiri</span>
+                  {d.author_email && <span className="drk-email">✉️ {d.author_email}</span>}
+                </div>
+                <div className="admin-drink-actions">
+                  <button className={`admin-btn-sm ${d.is_drink_of_month ? "admin-btn-gold" : ""}`} onClick={async () => { await supabase.from("community_drinks").update({ is_drink_of_month: !d.is_drink_of_month }).eq("id", d.id); load(); }}>
+                    {d.is_drink_of_month ? "★ Vincitore" : "☆ Nomina"}
+                  </button>
+                  <button className="admin-btn-sm admin-btn-danger" onClick={() => remove(d.id)}>✕</button>
+                </div>
+              </div>
+            ))}
+            {drinks.length === 0 && <p className="admin-empty">Nessun drink pubblicato ancora.</p>}
+          </div>
+        </>
       )}
     </div>
   );
@@ -485,6 +514,10 @@ function DrinksPanel() {
 function OrdersPanel() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<"all" | "pending" | "completed">("all");
+  const [scanOpen, setScanOpen] = useState(false);
+  const [codeInput, setCodeInput] = useState("");
+  const [scanMsg, setScanMsg] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -493,40 +526,89 @@ function OrdersPanel() {
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
+  // Realtime — nowe zamówienia QR na żywo
+  useEffect(() => {
+    const ch = supabase.channel("orders_rt").on("postgres_changes", { event: "*", schema: "public", table: "drink_orders" }, () => load()).subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
 
   const markDone = async (id: string) => {
     await supabase.from("drink_orders").update({ status: "completed", scanned_at: new Date().toISOString() }).eq("id", id);
     load();
   };
 
+  // Odbiór przez 4-znakowy kod (ważny 15 min — sprawdzane po created_at)
+  const redeemByCode = async () => {
+    const code = codeInput.trim().toUpperCase();
+    if (code.length < 4) { setScanMsg("Codice troppo corto"); return; }
+    const { data } = await supabase.from("drink_orders").select("*").eq("pickup_code", code).order("created_at", { ascending: false }).limit(1);
+    const order = data?.[0];
+    if (!order) { setScanMsg("❌ Codice non trovato"); return; }
+    const ageMin = (Date.now() - new Date(order.created_at).getTime()) / 60000;
+    if (order.status === "completed") { setScanMsg("⚠ Già ritirato"); return; }
+    if (ageMin > 15) { setScanMsg("⏱ Codice scaduto (max 15 min)"); return; }
+    await markDone(order.id);
+    setScanMsg(`✓ ${order.drink_name} — consegnato!`);
+    setCodeInput("");
+    setTimeout(() => { setScanOpen(false); setScanMsg(""); }, 1800);
+  };
+
+  const filtered = orders.filter((o) => filter === "all" ? true : o.status === (filter === "completed" ? "completed" : "pending") || (filter === "pending" && !o.status));
+
   return (
     <div className="admin-panel">
       <header className="admin-panel-head">
         <h1>Ordini QR</h1>
-        <span className="admin-count">{orders.filter((o) => o.status === "pending").length} in attesa</span>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+          <div className="ord-filter">
+            {([["all","Tutti"],["pending","In attesa"],["completed","Completati"]] as const).map(([id, lbl]) => (
+              <button key={id} className={filter === id ? "active" : ""} onClick={() => setFilter(id)}>{lbl}</button>
+            ))}
+          </div>
+          <button className="admin-btn" onClick={() => { setScanOpen(true); setScanMsg(""); }}>📷 Scansiona / Codice</button>
+        </div>
       </header>
+
+      {scanOpen && (
+        <div className="admin-modal-overlay" onClick={() => setScanOpen(false)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Ritira drink</h3>
+            <p style={{ opacity: 0.6, fontSize: 13, marginBottom: 16 }}>Scansiona il QR del cliente con la fotocamera, oppure inserisci il codice di 4 caratteri (valido 15 min).</p>
+            <a className="admin-btn" href="https://www.google.com/search?q=scanner+qr+online" target="_blank" rel="noopener" style={{ display: "block", textAlign: "center", marginBottom: 14 }}>📷 Apri fotocamera per QR</a>
+            <div className="admin-form">
+              <label>Codice ritiro (4 caratteri)</label>
+              <input value={codeInput} maxLength={6} onChange={(e) => { setCodeInput(e.target.value.toUpperCase()); setScanMsg(""); }} placeholder="es. A7K2" style={{ textTransform: "uppercase", letterSpacing: "0.3em", fontSize: 22, textAlign: "center" }} onKeyDown={(e) => e.key === "Enter" && redeemByCode()} />
+            </div>
+            {scanMsg && <p style={{ textAlign: "center", fontWeight: 700, margin: "12px 0" }}>{scanMsg}</p>}
+            <div className="admin-modal-actions">
+              <button className="admin-btn" onClick={redeemByCode}>Conferma ritiro</button>
+              <button className="admin-btn-ghost" onClick={() => setScanOpen(false)}>Chiudi</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading ? <p className="admin-loading">Caricamento...</p> : (
         <div className="admin-orders">
-          {orders.map((o) => (
+          {filtered.map((o) => (
             <div key={o.id} className={`admin-order ${o.status === "completed" ? "done" : ""}`}>
               <div className="admin-order-info">
                 <h4>{o.drink_name}</h4>
                 <span>di {o.author_name} · {o.total_ml}ml · {o.strength_label}</span>
                 <span className="admin-order-time">{new Date(o.created_at).toLocaleString("it-IT")}</span>
+                {o.pickup_code && <span className="ord-code">Codice: <strong>{o.pickup_code}</strong></span>}
               </div>
               <div className="admin-order-ingr">
                 {(o.ingredients || []).slice(0, 5).map((ing: any, i: number) => (
-                  <span key={i} className="admin-pill" style={{ background: ing.color + "33", color: ing.color }}>{ing.name}</span>
+                  <span key={i} className="admin-pill" style={{ background: (ing.color || "#888") + "33", color: ing.color || "#fff" }}>{ing.name}</span>
                 ))}
               </div>
-              {o.status === "pending" && (
+              {o.status !== "completed" ? (
                 <button className="admin-btn" onClick={() => markDone(o.id)}>✓ Fatto</button>
-              )}
-              {o.status === "completed" && <span className="admin-done-badge">✓ Completato</span>}
+              ) : <span className="admin-done-badge">✓ Completato</span>}
             </div>
           ))}
-          {orders.length === 0 && <p className="admin-empty">Nessun ordine QR ricevuto.</p>}
+          {filtered.length === 0 && <p className="admin-empty">Nessun ordine in questa categoria.</p>}
         </div>
       )}
     </div>
@@ -1079,6 +1161,20 @@ function AdminStyles() {
       .menu-img-preview button { position:absolute; top:6px; right:6px; width:26px; height:26px; border-radius:50%; border:none; background:rgba(0,0,0,0.6); color:#fff; cursor:pointer; }
       .menu-sel { padding:11px 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.05); color:#fff; font-size:14px; }
       .menu-sel option { background:#12171e; }
+      /* ── Ordini QR filtr + kod ── */
+      .ord-filter { display:flex; gap:4px; background:rgba(255,255,255,0.04); border-radius:999px; padding:3px; }
+      .ord-filter button { padding:7px 14px; border-radius:999px; border:none; background:none; color:rgba(255,255,255,0.6); font-size:12px; cursor:pointer; transition:all .2s; }
+      .ord-filter button.active { background:linear-gradient(135deg,#E8927C,#5BB8D4); color:#fff; font-weight:700; }
+      .ord-code { display:inline-block; margin-top:4px; font-size:12px; color:#5BB8D4; letter-spacing:0.1em; }
+      /* ── Drinki ranking ── */
+      .drk-ranking { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:24px; }
+      .drk-rank { flex:1; min-width:200px; display:flex; align-items:center; gap:10px; padding:14px 16px; border-radius:14px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); }
+      .drk-rank-1 { background:linear-gradient(135deg,rgba(241,196,15,0.2),rgba(255,255,255,0.04)); border-color:rgba(241,196,15,0.4); }
+      .drk-rank-pos { font-size:24px; }
+      .drk-rank-name { font-weight:800; color:#fff; }
+      .drk-rank-by { font-size:12px; opacity:0.6; }
+      .drk-rank-score { margin-left:auto; font-size:13px; color:#E8927C; font-weight:700; }
+      .drk-email { font-size:12px; color:#5BB8D4; }
       .hours-rows { display:flex; flex-direction:column; gap:10px; }
       .hours-row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
       .hours-day, .hours-time { flex:1; min-width:140px; padding:11px 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.05); color:#fff; font-size:14px; }

@@ -151,3 +151,9 @@ CREATE TABLE IF NOT EXISTS contact_messages (
 ALTER TABLE contact_messages ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public insert contact_messages" ON contact_messages FOR INSERT WITH CHECK (true);
 CREATE POLICY "Admin manage contact_messages" ON contact_messages FOR ALL USING (true);
+
+-- ─── Kod odbioru drinka (4 znaki, ważny 15 min) ─────────────────────────────
+ALTER TABLE drink_orders ADD COLUMN IF NOT EXISTS pickup_code text;
+CREATE INDEX IF NOT EXISTS idx_orders_pickup_code ON drink_orders(pickup_code);
+-- Realtime dla zamówień (panel admin na żywo)
+ALTER PUBLICATION supabase_realtime ADD TABLE drink_orders;
