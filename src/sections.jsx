@@ -712,7 +712,7 @@ function Recensioni({ t }) {
 
 // ─── Contatti ─────────────────────────────────────────────────────────────────
 function Contatti({ t }) {
-  const [form, setForm] = useStateE({ firstName: "", lastName: "", email: "", phone: "", date: "", time: "", people: 2, message: "" });
+  const [form, setForm] = useStateE({ firstName: "", lastName: "", email: "", phone: "", date: "", time: "", people: 2, message: "", whatsapp: false });
   const [submitted, setSubmitted] = useStateE(false);
   const [errors, setErrors] = useStateE({});
 
@@ -753,7 +753,7 @@ function Contatti({ t }) {
     // make.com webhook (e-mail właściciel po IT + klient w jego języku + WhatsApp)
     try {
       const { sendReservation } = await import("./lib/make-webhooks");
-      await sendReservation({ name: fullName, firstName: form.firstName, lastName: form.lastName, email: form.email, phone: form.phone, date: form.date, time: form.time, people: form.people, message: form.message, lang });
+      await sendReservation({ name: fullName, firstName: form.firstName, lastName: form.lastName, email: form.email, phone: form.phone, date: form.date, time: form.time, people: form.people, message: form.message, lang, whatsapp: form.whatsapp });
     } catch (err3) { console.error("Make webhook error:", err3); }
 
     // WhatsApp callmebot (fallback bezpośredni, jeśli skonfigurowany window.__CALLMEBOT)
@@ -838,7 +838,7 @@ function Contatti({ t }) {
                   </div>
                   <div className="field">
                     <label>{t("contatti.fields.date")}</label>
-                    <input type="date" value={form.date} onChange={upd("date")} />
+                    <input type="date" lang={(typeof window !== "undefined" && window.currentLanguage) || "it"} value={form.date} onChange={upd("date")} className="cnt-date" />
                   </div>
                   <div className="field">
                     <label>{t("contatti.fields.time") || "Ora"}</label>
@@ -859,6 +859,13 @@ function Contatti({ t }) {
                     <label>{t("contatti.fields.message")}</label>
                     <textarea rows={3} value={form.message} onChange={upd("message")} placeholder="Allergie, occasione speciale, richieste..." />
                   </div>
+                  <label className="cnt-whatsapp" style={{ gridColumn: "1 / -1" }}>
+                    <input type="checkbox" checked={form.whatsapp} onChange={(e) => setForm((f) => ({ ...f, whatsapp: e.target.checked }))} />
+                    <span className="cnt-wa-box" aria-hidden="true" />
+                    <span className="cnt-wa-text">
+                      {({ it: "Voglio ricevere conferma via WhatsApp", pl: "Chcę otrzymać potwierdzenie przez WhatsApp", en: "I want a WhatsApp confirmation", de: "WhatsApp-Bestätigung erhalten", fr: "Recevoir une confirmation WhatsApp", es: "Recibir confirmación por WhatsApp" })[(typeof window !== "undefined" && window.currentLanguage) || "it"]}
+                    </span>
+                  </label>
                 </div>
                 <button type="submit" className="btn cnt-submit">{t("contatti.submit")} <span className="arrow">→</span></button>
               </form>
@@ -888,11 +895,22 @@ function Contatti({ t }) {
         .field.err input { border-bottom-color: var(--c-coral); animation: shake 0.3s; }
         @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
         .stepper { display: flex; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.2); }
-        .cnt-select { width: 100%; background: transparent; border: 0; border-bottom: 1px solid rgba(255,255,255,0.2); color: #fff;
-          font-family: var(--f-body); font-size: 15px; padding: 10px 0; outline: none; cursor: pointer; appearance: none;
-          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' stroke='%23ffffff' stroke-width='1.5' fill='none' stroke-opacity='0.5'/></svg>");
-          background-repeat: no-repeat; background-position: right 4px center; }
-        .cnt-select option { background: var(--c-deep); color: #fff; }
+        .cnt-select { width: 100%; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.16); border-radius: 12px; color: #fff;
+          font-family: var(--f-body); font-size: 15px; padding: 12px 36px 12px 14px; outline: none; cursor: pointer; appearance: none;
+          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' stroke='%23E8927C' stroke-width='1.6' fill='none'/></svg>");
+          background-repeat: no-repeat; background-position: right 14px center; transition: border-color .25s, background .25s; }
+        .cnt-select:hover, .cnt-select:focus { border-color: var(--c-coral, #E8927C); background: rgba(232,146,124,0.08); }
+        .cnt-select option { background: var(--c-deep); color: #fff; padding: 8px; }
+        .cnt-date { width: 100%; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.16); border-radius: 12px; color: #fff;
+          font-family: var(--f-body); font-size: 15px; padding: 12px 14px; outline: none; transition: border-color .25s, background .25s; color-scheme: dark; }
+        .cnt-date:hover, .cnt-date:focus { border-color: var(--c-coral, #E8927C); background: rgba(232,146,124,0.08); }
+        .cnt-date::-webkit-calendar-picker-indicator { filter: invert(1) sepia(1) saturate(4) hue-rotate(-20deg); cursor: pointer; opacity: 0.8; }
+        .cnt-whatsapp { display: flex; align-items: center; gap: 12px; cursor: pointer; padding: 8px 0; }
+        .cnt-whatsapp input { position: absolute; opacity: 0; width: 0; height: 0; }
+        .cnt-wa-box { width: 24px; height: 24px; flex-shrink: 0; border-radius: 7px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.04); position: relative; transition: all .2s; }
+        .cnt-whatsapp input:checked + .cnt-wa-box { background: #25D366; border-color: #25D366; }
+        .cnt-whatsapp input:checked + .cnt-wa-box::after { content: "✓"; position: absolute; inset: 0; display: grid; place-items: center; color: #fff; font-size: 15px; font-weight: 800; }
+        .cnt-wa-text { font-size: 14px; color: rgba(255,255,255,0.85); }
         .stepper button { width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 16px; }
         .stepper button:hover { background: var(--c-sky); border-color: var(--c-sky); }
         .stepper span { font-family: var(--f-display); font-weight: 700; font-size: 22px; min-width: 32px; text-align: center; }
