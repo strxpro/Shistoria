@@ -13,12 +13,36 @@ const StatsGlobe = dynamic(() => import("../../components/StatsGlobe"), {
 
 type Tab = "menu" | "events" | "drinks" | "orders" | "messages" | "reviews" | "stats" | "hours";
 
+// Skeleton loading — animowane „kości" zamiast napisu Caricamento
+function Skeleton({ rows = 5 }: { rows?: number }) {
+  return (
+    <div className="admin-skel">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="admin-skel-row">
+          <div className="admin-skel-box admin-skel-thumb" />
+          <div className="admin-skel-lines">
+            <div className="admin-skel-box admin-skel-line" style={{ width: `${60 + (i % 3) * 12}%` }} />
+            <div className="admin-skel-box admin-skel-line admin-skel-line-sm" style={{ width: `${30 + (i % 4) * 10}%` }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>("menu");
   const [authed, setAuthed] = useState(false);
   const [pin, setPin] = useState("");
   const [pinErr, setPinErr] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+
+  // Wczytaj zapamiętany motyw
+  useEffect(() => {
+    try { const t = localStorage.getItem("sh-admin-theme"); if (t === "light" || t === "dark") setTheme(t); } catch {}
+  }, []);
+  const toggleTheme = () => setTheme((t) => { const n = t === "dark" ? "light" : "dark"; try { localStorage.setItem("sh-admin-theme", n); } catch {} return n; });
 
   // Prosty PIN do admina (w produkcji zastąpić Supabase Auth)
   const checkPin = () => {
@@ -28,7 +52,7 @@ export default function AdminPage() {
 
   if (!authed) {
     return (
-      <div className="admin-login">
+      <div className={`admin-login admin-theme-${theme}`}>
         <div className="admin-login-card">
           <h1>S'Historia</h1>
           <p>Pannello di controllo</p>
@@ -49,7 +73,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="admin">
+    <div className={`admin admin-theme-${theme}`}>
       <aside className={`admin-nav ${navOpen ? "is-open" : ""}`}>
         <div className="admin-logo">
           <h2>S'Historia</h2>
@@ -76,6 +100,10 @@ export default function AdminPage() {
             </button>
           ))}
         </nav>
+        {/* Przełącznik motywu jasny/ciemny */}
+        <button className="admin-theme-toggle" onClick={toggleTheme}>
+          {theme === "dark" ? "☀️ Tema chiaro" : "🌙 Tema scuro"}
+        </button>
       </aside>
       <button className="admin-nav-toggle" onClick={() => setNavOpen((o) => !o)} aria-label="Menu">{navOpen ? "✕" : "☰"}</button>
       <main className="admin-main">
@@ -425,7 +453,7 @@ function MenuPanel() {
         </div>
       )}
 
-      {loading ? <p className="admin-loading">Caricamento...</p> : (
+      {loading ? <Skeleton /> : (
         <div className="admin-table">
           <table>
             <thead><tr><th>Foto</th><th>Categoria</th><th>Nome</th><th>Prezzo</th><th>❤️</th><th>Allergeni</th><th></th></tr></thead>
@@ -608,7 +636,7 @@ function EventsPanel() {
         </div>
       )}
 
-      {loading ? <p className="admin-loading">Caricamento...</p> : (
+      {loading ? <Skeleton /> : (
         <div className="admin-grid">
           {events.map((evt) => (
             <div key={evt.id} className="admin-event-card" style={{ borderLeftColor: evt.custom_colors?.accent || "#E8927C" }}>
@@ -696,7 +724,7 @@ function DrinksPanel() {
         </div>
       </header>
 
-      {loading ? <p className="admin-loading">Caricamento...</p> : (
+      {loading ? <Skeleton /> : (
         <>
           {/* Ranking top 3 */}
           {ranked.length > 0 && (
@@ -815,7 +843,7 @@ function OrdersPanel() {
         </div>
       )}
 
-      {loading ? <p className="admin-loading">Caricamento...</p> : (
+      {loading ? <Skeleton /> : (
         <div className="admin-orders">
           {filtered.map((o) => (
             <div key={o.id} className={`admin-order ${o.status === "completed" ? "done" : ""}`}>
@@ -954,7 +982,7 @@ function MessagesPanel() {
         <span className="admin-count">{threads.filter((t) => t.unread).length} non letti</span>
       </header>
 
-      {loading ? <p className="admin-loading">Caricamento...</p> : (
+      {loading ? <Skeleton /> : (
         <div className="amsg-chat">
           {/* Lewa kolumna: lista konwersacji */}
           <div className="amsg-list">
@@ -1051,7 +1079,7 @@ function ReviewsPanel() {
         <h1>Recensioni Locali</h1>
         <span className="admin-count">{reviews.filter(r => !r.is_approved).length} in attesa</span>
       </header>
-      {loading ? <p className="admin-loading">Caricamento...</p> : (
+      {loading ? <Skeleton /> : (
         <div className="admin-orders">
           {reviews.map((r) => (
             <div key={r.id} className={`admin-order ${r.is_approved ? "" : ""}`}>
@@ -1119,7 +1147,7 @@ function HoursPanel() {
   const addRow = () => setRows((r) => [...r, { day: "", time: "", closed: false }]);
   const delRow = (i: number) => setRows((r) => r.filter((_, idx) => idx !== i));
 
-  if (loading) return <div className="admin-panel"><p className="admin-loading">Caricamento...</p></div>;
+  if (loading) return <div className="admin-panel"><Skeleton /></div>;
 
   return (
     <div className="admin-panel">
@@ -1263,7 +1291,7 @@ function StatsPanel() {
         </div>
       </header>
 
-      {loading ? <p className="admin-loading">Caricamento...</p> : (
+      {loading ? <Skeleton /> : (
         <>
           {/* KPI ogólne */}
           <div className="stats-kpis">
@@ -1350,6 +1378,38 @@ function StatsPanel() {
 function AdminStyles() {
   return (
     <style>{`
+      /* ── MOTYW: zmienne (ciemny domyślnie, jasny przez .admin-theme-light) ── */
+      .admin-theme-dark, .admin-theme-light { --a-bg:#0a0e14; --a-text:#ffffff; }
+      .admin-theme-light { --a-bg:#f4f6f9; --a-text:#15202b; }
+      /* Jasny motyw — nadpisania kluczowych powierzchni */
+      .admin-theme-light.admin, .admin-theme-light.admin-login { background:#f4f6f9 !important; color:#15202b !important; }
+      .admin-theme-light .admin-nav { background:#ffffff !important; border-color:rgba(0,0,0,0.08) !important; }
+      .admin-theme-light .admin-logo h2, .admin-theme-light .admin-panel-head h1, .admin-theme-light .admin-nav nav button { color:#15202b !important; }
+      .admin-theme-light .admin-nav nav button { background:rgba(0,0,0,0.03) !important; }
+      .admin-theme-light .admin-nav nav button:hover { background:rgba(232,146,124,0.14) !important; }
+      .admin-theme-light .admin-table, .admin-theme-light .admin-order, .admin-theme-light .admin-event-card, .admin-theme-light .admin-drink-card, .admin-theme-light .stats-country, .admin-theme-light .stats-kpi, .admin-theme-light .amsg-list, .admin-theme-light .amsg-conv { background:#ffffff !important; border-color:rgba(0,0,0,0.08) !important; color:#15202b !important; }
+      .admin-theme-light .admin-table th { color:rgba(0,0,0,0.55) !important; border-color:rgba(0,0,0,0.1) !important; }
+      .admin-theme-light .admin-table td { border-color:rgba(0,0,0,0.06) !important; color:#15202b !important; }
+      .admin-theme-light .admin-modal { background:#ffffff !important; color:#15202b !important; }
+      .admin-theme-light .admin-modal-actions { background:linear-gradient(to top,#ffffff 70%,rgba(255,255,255,0)) !important; }
+      .admin-theme-light .admin-form input, .admin-theme-light .admin-form textarea, .admin-theme-light .admin-form select, .admin-theme-light .menu-sel, .admin-theme-light .hours-slots, .admin-theme-light .hours-day, .admin-theme-light .hours-time { background:#f4f6f9 !important; color:#15202b !important; border-color:rgba(0,0,0,0.15) !important; }
+      .admin-theme-light .admin-btn-ghost, .admin-theme-light .admin-btn-sm { color:#15202b !important; border-color:rgba(0,0,0,0.15) !important; }
+      .admin-theme-light .admin-form label, .admin-theme-light .stats-kpi-lbl, .admin-theme-light .admin-count { color:rgba(0,0,0,0.55) !important; }
+      .admin-theme-light .amsg-msg.them { background:#eceff3 !important; color:#15202b !important; }
+      /* przełącznik motywu */
+      .admin-theme-toggle { margin-top:auto; padding:12px 16px; border-radius:12px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.12); color:inherit; font-size:13px; cursor:pointer; transition:all .2s; }
+      .admin-theme-toggle:hover { background:rgba(232,146,124,0.15); }
+      .admin-theme-light .admin-theme-toggle { background:rgba(0,0,0,0.04); border-color:rgba(0,0,0,0.12); color:#15202b; }
+      /* ── Skeleton loading ── */
+      .admin-skel { display:flex; flex-direction:column; gap:14px; padding:8px 0; }
+      .admin-skel-row { display:flex; gap:14px; align-items:center; }
+      .admin-skel-lines { flex:1; display:flex; flex-direction:column; gap:8px; }
+      .admin-skel-box { border-radius:10px; background:linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.12) 37%, rgba(255,255,255,0.05) 63%); background-size:400% 100%; animation:adminShimmer 1.4s ease infinite; }
+      .admin-theme-light .admin-skel-box { background:linear-gradient(90deg, rgba(0,0,0,0.05) 25%, rgba(0,0,0,0.1) 37%, rgba(0,0,0,0.05) 63%); background-size:400% 100%; }
+      .admin-skel-thumb { width:52px; height:52px; flex-shrink:0; border-radius:12px; }
+      .admin-skel-line { height:14px; } .admin-skel-line-sm { height:10px; opacity:0.7; }
+      @keyframes adminShimmer { 0%{ background-position:100% 0; } 100%{ background-position:-100% 0; } }
+
       .admin-login { min-height:100vh; display:flex; align-items:center; justify-content:center; background:#0a0e14; color:#fff; font-family:system-ui; }
       .admin-login-card { text-align:center; padding:48px; border-radius:24px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.1); max-width:360px; width:100%; }
       .admin-login-card h1 { font-size:36px; margin:0 0 8px; }
@@ -1493,7 +1553,7 @@ function AdminStyles() {
       .stats-globe-loading { width:100%; aspect-ratio:1/1; max-width:320px; margin:0 auto; display:grid; place-items:center; font-size:48px; opacity:0.4; animation:globeSpin 3s linear infinite; }
       @keyframes globeSpin { to { transform:rotate(360deg); } }
       @media (max-width:768px) { .stats-geo { flex-direction:column; align-items:center; } .stats-globe { flex:0 0 auto; width:260px; } .stats-geo .stats-countries { width:100%; } }
-      .stats-country { display:flex; align-items:center; gap:12px; padding:8px 12px; border-radius:12px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); cursor:pointer; transition:all .2s; width:100%; text-align:left; color:#fff; }
+      .stats-country { display:flex; align-items:center; gap:12px; padding:8px 12px; border-radius:12px; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.12); cursor:pointer; transition:all .2s; width:100%; text-align:left; color:#fff; }
       .stats-country:hover { background:rgba(232,146,124,0.1); border-color:rgba(232,146,124,0.3); }
       .stats-country-flag { font-size:22px; flex-shrink:0; }
       .stats-country-name { font-size:14px; min-width:90px; flex-shrink:0; }
@@ -1519,18 +1579,18 @@ function AdminStyles() {
       .admin-table tr:hover { background:rgba(255,255,255,0.03); }
 
       .admin-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; }
-      .admin-event-card { padding:20px; border-radius:16px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); border-left:4px solid; display:flex; flex-direction:column; gap:8px; }
+      .admin-event-card { padding:20px; border-radius:16px; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.14); border-left:4px solid; display:flex; flex-direction:column; gap:8px; }
       .admin-event-date { font-size:12px; opacity:0.5; } .admin-event-tag { font-size:11px; color:#E8927C; }
       .admin-event-actions { display:flex; gap:8px; margin-top:8px; }
 
-      .admin-drink-card { padding:16px; border-radius:16px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); display:flex; flex-direction:column; gap:10px; }
-      .admin-drink-card.is-month { border-color:rgba(241,196,15,0.5); background:rgba(241,196,15,0.05); }
+      .admin-drink-card { padding:16px; border-radius:16px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.16); display:flex; flex-direction:column; gap:10px; }
+      .admin-drink-card.is-month { border-color:rgba(241,196,15,0.6); background:rgba(241,196,15,0.12); }
       .admin-drink-photo { width:100%; height:120px; object-fit:cover; border-radius:10px; }
       .admin-drink-info h4 { margin:0; font-size:16px; } .admin-drink-info span { font-size:12px; opacity:0.6; display:block; }
       .admin-drink-actions { display:flex; gap:8px; flex-wrap:wrap; }
 
       .admin-orders { display:flex; flex-direction:column; gap:12px; }
-      .admin-order { padding:20px; border-radius:16px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+      .admin-order { padding:20px; border-radius:16px; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.14); display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
       .admin-order.done { opacity:0.5; }
       .admin-order-info h4 { margin:0; font-size:15px; } .admin-order-info span { font-size:12px; opacity:0.6; display:block; }
       .admin-order-time { font-size:11px; opacity:0.4; }
