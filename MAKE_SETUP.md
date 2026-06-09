@@ -1,154 +1,247 @@
-# 🔧 Konfiguracja make.com — S'Historia
+# 🔧 Konfiguracja make.com — S'Historia (gotowce do skopiuj-wklej)
 
-Ten przewodnik tłumaczy **krok po kroku**, co masz zrobić w [make.com](https://www.make.com), żeby działały:
-- 📅 rezerwacje z formularza kontaktowego (e-mail + WhatsApp)
-- 🍸 e-mail przy udostępnieniu drinka
-- 👑 ogłoszenie "Drink Miesiąca" (e-mail do wszystkich)
-- 🔔 przypomnienia o wydarzeniach (3 dni + 5 godzin przed)
+Ten plik ma **gotowe szablony e-maili** i **dokładne nazwy pól**, które wysyła strona. Wystarczy kopiuj-wklej do make.com.
 
-> **WAŻNE — bezpieczeństwo:** Twojego tokena/klucza API make.com **NIE wpisujemy do kodu** (kod jest publiczny na GitHub). Zamiast tego kod używa **adresów webhooków** (URL), które wklejasz do **zmiennych środowiskowych w Vercel**. Webhook URL nie jest tajny w taki sam sposób jak klucz API — to po prostu adres, na który strona wysyła dane.
+> **Bezpieczeństwo:** do kodu NIE wpisujemy tokena API. Strona wysyła dane na **adresy webhooków (URL)**, które wklejasz do **Vercel → Environment Variables**. To nie jest poufny klucz — to adres docelowy.
 
 ---
 
-## 📦 KROK 0 — Co już jest gotowe (zrobione w kodzie)
+## 📋 DOKŁADNE POLA, które wysyła strona (mapowanie w make.com)
 
-Strona już wysyła dane (JSON) na webhooki w 4 sytuacjach. Każdy payload zawiera pole `lang` (język klienta), żebyś mógł wysłać e-mail w jego języku.
+### 1. Rezerwacja (formularz kontaktowy) → `NEXT_PUBLIC_MAKE_CONTACT_WEBHOOK`
+```json
+{
+  "type": "reservation",
+  "name": "Mario Rossi",
+  "email": "mario@email.com",
+  "phone": "+39 333 1234567",
+  "date": "2026-07-15",
+  "people": 4,
+  "message": "Tavolo vicino alla finestra",
+  "lang": "pl",
+  "notify_whatsapp": true,
+  "owner_lang": "it",
+  "source": "shistoria.it",
+  "ts": "2026-06-09T18:00:00.000Z"
+}
+```
+W make.com pola dostępne jako: `{{1.name}}`, `{{1.email}}`, `{{1.phone}}`, `{{1.date}}`, `{{1.people}}`, `{{1.message}}`, `{{1.lang}}`.
 
-| Funkcja | Env (zmienna w Vercel) | Kiedy się wysyła |
-|---|---|---|
-| Rezerwacja | `NEXT_PUBLIC_MAKE_CONTACT_WEBHOOK` | klient wyśle formularz kontaktowy |
-| Share drinka | `NEXT_PUBLIC_MAKE_DRINK_WEBHOOK` | klient udostępni drink (jeśli podał email) |
-| Drink Miesiąca | `NEXT_PUBLIC_MAKE_WINNER_WEBHOOK` | admin kliknie "👑 Ogłoś Drink del Mese" |
-| Przypomnienie o evencie | `NEXT_PUBLIC_MAKE_EVENT_WEBHOOK` | klient kliknie "Ricordamelo" na wydarzeniu |
+### 2. Share drinka → `NEXT_PUBLIC_MAKE_DRINK_WEBHOOK`
+```json
+{
+  "type": "drink_shared",
+  "drink_name": "Sole di Rena",
+  "author_name": "Luca",
+  "email": "luca@email.com",
+  "ingredients": "Gin, Tonica, Limone",
+  "photo_url": "https://...",
+  "lang": "it"
+}
+```
 
-> Możesz też ustawić jeden wspólny webhook dla wszystkiego: `NEXT_PUBLIC_MAKE_WEBHOOK` (wtedy w make rozróżniasz typ po polu `type`).
+### 3. Drink Miesiąca → `NEXT_PUBLIC_MAKE_WINNER_WEBHOOK`
+```json
+{
+  "type": "winner_announcement",
+  "period": "month",
+  "winner_drink": "Sole di Rena",
+  "winner_author": "Luca",
+  "winner_email": "luca@email.com",
+  "recipients": [ { "email": "...", "name": "...", "lang": "pl" } ],
+  "link": "https://www.shistoria.it/#ready-drinks"
+}
+```
+
+### 4. Przypomnienie o evencie → `NEXT_PUBLIC_MAKE_EVENT_WEBHOOK`
+```json
+{
+  "type": "event_reminder",
+  "name": "Anna",
+  "email": "anna@email.com",
+  "lang": "en",
+  "event_title": "Live Jazz Night",
+  "event_date": "2026-07-20",
+  "event_description": "...",
+  "remind_days_before": 3,
+  "remind_hours_before": 5
+}
+```
 
 ---
 
-## 🚀 KROK 1 — Załóż konto make.com
+## 🚀 KROK 1 — Konto + scenariusz
 
-1. Wejdź na [make.com](https://www.make.com) i załóż darmowe konto (plan Free wystarcza na start — 1000 operacji/miesiąc).
-2. Po zalogowaniu kliknij **"Create a new scenario"** (Utwórz nowy scenariusz).
+1. Załóż konto na [make.com](https://www.make.com) (plan Free = 1000 operacji/mc).
+2. **Create a new scenario**.
 
----
+## 🔌 KROK 2 — Webhook (pierwszy moduł)
 
-## 🔌 KROK 2 — Pierwszy moduł: Webhook
+1. Kliknij **"+"** → **Webhooks** → **Custom webhook** → **Add** → nazwa `shistoria-rezerwacje` → **Save**.
+2. **Skopiuj wyświetlony URL** (np. `https://hook.eu2.make.com/abc...`).
+3. Kliknij **OK** (status: "Determine data structure" / nasłuchiwanie).
+4. Żeby make poznał pola: na www.shistoria.it wyślij **testowy formularz kontaktowy**. make złapie JSON i zmapuje pola.
 
-1. W nowym scenariuszu kliknij wielki **"+"**.
-2. Wyszukaj **"Webhooks"** → wybierz **"Custom webhook"**.
-3. Kliknij **"Add"** → nadaj nazwę np. `shistoria-rezerwacje` → **Save**.
-4. make.com pokaże **adres URL** (coś jak `https://hook.eu2.make.com/abc123xyz...`).
-5. **Skopiuj ten URL** — to jest wartość, którą wkleisz do Vercel (patrz Krok 5).
-6. Kliknij **"OK"**. make.com czeka teraz na pierwsze dane ("Listening").
+## 🌍 KROK 3 — Wklej URL do Vercel
 
-> 💡 Żeby make.com "nauczył się" struktury danych: zostaw scenariusz w trybie nasłuchiwania i na stronie wyślij testowo formularz (albo poproś mnie — mogę dodać przycisk testowy). make.com złapie przykładowy JSON i pokaże wszystkie pola (`name`, `email`, `lang`, `message`, itd.).
+[vercel.com](https://vercel.com) → projekt **Shistoria** → **Settings → Environment Variables** → dodaj:
 
----
+| Name | Value |
+|---|---|
+| `NEXT_PUBLIC_MAKE_CONTACT_WEBHOOK` | URL webhooka rezerwacji |
+| `NEXT_PUBLIC_MAKE_DRINK_WEBHOOK` | URL webhooka share drinka |
+| `NEXT_PUBLIC_MAKE_WINNER_WEBHOOK` | URL webhooka drink miesiąca |
+| `NEXT_PUBLIC_MAKE_EVENT_WEBHOOK` | URL webhooka eventów |
 
-## ✉️ KROK 3 — Dodaj tłumaczenie (opcjonalnie, zalecane)
-
-Żeby e-mail do klienta był w jego języku, a do Ciebie po włosku:
-
-1. Po module Webhook kliknij **"+"**.
-2. Wyszukaj **"Google Translate"** (lub **"DeepL"**).
-3. Ustaw: **Text** = pole `message` z webhooka, **Target language** = `it` (włoski) — to tłumaczy wiadomość klienta na włoski dla Ciebie.
-4. (Połącz konto Google/DeepL gdy poprosi — darmowe limity wystarczą.)
+> Możesz dać jeden URL do wszystkich 4 (i rozróżniać po polu `type`). Po dodaniu env zrób **Redeploy**.
 
 ---
 
-## 📧 KROK 4 — Dodaj wysyłkę e-maila
+## ✉️ KROK 4 — E-maile (GOTOWE do skopiuj-wklej)
 
-1. Kliknij **"+"** → wyszukaj **"Email"** → **"Send an email"**.
-2. Połącz swoją skrzynkę (Gmail / własny SMTP — make poprowadzi Cię przez logowanie).
-3. Skonfiguruj **dwa** moduły e-mail (lub jeden z routerem):
+Po webhooku dodaj **Router** (Flow Control → Router), z 2 gałęziami:
 
-   **E-mail A — do właściciela (Ty), po włosku:**
-   - **To:** Twój adres (np. `info@shistoria.it`)
-   - **Subject:** `Nuova prenotazione da {{name}}`
-   - **Content:** wszystkie dane: imię `{{name}}`, email `{{email}}`, telefon `{{phone}}`, data `{{date}}`, osoby `{{people}}`, wiadomość (przetłumaczona na IT) + **język źródłowy klienta: `{{lang}}`**
+### GAŁĄŹ A — e-mail do WŁAŚCICIELA (zawsze po włosku)
 
-   **E-mail B — do klienta, w jego języku:**
-   - **To:** `{{email}}` (z webhooka)
-   - **Subject / Content:** podziękowanie w języku `{{lang}}`. Możesz użyć routera make.com z filtrami: jeśli `lang = pl` → treść po polsku, `lang = en` → po angielsku, itd.
-   - Dodaj **link telefoniczny** do rezerwacji: `tel:+39XXXXXXXXX`.
+Moduł **Email → Send an email**:
+- **To:** `info@shistoria.it` (Twój adres)
+- **Subject (wklej):**
+```
+🍽️ Nuova prenotazione — {{1.name}} ({{1.people}} pers.)
+```
+- **Content (HTML, wklej):**
+```html
+<h2>Nuova prenotazione da S'Historia</h2>
+<p><strong>Nome:</strong> {{1.name}}</p>
+<p><strong>Email:</strong> {{1.email}}</p>
+<p><strong>Telefono:</strong> {{1.phone}}</p>
+<p><strong>Data richiesta:</strong> {{1.date}}</p>
+<p><strong>Persone:</strong> {{1.people}}</p>
+<p><strong>Messaggio:</strong> {{1.message}}</p>
+<hr>
+<p><em>Lingua del cliente: {{1.lang}}</em></p>
+<p>Rispondi al cliente in: {{1.lang}}</p>
+```
+
+### GAŁĄŹ B — e-mail do KLIENTA (w jego języku)
+
+Dodaj **Router** wewnątrz tej gałęzi z filtrem po `{{1.lang}}` (jedna ścieżka na język). Albo jeden moduł e-mail i ręcznie dobierz treść. Gotowe treści poniżej:
+
+**To:** `{{1.email}}`
+
+#### 🇮🇹 lang = it
+- Subject: `Grazie per la tua richiesta — S'Historia`
+```html
+<h2>Ciao {{1.name}},</h2>
+<p>Grazie per averci contattato! Abbiamo ricevuto la tua richiesta di prenotazione per <strong>{{1.people}} persone</strong> il <strong>{{1.date}}</strong>.</p>
+<p>Ti confermeremo al più presto. Per modifiche chiamaci: <a href="tel:+390000000000">+39 000 000 000</a></p>
+<p>A presto,<br>Il team di S'Historia 🍸</p>
+```
+
+#### 🇵🇱 lang = pl
+- Subject: `Dziękujemy za wiadomość — S'Historia`
+```html
+<h2>Cześć {{1.name}},</h2>
+<p>Dziękujemy za kontakt! Otrzymaliśmy Twoją rezerwację na <strong>{{1.people}} osób</strong> w dniu <strong>{{1.date}}</strong>.</p>
+<p>Wkrótce potwierdzimy. W razie zmian zadzwoń: <a href="tel:+390000000000">+39 000 000 000</a></p>
+<p>Do zobaczenia,<br>Zespół S'Historia 🍸</p>
+```
+
+#### 🇬🇧 lang = en
+- Subject: `Thanks for your request — S'Historia`
+```html
+<h2>Hi {{1.name}},</h2>
+<p>Thanks for reaching out! We received your booking request for <strong>{{1.people}} people</strong> on <strong>{{1.date}}</strong>.</p>
+<p>We'll confirm shortly. To make changes call us: <a href="tel:+390000000000">+39 000 000 000</a></p>
+<p>See you soon,<br>The S'Historia team 🍸</p>
+```
+
+#### 🇩🇪 lang = de
+- Subject: `Danke für deine Anfrage — S'Historia`
+```html
+<h2>Hallo {{1.name}},</h2>
+<p>Danke für deine Nachricht! Wir haben deine Reservierung für <strong>{{1.people}} Personen</strong> am <strong>{{1.date}}</strong> erhalten.</p>
+<p>Wir bestätigen in Kürze. Für Änderungen ruf uns an: <a href="tel:+390000000000">+39 000 000 000</a></p>
+<p>Bis bald,<br>Dein S'Historia Team 🍸</p>
+```
+
+#### 🇫🇷 lang = fr
+- Subject: `Merci pour votre demande — S'Historia`
+```html
+<h2>Bonjour {{1.name}},</h2>
+<p>Merci de nous avoir contactés ! Nous avons reçu votre réservation pour <strong>{{1.people}} personnes</strong> le <strong>{{1.date}}</strong>.</p>
+<p>Nous confirmerons bientôt. Pour modifier, appelez-nous : <a href="tel:+390000000000">+39 000 000 000</a></p>
+<p>À bientôt,<br>L'équipe S'Historia 🍸</p>
+```
+
+#### 🇪🇸 lang = es
+- Subject: `Gracias por tu solicitud — S'Historia`
+```html
+<h2>Hola {{1.name}},</h2>
+<p>¡Gracias por contactarnos! Recibimos tu reserva para <strong>{{1.people}} personas</strong> el <strong>{{1.date}}</strong>.</p>
+<p>Te confirmaremos pronto. Para cambios llámanos: <a href="tel:+390000000000">+39 000 000 000</a></p>
+<p>Hasta pronto,<br>El equipo de S'Historia 🍸</p>
+```
+
+> 🔧 Zamień `+390000000000` i `info@shistoria.it` na swoje prawdziwe dane.
 
 ---
 
-## 📱 KROK 5 — WhatsApp dla właściciela (callmebot — darmowe)
+## 📱 KROK 5 — WhatsApp do właściciela (callmebot, darmowe)
 
-1. Zapisz numer **callmebot** w telefonie: **+34 644 51 95 23**.
-2. Wyślij do niego WhatsAppem: `I allow callmebot to send me messages`.
-3. Dostaniesz w odpowiedzi swój **API key** (np. `123456`).
-4. W make.com po e-mailu dodaj moduł **"HTTP" → "Make a request"**:
-   - **URL:** `https://api.callmebot.com/whatsapp.php?phone=39XXXXXXXXX&text={{tekst}}&apikey=TWOJ_API_KEY`
+1. Zapisz kontakt **+34 644 51 95 23** w telefonie.
+2. Wyślij mu WhatsApp: `I allow callmebot to send me messages`.
+3. Dostaniesz **API key** (np. `123456`).
+4. W make.com dodaj moduł **HTTP → Make a request**:
+   - **URL (wklej, podmień TWOJ_NUMER i TWOJ_APIKEY):**
+```
+https://api.callmebot.com/whatsapp.php?phone=TWOJ_NUMER&text=Nuova%20prenotazione:%20{{1.name}}%20-%20{{1.people}}%20pers%20-%20{{1.date}}%20-%20{{1.phone}}%20({{1.lang}})&apikey=TWOJ_APIKEY
+```
    - **Method:** GET
-   - W `text` wstaw dane rezerwacji (zakodowane). make.com sam zakoduje spacje.
-
-> Alternatywa profesjonalna: moduł **Twilio WhatsApp** (płatny, ale stabilniejszy).
 
 ---
 
-## 🌍 KROK 6 — Wklej webhooki do Vercel
+## 🔔 KROK 6 — Przypomnienia o eventach (3 dni + 5 godzin przed)
 
-1. Wejdź na [vercel.com](https://vercel.com) → Twój projekt **Shistoria** → **Settings** → **Environment Variables**.
-2. Dodaj zmienne (Name = nazwa, Value = URL webhooka z make.com):
+Osobny scenariusz (webhook `event_reminder`):
 
-   | Name | Value |
-   |---|---|
-   | `NEXT_PUBLIC_MAKE_CONTACT_WEBHOOK` | URL webhooka rezerwacji |
-   | `NEXT_PUBLIC_MAKE_DRINK_WEBHOOK` | URL webhooka share drinka |
-   | `NEXT_PUBLIC_MAKE_WINNER_WEBHOOK` | URL webhooka drink miesiąca |
-   | `NEXT_PUBLIC_MAKE_EVENT_WEBHOOK` | URL webhooka przypomnień o eventach |
+1. **Webhook** odbiera zgłoszenie → **Data store → Add a record** (zapisz: `email`, `name`, `lang`, `event_title`, `event_date`).
+2. Utwórz **2. scenariusz** ze **Schedule** (uruchamiany co 1h):
+   - **Data store → Search records** (pobierz wszystkie).
+   - **Iterator** po rekordach.
+   - **Filtr 1:** jeśli `now` = `event_date − 3 dni` → wyślij e-mail "zapowiedź".
+   - **Filtr 2:** jeśli `now` = `event_date − 5 godzin` → wyślij e-mail "dziś wydarzenie".
+   - Po wysłaniu obu → **Delete record**.
 
-   > Każda funkcja może mieć **osobny scenariusz** w make.com (osobny webhook URL) albo wszystkie mogą iść na **jeden** webhook (`NEXT_PUBLIC_MAKE_WEBHOOK`), a w make rozróżniasz je po polu `type`.
-
-3. Ustaw je dla **Production** (i Preview jeśli chcesz testować).
-4. Kliknij **Save**. Vercel poprosi o **Redeploy** — zrób redeploy, żeby zmienne weszły w życie.
-
----
-
-## 🔔 KROK 7 — Przypomnienia o wydarzeniach (3 dni + 5 godzin przed)
-
-To jedyna funkcja wymagająca **planowania w czasie**. Payload z `type: "event_reminder"` zawiera:
-- `email`, `name`, `lang`
-- `event_title`, `event_date` (data wydarzenia)
-- `remind_days_before: 3`, `remind_hours_before: 5`
-
-**Jak to ustawić w make.com:**
-
-**Opcja A (najprościej) — Data Store + scenariusz cykliczny:**
-1. Webhook zapisuje zgłoszenie do **Data Store** make.com (moduł "Data store → Add a record"): email, lang, event_title, event_date.
-2. Utwórz **drugi scenariusz** uruchamiany **co godzinę** (Schedule):
-   - Pobiera rekordy z Data Store.
-   - Dla każdego sprawdza: czy `teraz` = `event_date − 3 dni` (±1h)? → wyślij e-mail "zapowiedź".
-   - Czy `teraz` = `event_date − 5 godzin` (±30 min)? → wyślij e-mail "dziś wydarzenie".
-   - Po wysłaniu obu — usuń/oznacz rekord.
-
-**Opcja B — moduł Sleep (tylko krótkie odstępy):** niezalecane dla 3 dni (make.com ma limit czasu Sleep).
+**E-mail przypomnienia (przykład PL, analogicznie inne języki wg `lang`):**
+- Subject: `🔔 Przypomnienie: {{event_title}} już niedługo!`
+```html
+<h2>Cześć {{name}},</h2>
+<p>Przypominamy o wydarzeniu <strong>{{event_title}}</strong> w S'Historia dnia <strong>{{event_date}}</strong>!</p>
+<p>Czekamy na Ciebie 🍸</p>
+<p><a href="https://www.shistoria.it/#eventi">Zobacz szczegóły</a></p>
+```
 
 ---
 
-## ✅ KROK 8 — Test
+## ✅ KROK 7 — Test końcowy
 
-1. Wejdź na www.shistoria.it.
-2. Wyślij testowy formularz kontaktowy.
-3. W make.com scenariusz powinien "ożyć" (zielone kółko) i wykonać kroki.
-4. Sprawdź, czy przyszedł e-mail (do Ciebie + na testowy adres klienta) i WhatsApp.
-
----
-
-## 🆘 Najczęstsze problemy
-
-- **make.com nie reaguje:** sprawdź czy scenariusz jest **włączony** (przełącznik ON, lewy-dolny róg) i czy webhook URL w Vercel = URL z make.com.
-- **Brak danych w e-mailu:** w trybie nasłuchiwania wyślij raz formularz, żeby make "nauczył się" pól, potem zmapuj je w module e-mail.
-- **E-mail nie po polsku/angielsku:** dodaj **Router** z filtrami po polu `lang`, każda gałąź = osobny język.
-- **Zmienne nie działają:** po dodaniu env w Vercel **zawsze zrób Redeploy**.
+1. Włącz scenariusz (przełącznik **ON**, lewy-dolny róg).
+2. Na www.shistoria.it wyślij formularz / udostępnij drink / kliknij "Ricordamelo".
+3. Sprawdź czy scenariusz się wykonał (zielone kółka) i czy przyszedł e-mail + WhatsApp.
 
 ---
 
-## 📁 Pliki w kodzie (do wglądu — nic nie musisz zmieniać)
+## ❓ "Czy można to skonfigurować w Next zamiast make.com?"
 
-- `src/lib/make-webhooks.ts` — funkcje wysyłające dane (sendReservation, sendDrinkShared, announceWinner, subscribeEventReminder).
-- Webhooki są wołane z: formularza kontaktowego, przycisku share drinka, panelu admin (drink miesiąca), karty wydarzenia (Ricordamelo).
+Tak, alternatywy bez make.com:
+- **Resend / SendGrid** (e-mail API) + Next.js **API route** (`/api/contact`) — wysyłka e-maili bezpośrednio z serwera. Wymaga klucza API w env (`RESEND_API_KEY`) i kodu route. Mogę to dodać jeśli wolisz — wtedy nie potrzebujesz make.com do samych e-maili (ale planowanie przypomnień 3dni/5h nadal wymaga crona, np. Vercel Cron).
+- **make.com jest prostszy** bo nie wymaga pisania kodu — wizualnie układasz webhook → tłumaczenie → e-mail → WhatsApp.
 
-> Token API make.com, który mi podałeś (`8dee...`), **celowo NIE jest w kodzie** — jest poufny. Do działania potrzebne są tylko **adresy webhooków (URL)** w Vercel, jak opisano wyżej.
+Napisz, którą drogę wolisz (make.com czy Resend+API route), a przygotuję resztę.
+
+---
+
+## 🔑 Pliki w repo (do wglądu)
+- `src/lib/make-webhooks.ts` — funkcje wysyłające (sendReservation, sendDrinkShared, announceWinner, subscribeEventReminder).
+- Twój token API make.com (`8dee...`) **celowo NIE jest w kodzie** — do działania potrzebne są tylko URL-e webhooków w Vercel.
