@@ -304,12 +304,17 @@ function EventsPanel() {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editEvt, setEditEvt] = useState<any>(null);
+  const [step, setStep] = useState<"edit" | "preview">("edit"); // krok modala
+  const [previewMode, setPreviewMode] = useState<"mobile" | "desktop">("mobile");
+  const [uploading, setUploading] = useState(false);
 
   const TEMPLATES = [
     { id: "jazz", label: "🎵 Jazz Night", colors: { bg: "#1a1040", accent: "#9b59b6" } },
     { id: "degustazione", label: "🍷 Degustazione", colors: { bg: "#2d1b0e", accent: "#c0392b" } },
     { id: "cena", label: "🍽 Cena Speciale", colors: { bg: "#0d2818", accent: "#27ae60" } },
     { id: "aperitivo", label: "🌅 Aperitivo", colors: { bg: "#1a2a3a", accent: "#f39c12" } },
+    { id: "estate", label: "🏖 Estate", colors: { bg: "#0e2840", accent: "#0fa3b1" } },
+    { id: "natale", label: "🎄 Festività", colors: { bg: "#1a0e0e", accent: "#e74c3c" } },
   ];
 
   const load = async () => {
@@ -320,6 +325,26 @@ function EventsPanel() {
   };
   useEffect(() => { load(); }, []);
 
+  const openNew = () => { setEditEvt({ title: "", description: "", event_date: "", tag: "", template: "jazz", custom_colors: TEMPLATES[0].colors }); setStep("edit"); };
+  const openEdit = (evt: any) => { setEditEvt(evt); setStep("edit"); };
+  const close = () => { setEditEvt(null); setStep("edit"); };
+
+  const handleImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const ext = file.name.split(".").pop() || "jpg";
+      const path = `events/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+      const { error } = await supabase.storage.from("assets").upload(path, file, { upsert: true });
+      if (!error) {
+        const { data } = supabase.storage.from("assets").getPublicUrl(path);
+        setEditEvt((prev: any) => ({ ...prev, image_url: data.publicUrl }));
+      } else { alert("Errore upload: " + error.message); }
+    } catch (e2) { console.error(e2); }
+    setUploading(false);
+  };
+
   const save = async (evt: any) => {
     const payload = { ...evt, is_published: true };
     if (evt.id) {
@@ -327,7 +352,7 @@ function EventsPanel() {
     } else {
       await supabase.from("events").insert(payload);
     }
-    setEditEvt(null);
+    close();
     load();
   };
 
@@ -342,44 +367,87 @@ function EventsPanel() {
     <div className="admin-panel">
       <header className="admin-panel-head">
         <h1>Eventi</h1>
-        <button className="admin-btn" onClick={() => setEditEvt({ title: "", description: "", event_date: "", tag: "", template: "jazz" })}>
-          + Nuovo evento
-        </button>
+        <button className="admin-btn" onClick={openNew}>+ Nuovo evento</button>
       </header>
 
       {editEvt && (
-        <div className="admin-modal-overlay" onClick={() => setEditEvt(null)}>
-          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>{editEvt.id ? "Modifica evento" : "Nuovo evento"}</h3>
-            <div className="admin-form">
-              <label>Template</label>
-              <div className="admin-templates">
-                {TEMPLATES.map((t) => (
-                  <button key={t.id} className={`admin-tpl ${editEvt.template === t.id ? "active" : ""}`}
-                    style={{ background: t.colors.bg, borderColor: t.colors.accent }}
-                    onClick={() => setEditEvt({ ...editEvt, template: t.id, custom_colors: t.colors })}>
-                    {t.label}
-                  </button>
-                ))}
-              </div>
-              <label>Titolo</label>
-              <input value={editEvt.title} onChange={(e) => setEditEvt({ ...editEvt, title: e.target.value })} placeholder="Nome dell'evento" />
-              <label>Data</label>
-              <input type="date" value={editEvt.event_date} onChange={(e) => setEditEvt({ ...editEvt, event_date: e.target.value })} />
-              <label>Tag</label>
-              <input value={editEvt.tag || ""} onChange={(e) => setEditEvt({ ...editEvt, tag: e.target.value })} placeholder="es. Live Music, Degustazione..." />
-              <label>Descrizione (italiano — si traduce automaticamente)</label>
-              <textarea value={editEvt.description || ""} onChange={(e) => setEditEvt({ ...editEvt, description: e.target.value })} placeholder="Descrivi l'evento..." />
-              <label>Condividi sui social</label>
-              <div className="admin-form-row" style={{ gap: 16 }}>
-                <label><input type="checkbox" checked={editEvt.shareInstagram || false} onChange={(e) => setEditEvt({ ...editEvt, shareInstagram: e.target.checked })} /> 📸 Instagram</label>
-                <label><input type="checkbox" checked={editEvt.shareFacebook || false} onChange={(e) => setEditEvt({ ...editEvt, shareFacebook: e.target.checked })} /> 📘 Facebook</label>
-              </div>
-            </div>
-            <div className="admin-modal-actions">
-              <button className="admin-btn" onClick={() => save(editEvt)}>Pubblica</button>
-              <button className="admin-btn-ghost" onClick={() => setEditEvt(null)}>Annulla</button>
-            </div>
+        <div className="admin-modal-overlay" onClick={close}>
+          <div className="admin-modal admin-modal-wide" onClick={(e) => e.stopPropagation()}>
+            {step === "edit" ? (
+              <>
+                <h3>{editEvt.id ? "Modifica evento" : "Nuovo evento"}</h3>
+                <div className="admin-form">
+                  <label>Template (colore di sfondo)</label>
+                  <div className="admin-templates">
+                    {TEMPLATES.map((t) => (
+                      <button key={t.id} className={`admin-tpl ${editEvt.template === t.id ? "active" : ""}`}
+                        style={{ background: t.colors.bg, borderColor: t.colors.accent }}
+                        onClick={() => setEditEvt({ ...editEvt, template: t.id, custom_colors: t.colors })}>
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <label>Foto evento (opzionale)</label>
+                  <div className="menu-img-upload">
+                    {editEvt.image_url ? (
+                      <div className="menu-img-preview">
+                        <img src={editEvt.image_url} alt="" />
+                        <button type="button" onClick={() => setEditEvt({ ...editEvt, image_url: null })}>✕</button>
+                      </div>
+                    ) : (
+                      <label className="menu-img-drop">
+                        {uploading ? "Caricamento..." : "📷 Carica foto"}
+                        <input type="file" accept="image/*" hidden onChange={handleImage} />
+                      </label>
+                    )}
+                  </div>
+
+                  <label>Titolo</label>
+                  <input value={editEvt.title} onChange={(e) => setEditEvt({ ...editEvt, title: e.target.value })} placeholder="Nome dell'evento" />
+                  <label>Data</label>
+                  <input type="date" value={editEvt.event_date} onChange={(e) => setEditEvt({ ...editEvt, event_date: e.target.value })} />
+                  <label>Tag</label>
+                  <input value={editEvt.tag || ""} onChange={(e) => setEditEvt({ ...editEvt, tag: e.target.value })} placeholder="es. Live Music, Degustazione..." />
+                  <label>Descrizione (italiano — si traduce automaticamente)</label>
+                  <textarea value={editEvt.description || ""} onChange={(e) => setEditEvt({ ...editEvt, description: e.target.value })} placeholder="Descrivi l'evento..." />
+                  <label>Condividi sui social (al salvataggio)</label>
+                  <div className="admin-form-row" style={{ gap: 16 }}>
+                    <label><input type="checkbox" checked={editEvt.shareInstagram || false} onChange={(e) => setEditEvt({ ...editEvt, shareInstagram: e.target.checked })} /> 📸 Instagram Story</label>
+                    <label><input type="checkbox" checked={editEvt.shareFacebook || false} onChange={(e) => setEditEvt({ ...editEvt, shareFacebook: e.target.checked })} /> 📘 Facebook Post</label>
+                  </div>
+                </div>
+                <div className="admin-modal-actions">
+                  <button className="admin-btn" onClick={() => setStep("preview")} disabled={!editEvt.title}>Avanti — Anteprima →</button>
+                  <button className="admin-btn-ghost" onClick={close}>Annulla</button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3>Anteprima evento</h3>
+                <div className="ev-preview-switch">
+                  <button className={previewMode === "mobile" ? "active" : ""} onClick={() => setPreviewMode("mobile")}>📱 Telefono</button>
+                  <button className={previewMode === "desktop" ? "active" : ""} onClick={() => setPreviewMode("desktop")}>💻 Computer</button>
+                </div>
+                <div className={`ev-preview-stage ${previewMode}`}>
+                  <div className="ev-preview-card" style={{ background: editEvt.custom_colors?.bg || "#1a1040" }}>
+                    {editEvt.image_url && <img className="ev-preview-img" src={editEvt.image_url} alt="" />}
+                    <div className="ev-preview-content">
+                      <span className="ev-preview-tag" style={{ color: editEvt.custom_colors?.accent || "#E8927C" }}>{editEvt.tag || "Evento"}</span>
+                      <h4 className="ev-preview-title">{editEvt.title || "Titolo evento"}</h4>
+                      {editEvt.event_date && <span className="ev-preview-date">{new Date(editEvt.event_date + "T00:00:00").toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" })}</span>}
+                      {editEvt.description && <p className="ev-preview-desc">{editEvt.description}</p>}
+                      <button className="ev-preview-btn" style={{ borderColor: editEvt.custom_colors?.accent }}>🔔 Avvisami</button>
+                    </div>
+                  </div>
+                </div>
+                <p className="ev-preview-note">Così apparirà sul sito (sezione Eventi). {previewMode === "mobile" ? "Vista mobile." : "Vista desktop."}</p>
+                <div className="admin-modal-actions">
+                  <button className="admin-btn" onClick={() => save(editEvt)}>✓ Salva e pubblica</button>
+                  <button className="admin-btn-ghost" onClick={() => setStep("edit")}>← Modifica</button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
@@ -392,7 +460,7 @@ function EventsPanel() {
               <h4>{evt.title}</h4>
               <span className="admin-event-tag">{evt.tag}</span>
               <div className="admin-event-actions">
-                <button className="admin-btn-sm" onClick={() => setEditEvt(evt)}>✎</button>
+                <button className="admin-btn-sm" onClick={() => openEdit(evt)}>✎</button>
                 <button className="admin-btn-sm admin-btn-danger" onClick={() => remove(evt.id)}>✕</button>
               </div>
             </div>
@@ -959,6 +1027,69 @@ function HoursPanel() {
   );
 }
 
+// ─── Globo leggero (SVG, senza dipendenze pesanti) ────────────────────────────
+// Mostra i paesi dei visitatori come punti su una sfera rotante (proiezione ortografica).
+const COUNTRY_COORDS: Record<string, [number, number]> = {
+  IT: [41.9, 12.5], PL: [52.0, 19.0], DE: [51.0, 9.0], FR: [46.0, 2.0], ES: [40.0, -4.0],
+  GB: [54.0, -2.0], US: [38.0, -97.0], NL: [52.1, 5.3], BE: [50.5, 4.5], CH: [46.8, 8.2],
+  AT: [47.5, 14.5], CZ: [49.8, 15.5], RU: [61.5, 105.0], UA: [48.4, 31.2], RO: [45.9, 24.9],
+  PT: [39.4, -8.2], SE: [60.1, 18.6], NO: [60.5, 8.5], DK: [56.3, 9.5], FI: [64.0, 26.0],
+  IE: [53.4, -8.2], GR: [39.1, 21.8], HR: [45.1, 15.2], HU: [47.2, 19.5], SK: [48.7, 19.7],
+  CA: [56.1, -106.3], BR: [-14.2, -51.9], AU: [-25.3, 133.8], JP: [36.2, 138.3], CN: [35.9, 104.2],
+  IN: [20.6, 78.9], MX: [23.6, -102.6], AR: [-38.4, -63.6], ZA: [-30.6, 22.9], EG: [26.8, 30.8],
+  TR: [38.9, 35.2], AE: [23.4, 53.8], MA: [31.8, -7.1], TN: [33.9, 9.5], SI: [46.2, 14.8],
+};
+function MiniGlobe({ countries }: { countries: { code: string; name: string; count: number }[] }) {
+  const [rot, setRot] = useState(0);
+  useEffect(() => {
+    let raf = 0; let last = performance.now();
+    const tick = (now: number) => { const dt = now - last; last = now; setRot((r) => (r + dt * 0.012) % 360); raf = requestAnimationFrame(tick); };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  const R = 90, cx = 100, cy = 100;
+  const maxC = Math.max(1, ...countries.map((c) => c.count));
+  const meridians = [0, 30, 60, 90, 120, 150].map((deg) => {
+    const rad = ((deg + rot) % 180) * Math.PI / 180;
+    const rx = Math.abs(R * Math.cos(rad));
+    return <ellipse key={deg} cx={cx} cy={cy} rx={rx} ry={R} fill="none" stroke="rgba(91,184,212,0.18)" strokeWidth={1} />;
+  });
+  const parallels = [-60, -30, 0, 30, 60].map((lat) => {
+    const y = cy - R * Math.sin(lat * Math.PI / 180);
+    const rx = R * Math.cos(lat * Math.PI / 180);
+    return <ellipse key={lat} cx={cx} cy={y} rx={rx} ry={rx * 0.18} fill="none" stroke="rgba(91,184,212,0.12)" strokeWidth={1} />;
+  });
+  const pins = countries.map((c) => {
+    const co = COUNTRY_COORDS[c.code?.toUpperCase()];
+    if (!co) return null;
+    const [lat, lon] = co;
+    const lonR = (lon + rot) * Math.PI / 180;
+    const latR = lat * Math.PI / 180;
+    const x = Math.cos(latR) * Math.sin(lonR);
+    const z = Math.cos(latR) * Math.cos(lonR);
+    const y = Math.sin(latR);
+    if (z < 0) return null;
+    const px = cx + R * x, py = cy - R * y;
+    const size = 2.5 + (c.count / maxC) * 5;
+    const op = 0.45 + z * 0.55;
+    return <circle key={c.code} cx={px} cy={py} r={size} fill="#E8927C" opacity={op}><title>{c.name}: {c.count}</title></circle>;
+  });
+  return (
+    <svg viewBox="0 0 200 200" className="stats-globe-svg">
+      <defs>
+        <radialGradient id="globeGrad" cx="38%" cy="34%" r="75%">
+          <stop offset="0%" stopColor="#163243" />
+          <stop offset="70%" stopColor="#0c1d28" />
+          <stop offset="100%" stopColor="#060f16" />
+        </radialGradient>
+      </defs>
+      <circle cx={cx} cy={cy} r={R} fill="url(#globeGrad)" stroke="rgba(91,184,212,0.35)" strokeWidth={1.5} />
+      {parallels}{meridians}{pins}
+      <circle cx={cx} cy={cy} r={R} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={6} />
+    </svg>
+  );
+}
+
 function StatsPanel() {
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<"today" | "week" | "month" | "prevmonth" | "all">("month");
@@ -1053,17 +1184,20 @@ function StatsPanel() {
           <div className="stats-section">
             <h3>Da dove arrivano i visitatori</h3>
             {byCountry.length === 0 ? <p className="admin-empty">Nessun dato per questo periodo.</p> : (
-              <div className="stats-countries">
-                {byCountry.map((c) => (
-                  <button key={c.code} className="stats-country" onClick={() => setPopCountry(c.code)}>
-                    <span className="stats-country-flag">{flag(c.code)}</span>
-                    <span className="stats-country-name">{c.name}</span>
-                    <span className="stats-country-bar-wrap">
-                      <span className="stats-country-bar" style={{ width: `${(c.count / maxCount) * 100}%`, background: intensity(c.count) }} />
-                    </span>
-                    <span className="stats-country-count">{c.count}</span>
-                  </button>
-                ))}
+              <div className="stats-geo">
+                <div className="stats-globe"><MiniGlobe countries={byCountry} /></div>
+                <div className="stats-countries">
+                  {byCountry.map((c) => (
+                    <button key={c.code} className="stats-country" onClick={() => setPopCountry(c.code)}>
+                      <span className="stats-country-flag">{flag(c.code)}</span>
+                      <span className="stats-country-name">{c.name}</span>
+                      <span className="stats-country-bar-wrap">
+                        <span className="stats-country-bar" style={{ width: `${(c.count / maxCount) * 100}%`, background: intensity(c.count) }} />
+                      </span>
+                      <span className="stats-country-count">{c.count}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -1252,6 +1386,11 @@ function AdminStyles() {
       .stats-section { margin-bottom:28px; }
       .stats-section h3 { font-size:16px; margin:0 0 14px; color:#fff; }
       .stats-countries { display:flex; flex-direction:column; gap:8px; }
+      .stats-geo { display:flex; gap:24px; align-items:flex-start; }
+      .stats-geo .stats-countries { flex:1; }
+      .stats-globe { flex:0 0 220px; max-width:220px; }
+      .stats-globe-svg { width:100%; height:auto; display:block; filter:drop-shadow(0 10px 30px rgba(0,0,0,0.4)); }
+      @media (max-width:768px) { .stats-geo { flex-direction:column; align-items:center; } .stats-globe { flex:0 0 auto; width:200px; } .stats-geo .stats-countries { width:100%; } }
       .stats-country { display:flex; align-items:center; gap:12px; padding:8px 12px; border-radius:12px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); cursor:pointer; transition:all .2s; width:100%; text-align:left; color:#fff; }
       .stats-country:hover { background:rgba(232,146,124,0.1); border-color:rgba(232,146,124,0.3); }
       .stats-country-flag { font-size:22px; flex-shrink:0; }
@@ -1299,6 +1438,23 @@ function AdminStyles() {
 
       .admin-modal-overlay { position:fixed; inset:0; z-index:100; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; padding:24px; }
       .admin-modal { width:min(520px,92vw); max-height:85vh; overflow-y:auto; background:#14181e; border-radius:20px; padding:32px; border:1px solid rgba(255,255,255,0.1); }
+      .admin-modal-wide { width:min(640px,94vw); }
+      /* Anteprima evento */
+      .ev-preview-switch { display:flex; gap:8px; margin:0 0 18px; }
+      .ev-preview-switch button { flex:1; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.04); color:#fff; font-size:13px; cursor:pointer; }
+      .ev-preview-switch button.active { background:rgba(232,146,124,0.2); border-color:#E8927C; }
+      .ev-preview-stage { display:flex; justify-content:center; padding:18px; background:repeating-linear-gradient(45deg,rgba(255,255,255,0.02),rgba(255,255,255,0.02) 10px,transparent 10px,transparent 20px); border-radius:16px; }
+      .ev-preview-stage.mobile .ev-preview-card { width:280px; }
+      .ev-preview-stage.desktop .ev-preview-card { width:100%; max-width:560px; }
+      .ev-preview-card { border-radius:18px; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,0.4); position:relative; }
+      .ev-preview-img { width:100%; height:160px; object-fit:cover; opacity:0.8; display:block; }
+      .ev-preview-content { padding:20px; color:#fff; }
+      .ev-preview-tag { font-size:11px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; }
+      .ev-preview-title { font-size:22px; margin:8px 0; }
+      .ev-preview-date { font-size:13px; opacity:0.7; text-transform:capitalize; }
+      .ev-preview-desc { font-size:13px; opacity:0.85; line-height:1.5; margin:12px 0; }
+      .ev-preview-btn { margin-top:8px; padding:9px 16px; border-radius:999px; border:1px solid rgba(255,255,255,0.4); background:rgba(255,255,255,0.1); color:#fff; font-size:13px; cursor:default; }
+      .ev-preview-note { text-align:center; font-size:12px; opacity:0.5; margin:14px 0 0; }
       .admin-modal h3 { margin:0 0 24px; font-size:22px; }
       .admin-form { display:flex; flex-direction:column; gap:14px; }
       .admin-form label { font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:rgba(255,255,255,0.5); }

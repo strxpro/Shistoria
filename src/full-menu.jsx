@@ -1,6 +1,16 @@
 import React from 'react';
 import { SplitReveal } from "./shell";
-import { likeMenuItem, getMenuLikes } from "./lib/supabase";
+import { toggleMenuLike, getMenuLikes } from "./lib/supabase";
+
+// Serce w stylu TikTok (SVG, nie emoji) — wypełnione gdy liked
+function HeartIcon({ filled, className = "", style }) {
+  return (
+    <svg className={className} style={style} viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true">
+      <path d="M12 21s-7.5-4.6-10-9.2C.4 8.5 1.8 5 5.2 5c2 0 3.3 1.1 4.1 2.3C10.1 6.1 11.4 5 13.4 5c3.4 0 4.8 3.5 3.2 6.8C19.5 16.4 12 21 12 21z"
+        fill={filled ? "#FE2C55" : "none"} stroke={filled ? "#FE2C55" : "currentColor"} strokeWidth="2" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 // FullMenu (categorized food list) + DrinksList (filtered drinks/wine carousel)
 import { motion } from "framer-motion";
@@ -42,7 +52,10 @@ function MobileFullMenu() {
   const [pillVisible, setPillVisible] = useStateM(false);
   const [allergenInfo, setAllergenInfo] = useStateM(null); // {nums:[...]} → popout legendy
   const [likesMap, setLikesMap] = useStateM({}); // { nameLower: {id, likes} }
-  const [likedNow, setLikedNow] = useStateM({}); // { nameLower: true } — heart burst tej sesji
+  const [likedSet, setLikedSet] = useStateM(() => {
+    try { return new Set(JSON.parse(localStorage.getItem("sh-menu-liked") || "[]")); } catch { return new Set(); }
+  });
+  const [burstKey, setBurstKey] = useStateM(null); // klucz dania z chwilową animacją serca (tylko na miniaturze)
   const sheetTouch = useRefM(null);
 
   // Pobierz liczbę polubień dań z DB (łączymy po nazwie)
@@ -56,27 +69,37 @@ function MobileFullMenu() {
   const itemKey = (it) => String(it.name || "").trim().toLowerCase();
   const getLikes = (it) => (likesMap[itemKey(it)]?.likes || 0);
   const isLiked = (it) => {
-    if (likedNow[itemKey(it)]) return true;
-    try { return JSON.parse(localStorage.getItem("sh-menu-liked") || "[]").includes(likesMap[itemKey(it)]?.id); } catch { return false; }
+    const id = likesMap[itemKey(it)]?.id;
+    return id ? likedSet.has(id) : false;
   };
+  // toggle (polub / cofnij). burst tylko gdy DODAJEMY polubienie.
   const toggleLike = async (it) => {
     const k = itemKey(it);
     const rec = likesMap[k];
     if (!rec?.id) return; // brak w DB (menu nie zaimportowane) — pomiń cicho
-    if (isLiked(it)) return;
-    setLikedNow((p) => ({ ...p, [k]: true }));
-    setLikesMap((p) => ({ ...p, [k]: { ...p[k], likes: (p[k]?.likes || 0) + 1 } }));
-    await likeMenuItem(rec.id);
+    const wasLiked = likedSet.has(rec.id);
+    const delta = wasLiked ? -1 : 1;
+    // optymistyczny update UI
+    setLikedSet((prev) => { const n = new Set(prev); if (wasLiked) n.delete(rec.id); else n.add(rec.id); return n; });
+    setLikesMap((p) => ({ ...p, [k]: { ...p[k], likes: Math.max(0, (p[k]?.likes || 0) + delta) } }));
+    if (!wasLiked) { setBurstKey(k); setTimeout(() => setBurstKey((cur) => (cur === k ? null : cur)), 650); }
+    await toggleMenuLike(rec.id);
   };
 
-  // Gdy pill categories widoczny LUB sheet otwarty → hamburger w prawo
-  // Header NIE rusza się od samego pillVisible — tylko gdy sheet faktycznie otwarty
+  // Gdy sheet kategorii otwarty → blokada scrolla + hamburger w prawo (cx-sheet).
+  // Gdy tylko jesteśmy w sekcji menu (pasek kategorii widoczny) → przesuń hamburger BEZ blokady scrolla (cx-menucat).
   useEffectM(() => {
     if (typeof document === "undefined") return;
     if (catSheet) document.body.dataset.cxSheet = "open";
     else delete document.body.dataset.cxSheet;
     return () => { delete document.body.dataset.cxSheet; };
   }, [catSheet]);
+  useEffectM(() => {
+    if (typeof document === "undefined") return;
+    if (pillVisible) document.body.dataset.cxMenucat = "on";
+    else delete document.body.dataset.cxMenucat;
+    return () => { delete document.body.dataset.cxMenucat; };
+  }, [pillVisible]);
   const catBarRef = useRefM(null);
   const sectionRef = useRefM(null);
 
@@ -139,6 +162,30 @@ function MobileFullMenu() {
         <p className="mfm-intro">Pasta fatta in casa, pesce del giorno, pizze cotte nel forno a legna.</p>
       </div>
 
+      {/* I più amati — dania z największą liczbą serc na samej górze */}
+      {(() => {
+        const all = [];
+        window.FULL_MENU.forEach((cat) => (cat.items || []).forEach((it) => all.push({ ...it, icon: cat.icon, _l: getLikes(it) })));
+        const top = all.filter((it) => it._l > 0).sort((a, b) => b._l - a._l).slice(0, 8);
+        if (top.length === 0) return null;
+        return (
+          <div className="mfm-top">
+            <div className="mfm-top-head"><HeartIcon filled className="mfm-top-ico" /> <span>{({ it:"I più amati", en:"Most loved", pl:"Najczęściej lubiane", de:"Am beliebtesten", fr:"Les plus aimés", es:"Los más amados" })[lang] || "I più amati"}</span></div>
+            <div className="mfm-top-row">
+              {top.map((it, i) => (
+                <button key={i} className="mfm-top-card" onClick={() => setDishPopout(it)}>
+                  <div className="mfm-top-thumb">
+                    {it.img ? <img src={it.img} alt="" loading="lazy" /> : <span className="mfm-top-ph">{it.icon}</span>}
+                    <span className="mfm-top-badge"><HeartIcon filled /> {it._l}</span>
+                  </div>
+                  <span className="mfm-top-name">{it.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* sticky pasek kategorii — przewijany palcem */}
       <div className="mfm-catbar-wrap">
         <div className="mfm-catbar" ref={catBarRef}>
@@ -167,8 +214,12 @@ function MobileFullMenu() {
                       if (now - last < 320) { e.preventDefault(); e.stopPropagation(); toggleLike(it); }
                     }}>
                     {it.img ? <img src={it.img} alt="" loading="lazy" /> : <span className="mfm-item-thumb-ph">{cat.icon}</span>}
-                    {isLiked(it) && <span className="mfm-thumb-heart">❤️</span>}
-                    {getLikes(it) > 0 && <span className="mfm-thumb-likes">❤ {getLikes(it)}</span>}
+                    {burstKey === itemKey(it) && <span className="mfm-thumb-burst"><HeartIcon filled /></span>}
+                    <span className={`mfm-thumb-like ${isLiked(it) ? "is-liked" : ""}`}
+                      onClick={(e) => { e.stopPropagation(); toggleLike(it); }}>
+                      <HeartIcon filled={isLiked(it)} className="mfm-thumb-like-ico" />
+                      {getLikes(it) > 0 && <span className="mfm-thumb-like-n">{getLikes(it)}</span>}
+                    </span>
                   </div>
                   <div className="mfm-item-main">
                     <div className="mfm-item-top">
@@ -245,11 +296,17 @@ function MobileFullMenu() {
       {dishPopout && (
         <div className="mfm-pop-overlay" onClick={() => setDishPopout(null)}>
           <div className="mfm-pop" onClick={(e) => e.stopPropagation()}>
-            <div className="mfm-pop-img">
+            <div className="mfm-pop-img"
+              onDoubleClick={(e) => { e.stopPropagation(); toggleLike(dishPopout); }}
+              onTouchEnd={(e) => {
+                const now = Date.now(); const last = e.currentTarget._lt || 0; e.currentTarget._lt = now;
+                if (now - last < 320) { e.preventDefault(); e.stopPropagation(); toggleLike(dishPopout); }
+              }}>
               {dishPopout.img ? <img src={dishPopout.img} alt={dishPopout.name} /> : <span className="mfm-pop-ph">{dishPopout.icon}</span>}
+              {burstKey === itemKey(dishPopout) && <span className="mfm-pop-burst"><HeartIcon filled /></span>}
               <button className="mfm-pop-close" onClick={() => setDishPopout(null)}>×</button>
               <button className={`mfm-pop-like ${isLiked(dishPopout) ? "is-liked" : ""}`} onClick={(e) => { e.stopPropagation(); toggleLike(dishPopout); }}>
-                {isLiked(dishPopout) ? "❤️" : "🤍"} <span>{getLikes(dishPopout)}</span>
+                <HeartIcon filled={isLiked(dishPopout)} className="mfm-pop-like-ico" /> <span>{getLikes(dishPopout)}</span>
               </button>
             </div>
             <div className="mfm-pop-body">
@@ -305,9 +362,29 @@ function MobileFullMenu() {
         .mfm-item { display: flex; gap: 12px; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid var(--c-line); cursor: pointer; }
         .mfm-item.feat { background: rgba(245,237,224,0.5); border-radius: 12px; padding: 14px 12px; margin: 6px 0; border-bottom: 1px solid transparent; }
         .mfm-item-thumb { flex: 0 0 auto; width: 56px; height: 56px; border-radius: 12px; overflow: hidden; background: linear-gradient(135deg, var(--c-sand), #E8DDC8); display: flex; align-items: center; justify-content: center; position: relative; -webkit-user-select: none; user-select: none; }
-        .mfm-thumb-heart { position: absolute; inset: 0; display: grid; place-items: center; font-size: 30px; animation: mfmHeartPop .6s ease; pointer-events: none; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.4)); }
-        @keyframes mfmHeartPop { 0% { transform: scale(0); opacity: 0; } 30% { transform: scale(1.3); opacity: 1; } 60% { transform: scale(1); } 100% { transform: scale(1); opacity: 1; } }
-        .mfm-thumb-likes { position: absolute; bottom: 3px; right: 3px; background: rgba(0,0,0,0.6); color: #fff; font-size: 9px; font-weight: 700; padding: 1px 5px; border-radius: 999px; line-height: 1.4; }
+        /* I più amati — pozioma karuzela na górze menu */
+        .mfm-top { margin: 4px 0 20px; }
+        .mfm-top-head { display: flex; align-items: center; gap: 7px; font-family: var(--f-display); font-weight: 700; font-size: 15px; color: var(--c-deep); padding: 0 4px 10px; }
+        .mfm-top-ico { font-size: 17px; color: #FE2C55; }
+        .mfm-top-row { display: flex; gap: 12px; overflow-x: auto; padding: 2px 4px 8px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+        .mfm-top-row::-webkit-scrollbar { display: none; }
+        .mfm-top-card { flex: 0 0 auto; width: 92px; background: none; border: none; padding: 0; cursor: pointer; display: flex; flex-direction: column; gap: 6px; text-align: left; }
+        .mfm-top-thumb { position: relative; width: 92px; height: 92px; border-radius: 14px; overflow: hidden; background: linear-gradient(135deg, var(--c-sand), #E8DDC8); display: grid; place-items: center; }
+        .mfm-top-thumb img { width: 100%; height: 100%; object-fit: cover; }
+        .mfm-top-ph { font-size: 30px; opacity: 0.45; }
+        .mfm-top-badge { position: absolute; bottom: 4px; right: 4px; display: inline-flex; align-items: center; gap: 3px; padding: 2px 6px; border-radius: 999px; background: rgba(0,0,0,0.55); color: #fff; font-size: 10px; font-weight: 700; }
+        .mfm-top-badge svg { font-size: 11px; color: #FE2C55; }
+        .mfm-top-name { font-family: var(--f-body); font-size: 11px; line-height: 1.25; color: var(--c-deep); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+        /* mała pigułka serca w rogu zdjęcia (TikTok-style) */
+        .mfm-thumb-like { position: absolute; bottom: 3px; right: 3px; display: inline-flex; align-items: center; gap: 3px; padding: 2px 5px; border-radius: 999px; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); cursor: pointer; line-height: 1; }
+        .mfm-thumb-like-ico { font-size: 13px; color: #fff; }
+        .mfm-thumb-like.is-liked .mfm-thumb-like-ico { animation: mfmPulse .3s ease; }
+        .mfm-thumb-like-n { font-size: 10px; font-weight: 700; color: #fff; }
+        /* burst — chwilowe duże serce, TYLKO w obrębie miniatury (nie na całym ekranie) */
+        .mfm-thumb-burst { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 3; }
+        .mfm-thumb-burst svg { font-size: 34px; color: #FE2C55; animation: mfmHeartPop .6s cubic-bezier(.17,.89,.32,1.28); filter: drop-shadow(0 2px 6px rgba(0,0,0,0.4)); }
+        @keyframes mfmHeartPop { 0% { transform: scale(0) rotate(-18deg); opacity: 0; } 35% { transform: scale(1.25) rotate(6deg); opacity: 1; } 70% { transform: scale(0.95) rotate(0deg); } 100% { transform: scale(1.05); opacity: 0; } }
+        @keyframes mfmPulse { 0% { transform: scale(1); } 50% { transform: scale(1.35); } 100% { transform: scale(1); } }
         .mfm-item-thumb img { width: 100%; height: 100%; object-fit: cover; }
         .mfm-item-thumb-ph { font-size: 24px; opacity: 0.45; }
         .mfm-item.feat .mfm-item-thumb { width: 64px; height: 64px; }
@@ -342,8 +419,11 @@ function MobileFullMenu() {
         .mfm-pop-ph { font-size: 56px; opacity: 0.4; }
         .mfm-pop-close { position: absolute; top: 12px; right: 12px; width: 38px; height: 38px; border-radius: 50%; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.4); color: #fff; font-size: 22px; display: grid; place-items: center; cursor: pointer; }
         .mfm-pop-like { position: absolute; bottom: 12px; right: 12px; display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 999px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.4); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; backdrop-filter: blur(6px); transition: transform .2s; }
+        .mfm-pop-like-ico { font-size: 18px; }
         .mfm-pop-like:active { transform: scale(0.92); }
-        .mfm-pop-like.is-liked { background: rgba(232,84,84,0.85); border-color: rgba(255,255,255,0.6); }
+        .mfm-pop-like.is-liked { background: rgba(254,44,85,0.18); border-color: rgba(254,44,85,0.6); }
+        .mfm-pop-burst { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 3; }
+        .mfm-pop-burst svg { font-size: 90px; color: #FE2C55; animation: mfmHeartPop .65s cubic-bezier(.17,.89,.32,1.28); filter: drop-shadow(0 4px 12px rgba(0,0,0,0.5)); }
         .mfm-pop-body { padding: 20px; }
         .mfm-pop-body h3 { font-family: var(--f-display); font-weight: 700; font-size: 21px; color: var(--c-deep); overflow-wrap: anywhere; }
         .mfm-pop-desc { font-family: var(--f-serif); font-style: italic; font-size: 14px; color: var(--c-mute); line-height: 1.5; margin: 10px 0 16px; overflow-wrap: anywhere; }

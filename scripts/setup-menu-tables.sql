@@ -22,10 +22,10 @@ CREATE TABLE menu_items (
   updated_at timestamptz DEFAULT now()
 );
 
--- Funkcja inkrementacji polubień dania (atomowa, bez wyścigu)
-CREATE OR REPLACE FUNCTION increment_menu_like(item_id uuid)
+-- Funkcja inkrementacji/dekrementacji polubień dania (atomowa, delta ±1)
+CREATE OR REPLACE FUNCTION increment_menu_like(item_id uuid, delta integer DEFAULT 1)
 RETURNS void LANGUAGE sql AS $$
-  UPDATE menu_items SET likes = COALESCE(likes, 0) + 1 WHERE id = item_id;
+  UPDATE menu_items SET likes = GREATEST(0, COALESCE(likes, 0) + delta) WHERE id = item_id;
 $$;
 
 CREATE INDEX IF NOT EXISTS idx_menu_items_section ON menu_items(section);

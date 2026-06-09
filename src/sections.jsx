@@ -214,7 +214,7 @@ function Eventi({ t }) {
           transition:transform .65s cubic-bezier(.22,.9,.36,1), opacity .5s ease;
           box-shadow:0 20px 60px rgba(0,0,0,0.3); will-change:transform,opacity; transform-style:preserve-3d; }
         .ev-card-active { box-shadow:0 30px 80px rgba(0,0,0,0.45); }
-        .ev-playstop { position:absolute; top:12px; right:12px; z-index:20; width:38px; height:38px; border-radius:50%; border:none;
+        .ev-playstop { position:absolute; bottom:14px; right:14px; z-index:20; width:38px; height:38px; border-radius:50%; border:none;
           background:rgba(0,0,0,0.5); color:#fff; font-size:12px; cursor:pointer; display:grid; place-items:center; backdrop-filter:blur(6px);
           transition:background .2s; }
         .ev-playstop:hover { background:rgba(0,0,0,0.75); }

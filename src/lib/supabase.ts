@@ -200,26 +200,43 @@ export async function getMenuItems() {
   return data || [];
 }
 
-// Polub danie (serduszko). 1 polubienie / urządzenie / danie (localStorage guard).
-export async function likeMenuItem(itemId: string): Promise<boolean> {
+// Polub / cofnij polubienie dania (toggle). Zwraca nowy stan: true=polubione, false=cofnięte.
+export async function toggleMenuLike(itemId: string): Promise<boolean> {
   if (!itemId) return false;
   try {
     const key = 'sh-menu-liked';
     const liked: string[] = JSON.parse(localStorage.getItem(key) || '[]');
-    if (liked.includes(itemId)) return false; // już polubione
-    const { error } = await supabase.rpc('increment_menu_like', { item_id: itemId });
+    const already = liked.includes(itemId);
+    const delta = already ? -1 : 1;
+    const { error } = await supabase.rpc('increment_menu_like', { item_id: itemId, delta });
     if (error) {
-      // fallback bez RPC: pobierz + update
+      // fallback bez nowego RPC (stara sygnatura/brak): pobierz + update
       const { data } = await supabase.from('menu_items').select('likes').eq('id', itemId).single();
-      await supabase.from('menu_items').update({ likes: ((data?.likes as number) || 0) + 1 }).eq('id', itemId);
+      const next = Math.max(0, ((data?.likes as number) || 0) + delta);
+      await supabase.from('menu_items').update({ likes: next }).eq('id', itemId);
     }
-    liked.push(itemId);
-    localStorage.setItem(key, JSON.stringify(liked));
-    return true;
+    if (already) {
+      localStorage.setItem(key, JSON.stringify(liked.filter((x) => x !== itemId)));
+      return false;
+    } else {
+      liked.push(itemId);
+      localStorage.setItem(key, JSON.stringify(liked));
+      return true;
+    }
   } catch (e) {
-    console.error('likeMenuItem error:', e);
+    console.error('toggleMenuLike error:', e);
     return false;
   }
+}
+
+// (kompat.) Polub danie — używa toggle, ale tylko dodaje.
+export async function likeMenuItem(itemId: string): Promise<boolean> {
+  const key = 'sh-menu-liked';
+  try {
+    const liked: string[] = JSON.parse(localStorage.getItem(key) || '[]');
+    if (liked.includes(itemId)) return false;
+  } catch {}
+  return toggleMenuLike(itemId);
 }
 
 // Mapa polubień menu po nazwie pozycji (front używa statycznego FULL_MENU, łączymy po name).
