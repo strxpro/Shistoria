@@ -796,6 +796,15 @@
 - [x] N: geolokalizacja → auto-język (ipapi.co + navigator.language fallback) ✅
 - [x] O: integracje make.com — rezerwacja+email+WhatsApp, share drink email, Ogłoś Drink del Mese (auto-wybór, email do wszystkich) ✅ (webhook URL z env)
 
+### 🐛 NAPRAWIONE BUGI MOBILE (sesja iteracyjna 2):
+- [x] Header NIE rusza się od pill "Categorie" (data-cx-sheet tylko gdy sheet faktycznie otwarty) ✅
+- [x] Hamburger widoczny w kreatorze (ukrywamy .nav-inner zamiast całego .nav; usunięto data-cx-scrolling hide) ✅
+- [x] "Wybierz ten" → wybór szkła → QR bez formularza (DirectOrderQR, krzyżyk zamyka, tło blur) ✅
+- [x] Community share form: overflow-wrap + box-sizing (napisy nie wychodzą poza ekran) ✅
+- [x] Eventi: play/stop w rogu AKTYWNEJ karty (nie wychodzi); klik lewa/prawa nawiguje (nie blokuje) ✅
+- [x] Eventi: przycisk "Ricordamelo" → modal (imię+email) → webhook event reminder (3 dni + 5h przed, w języku) ✅
+- [x] Teleportacja: storia snap przez Lenis.scrollTo (nie raw window.scrollTo walczący z Lenis) ✅
+
 ### 🐛 NAPRAWIONE BUGI MOBILE (sesja iteracyjna):
 - [x] GPU Context Lost: Environment/ContactShadows off na mobile, mini-butelki SVG (zero mini-canvas) ✅
 - [x] Animacja shake: usunięto overflow:hidden (czarny ekran iOS) + safety timeout 4s ✅
@@ -830,6 +839,7 @@
   - NEXT_PUBLIC_MAKE_CONTACT_WEBHOOK (rezerwacje)
   - NEXT_PUBLIC_MAKE_DRINK_WEBHOOK (share drinka)
   - NEXT_PUBLIC_MAKE_WINNER_WEBHOOK (drink miesiąca)
+  - NEXT_PUBLIC_MAKE_EVENT_WEBHOOK (przypomnienie o wydarzeniu — 3 dni + 5h przed)
 - W scenariuszu: Translate (pole `lang`) → Email (właściciel IT + klient w jego języku) → WhatsApp (callmebot/Twilio)
 
 
