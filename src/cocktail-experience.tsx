@@ -4729,6 +4729,106 @@ function OrganicFlood({ floodRef, grainRef }: { floodRef: React.RefObject<HTMLDi
  * ──────────────────────────────────────────────────────────────────────── */
 
 /* ──────────────────────────────────────────────────────────────────────────
+ * DbDrinkCard — karta drinka z bazy (Supabase) z pełnymi funkcjami:
+ * zdjęcie, double-tap serce, lajki, komentarze, zamów (QR).
+ * ──────────────────────────────────────────────────────────────────────── */
+function DbDrinkCard({ d }: { d: any }) {
+  const [liked, setLiked] = useState(false);
+  const [likes, setLikes] = useState(d.likes || 0);
+  const [popout, setPopout] = useState(false);
+  const [orderQR, setOrderQR] = useState<string | null>(null);
+  const clickTimer = useRef<number | null>(null);
+  const strengthColor = d.strength_value > 0.3 ? "#C8102E" : d.strength_value > 0.15 ? "#E8927C" : "#F4D03F";
+
+  const doLike = async () => {
+    if (liked) return;
+    setLiked(true); setLikes((n: number) => n + 1);
+    try { await likeDrink(d.id); } catch {}
+  };
+  const handleClick = () => {
+    if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; return; }
+    clickTimer.current = window.setTimeout(() => { clickTimer.current = null; setPopout(true); }, 280);
+  };
+  const handleDbl = (e: React.MouseEvent) => { e.preventDefault(); e.stopPropagation(); if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; } doLike(); };
+  const handleOrder = async () => {
+    try {
+      const order = await createOrder({ drink_id: d.id, drink_name: d.name, author_name: d.author_name, ingredients: d.ingredients || [], total_ml: d.total_ml || 0, strength_label: d.strength_label || "—" });
+      if (order?.id) setOrderQR(`${typeof window !== "undefined" ? window.location.origin : ""}/order/${order.id}`);
+    } catch {}
+  };
+
+  return (
+    <>
+      <article className="cx-cc" onClick={handleClick} onDoubleClick={handleDbl} style={{ "--cc-strength": strengthColor } as React.CSSProperties}>
+        <div className="cx-cc-strength-bar" />
+        <span className="cx-cc-heart-corner">♥</span>
+        <div className="cx-cc-vis" style={{ background: `radial-gradient(120% 90% at 30% 10%, ${d.color}22, transparent 60%)` }}>
+          <span className="cx-cc-by">by {d.author_name}</span>
+          {d.photo_url && <img src={d.photo_url} style={{ width: "70%", height: "82%", objectFit: "cover", borderRadius: 12 }} alt={d.name} />}
+        </div>
+        <div className="cx-cc-body">
+          <h3>{d.name}</h3>
+          <div className="cx-cc-pills">
+            {(d.ingredients || []).slice(0, 4).map((ing: any, i: number) => (
+              <span key={i} className="cx-cc-pill"><span style={{ background: ing.color }} />{ing.name}</span>
+            ))}
+          </div>
+          <div className="cx-cc-meta">
+            <button className={`cx-cc-like ${liked ? "on" : ""}`} onClick={(e) => { e.stopPropagation(); doLike(); }}>♥ {likes}</button>
+            <button className="cx-cc-cmt-btn" onClick={(e) => { e.stopPropagation(); setPopout(true); }}>💬 {d.comments || 0}</button>
+            <span className="cx-cc-claimed-pill">🍸 {d.claimed_count || 0}</span>
+          </div>
+        </div>
+      </article>
+
+      {popout && typeof document !== "undefined" && createPortal(
+        <div className="cx-cc-popout-overlay" onClick={() => setPopout(false)}>
+          <div className="cx-cc-popout" onClick={(e) => e.stopPropagation()}>
+            <button className="cx-cc-popout-close" onClick={() => setPopout(false)}>×</button>
+            <div className="cx-cc-popout-left">
+              {d.photo_url ? <img src={d.photo_url} alt={d.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <div style={{ fontSize: 60 }}>🍸</div>}
+            </div>
+            <div className="cx-cc-popout-right">
+              <div className="cx-cc-popout-header">
+                <span className="cx-cc-popout-by">by {d.author_name}</span>
+                <h3 className="cx-cc-popout-name">{d.name}</h3>
+                <div className="cx-cc-popout-strength" style={{ color: strengthColor }}><span className="cx-cc-popout-dot" style={{ background: strengthColor }} />{d.strength_label}</div>
+              </div>
+              <button className="cx-cc-claim-btn cx-cc-claim-top" onClick={handleOrder}>🍸 Ordina questo drink</button>
+              <div className="cx-cc-claimed-count">🍸 {d.claimed_count || 0} volte ritirato</div>
+              <div className="cx-cc-popout-ingr">
+                <span className="cx-cc-popout-label">Ingredienti</span>
+                <div className="cx-cc-popout-pills">
+                  {(d.ingredients || []).map((ing: any, i: number) => (
+                    <span key={i} className="cx-cc-pill"><span style={{ background: ing.color }} />{ing.name}</span>
+                  ))}
+                </div>
+              </div>
+              <div className="cx-cc-popout-actions">
+                <button className={`cx-cc-like ${liked ? "on" : ""}`} onClick={doLike}>♥ {likes}</button>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
+
+      {orderQR && typeof document !== "undefined" && createPortal(
+        <div className="cx-qr-overlay" onClick={() => setOrderQR(null)}>
+          <div className="cx-qr-card" onClick={(e) => e.stopPropagation()}>
+            <button className="cx-qr-close" onClick={() => setOrderQR(null)}>×</button>
+            <span className="cx-mini-kicker">Mostralo al barman</span>
+            <div className="cx-qr-box"><PersonalizedQR url={orderQR} color={d.color || "#E8927C"} size={180} icon="🍸" /></div>
+            <h4 style={{ margin: "8px 0 0", color: "#fff" }}>{d.name}</h4>
+          </div>
+        </div>,
+        document.body,
+      )}
+    </>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
  * ShareDrinkBtn — popout z podglądem live + upload zdjęcia.
  * ──────────────────────────────────────────────────────────────────────── */
 function ShareDrinkBtn() {
@@ -4816,7 +4916,7 @@ function ShareDrinkBtn() {
               <div className="cx-share-success">
                 <span className="cx-share-success-ico">🎉</span>
                 <h3>Grazie!</h3>
-                <p>Il tuo drink è stato inviato. Hai una maggiore possibilità di vincere il <strong>Drink del Mese</strong> nella nostra carta!</p>
+                <p>Il tuo drink è stato inviato. Vinci il <strong>Drink del Mese</strong> e ricevi un <strong>drink GRATIS</strong> a tua scelta! 🍸</p>
               </div>
             ) : (
               <div className="cx-share-form">
@@ -4864,7 +4964,7 @@ function ShareDrinkBtn() {
                       </button>
                     </div>
                   )}
-                  {myDrink && <p className="cx-share-hint">La foto apparirà nella community. Più creatività = Drink del Mese!</p>}
+                  {myDrink && <p className="cx-share-hint">{(() => { const L = { it:"La foto apparirà nella community. Vinci il Drink del Mese e ricevi un drink GRATIS a tua scelta! 🍸", pl:"Zdjęcie pojawi się w community. Wygraj Drink Miesiąca i odbierz DARMOWY dowolny drink! 🍸", en:"Your photo joins the community. Win Drink of the Month and get a FREE drink of your choice! 🍸", de:"Dein Foto erscheint in der Community. Gewinne den Drink des Monats und erhalte einen GRATIS-Drink deiner Wahl! 🍸", fr:"Ta photo rejoint la communauté. Gagne le Cocktail du Mois et reçois un cocktail GRATUIT au choix! 🍸", es:"Tu foto se une a la comunidad. ¡Gana el Drink del Mes y recibe un trago GRATIS a tu elección! 🍸" }; return L[((typeof window!=="undefined"&&(window as any).currentLanguage)||"it") as keyof typeof L]??L.it; })()}</p>}
                   {myDrink && (
                     <button className="cx-btn cx-share-submit" disabled={!photo} onClick={handleSend}>
                       Pubblica nella community →
@@ -5066,27 +5166,7 @@ function CommunitySection({ sectionRef }: { sectionRef?: React.RefObject<HTMLEle
             if (commFilter === "popular") return b.comments - a.comments;
             return 0;
           }).map((c) => <CommunityCard key={c.name} c={c} />)}
-          {dbDrinks.map((d) => (
-            <article key={d.id} className="cx-cc" style={{"--cc-strength": d.strength_value > 0.3 ? "#C8102E" : d.strength_value > 0.15 ? "#E8927C" : "#F4D03F"} as React.CSSProperties}>
-              <div className="cx-cc-strength-bar" />
-              <div className="cx-cc-vis" style={{background: `radial-gradient(120% 90% at 30% 10%, ${d.color}22, transparent 60%)`}}>
-                <span className="cx-cc-by">by {d.author_name}</span>
-                {d.photo_url && <img src={d.photo_url} style={{width:"60%",height:"80%",objectFit:"cover",borderRadius:12,opacity:0.9}} alt={d.name} />}
-              </div>
-              <div className="cx-cc-body">
-                <h3>{d.name}</h3>
-                <div className="cx-cc-pills">
-                  {(d.ingredients||[]).slice(0,4).map((ing: any, i: number) => (
-                    <span key={i} className="cx-cc-pill"><span style={{background:ing.color}} />{ing.name}</span>
-                  ))}
-                </div>
-                <div className="cx-cc-meta">
-                  <span className="cx-cc-like">{String.fromCharCode(9829)} {d.likes}</span>
-                  <span>{d.strength_label}</span>
-                </div>
-              </div>
-            </article>
-          ))}
+          {dbDrinks.map((d) => <DbDrinkCard key={d.id} d={d} />)}
         </div>
         <div className="cx-comm-more">
           {!noMore && (
@@ -5921,10 +6001,12 @@ function CocktailStyles() {
       .cx-comm-grid-toggle { width:36px; height:36px; border-radius:10px; border:1px solid rgba(255,255,255,0.15); color:#fff; font-size:18px;
         display:grid; place-items:center; cursor:pointer; background:rgba(255,255,255,0.04); transition:all .25s; }
       .cx-comm-grid-toggle:hover { background:rgba(255,255,255,0.1); }
-      /* Domyślnie: 1 kolumna (single) na mobile, auto-fill na desktop */
-      .cx-comm-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:24px; }
+      /* Domyślnie (single): 1 szeroka kolumna. Tryb "grid": wiele kolumn (desktop do 4). */
+      .cx-comm-grid { display:grid; grid-template-columns:1fr; gap:24px; max-width:640px; margin:0 auto; }
       .cx-comm-grid .cx-cc { transition:transform .4s cubic-bezier(.2,.8,.2,1), opacity .3s ease, box-shadow .4s; }
-      .cx-comm-grid-2col { grid-template-columns:repeat(2,1fr) !important; gap:16px !important; }
+      .cx-comm-grid-2col { max-width:none !important; grid-template-columns:repeat(2,1fr) !important; gap:16px !important; }
+      @media (min-width:900px) { .cx-comm-grid-2col { grid-template-columns:repeat(3,1fr) !important; } }
+      @media (min-width:1200px) { .cx-comm-grid-2col { grid-template-columns:repeat(4,1fr) !important; } }
       @media (max-width:768px) { .cx-comm-grid { grid-template-columns:1fr; gap:14px; }
         .cx-comm-grid-2col { grid-template-columns:repeat(2,1fr) !important; gap:12px !important; }
         .cx-comm-filter-desktop { display:none !important; }
