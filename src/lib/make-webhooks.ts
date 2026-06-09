@@ -48,8 +48,23 @@ async function send(key: "contact" | "drink" | "winner" | "event", payload: Json
  * → WhatsApp do właściciela (przez moduł callmebot/Twilio w make.com)
  */
 export async function sendReservation(data: {
-  name: string; firstName?: string; lastName?: string; email: string; phone?: string; date?: string; time?: string; people?: number; message?: string; lang: string; whatsapp?: boolean;
+  name: string; firstName?: string; lastName?: string; email: string; phone?: string; date?: string; time?: string; people?: number; message?: string; lang: string;
 }): Promise<boolean> {
+  const { clientEmailHTML, ownerEmailHTML, ownerWhatsAppText } = await import("./email-templates");
+  const lang = (["it","pl","en","de","fr","es"].includes(data.lang) ? data.lang : "it") as import("./email-templates").Lang;
+  const vars = {
+    firstName: data.firstName || data.name || "",
+    lastName: data.lastName || "",
+    email: data.email,
+    phone: data.phone || "",
+    date: data.date || "",
+    time: data.time || "",
+    people: data.people ?? 2,
+    message: data.message || "",
+    lang,
+  };
+  const client = clientEmailHTML(vars);
+  const owner = ownerEmailHTML(vars);
   return send("contact", {
     type: "reservation",
     name: data.name,
@@ -61,9 +76,15 @@ export async function sendReservation(data: {
     time: data.time || "",
     people: data.people ?? 2,
     message: data.message || "",
-    lang: data.lang,           // język klienta → make tłumaczy email zwrotny
-    notify_whatsapp: data.whatsapp === true, // tylko gdy klient zaznaczył zgodę
-    owner_lang: "it",          // właściciel zawsze po włosku
+    lang: data.lang,
+    owner_lang: "it",
+    notify_whatsapp: true,                   // WhatsApp do właściciela ZAWSZE
+    // ── GOTOWE treści (pre-renderowane) — w make.com mapujesz tylko te pola ──
+    email_subject_client: client.subject,    // temat maila do klienta (w jego języku)
+    email_html_client: client.html,          // pełny HTML maila do klienta
+    email_subject_owner: owner.subject,       // temat maila do właściciela (IT)
+    email_html_owner: owner.html,            // pełny HTML maila do właściciela (IT)
+    whatsapp_text_owner: ownerWhatsAppText(vars), // treść WhatsApp (IT)
   });
 }
 

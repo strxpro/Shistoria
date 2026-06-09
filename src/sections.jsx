@@ -712,7 +712,7 @@ function Recensioni({ t }) {
 
 // ─── Contatti ─────────────────────────────────────────────────────────────────
 function Contatti({ t }) {
-  const [form, setForm] = useStateE({ firstName: "", lastName: "", email: "", phone: "", date: "", time: "", people: 2, message: "", whatsapp: false });
+  const [form, setForm] = useStateE({ firstName: "", lastName: "", email: "", phone: "", date: "", time: "", people: 2, message: "" });
   const [submitted, setSubmitted] = useStateE(false);
   const [errors, setErrors] = useStateE({});
 
@@ -753,7 +753,7 @@ function Contatti({ t }) {
     // make.com webhook (e-mail właściciel po IT + klient w jego języku + WhatsApp)
     try {
       const { sendReservation } = await import("./lib/make-webhooks");
-      await sendReservation({ name: fullName, firstName: form.firstName, lastName: form.lastName, email: form.email, phone: form.phone, date: form.date, time: form.time, people: form.people, message: form.message, lang, whatsapp: form.whatsapp });
+      await sendReservation({ name: fullName, firstName: form.firstName, lastName: form.lastName, email: form.email, phone: form.phone, date: form.date, time: form.time, people: form.people, message: form.message, lang });
     } catch (err3) { console.error("Make webhook error:", err3); }
 
     // WhatsApp callmebot (fallback bezpośredni, jeśli skonfigurowany window.__CALLMEBOT)
@@ -859,13 +859,6 @@ function Contatti({ t }) {
                     <label>{t("contatti.fields.message")}</label>
                     <textarea rows={3} value={form.message} onChange={upd("message")} placeholder="Allergie, occasione speciale, richieste..." />
                   </div>
-                  <label className="cnt-whatsapp" style={{ gridColumn: "1 / -1" }}>
-                    <input type="checkbox" checked={form.whatsapp} onChange={(e) => setForm((f) => ({ ...f, whatsapp: e.target.checked }))} />
-                    <span className="cnt-wa-box" aria-hidden="true" />
-                    <span className="cnt-wa-text">
-                      {({ it: "Voglio ricevere conferma via WhatsApp", pl: "Chcę otrzymać potwierdzenie przez WhatsApp", en: "I want a WhatsApp confirmation", de: "WhatsApp-Bestätigung erhalten", fr: "Recevoir une confirmation WhatsApp", es: "Recibir confirmación por WhatsApp" })[(typeof window !== "undefined" && window.currentLanguage) || "it"]}
-                    </span>
-                  </label>
                 </div>
                 <button type="submit" className="btn cnt-submit">{t("contatti.submit")} <span className="arrow">→</span></button>
               </form>
