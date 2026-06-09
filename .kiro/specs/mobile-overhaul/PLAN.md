@@ -978,8 +978,8 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS image_url text;
 
 ### ⏳ DO DOPRACOWANIA NA URZĄDZENIU (kreator 3D — `cocktail-experience.tsx`):
 > To wymaga testów na realnym telefonie (zmiany w scenie R3F/GSAP są ryzykowne „w ciemno").
+- [x] **Strona „teleportuje" w kreatorze + scena podskakuje/powiększa się** — przyczyna: pasek adresu na mobile pokazuje/chowa się przy scrollu → fałszywy `resize` → ScrollTrigger.refresh + przeliczenie kamery. NAPRAWIONE: `ScrollTrigger.config({ ignoreMobileResize:true })` + kamera reaguje tylko na zmianę SZEROKOŚCI (ignoruje zmianę wysokości). ✅
 - [ ] **Animacja wjazdu szejkera** — sprawdzić czy `shakerEnterFrom` odtwarza się na mobile.
 - [ ] **Brak strumienia przy wyborze butelki** — strumień (`PourStream`) nie pojawia się; sprawdzić trigger pour na mobile.
-- [ ] **Szejker + tło powiększa się przy otwarciu menu butelek** — błąd skalowania sceny gdy otwiera się drawer.
-- [ ] **Strona „teleportuje" w kreatorze** — scroll nie jest płynny (ScrollTrigger scrub / snap).
+- [ ] **Szejker + tło powiększa się przy otwarciu menu butelek** — częściowo zaadresowane przez fix kamery (resize); do potwierdzenia na urządzeniu.
 - [ ] **Header przesuwa się w kreatorze** — zweryfikować `data-cx-section="creator"` (logo/flaga mają zostać).

@@ -62,6 +62,11 @@ import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
 
 gsap.registerPlugin(ScrollTrigger);
+// Ignoruj fałszywe resize na mobile (pokazywanie/chowanie paska adresu przy scrollu),
+// które powodowały „teleportowanie" / przeskoki sceny kreatora.
+if (typeof window !== "undefined") {
+  try { ScrollTrigger.config({ ignoreMobileResize: true }); } catch { /* ignore */ }
+}
 
 import { supabase, getSessionId, createOrder, publishDrink, likeDrink, addComment, claimDrink as claimDrinkApi } from "./lib/supabase";
 import { findCocktailByIngredients } from "./lib/cocktail-db";
@@ -1316,6 +1321,7 @@ function Scene({
   // responsywna kamera: na wąskich ekranach odsuń i poszerz FOV, by szejker się mieścił
   useEffect(() => {
     const cam = camera as THREE.PerspectiveCamera;
+    let lastW = typeof window !== "undefined" ? window.innerWidth : 0;
     const apply = () => {
       const mobile = window.innerWidth < 768;
       cam.fov = mobile ? 50 : 36;
@@ -1324,8 +1330,15 @@ function Scene({
       invalidate();
     };
     apply();
-    window.addEventListener("resize", apply);
-    return () => window.removeEventListener("resize", apply);
+    // Reaguj TYLKO na zmianę szerokości — ignoruj zmiany wysokości (pasek adresu na mobile
+    // pokazuje/chowa się przy scrollu → fałszywy resize → scena „podskakiwała"/powiększała się).
+    const onResize = () => {
+      if (window.innerWidth === lastW) return;
+      lastW = window.innerWidth;
+      apply();
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
   }, [camera, invalidate]);
 
   // parallax pokoju: mysz (desktop) + orientacja urządzenia (mobile)
