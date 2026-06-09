@@ -10,23 +10,27 @@ Załóż **jeden plik Google Sheets** (np. „S'Historia Dane") i w nim **5 zak�
 
 Webhook: `NEXT_PUBLIC_MAKE_CONTACT_WEBHOOK` (`type = reservation`)
 
-| A | B | C | D | E | F | G | H |
-|---|---|---|---|---|---|---|---|
-| Data zgłoszenia | Nazwisko | Email | Telefon | Data rezerwacji | Osoby | Wiadomość | Język |
+| A | B | C | D | E | F | G | H | I |
+|---|---|---|---|---|---|---|---|---|
+| Data zgłoszenia | Imię | Nazwisko | Email | Telefon | Data rezerwacji | Godzina | Osoby | Wiadomość |
 
-Nagłówki do wklejenia w wiersz 1 (A1:H1):
+> + kolumna J = Język (`{{lang}}`).
+
+Nagłówki do wklejenia w wiersz 1 (A1:J1):
 ```
-Data zgłoszenia	Nazwisko	Email	Telefon	Data rezerwacji	Osoby	Wiadomość	Język
+Data zgłoszenia	Imię	Nazwisko	Email	Telefon	Data rezerwacji	Godzina	Osoby	Wiadomość	Język
 ```
 Mapowanie w make.com (Add a Row):
 - A → `{{ts}}` (lub `formatDate(now)`)
-- B → `{{name}}`
-- C → `{{email}}`
-- D → `{{phone}}`
-- E → `{{date}}`
-- F → `{{people}}`
-- G → `{{message}}`
-- H → `{{lang}}`
+- B → `{{first_name}}`
+- C → `{{last_name}}`
+- D → `{{email}}`
+- E → `{{phone}}`
+- F → `{{date}}`
+- G → `{{time}}`
+- H → `{{people}}`
+- I → `{{message}}`
+- J → `{{lang}}`
 
 ---
 
@@ -135,7 +139,7 @@ Mapowanie:
 
 Otwórz każdą zakładkę i wklej nagłówki w komórkę A1 (Google Sheets sam rozbije po Tab):
 
-- **Prenotazioni:** `Data zgłoszenia	Nazwisko	Email	Telefon	Data rezerwacji	Osoby	Wiadomość	Język`
+- **Prenotazioni:** `Data zgłoszenia	Imię	Nazwisko	Email	Telefon	Data rezerwacji	Godzina	Osoby	Wiadomość	Język`
 - **Drink_Community:** `Data	Nazwa drinka	Autor	Email autora	Składniki	Zdjęcie (URL)	Język`
 - **Ordini_QR:** `Data	Nazwa drinka	Autor	Składniki	ml	Status	Odebrano (data)`
 - **Eventi_Promemoria:** `Data zapisu	Imię	Email	Język	Wydarzenie	Data wydarzenia	Wysłano 3dni	Wysłano 5h`

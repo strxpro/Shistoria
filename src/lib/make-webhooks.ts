@@ -48,14 +48,17 @@ async function send(key: "contact" | "drink" | "winner" | "event", payload: Json
  * → WhatsApp do właściciela (przez moduł callmebot/Twilio w make.com)
  */
 export async function sendReservation(data: {
-  name: string; email: string; phone?: string; date?: string; people?: number; message?: string; lang: string;
+  name: string; firstName?: string; lastName?: string; email: string; phone?: string; date?: string; time?: string; people?: number; message?: string; lang: string;
 }): Promise<boolean> {
   return send("contact", {
     type: "reservation",
     name: data.name,
+    first_name: data.firstName || "",
+    last_name: data.lastName || "",
     email: data.email,
     phone: data.phone || "",
     date: data.date || "",
+    time: data.time || "",
     people: data.people ?? 2,
     message: data.message || "",
     lang: data.lang,           // język klienta → make tłumaczy email zwrotny

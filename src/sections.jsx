@@ -712,21 +712,26 @@ function Recensioni({ t }) {
 
 // ─── Contatti ─────────────────────────────────────────────────────────────────
 function Contatti({ t }) {
-  const [form, setForm] = useStateE({ name: "", email: "", phone: "", date: "", people: 2, message: "" });
+  const [form, setForm] = useStateE({ firstName: "", lastName: "", email: "", phone: "", date: "", time: "", people: 2, message: "" });
   const [submitted, setSubmitted] = useStateE(false);
   const [errors, setErrors] = useStateE({});
+
+  // Godziny do wyboru (wg godzin otwarcia restauracji)
+  const TIME_SLOTS = ["12:00","12:30","13:00","13:30","14:00","14:30","19:00","19:30","20:00","20:30","21:00","21:30","22:00"];
 
   const upd = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   const submit = async (e) => {
     e.preventDefault();
     const err = {};
-    if (!form.name) err.name = true;
+    if (!form.firstName) err.firstName = true;
+    if (!form.lastName) err.lastName = true;
     if (!form.email || !form.email.includes("@")) err.email = true;
     setErrors(err);
     if (Object.keys(err).length > 0) return;
 
     const lang = (typeof window !== "undefined" && window.currentLanguage) || "it";
+    const fullName = `${form.firstName} ${form.lastName}`.trim();
 
     // Zapisz do Supabase
     try {
@@ -735,12 +740,12 @@ function Contatti({ t }) {
       const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNsYXRlbHBpcHh0cXZleWRnc2xjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODcyNTQsImV4cCI6MjA5NjE2MzI1NH0.5dwE9IStThjC-krTtgg7PtEwmTnr_bQ_TEbQhgMpHdY';
       const sb = createClient(url, key);
       await sb.from("contact_messages").insert({
-        name: form.name,
+        name: fullName,
         email: form.email,
         phone: form.phone || null,
         date: form.date || null,
         people: form.people,
-        message: form.message || null,
+        message: [form.time ? `Ora: ${form.time}` : "", form.message].filter(Boolean).join(" · ") || null,
         language: lang, // auto-wykryty język klienta
       });
     } catch (err2) { console.error("Contact save error:", err2); }
@@ -748,14 +753,14 @@ function Contatti({ t }) {
     // make.com webhook (e-mail właściciel po IT + klient w jego języku + WhatsApp)
     try {
       const { sendReservation } = await import("./lib/make-webhooks");
-      await sendReservation({ name: form.name, email: form.email, phone: form.phone, date: form.date, people: form.people, message: form.message, lang });
+      await sendReservation({ name: fullName, firstName: form.firstName, lastName: form.lastName, email: form.email, phone: form.phone, date: form.date, time: form.time, people: form.people, message: form.message, lang });
     } catch (err3) { console.error("Make webhook error:", err3); }
 
     // WhatsApp callmebot (fallback bezpośredni, jeśli skonfigurowany window.__CALLMEBOT)
     const cmb = typeof window !== "undefined" && window.__CALLMEBOT;
     if (cmb && cmb.phone && cmb.apikey) {
       try {
-        const msg = encodeURIComponent(`Nuova prenotazione S'Historia:\n${form.name} (${lang})\n${form.email} ${form.phone}\n${form.people} pers. ${form.date}\n${form.message || ""}`);
+        const msg = encodeURIComponent(`Nuova prenotazione S'Historia:\n${fullName} (${lang})\n${form.email} ${form.phone}\n${form.people} pers. ${form.date} ${form.time}\n${form.message || ""}`);
         await fetch(`https://api.callmebot.com/whatsapp.php?phone=${cmb.phone}&text=${msg}&apikey=${cmb.apikey}`, { mode: "no-cors" });
       } catch (err4) { console.error("WhatsApp error:", err4); }
     }
@@ -815,9 +820,13 @@ function Contatti({ t }) {
               <form className="cnt-form" onSubmit={submit}>
                 <h3 className="cnt-form-title">{t("contatti.formTitle")}</h3>
                 <div className="cnt-form-grid">
-                  <div className={`field ${errors.name ? "err" : ""}`}>
-                    <label>{t("contatti.fields.name")} *</label>
-                    <input value={form.name} onChange={upd("name")} placeholder="Mario Rossi" />
+                  <div className={`field ${errors.firstName ? "err" : ""}`}>
+                    <label>{t("contatti.fields.firstName") || "Nome"} *</label>
+                    <input value={form.firstName} onChange={upd("firstName")} placeholder="Mario" />
+                  </div>
+                  <div className={`field ${errors.lastName ? "err" : ""}`}>
+                    <label>{t("contatti.fields.lastName") || "Cognome"} *</label>
+                    <input value={form.lastName} onChange={upd("lastName")} placeholder="Rossi" />
                   </div>
                   <div className={`field ${errors.email ? "err" : ""}`}>
                     <label>{t("contatti.fields.email")} *</label>
@@ -830,6 +839,13 @@ function Contatti({ t }) {
                   <div className="field">
                     <label>{t("contatti.fields.date")}</label>
                     <input type="date" value={form.date} onChange={upd("date")} />
+                  </div>
+                  <div className="field">
+                    <label>{t("contatti.fields.time") || "Ora"}</label>
+                    <select className="cnt-select" value={form.time} onChange={upd("time")}>
+                      <option value="">—</option>
+                      {TIME_SLOTS.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
                   </div>
                   <div className="field">
                     <label>{t("contatti.fields.people")}</label>
@@ -872,6 +888,11 @@ function Contatti({ t }) {
         .field.err input { border-bottom-color: var(--c-coral); animation: shake 0.3s; }
         @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
         .stepper { display: flex; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.2); }
+        .cnt-select { width: 100%; background: transparent; border: 0; border-bottom: 1px solid rgba(255,255,255,0.2); color: #fff;
+          font-family: var(--f-body); font-size: 15px; padding: 10px 0; outline: none; cursor: pointer; appearance: none;
+          background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' stroke='%23ffffff' stroke-width='1.5' fill='none' stroke-opacity='0.5'/></svg>");
+          background-repeat: no-repeat; background-position: right 4px center; }
+        .cnt-select option { background: var(--c-deep); color: #fff; }
         .stepper button { width: 32px; height: 32px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.2); color: #fff; font-size: 16px; }
         .stepper button:hover { background: var(--c-sky); border-color: var(--c-sky); }
         .stepper span { font-family: var(--f-display); font-weight: 700; font-size: 22px; min-width: 32px; text-align: center; }
