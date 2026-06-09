@@ -91,6 +91,7 @@ function MenuPanel() {
   const [loading, setLoading] = useState(true);
   const [editItem, setEditItem] = useState<any>(null);
   const [section, setSection] = useState<"ristorante" | "bar" | "all">("all");
+  const [sortByLikes, setSortByLikes] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -163,10 +164,10 @@ function MenuPanel() {
     if (!silent) load();
   };
 
-  const filtered = section === "all" ? items : items.filter((it) => {
+  const filtered = (section === "all" ? items : items.filter((it) => {
     if (section === "bar") return ["cocktails", "analcolici", "spina", "bottiglia", "vodka", "grappe", "bianchi", "rossi", "bollicine"].includes(it.category?.toLowerCase());
     return !["cocktails", "analcolici", "spina", "bottiglia", "vodka", "grappe", "bianchi", "rossi", "bollicine"].includes(it.category?.toLowerCase());
-  });
+  })).slice().sort((a, b) => sortByLikes ? (b.likes || 0) - (a.likes || 0) : (a.sort_order || 0) - (b.sort_order || 0));
 
   const save = async (item: any) => {
     if (item.id) {
@@ -215,6 +216,7 @@ function MenuPanel() {
           ))}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
+          <button className={`admin-btn-sm ${sortByLikes ? "admin-btn-gold" : ""}`} onClick={() => setSortByLikes((v) => !v)}>❤️ Più popolari</button>
           <button className="admin-btn-ghost" onClick={() => importMenu(false)}>🔄 Reimporta dal sito</button>
           <button className="admin-btn" onClick={() => setEditItem({ section: "ristorante", category: "", name: "", price: "", description: "" })}>
             + Aggiungi piatto
@@ -272,7 +274,7 @@ function MenuPanel() {
       {loading ? <p className="admin-loading">Caricamento...</p> : (
         <div className="admin-table">
           <table>
-            <thead><tr><th>Foto</th><th>Categoria</th><th>Nome</th><th>Prezzo</th><th>Allergeni</th><th></th></tr></thead>
+            <thead><tr><th>Foto</th><th>Categoria</th><th>Nome</th><th>Prezzo</th><th>❤️</th><th>Allergeni</th><th></th></tr></thead>
             <tbody>
               {filtered.map((it) => (
                 <tr key={it.id}>
@@ -280,6 +282,7 @@ function MenuPanel() {
                   <td>{it.category}</td>
                   <td><strong>{it.name}</strong>{it.is_featured && <span className="admin-badge">★</span>}</td>
                   <td>{it.price}</td>
+                  <td>{(it.likes || 0) > 0 ? <span className="menu-likes-badge">❤️ {it.likes}</span> : "—"}</td>
                   <td>{it.allergens || "—"}</td>
                   <td>
                     <button className="admin-btn-sm" onClick={() => setEditItem(it)}>✎</button>
@@ -1101,6 +1104,10 @@ function AdminStyles() {
         .admin-table { font-size:12px; }
         .admin-grid { grid-template-columns:1fr !important; }
         .admin-order { flex-direction:column; gap:12px; }
+        .admin-modal { width:100vw; max-width:100vw; max-height:92vh; border-radius:20px 20px 0 0; padding:24px 20px; }
+        .admin-modal-overlay { align-items:flex-end; padding:0; }
+        .admin-table table { min-width:520px; }
+        .admin-panel-head > div { flex-wrap:wrap; }
       }
       .admin-nav { padding:32px 20px; background:rgba(255,255,255,0.04); border-right:1px solid rgba(255,255,255,0.1); display:flex; flex-direction:column; gap:32px; }
       .admin-logo h2 { font-size:24px; margin:0; color:#fff; } .admin-logo span { font-size:11px; opacity:0.55; letter-spacing:0.15em; text-transform:uppercase; }
@@ -1161,6 +1168,7 @@ function AdminStyles() {
       .menu-img-preview button { position:absolute; top:6px; right:6px; width:26px; height:26px; border-radius:50%; border:none; background:rgba(0,0,0,0.6); color:#fff; cursor:pointer; }
       .menu-sel { padding:11px 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.05); color:#fff; font-size:14px; }
       .menu-sel option { background:#12171e; }
+      .menu-likes-badge { display:inline-block; padding:2px 8px; border-radius:999px; background:rgba(232,146,124,0.15); color:#E8927C; font-size:12px; font-weight:700; white-space:nowrap; }
       /* ── Ordini QR filtr + kod ── */
       .ord-filter { display:flex; gap:4px; background:rgba(255,255,255,0.04); border-radius:999px; padding:3px; }
       .ord-filter button { padding:7px 14px; border-radius:999px; border:none; background:none; color:rgba(255,255,255,0.6); font-size:12px; cursor:pointer; transition:all .2s; }
@@ -1244,7 +1252,8 @@ function AdminStyles() {
       .admin-form input, .admin-form textarea, .admin-form select { width:100%; padding:12px 16px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04); color:#fff; font-size:14px; }
       .admin-form textarea { min-height:80px; resize:vertical; }
       .admin-form-row { display:flex; align-items:center; gap:8px; }
-      .admin-modal-actions { display:flex; gap:12px; margin-top:24px; }
+      .admin-modal-actions { display:flex; gap:12px; margin-top:24px; position:sticky; bottom:-32px; background:linear-gradient(to top, #14181e 70%, rgba(20,24,30,0)); padding:16px 0 4px; margin-bottom:-8px; z-index:5; }
+      .admin-modal-actions .admin-btn { flex:1; }
       .admin-templates { display:flex; gap:8px; flex-wrap:wrap; }
       .admin-tpl { padding:10px 16px; border-radius:10px; border:2px solid; font-size:13px; cursor:pointer; transition:all .2s; color:#fff; }
       .admin-tpl.active { transform:scale(1.05); box-shadow:0 4px 20px rgba(0,0,0,0.4); }

@@ -200,6 +200,37 @@ export async function getMenuItems() {
   return data || [];
 }
 
+// Polub danie (serduszko). 1 polubienie / urządzenie / danie (localStorage guard).
+export async function likeMenuItem(itemId: string): Promise<boolean> {
+  if (!itemId) return false;
+  try {
+    const key = 'sh-menu-liked';
+    const liked: string[] = JSON.parse(localStorage.getItem(key) || '[]');
+    if (liked.includes(itemId)) return false; // już polubione
+    const { error } = await supabase.rpc('increment_menu_like', { item_id: itemId });
+    if (error) {
+      // fallback bez RPC: pobierz + update
+      const { data } = await supabase.from('menu_items').select('likes').eq('id', itemId).single();
+      await supabase.from('menu_items').update({ likes: ((data?.likes as number) || 0) + 1 }).eq('id', itemId);
+    }
+    liked.push(itemId);
+    localStorage.setItem(key, JSON.stringify(liked));
+    return true;
+  } catch (e) {
+    console.error('likeMenuItem error:', e);
+    return false;
+  }
+}
+
+// Mapa polubień menu po nazwie pozycji (front używa statycznego FULL_MENU, łączymy po name).
+export async function getMenuLikes(): Promise<Record<string, { id: string; likes: number }>> {
+  const { data } = await supabase.from('menu_items').select('id,name,likes');
+  const map: Record<string, { id: string; likes: number }> = {};
+  (data || []).forEach((r: any) => { if (r.name) map[String(r.name).trim().toLowerCase()] = { id: r.id, likes: r.likes || 0 }; });
+  return map;
+}
+
+
 // ─── Events (admin) ───────────────────────────────────────────────────────────
 
 export async function getEvents() {

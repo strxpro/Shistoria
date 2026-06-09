@@ -17,9 +17,16 @@ CREATE TABLE menu_items (
   image_url text,                      -- URL zdjęcia (Supabase storage / Google)
   is_featured boolean DEFAULT false,
   is_published boolean DEFAULT true,
+  likes integer DEFAULT 0,             -- liczba polubień (serduszko na daniu)
   sort_order integer DEFAULT 0,
   updated_at timestamptz DEFAULT now()
 );
+
+-- Funkcja inkrementacji polubień dania (atomowa, bez wyścigu)
+CREATE OR REPLACE FUNCTION increment_menu_like(item_id uuid)
+RETURNS void LANGUAGE sql AS $$
+  UPDATE menu_items SET likes = COALESCE(likes, 0) + 1 WHERE id = item_id;
+$$;
 
 CREATE INDEX IF NOT EXISTS idx_menu_items_section ON menu_items(section);
 CREATE INDEX IF NOT EXISTS idx_menu_items_sort ON menu_items(sort_order);
