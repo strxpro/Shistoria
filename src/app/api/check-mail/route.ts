@@ -89,7 +89,15 @@ function imapFetchUnseen(): Promise<{ from: string; fromName: string; subject: s
         const subject = decodeMime((raw.match(/Subject:\s*(.*)/i)?.[1] || "").trim());
         // TEXT body: bierzemy największy blok po nagłówkach literalu {n}
         let body = extractBody(raw);
-        if (fromEmail && fromEmail.includes("@")) {
+        // POMIŃ własne powiadomienia / autorespondery (żeby nie zaśmiecać czatu):
+        // - maile od samego siebie (info@shistoria.it)
+        // - noreply / mailer-daemon / make.com
+        // - powiadomienia o nowej rezerwacji (te wysyła system, nie klient)
+        const lowerFrom = fromEmail.toLowerCase();
+        const isOwn = lowerFrom === IMAP_USER.toLowerCase();
+        const isNoreply = /no-?reply|mailer-daemon|postmaster|notification|noreply/i.test(lowerFrom);
+        const isSystemSubject = /nuova prenotazione|drink del mese|drink della settimana|nuova richiesta|new reservation/i.test(subject);
+        if (fromEmail && fromEmail.includes("@") && !isOwn && !isNoreply && !isSystemSubject) {
           results.push({ from: fromEmail, fromName: fromName || fromEmail, subject, body: body.slice(0, 4000), uid });
         }
         fetchIdx++;
@@ -115,18 +123,60 @@ function decodeMime(s: string): string {
   });
 }
 
-// Wyciągnij czytelny tekst z surowej odpowiedzi FETCH (pomija nagłówki/HTML grubsze)
+// Wyciągnij CZYSTY tekst z surowej odpowiedzi FETCH (obsługa multipart MIME + quoted-printable + HTML)
 function extractBody(raw: string): string {
-  // weź fragment po ostatnim literalu {n}\r\n
-  const parts = raw.split(/\}\r?\n/);
-  let text = parts.length > 1 ? parts[parts.length - 1] : raw;
-  // utnij końcowy ") A.. OK"
-  text = text.replace(/\)\s*A\d+ OK[\s\S]*$/i, "");
-  // usuń tagi HTML jeśli to HTML
-  if (/<[a-z][\s\S]*>/i.test(text)) text = text.replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<[^>]+>/g, " ");
-  // dekoduj quoted-printable proste
-  text = text.replace(/=\r?\n/g, "").replace(/=([0-9A-F]{2})/gi, (_m, h) => String.fromCharCode(parseInt(h, 16)));
-  return text.replace(/\r/g, "").replace(/\n{3,}/g, "\n\n").trim();
+  // 1) odetnij część przed pierwszym literalem {n}\r\n (to są dane FETCH/nagłówki IMAP)
+  let body = raw;
+  const litIdx = raw.search(/\}\r?\n/);
+  if (litIdx >= 0) body = raw.slice(litIdx + raw.slice(litIdx).indexOf("\n") + 1);
+  // utnij końcówkę odpowiedzi IMAP ") A.. OK"
+  body = body.replace(/\)\s*A\d+ OK[\s\S]*$/i, "");
+
+  // 2) jeśli to multipart — znajdź granicę i wybierz część text/plain (albo text/html)
+  const boundaryMatch = body.match(/boundary="?([^"\r\n;]+)"?/i);
+  if (boundaryMatch) {
+    const boundary = "--" + boundaryMatch[1];
+    const parts = body.split(boundary).filter((p) => /content-type:/i.test(p));
+    const plain = parts.find((p) => /content-type:\s*text\/plain/i.test(p));
+    const html = parts.find((p) => /content-type:\s*text\/html/i.test(p));
+    const chosen = plain || html;
+    if (chosen) body = chosen;
+  }
+
+  // 3) usuń nagłówki części (wszystko do pierwszej pustej linii) — zostaw samą treść
+  const headerEnd = body.search(/\r?\n\r?\n/);
+  const isQP = /content-transfer-encoding:\s*quoted-printable/i.test(body.slice(0, headerEnd >= 0 ? headerEnd : 400));
+  const isB64 = /content-transfer-encoding:\s*base64/i.test(body.slice(0, headerEnd >= 0 ? headerEnd : 400));
+  const isHtml = /content-type:\s*text\/html/i.test(body.slice(0, headerEnd >= 0 ? headerEnd : 400));
+  if (headerEnd >= 0) body = body.slice(headerEnd).replace(/^\r?\n\r?\n/, "");
+
+  // 4) dekodowanie
+  if (isB64) {
+    try { body = Buffer.from(body.replace(/\s+/g, ""), "base64").toString("utf8"); } catch { /* ignore */ }
+  } else if (isQP) {
+    body = body.replace(/=\r?\n/g, "").replace(/=([0-9A-F]{2})/gi, (_m, h) => String.fromCharCode(parseInt(h, 16)));
+    try { body = Buffer.from(body, "latin1").toString("utf8"); } catch { /* ignore */ }
+  }
+
+  // 5) jeśli HTML — usuń style/skrypty/tagi, zostaw tekst
+  if (isHtml || /<[a-z][\s\S]*>/i.test(body)) {
+    body = body
+      .replace(/<style[\s\S]*?<\/style>/gi, "")
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/<\/(p|div|tr|h[1-6]|li|br)[^>]*>/gi, "\n")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&#39;|&apos;/gi, "'").replace(/&quot;/gi, '"');
+  }
+
+  // 6) sprzątanie: usuń pozostałe granice MIME i nadmiar białych znaków
+  body = body
+    .replace(/--[A-Za-z0-9'._-]{10,}--?/g, "")
+    .replace(/\r/g, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  return body || "(messaggio vuoto)";
 }
 
 export async function GET(req: NextRequest) {
