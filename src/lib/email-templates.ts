@@ -32,6 +32,7 @@ export interface ReservationVars {
   time?: string;
   people?: number;
   message?: string;
+  messageIt?: string; // wiadomość przetłumaczona na włoski (dla właściciela)
   lang: Lang;
 }
 
@@ -105,6 +106,13 @@ export function clientEmailHTML(v: ReservationVars): { subject: string; html: st
 /** E-mail do WŁAŚCICIELA — ZAWSZE po włosku. */
 export function ownerEmailHTML(v: ReservationVars): { subject: string; html: string } {
   const subject = `🍽️ Nuova prenotazione — ${v.firstName} ${v.lastName} (${v.people ?? "?"} pers.)`;
+  // Wiadomość po włosku (jeśli przetłumaczona) + oryginał gdy inny język
+  const msgIt = v.messageIt || v.message;
+  const msgRow = msgIt
+    ? row("Messaggio", v.lang !== "it" && v.message && v.messageIt && v.messageIt !== v.message
+        ? `${v.messageIt}<br><span style="color:${BRAND.muted};font-size:12px;font-style:italic;">(originale ${v.lang.toUpperCase()}: ${v.message})</span>`
+        : (msgIt || ""))
+    : "";
   const inner = `
     <h1 style="margin:0 0 14px;font-size:22px;color:${BRAND.cream};font-weight:800;">Nuova prenotazione</h1>
     <table style="width:100%;border-collapse:collapse;">
@@ -114,7 +122,7 @@ export function ownerEmailHTML(v: ReservationVars): { subject: string; html: str
       ${row("Data", v.date)}
       ${row("Ora", v.time)}
       ${row("Persone", v.people)}
-      ${row("Messaggio", v.message)}
+      ${msgRow}
       ${row("Lingua cliente", v.lang.toUpperCase())}
     </table>
     <p style="margin:18px 0 0;font-size:12px;color:${BRAND.muted};">Rispondi al cliente nella sua lingua (${v.lang.toUpperCase()}).</p>
@@ -131,6 +139,6 @@ export function ownerWhatsAppText(v: ReservationVars): string {
     `👥 ${v.people ?? "?"} persone`,
     `📞 ${v.phone || "—"}`,
     `✉️ ${v.email}`,
-    v.message ? `💬 ${v.message}` : "",
+    (v.messageIt || v.message) ? `💬 ${v.messageIt || v.message}` : "",
   ].filter(Boolean).join("\n");
 }

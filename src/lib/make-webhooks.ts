@@ -52,6 +52,15 @@ export async function sendReservation(data: {
 }): Promise<boolean> {
   const { clientEmailHTML, ownerEmailHTML, ownerWhatsAppText } = await import("./email-templates");
   const lang = (["it","pl","en","de","fr","es"].includes(data.lang) ? data.lang : "it") as import("./email-templates").Lang;
+  // Przetłumacz wiadomość klienta na włoski (dla właściciela) — auto-detect języka
+  let messageIt = data.message || "";
+  if (data.message && lang !== "it") {
+    try {
+      const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=it&dt=t&q=${encodeURIComponent(data.message)}`);
+      const j = await r.json();
+      messageIt = (j?.[0] || []).map((s: any) => s[0]).join("") || data.message;
+    } catch { messageIt = data.message; }
+  }
   const vars = {
     firstName: data.firstName || data.name || "",
     lastName: data.lastName || "",
@@ -61,6 +70,7 @@ export async function sendReservation(data: {
     time: data.time || "",
     people: data.people ?? 2,
     message: data.message || "",
+    messageIt,
     lang,
   };
   const client = clientEmailHTML(vars);
@@ -76,6 +86,7 @@ export async function sendReservation(data: {
     time: data.time || "",
     people: data.people ?? 2,
     message: data.message || "",
+    message_it: messageIt,                   // wiadomość po włosku (dla właściciela)
     lang: data.lang,
     owner_lang: "it",
     notify_whatsapp: true,                   // WhatsApp do właściciela ZAWSZE

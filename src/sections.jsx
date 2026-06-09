@@ -710,6 +710,48 @@ function Recensioni({ t }) {
   );
 }
 
+// ─── Custom Time Picker (stylizowany pod stronę) ──────────────────────────────
+function CustomTimePicker({ value, onChange, slots, lang }) {
+  const [open, setOpen] = useStateE(false);
+  const wrapRef = useRefE(null);
+  useEffectE(() => {
+    if (!open) return;
+    const onDown = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [open]);
+  const PLACEHOLDER = { it: "Seleziona ora", pl: "Wybierz godzinę", en: "Select time", de: "Uhrzeit wählen", fr: "Choisir l'heure", es: "Elegir hora" }[lang || "it"];
+  // Grupy: pranzo / cena dla czytelności
+  const lunch = slots.filter((s) => parseInt(s) < 17);
+  const dinner = slots.filter((s) => parseInt(s) >= 17);
+  const GROUP = { lunch: { it:"Pranzo",pl:"Obiad",en:"Lunch",de:"Mittag",fr:"Déjeuner",es:"Almuerzo" }, dinner: { it:"Cena",pl:"Kolacja",en:"Dinner",de:"Abend",fr:"Dîner",es:"Cena" } };
+  const g = (k) => GROUP[k][lang || "it"];
+  return (
+    <div className="cdp" ref={wrapRef}>
+      <button type="button" className={`cdp-trigger ${value ? "has-val" : ""}`} onClick={() => setOpen((o) => !o)}>
+        <span>{value || PLACEHOLDER}</span>
+        <span className="cdp-cal-ico">🕐</span>
+      </button>
+      {open && (
+        <div className="cdp-pop ctp-pop">
+          <div className="ctp-group-label">🍝 {g("lunch")}</div>
+          <div className="ctp-grid">
+            {lunch.map((s) => (
+              <button type="button" key={s} className={`ctp-slot ${value === s ? "sel" : ""}`} onClick={() => { onChange(s); setOpen(false); }}>{s}</button>
+            ))}
+          </div>
+          <div className="ctp-group-label">🌙 {g("dinner")}</div>
+          <div className="ctp-grid">
+            {dinner.map((s) => (
+              <button type="button" key={s} className={`ctp-slot ${value === s ? "sel" : ""}`} onClick={() => { onChange(s); setOpen(false); }}>{s}</button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Custom Date Picker (stylizowany pod stronę, wielojęzyczny) ───────────────
 function CustomDatePicker({ value, onChange, lang }) {
   const [open, setOpen] = useStateE(false);
@@ -943,10 +985,7 @@ function Contatti({ t }) {
                   </div>
                   <div className="field">
                     <label>{t("contatti.fields.time") || "Ora"}</label>
-                    <select className="cnt-select" value={form.time} onChange={upd("time")}>
-                      <option value="">—</option>
-                      {TIME_SLOTS.map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
+                    <CustomTimePicker value={form.time} onChange={(v) => setForm((f) => ({ ...f, time: v }))} slots={TIME_SLOTS} lang={(typeof window !== "undefined" && window.currentLanguage) || "it"} />
                   </div>
                   <div className="field">
                     <label>{t("contatti.fields.people")}</label>
@@ -1032,6 +1071,13 @@ function Contatti({ t }) {
         .cdp-day.sel { background: var(--c-coral, #E8927C); color: #1a1014; font-weight: 800; }
         .cdp-day.past { opacity: 0.25; cursor: not-allowed; }
         .cdp-day.closed { opacity: 0.3; cursor: not-allowed; text-decoration: line-through; color: var(--c-coral, #E8927C); }
+        .ctp-pop { width: 280px; }
+        .ctp-group-label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--c-coral, #E8927C); font-weight: 700; margin: 4px 0 8px; }
+        .ctp-group-label:not(:first-child) { margin-top: 14px; }
+        .ctp-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+        .ctp-slot { padding: 9px 0; border-radius: 9px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: #fff; font-size: 13px; cursor: pointer; transition: all .15s; }
+        .ctp-slot:hover { background: rgba(232,146,124,0.25); border-color: var(--c-coral, #E8927C); }
+        .ctp-slot.sel { background: var(--c-coral, #E8927C); color: #1a1014; font-weight: 800; border-color: transparent; }
         .cnt-whatsapp { display: flex; align-items: center; gap: 12px; cursor: pointer; padding: 8px 0; }
         .cnt-whatsapp input { position: absolute; opacity: 0; width: 0; height: 0; }
         .cnt-wa-box { width: 24px; height: 24px; flex-shrink: 0; border-radius: 7px; border: 1px solid rgba(255,255,255,0.3); background: rgba(255,255,255,0.04); position: relative; transition: all .2s; }
