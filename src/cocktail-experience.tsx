@@ -1986,9 +1986,11 @@ function CocktailExperience() {
       // wspólna poza wlotu shakera: k=0 → daleko z prawej (mały), k=1 → spoczynek.
       const flyInPose = (k: number) => {
         k = clamp01(k);
-        // NIE ustawiaj visible jeśli szklanka jest aktywna (glassReady/pickGlass/inSceneGlass)
+        // Gdy szklanka aktywna (glassReady/pickGlass/inSceneGlass) → shaker ZAWSZE ukryty
+        // (inaczej przy scrollu w górę zamknięty shaker nachodzi na gotową szklankę).
         const glassAct = !!inSceneGlassRef.current || stageRef.current === "glassReady" || stageRef.current === "pickGlass";
-        if (!glassAct) api.shakerRoot.visible = true;
+        if (glassAct) { api.shakerRoot.visible = false; return; }
+        api.shakerRoot.visible = true;
         api.shakerRoot.scale.setScalar(lerp(CONFIG.shakerEnterFrom.s, 1, k));
         api.shakerRoot.position.x = lerp(CONFIG.shakerEnterFrom.x, CONFIG.shakerRest.x, k);
         api.shakerRoot.position.y = lerp(CONFIG.shakerEnterFrom.y, CONFIG.shakerRest.y, k);
@@ -4467,6 +4469,15 @@ function Confetti({ fireKey }: { fireKey: number }) {
 function DirectOrderQR({ name, orderId, color, onReset }: { name: string; orderId?: string; color: string; onReset: () => void }) {
   const orderUrl = orderId ? `${typeof window !== "undefined" ? window.location.origin : ""}/order/${orderId}` : "";
   const [full, setFull] = useState(false);
+  // Blokada scrolla strony gdy QR otwarty (ekran nie skroluje)
+  useEffect(() => {
+    if (typeof window !== "undefined" && (window as any).lenis) (window as any).lenis.stop();
+    document.body.style.overflow = "hidden";
+    return () => {
+      if (typeof window !== "undefined" && (window as any).lenis) (window as any).lenis.start();
+      document.body.style.overflow = "";
+    };
+  }, []);
   const lang = (typeof window !== "undefined" && (window as any).currentLanguage) || "it";
   const tr = ({
     it: { show: "Mostralo al barman", full: "⛶ Schermo intero" },
@@ -4550,6 +4561,21 @@ function NameCard({
 
   const [qrOpen, setQrOpen] = useState(false);
   const [qrFull, setQrFull] = useState(false);
+  // Blokada scrolla strony gdy QR/fullscreen otwarty
+  useEffect(() => {
+    const lock = qrOpen || qrFull;
+    if (lock) {
+      if (typeof window !== "undefined" && (window as any).lenis) (window as any).lenis.stop();
+      document.body.style.overflow = "hidden";
+    } else {
+      if (typeof window !== "undefined" && (window as any).lenis) (window as any).lenis.start();
+      document.body.style.overflow = "";
+    }
+    return () => {
+      if (typeof window !== "undefined" && (window as any).lenis) (window as any).lenis.start();
+      document.body.style.overflow = "";
+    };
+  }, [qrOpen, qrFull]);
 
   if (done) {
     return (
