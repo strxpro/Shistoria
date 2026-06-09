@@ -486,35 +486,93 @@ function OrdersPanel() {
   );
 }
 
-// ─── Messages Panel (formularz kontaktowy — iMessage style) ───────────────────
+// ─── Messages Panel (chat stile WhatsApp — raggruppato per email) ─────────────
+// Tłumaczenie na włoski (darmowy endpoint Google Translate) — cache w pamięci.
+const _trCache: Record<string, string> = {};
+async function toItalian(text: string, srcLang: string): Promise<string> {
+  if (!text || srcLang === "it") return text;
+  const key = `${srcLang}:${text}`;
+  if (_trCache[key]) return _trCache[key];
+  try {
+    const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${srcLang || "auto"}&tl=it&dt=t&q=${encodeURIComponent(text)}`);
+    const j = await r.json();
+    const out = (j?.[0] || []).map((s: any) => s[0]).join("");
+    _trCache[key] = out || text;
+    return out || text;
+  } catch { return text; }
+}
+
 function MessagesPanel() {
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [reply, setReply] = useState<{ id: string; text: string } | null>(null);
+  const [activeEmail, setActiveEmail] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  const [trMap, setTrMap] = useState<Record<string, string>>({});
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase.from("contact_messages").select("*").order("created_at", { ascending: false });
+    const { data } = await supabase.from("contact_messages").select("*").order("created_at", { ascending: true });
     setMessages(data || []);
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
 
-  const markRead = async (id: string) => {
-    await supabase.from("contact_messages").update({ is_read: true }).eq("id", id);
+  // Grupuj po emailu → wątki (konwersacje)
+  const threads = React.useMemo(() => {
+    const map: Record<string, any[]> = {};
+    for (const m of messages) {
+      const k = (m.email || "—").toLowerCase();
+      (map[k] ||= []).push(m);
+    }
+    return Object.entries(map)
+      .map(([email, msgs]) => ({ email, msgs, last: msgs[msgs.length - 1], name: msgs[msgs.length - 1]?.name || email, unread: msgs.some((x) => !x.is_read) }))
+      .sort((a, b) => new Date(b.last.created_at).getTime() - new Date(a.last.created_at).getTime());
+  }, [messages]);
+
+  const activeThread = threads.find((t) => t.email === activeEmail) || threads[0] || null;
+
+  // Tłumacz wiadomości klienta (nie-IT) na włoski do wyświetlenia
+  useEffect(() => {
+    if (!activeThread) return;
+    activeThread.msgs.forEach(async (m: any) => {
+      if (m.message && m.language && m.language !== "it" && !trMap[m.id]) {
+        const it = await toItalian(m.message, m.language);
+        setTrMap((prev) => ({ ...prev, [m.id]: it }));
+      }
+    });
+  }, [activeThread, trMap]);
+
+  const markThreadRead = async (email: string) => {
+    await supabase.from("contact_messages").update({ is_read: true }).eq("email", email);
     load();
   };
 
   const sendReply = async () => {
-    if (!reply) return;
-    await supabase.from("contact_messages").update({ admin_reply: reply.text, is_read: true }).eq("id", reply.id);
-    setReply(null);
+    if (!draft.trim() || !activeThread) return;
+    setSending(true);
+    const target = activeThread.last;
+    // Zapisz odpowiedź admina + oznacz przeczytane
+    await supabase.from("contact_messages").update({ admin_reply: draft.trim(), is_read: true }).eq("id", target.id);
+    // Webhook make.com → wyśle e-mail do klienta w jego języku (tłumaczenie po stronie make/template)
+    try {
+      const url = process.env.NEXT_PUBLIC_MAKE_REPLY_WEBHOOK || process.env.NEXT_PUBLIC_MAKE_CONTACT_WEBHOOK;
+      if (url) {
+        await fetch(url, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ type: "admin_reply", email: activeThread.email, name: target.name, lang: target.language || "it", reply_it: draft.trim() }),
+        });
+      }
+    } catch (e) { console.error(e); }
+    setDraft("");
+    setSending(false);
     load();
   };
 
-  const remove = async (id: string) => {
-    if (confirm("Eliminare questo messaggio?")) {
-      await supabase.from("contact_messages").delete().eq("id", id);
+  const removeThread = async (email: string) => {
+    if (confirm("Eliminare tutta la conversazione?")) {
+      await supabase.from("contact_messages").delete().eq("email", email);
+      setActiveEmail(null);
       load();
     }
   };
@@ -523,47 +581,69 @@ function MessagesPanel() {
     <div className="admin-panel">
       <header className="admin-panel-head">
         <h1>Messaggi</h1>
-        <span className="admin-count">{messages.filter(m => !m.is_read).length} non letti</span>
+        <span className="admin-count">{threads.filter((t) => t.unread).length} non letti</span>
       </header>
 
-      {reply && (
-        <div className="admin-modal-overlay" onClick={() => setReply(null)}>
-          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Rispondi</h3>
-            <div className="admin-form">
-              <label>Risposta (in italiano — verrà tradotta automaticamente)</label>
-              <textarea value={reply.text} onChange={(e) => setReply({ ...reply, text: e.target.value })} placeholder="Scrivi la risposta..." />
-            </div>
-            <div className="admin-modal-actions">
-              <button className="admin-btn" onClick={sendReply}>Invia risposta</button>
-              <button className="admin-btn-ghost" onClick={() => setReply(null)}>Annulla</button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {loading ? <p className="admin-loading">Caricamento...</p> : (
-        <div className="admin-orders">
-          {messages.map((m) => (
-            <div key={m.id} className={`admin-order ${m.is_read ? "done" : ""}`}>
-              <div className="admin-order-info">
-                <h4>{m.name}</h4>
-                <span>{m.email} · {m.phone || "—"} · {m.people} pers. · {m.date || "—"}</span>
-                <span className="admin-order-time">{new Date(m.created_at).toLocaleString("it-IT")}</span>
-                <span style={{ fontSize: 11, opacity: 0.5 }}>🌐 {m.language}</span>
-              </div>
-              <div style={{ flex: 1, fontSize: 13, opacity: 0.8 }}>
-                {m.message || <em style={{ opacity: 0.4 }}>Nessun messaggio</em>}
-                {m.admin_reply && <p style={{ marginTop: 8, color: "#27ae60", fontWeight: 600 }}>↳ {m.admin_reply}</p>}
-              </div>
-              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                {!m.is_read && <button className="admin-btn-sm" onClick={() => markRead(m.id)}>✓</button>}
-                <button className="admin-btn-sm" onClick={() => setReply({ id: m.id, text: "" })}>↩</button>
-                <button className="admin-btn-sm admin-btn-danger" onClick={() => remove(m.id)}>✕</button>
-              </div>
-            </div>
-          ))}
-          {messages.length === 0 && <p className="admin-empty">Nessun messaggio ricevuto.</p>}
+        <div className="amsg-chat">
+          {/* Lewa kolumna: lista konwersacji */}
+          <div className="amsg-list">
+            {threads.map((t) => (
+              <button key={t.email} className={`amsg-thread ${activeThread?.email === t.email ? "active" : ""} ${t.unread ? "unread" : ""}`}
+                onClick={() => { setActiveEmail(t.email); if (t.unread) markThreadRead(t.email); }}>
+                <span className="amsg-avatar">{(t.name || "?").charAt(0).toUpperCase()}</span>
+                <span className="amsg-thread-info">
+                  <span className="amsg-thread-name">{t.name}</span>
+                  <span className="amsg-thread-preview">{t.last.message || "—"}</span>
+                </span>
+                {t.unread && <span className="amsg-dot" />}
+              </button>
+            ))}
+            {threads.length === 0 && <p className="admin-empty">Nessun messaggio.</p>}
+          </div>
+
+          {/* Prawa kolumna: czat */}
+          <div className="amsg-conv">
+            {activeThread ? (
+              <>
+                <div className="amsg-conv-head">
+                  <div>
+                    <strong>{activeThread.name}</strong>
+                    <span className="amsg-conv-meta">{activeThread.email} · 🌐 {activeThread.last.language}</span>
+                  </div>
+                  <button className="admin-btn-sm admin-btn-danger" onClick={() => removeThread(activeThread.email)}>🗑</button>
+                </div>
+                <div className="amsg-bubbles">
+                  {activeThread.msgs.map((m: any) => (
+                    <React.Fragment key={m.id}>
+                      {/* Wiadomość klienta — po lewej */}
+                      {m.message && (
+                        <div className="amsg-bubble amsg-in">
+                          <p>{m.message}</p>
+                          {m.language && m.language !== "it" && (
+                            <p className="amsg-tr">🇮🇹 {trMap[m.id] || "..."}</p>
+                          )}
+                          <span className="amsg-time">{new Date(m.created_at).toLocaleString("it-IT")}</span>
+                        </div>
+                      )}
+                      {/* Odpowiedź admina — po prawej */}
+                      {m.admin_reply && (
+                        <div className="amsg-bubble amsg-out">
+                          <p>{m.admin_reply}</p>
+                          <span className="amsg-time">Tu · inviato</span>
+                        </div>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </div>
+                <div className="amsg-input">
+                  <textarea value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Scrivi in italiano — verrà tradotto nella lingua del cliente..." rows={2}
+                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply(); } }} />
+                  <button className="admin-btn" onClick={sendReply} disabled={sending || !draft.trim()}>{sending ? "..." : "Invia →"}</button>
+                </div>
+              </>
+            ) : <p className="admin-empty">Seleziona una conversazione.</p>}
+          </div>
         </div>
       )}
     </div>
@@ -730,6 +810,33 @@ function AdminStyles() {
       .admin-count { font-size:13px; opacity:0.6; }
       .admin-loading { opacity:0.5; font-style:italic; }
       .admin-empty { opacity:0.4; font-style:italic; text-align:center; padding:48px; }
+      /* ── Messaggi: chat stile WhatsApp ── */
+      .amsg-chat { display:grid; grid-template-columns:300px 1fr; gap:16px; height:70vh; min-height:480px; }
+      .amsg-list { display:flex; flex-direction:column; gap:4px; overflow-y:auto; border-right:1px solid rgba(255,255,255,0.08); padding-right:8px; }
+      .amsg-thread { display:flex; align-items:center; gap:12px; padding:12px; border-radius:12px; background:none; border:none; cursor:pointer; text-align:left; transition:background .15s; position:relative; }
+      .amsg-thread:hover { background:rgba(255,255,255,0.05); }
+      .amsg-thread.active { background:rgba(232,146,124,0.15); }
+      .amsg-thread.unread .amsg-thread-name { font-weight:800; }
+      .amsg-avatar { width:42px; height:42px; flex-shrink:0; border-radius:50%; background:linear-gradient(135deg,#E8927C,#5BB8D4); display:grid; place-items:center; color:#fff; font-weight:800; font-size:17px; }
+      .amsg-thread-info { display:flex; flex-direction:column; min-width:0; flex:1; }
+      .amsg-thread-name { color:#fff; font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .amsg-thread-preview { color:rgba(255,255,255,0.45); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+      .amsg-dot { width:9px; height:9px; border-radius:50%; background:#E8927C; flex-shrink:0; }
+      .amsg-conv { display:flex; flex-direction:column; background:rgba(0,0,0,0.2); border-radius:14px; overflow:hidden; }
+      .amsg-conv-head { display:flex; align-items:center; justify-content:space-between; padding:14px 18px; border-bottom:1px solid rgba(255,255,255,0.08); }
+      .amsg-conv-head strong { color:#fff; font-size:15px; display:block; }
+      .amsg-conv-meta { color:rgba(255,255,255,0.45); font-size:12px; }
+      .amsg-bubbles { flex:1; overflow-y:auto; padding:18px; display:flex; flex-direction:column; gap:10px; }
+      .amsg-bubble { max-width:75%; padding:10px 14px; border-radius:16px; font-size:14px; line-height:1.4; }
+      .amsg-bubble p { margin:0; }
+      .amsg-in { align-self:flex-start; background:#243845; color:#fff; border-bottom-left-radius:4px; }
+      .amsg-out { align-self:flex-end; background:#E8927C; color:#1a1014; border-bottom-right-radius:4px; }
+      .amsg-tr { margin-top:6px !important; padding-top:6px; border-top:1px solid rgba(255,255,255,0.15); font-size:12px; opacity:0.8; font-style:italic; }
+      .amsg-time { display:block; margin-top:4px; font-size:10px; opacity:0.5; }
+      .amsg-input { display:flex; gap:10px; padding:14px; border-top:1px solid rgba(255,255,255,0.08); }
+      .amsg-input textarea { flex:1; resize:none; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:12px; color:#fff; padding:10px 14px; font-family:inherit; font-size:14px; outline:none; }
+      .amsg-input textarea:focus { border-color:#E8927C; }
+      @media (max-width:768px) { .amsg-chat { grid-template-columns:1fr; height:auto; } .amsg-list { flex-direction:row; overflow-x:auto; border-right:none; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:8px; } .amsg-thread { flex-direction:column; min-width:80px; } .amsg-thread-preview { display:none; } .amsg-conv { height:60vh; } }
       .admin-badge { display:inline-block; margin-left:8px; color:#f1c40f; }
 
       .admin-table { overflow-x:auto; }
