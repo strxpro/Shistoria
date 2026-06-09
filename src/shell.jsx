@@ -642,7 +642,8 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
           }
           /* Gdy otwarta szuflada butelek LUB panel kategorii (FAB) — hamburger przesuwa się w prawo */
           body[data-cx-drawer="open"] .hamburger-mobile,
-          body[data-cx-sheet="open"] .hamburger-mobile { right: 16px; transform: none; }
+          body[data-cx-sheet="open"] .hamburger-mobile,
+          body[data-cx-menucat="on"] .hamburger-mobile { right: 16px; transform: none; }
           body[data-cx-section="creator"] .hamburger-mobile:not(.open) { right: 16px; transform:none; }
           /* hamburger pozostaje widoczny w kreatorze (NIE chowamy podczas scrollu/animacji) */
           /* W sekcji bar (Tramonti) hamburger w kolorze coral — bardziej widoczny */

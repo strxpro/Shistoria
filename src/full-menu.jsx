@@ -106,6 +106,14 @@ function MobileFullMenu() {
     else delete document.body.dataset.cxSheet;
     return () => { delete document.body.dataset.cxSheet; };
   }, [catSheet]);
+  // Gdy widać pasek kategorii menu → przesuń TYLKO hamburger w prawo (zrobić miejsce dla pigułki „Categorie"),
+  // logo i flaga zostają na miejscu (cx-menucat rusza tylko .hamburger-mobile).
+  useEffectM(() => {
+    if (typeof document === "undefined") return;
+    if (pillVisible) document.body.dataset.cxMenucat = "on";
+    else delete document.body.dataset.cxMenucat;
+    return () => { delete document.body.dataset.cxMenucat; };
+  }, [pillVisible]);
   const catBarRef = useRefM(null);
   const sectionRef = useRefM(null);
 
@@ -168,11 +176,15 @@ function MobileFullMenu() {
         <p className="mfm-intro">Pasta fatta in casa, pesce del giorno, pizze cotte nel forno a legna.</p>
       </div>
 
-      {/* I più amati — dania z największą liczbą serc na samej górze */}
+      {/* I più amati — NAJLEPSZE danie z KAŻDEJ kategorii (po 1), wg liczby serc */}
       {(() => {
-        const all = [];
-        window.FULL_MENU.forEach((cat) => (cat.items || []).forEach((it) => all.push({ ...it, icon: cat.icon, _l: getLikes(it) })));
-        const top = all.filter((it) => it._l > 0).sort((a, b) => b._l - a._l).slice(0, 8);
+        const top = [];
+        window.FULL_MENU.forEach((cat) => {
+          const best = (cat.items || []).map((it) => ({ ...it, icon: cat.icon, _l: getLikes(it) }))
+            .filter((it) => it._l > 0).sort((a, b) => b._l - a._l)[0];
+          if (best) top.push(best);
+        });
+        top.sort((a, b) => b._l - a._l); // najpopularniejsze kategorie pierwsze
         if (top.length === 0) return null;
         return (
           <div className="mfm-top">
@@ -211,8 +223,14 @@ function MobileFullMenu() {
           <div key={cat.id} className="mfm-cat" data-mcat={cat.id}>
             <h3 className="mfm-cat-title"><span className="mfm-cat-num">{String(ci + 1).padStart(2, "0")}</span>{cat.label}</h3>
             <ul className="mfm-list">
-              {cat.items.slice().sort((a, b) => getLikes(b) - getLikes(a)).map((it, i) => (
-                <li key={i} className={`mfm-item ${it.featured ? "feat" : ""}`} onClick={() => setDishPopout({ ...it, icon: cat.icon })}>
+              {(() => {
+                const sorted = cat.items.slice().sort((a, b) => getLikes(b) - getLikes(a));
+                const topLikes = getLikes(sorted[0]);
+                return sorted.map((it, i) => {
+                  const isTopLiked = topLikes > 0 && getLikes(it) === topLikes && i === 0;
+                  return (
+                <li key={i} className={`mfm-item ${it.featured ? "feat" : ""} ${isTopLiked ? "top-liked" : ""}`} onClick={() => setDishPopout({ ...it, icon: cat.icon })}>
+                  {isTopLiked && <span className="mfm-topliked-badge"><HeartIcon filled /> {({ it:"Il più amato", en:"Most loved", pl:"Najczęściej lubiane", de:"Beliebtest", fr:"Le plus aimé", es:"El más amado" })[lang] || "Il più amato"}</span>}
                   <div className="mfm-item-thumb"
                     onDoubleClick={(e) => { e.stopPropagation(); toggleLike(it); }}
                     onTouchEnd={(e) => {
@@ -243,7 +261,9 @@ function MobileFullMenu() {
                     {it.desc && <p className="mfm-item-desc">{trDesc(it)}</p>}
                   </div>
                 </li>
-              ))}
+                  );
+                });
+              })()}
             </ul>
           </div>
         ))}
@@ -367,6 +387,10 @@ function MobileFullMenu() {
         .mfm-list { list-style: none; padding: 0; margin: 0; }
         .mfm-item { display: flex; gap: 12px; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid var(--c-line); cursor: pointer; }
         .mfm-item.feat { background: rgba(245,237,224,0.5); border-radius: 12px; padding: 14px 12px; margin: 6px 0; border-bottom: 1px solid transparent; }
+        /* danie najczęściej lubiane w kategorii — wyróżnione jak featured */
+        .mfm-item.top-liked { position: relative; background: linear-gradient(90deg, rgba(254,44,85,0.06), rgba(245,237,224,0.4)); border: 1px solid rgba(254,44,85,0.25); border-radius: 14px; padding: 22px 12px 14px; margin: 8px 0; border-bottom: 1px solid rgba(254,44,85,0.25); }
+        .mfm-topliked-badge { position: absolute; top: -9px; left: 12px; display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; background: #FE2C55; color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 0.02em; box-shadow: 0 4px 12px rgba(254,44,85,0.4); }
+        .mfm-topliked-badge svg { font-size: 11px; }
         .mfm-item-thumb { flex: 0 0 auto; width: 56px; height: 56px; border-radius: 12px; overflow: hidden; background: linear-gradient(135deg, var(--c-sand), #E8DDC8); display: flex; align-items: center; justify-content: center; position: relative; -webkit-user-select: none; user-select: none; }
         /* I più amati — pozioma karuzela na górze menu */
         .mfm-top { margin: 4px 0 20px; }

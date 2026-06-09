@@ -3039,11 +3039,22 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
 
     const s = streamRef.current;
     if (!s) return;
-    // Strumień Bezier UKRYTY — user nie chce widzieć strumienia nad szejkerem.
-    // Napełnianie szejkera (ciecz rośnie w środku) prowadzi efekt shakerFill.
-    s.visible = false;
+    // Strumień: cienki walec wychodzący z szyjki, widoczny TYLKO podczas lania.
+    // Jest dzieckiem znormalizowanej butelki (inner) — gdy butelka przechyla się do lania,
+    // strumień naturalnie kieruje się w dół (do szejkera).
+    if (pouringRef.current) {
+      s.visible = true;
+      // płynne "wydłużanie" strumienia
+      const tgt = 1;
+      s.scale.y = THREE.MathUtils.lerp(s.scale.y, tgt, 0.25);
+    } else {
+      s.scale.y = THREE.MathUtils.lerp(s.scale.y, 0, 0.3);
+      if (s.scale.y < 0.02) s.visible = false;
+    }
   });
 
+  // długość strumienia (lokalna, sięga w stronę środka shakera)
+  const STREAM_LEN = 2.6;
   return (
     <group>
       <group ref={outer}>
@@ -3051,11 +3062,12 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
           <primitive object={cloned} />
           {/* marker czubka szyjki (lokalnie na górze znormalizowanej butelki) */}
           <object3D ref={neckRef} position={[0, NORM_H / 2, 0]} />
+          {/* strumień — z szyjki na zewnątrz (lokalne +Y); skala Y animowana podczas lania */}
+          <mesh ref={streamRef} material={streamMat} visible={false} position={[0, NORM_H / 2 + STREAM_LEN / 2, 0]} scale={[1, 0, 1]}>
+            <cylinderGeometry args={[0.035, 0.05, STREAM_LEN, 10, 1, true]} />
+          </mesh>
         </group>
       </group>
-      <mesh ref={streamRef} material={streamMat} visible={false} renderOrder={-1}>
-        <bufferGeometry />
-      </mesh>
     </group>
   );
 }
@@ -5899,11 +5911,11 @@ function CocktailStyles() {
       .cx-gauge-cap { font-family:var(--f-display,sans-serif); font-weight:800; font-size:10px; letter-spacing:.18em; color:rgba(255,255,255,.7); }
       .cx-gauge-tube { position:relative; flex:1; width:34px; border-radius:9px;
         background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.28);
-        overflow:hidden; box-shadow:inset 0 0 14px rgba(0,0,0,.5), 0 10px 30px rgba(0,0,0,.4); }
-      .cx-gauge-stack { position:absolute; inset:0; display:flex; flex-direction:column-reverse; }
+        overflow:hidden; box-shadow:inset 0 0 14px rgba(0,0,0,.5), 0 10px 30px rgba(0,0,0,.4); isolation:isolate; }
+      .cx-gauge-stack { position:absolute; inset:0; display:flex; flex-direction:column-reverse; overflow:hidden; border-radius:9px; }
       .cx-gauge-seg { width:100%; border-top:1.5px solid rgba(255,255,255,0.55); box-shadow:inset 0 1px 6px rgba(255,255,255,.18); }
-      .cx-gauge-live { position:absolute; left:0; right:0; bottom:0; height:0; opacity:0;
-        border-top:2px solid #fff; box-shadow:0 0 14px rgba(255,255,255,.5); transition:opacity .15s linear; }
+      .cx-gauge-live { position:absolute; left:0; right:0; bottom:0; height:0; opacity:0; max-height:100%;
+        border-top:2px solid #fff; box-shadow:inset 0 0 14px rgba(255,255,255,.35); transition:opacity .15s linear; }
       .cx-gauge-pct { font-family:var(--f-display,sans-serif); font-weight:800; font-size:13px; color:#fff; letter-spacing:.04em; text-shadow:0 1px 5px rgba(0,0,0,.7); }
 
       /* Kółko VERSA podążające za myszą */
