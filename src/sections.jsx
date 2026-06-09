@@ -899,6 +899,7 @@ function Contatti({ t }) {
 
     // Krótka animacja "wypełnienia" przycisku przed pokazaniem toast
     await new Promise((r) => setTimeout(r, 700));
+    try { const a = await import("./lib/analytics"); a.trackConversion(); } catch {}
     setSending(false);
     setSubmitted(true);
   };

@@ -730,57 +730,158 @@ function ReviewsPanel() {
 
 // ─── Stats Panel (statystyki odwiedzin) ───────────────────────────────────────
 function StatsPanel() {
-  const [stats, setStats] = useState<{ orders: number; drinks: number; messages: number; reviews: number }>({ orders: 0, drinks: 0, messages: 0, reviews: 0 });
   const [loading, setLoading] = useState(true);
+  const [range, setRange] = useState<"today" | "week" | "month" | "prevmonth" | "all">("month");
+  const [counts, setCounts] = useState({ orders: 0, drinks: 0, messages: 0, reviews: 0 });
+  const [visits, setVisits] = useState<any[]>([]);
+  const [sections, setSections] = useState<any[]>([]);
+  const [popCountry, setPopCountry] = useState<string | null>(null);
 
-  useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      const [o, d, m, r] = await Promise.all([
-        supabase.from("drink_orders").select("id", { count: "exact", head: true }),
-        supabase.from("community_drinks").select("id", { count: "exact", head: true }),
-        supabase.from("contact_messages").select("id", { count: "exact", head: true }),
-        supabase.from("reviews").select("id", { count: "exact", head: true }),
-      ]);
-      setStats({
-        orders: o.count || 0,
-        drinks: d.count || 0,
-        messages: m.count || 0,
-        reviews: r.count || 0,
-      });
-      setLoading(false);
-    };
-    load();
-  }, []);
+  // Zakres dat → from/to ISO
+  const rangeDates = () => {
+    const now = new Date();
+    const startOfDay = (d: Date) => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
+    if (range === "today") return { from: startOfDay(now), to: now };
+    if (range === "week") { const d = new Date(now); d.setDate(d.getDate() - 7); return { from: d, to: now }; }
+    if (range === "month") { const d = new Date(now.getFullYear(), now.getMonth(), 1); return { from: d, to: now }; }
+    if (range === "prevmonth") { const f = new Date(now.getFullYear(), now.getMonth() - 1, 1); const t = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59); return { from: f, to: t }; }
+    return { from: new Date(2020, 0, 1), to: now };
+  };
+
+  const load = async () => {
+    setLoading(true);
+    const { from, to } = rangeDates();
+    const fromIso = from.toISOString(), toIso = to.toISOString();
+    const [o, d, m, r, v, s] = await Promise.all([
+      supabase.from("drink_orders").select("id", { count: "exact", head: true }).gte("created_at", fromIso).lte("created_at", toIso),
+      supabase.from("community_drinks").select("id", { count: "exact", head: true }).gte("created_at", fromIso).lte("created_at", toIso),
+      supabase.from("contact_messages").select("id", { count: "exact", head: true }).gte("created_at", fromIso).lte("created_at", toIso),
+      supabase.from("reviews").select("id", { count: "exact", head: true }).gte("created_at", fromIso).lte("created_at", toIso),
+      supabase.from("analytics_visits").select("*").gte("created_at", fromIso).lte("created_at", toIso),
+      supabase.from("analytics_sections").select("*").gte("created_at", fromIso).lte("created_at", toIso),
+    ]);
+    setCounts({ orders: o.count || 0, drinks: d.count || 0, messages: m.count || 0, reviews: r.count || 0 });
+    setVisits(v.data || []);
+    setSections(s.data || []);
+    setLoading(false);
+  };
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [range]);
+
+  // Agregacje
+  const byCountry = React.useMemo(() => {
+    const map: Record<string, { code: string; name: string; count: number; durations: number[]; sections: Record<string, number>; conversions: number }> = {};
+    for (const v of visits) {
+      const code = v.country || "??";
+      const e = (map[code] ||= { code, name: v.country_name || code, count: 0, durations: [], sections: {}, conversions: 0 });
+      e.count++; if (v.duration_seconds) e.durations.push(v.duration_seconds);
+      if (v.top_section) e.sections[v.top_section] = (e.sections[v.top_section] || 0) + 1;
+      if (v.is_conversion) e.conversions++;
+    }
+    return Object.values(map).sort((a, b) => b.count - a.count);
+  }, [visits]);
+
+  const totalVisits = visits.length;
+  const maxCount = byCountry[0]?.count || 1;
+  const conversions = visits.filter((v) => v.is_conversion).length;
+  const emailVisits = visits.filter((v) => v.referrer === "email" || v.utm_source === "email").length;
+  const convRate = totalVisits ? Math.round((conversions / totalVisits) * 100) : 0;
+  const avgDuration = totalVisits ? Math.round(visits.reduce((s, v) => s + (v.duration_seconds || 0), 0) / totalVisits) : 0;
+  const flag = (code: string) => code && code.length === 2 ? String.fromCodePoint(...[...code.toUpperCase()].map((c) => 127397 + c.charCodeAt(0))) : "🌍";
+  const intensity = (c: number) => { const r = c / maxCount; return `rgba(232,146,124,${0.15 + r * 0.85})`; };
+  const fmtDur = (s: number) => s >= 60 ? `${Math.floor(s/60)}m ${s%60}s` : `${s}s`;
+  const popData = byCountry.find((c) => c.code === popCountry);
+
+  const RANGES: { id: typeof range; label: string }[] = [
+    { id: "today", label: "Oggi" }, { id: "week", label: "7 giorni" },
+    { id: "month", label: "Questo mese" }, { id: "prevmonth", label: "Mese scorso" }, { id: "all", label: "Tutto" },
+  ];
 
   return (
     <div className="admin-panel">
       <header className="admin-panel-head">
         <h1>Statistiche</h1>
-      </header>
-      {loading ? <p className="admin-loading">Caricamento...</p> : (
-        <div className="admin-grid">
-          <div className="admin-event-card" style={{ borderLeftColor: "#E8927C" }}>
-            <span style={{ fontSize: 36, fontWeight: 800 }}>{stats.orders}</span>
-            <h4>Ordini QR</h4>
-            <span className="admin-event-tag">drink ordinati via QR</span>
-          </div>
-          <div className="admin-event-card" style={{ borderLeftColor: "#5BB8D4" }}>
-            <span style={{ fontSize: 36, fontWeight: 800 }}>{stats.drinks}</span>
-            <h4>Drink pubblicati</h4>
-            <span className="admin-event-tag">nella community</span>
-          </div>
-          <div className="admin-event-card" style={{ borderLeftColor: "#27ae60" }}>
-            <span style={{ fontSize: 36, fontWeight: 800 }}>{stats.messages}</span>
-            <h4>Messaggi</h4>
-            <span className="admin-event-tag">formularz kontaktowy</span>
-          </div>
-          <div className="admin-event-card" style={{ borderLeftColor: "#f1c40f" }}>
-            <span style={{ fontSize: 36, fontWeight: 800 }}>{stats.reviews}</span>
-            <h4>Recensioni</h4>
-            <span className="admin-event-tag">komentarze lokalne</span>
-          </div>
+        <div className="stats-range">
+          {RANGES.map((r) => (
+            <button key={r.id} className={range === r.id ? "active" : ""} onClick={() => setRange(r.id)}>{r.label}</button>
+          ))}
         </div>
+      </header>
+
+      {loading ? <p className="admin-loading">Caricamento...</p> : (
+        <>
+          {/* KPI ogólne */}
+          <div className="stats-kpis">
+            <div className="stats-kpi"><span className="stats-kpi-val">{totalVisits}</span><span className="stats-kpi-lbl">Visite</span></div>
+            <div className="stats-kpi"><span className="stats-kpi-val">{conversions}</span><span className="stats-kpi-lbl">Conversioni ({convRate}%)</span></div>
+            <div className="stats-kpi"><span className="stats-kpi-val">{emailVisits}</span><span className="stats-kpi-lbl">Da email</span></div>
+            <div className="stats-kpi"><span className="stats-kpi-val">{fmtDur(avgDuration)}</span><span className="stats-kpi-lbl">Tempo medio</span></div>
+            <div className="stats-kpi"><span className="stats-kpi-val">{counts.orders}</span><span className="stats-kpi-lbl">Ordini QR</span></div>
+            <div className="stats-kpi"><span className="stats-kpi-val">{counts.messages}</span><span className="stats-kpi-lbl">Messaggi</span></div>
+          </div>
+
+          {/* Kraje — interaktywne słupki z intensywnością */}
+          <div className="stats-section">
+            <h3>Da dove arrivano i visitatori</h3>
+            {byCountry.length === 0 ? <p className="admin-empty">Nessun dato per questo periodo.</p> : (
+              <div className="stats-countries">
+                {byCountry.map((c) => (
+                  <button key={c.code} className="stats-country" onClick={() => setPopCountry(c.code)}>
+                    <span className="stats-country-flag">{flag(c.code)}</span>
+                    <span className="stats-country-name">{c.name}</span>
+                    <span className="stats-country-bar-wrap">
+                      <span className="stats-country-bar" style={{ width: `${(c.count / maxCount) * 100}%`, background: intensity(c.count) }} />
+                    </span>
+                    <span className="stats-country-count">{c.count}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Popout kraju */}
+          {popData && (
+            <div className="stats-pop-overlay" onClick={() => setPopCountry(null)}>
+              <div className="stats-pop" onClick={(e) => e.stopPropagation()}>
+                <button className="stats-pop-close" onClick={() => setPopCountry(null)}>×</button>
+                <div className="stats-pop-head"><span style={{ fontSize: 40 }}>{flag(popData.code)}</span><h2>{popData.name}</h2></div>
+                <div className="stats-pop-grid">
+                  <div><span className="stats-pop-val">{popData.count}</span><span className="stats-pop-lbl">Visitatori</span></div>
+                  <div><span className="stats-pop-val">{popData.durations.length ? fmtDur(Math.round(popData.durations.reduce((a,b)=>a+b,0)/popData.durations.length)) : "—"}</span><span className="stats-pop-lbl">Tempo medio</span></div>
+                  <div><span className="stats-pop-val">{popData.conversions}</span><span className="stats-pop-lbl">Conversioni</span></div>
+                </div>
+                <div className="stats-pop-sec">
+                  <span className="stats-pop-seclbl">Sezioni preferite</span>
+                  {Object.entries(popData.sections).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([sec, n]) => (
+                    <div key={sec} className="stats-pop-secrow"><span>{sec}</span><span>{n}</span></div>
+                  ))}
+                  {Object.keys(popData.sections).length === 0 && <p className="admin-empty">—</p>}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Sekcje — gdzie się zatrzymują */}
+          <div className="stats-section">
+            <h3>Sezioni più visitate</h3>
+            {(() => {
+              const secMap: Record<string, number> = {};
+              for (const v of visits) if (v.top_section) secMap[v.top_section] = (secMap[v.top_section] || 0) + 1;
+              const arr = Object.entries(secMap).sort((a,b)=>b[1]-a[1]);
+              const mx = arr[0]?.[1] || 1;
+              return arr.length ? (
+                <div className="stats-countries">
+                  {arr.map(([sec, n]) => (
+                    <div key={sec} className="stats-country" style={{ cursor: "default" }}>
+                      <span className="stats-country-name" style={{ minWidth: 120 }}>{sec}</span>
+                      <span className="stats-country-bar-wrap"><span className="stats-country-bar" style={{ width: `${(n/mx)*100}%`, background: "rgba(91,184,212,0.7)" }} /></span>
+                      <span className="stats-country-count">{n}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : <p className="admin-empty">Nessun dato.</p>;
+            })()}
+          </div>
+        </>
       )}
     </div>
   );
@@ -867,6 +968,36 @@ function AdminStyles() {
       .amsg-input textarea:focus { border-color:#E8927C; }
       @media (max-width:768px) { .amsg-chat { grid-template-columns:1fr; height:auto; } .amsg-list { flex-direction:row; overflow-x:auto; border-right:none; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:8px; } .amsg-thread { flex-direction:column; min-width:80px; } .amsg-thread-preview { display:none; } .amsg-conv { height:60vh; } }
       .admin-badge { display:inline-block; margin-left:8px; color:#f1c40f; }
+      /* ── Statistiche interattive ── */
+      .stats-range { display:flex; gap:6px; flex-wrap:wrap; }
+      .stats-range button { padding:8px 14px; border-radius:999px; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.04); color:rgba(255,255,255,0.7); font-size:12px; cursor:pointer; transition:all .2s; }
+      .stats-range button:hover { background:rgba(232,146,124,0.15); color:#fff; }
+      .stats-range button.active { background:linear-gradient(135deg,#E8927C,#5BB8D4); color:#fff; border-color:transparent; font-weight:700; }
+      .stats-kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:28px; }
+      .stats-kpi { background:linear-gradient(135deg,rgba(232,146,124,0.12),rgba(91,184,212,0.08)); border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:18px; display:flex; flex-direction:column; gap:4px; }
+      .stats-kpi-val { font-size:30px; font-weight:800; color:#fff; }
+      .stats-kpi-lbl { font-size:12px; color:rgba(255,255,255,0.6); }
+      .stats-section { margin-bottom:28px; }
+      .stats-section h3 { font-size:16px; margin:0 0 14px; color:#fff; }
+      .stats-countries { display:flex; flex-direction:column; gap:8px; }
+      .stats-country { display:flex; align-items:center; gap:12px; padding:8px 12px; border-radius:12px; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.06); cursor:pointer; transition:all .2s; width:100%; text-align:left; color:#fff; }
+      .stats-country:hover { background:rgba(232,146,124,0.1); border-color:rgba(232,146,124,0.3); }
+      .stats-country-flag { font-size:22px; flex-shrink:0; }
+      .stats-country-name { font-size:14px; min-width:90px; flex-shrink:0; }
+      .stats-country-bar-wrap { flex:1; height:14px; background:rgba(255,255,255,0.05); border-radius:999px; overflow:hidden; }
+      .stats-country-bar { display:block; height:100%; border-radius:999px; transition:width .5s cubic-bezier(.2,.8,.2,1); }
+      .stats-country-count { font-weight:800; font-size:15px; min-width:36px; text-align:right; flex-shrink:0; }
+      .stats-pop-overlay { position:fixed; inset:0; z-index:300; background:rgba(8,12,18,0.6); backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; padding:24px; }
+      .stats-pop { position:relative; width:min(420px,92vw); background:#11202c; border:1px solid rgba(255,255,255,0.12); border-radius:20px; padding:28px; box-shadow:0 30px 80px rgba(0,0,0,0.5); }
+      .stats-pop-close { position:absolute; top:14px; right:14px; width:34px; height:34px; border-radius:50%; border:1px solid rgba(255,255,255,0.15); background:rgba(0,0,0,0.3); color:#fff; font-size:20px; cursor:pointer; }
+      .stats-pop-head { display:flex; align-items:center; gap:14px; margin-bottom:20px; }
+      .stats-pop-head h2 { margin:0; font-size:24px; color:#fff; }
+      .stats-pop-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:20px; }
+      .stats-pop-grid > div { background:rgba(255,255,255,0.04); border-radius:12px; padding:14px; text-align:center; }
+      .stats-pop-val { display:block; font-size:22px; font-weight:800; color:#E8927C; }
+      .stats-pop-lbl { font-size:11px; color:rgba(255,255,255,0.55); }
+      .stats-pop-seclbl { font-size:11px; letter-spacing:0.1em; text-transform:uppercase; color:rgba(255,255,255,0.5); display:block; margin-bottom:10px; }
+      .stats-pop-secrow { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid rgba(255,255,255,0.06); font-size:14px; color:#fff; }
 
       .admin-table { overflow-x:auto; }
       .admin-table table { width:100%; border-collapse:collapse; }

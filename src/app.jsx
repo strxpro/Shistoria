@@ -208,9 +208,14 @@ export default function App() {
   useEffectA(() => {
     if (!preloadDone) return;
     const ids = ["top", "storia", "ristorante", "menu", "desserts", "bar", "cocktail-rise", "cocktail-builder", "eventi", "attrazioni", "social", "recensioni", "contatti"];
+    // Analytics — start śledzenia wizyty (kraj, źródło, czas)
+    import("./lib/analytics").then((a) => a.startTracking()).catch(() => {});
     const io = new IntersectionObserver((entries) => {
       entries.forEach((e) => {
-        if (e.isIntersecting) setActiveSection(e.target.id);
+        if (e.isIntersecting) {
+          setActiveSection(e.target.id);
+          import("./lib/analytics").then((a) => a.trackSection(e.target.id)).catch(() => {});
+        }
       });
     }, { rootMargin: "-50% 0% -50% 0%" });
     ids.forEach((id) => {
