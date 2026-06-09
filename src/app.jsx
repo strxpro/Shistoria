@@ -110,6 +110,8 @@ export default function App() {
 
   const handleLangChange = (lang) => {
     if (lang === t.language) return;
+    // Zapamiętaj, że użytkownik wybrał język ręcznie → auto-detekcja go nie nadpisze
+    try { localStorage.setItem("sh-lang-manual", "1"); } catch {}
 
     const selectors = [
       '.srt', '.text-clip-line', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p',
@@ -169,6 +171,44 @@ export default function App() {
   useEffectA(() => {
     document.documentElement.dataset.palette = t.palette;
   }, [t.palette]);
+
+  // Auto-wykrywanie języka wg geolokalizacji (tylko raz, jeśli użytkownik nie wybrał ręcznie)
+  useEffectA(() => {
+    if (typeof window === "undefined") return;
+    try {
+      // Jeśli użytkownik kiedyś sam wybrał język → nie nadpisuj
+      if (localStorage.getItem("sh-lang-manual") === "1") return;
+      if (localStorage.getItem("sh-lang-auto") === "1") return; // już wykryto w tej przeglądarce
+    } catch {}
+    const SUPPORTED = ["it", "pl", "en", "de", "fr", "es"];
+    // Mapowanie kraju → język (kraje spoza listy → angielski)
+    const COUNTRY_LANG = {
+      IT: "it", PL: "pl", DE: "de", AT: "de", CH: "de", FR: "fr", BE: "fr",
+      ES: "es", MX: "es", AR: "es", GB: "en", US: "en", IE: "en", CA: "en", AU: "en",
+    };
+    const applyLang = (lang) => {
+      if (!SUPPORTED.includes(lang) || lang === t.language) return;
+      try { localStorage.setItem("sh-lang-auto", "1"); } catch {}
+      setTweak("language", lang);
+    };
+    (async () => {
+      try {
+        const res = await fetch("https://ipapi.co/json/", { signal: AbortSignal.timeout?.(3000) });
+        if (res.ok) {
+          const data = await res.json();
+          const cc = (data.country_code || data.country || "").toUpperCase();
+          const lang = COUNTRY_LANG[cc] || (cc ? "en" : null);
+          if (lang) { applyLang(lang); return; }
+        }
+      } catch { /* fallback poniżej */ }
+      // Fallback: język przeglądarki
+      try {
+        const nav = (navigator.language || "it").slice(0, 2).toLowerCase();
+        applyLang(SUPPORTED.includes(nav) ? nav : "en");
+      } catch {}
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const tr = window.makeT(t.language);
   window.currentLanguage = t.language;

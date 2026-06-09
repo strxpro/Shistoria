@@ -665,7 +665,7 @@
 
 ## 🔴 N2. Geolokalizacja → automatyczny język
 - **Do zrobienia:**
-  - [ ] Wejście na stronę → wykrycie lokalizacji → **ustawienie języka**.
+  - [x] Wejście na stronę → wykrycie lokalizacji (ipapi) → **ustawienie języka**. ✅ *(app.jsx: ipapi.co kraj→język, fallback navigator.language; kraje spoza listy→EN; jednorazowo, localStorage `sh-lang-auto`; ręczny wybór `sh-lang-manual` blokuje nadpisanie)*
   - [ ] Brak / odmowa geolokalizacji → **język przeglądarki** lub domyślny (włoski).
 
 > 📎 *Odpowiada wymaganiom: 40, 41.*
