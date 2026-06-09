@@ -4128,8 +4128,20 @@ function LayerBar({ poured, totalMl, cap, onRemove }: {
  * ──────────────────────────────────────────────────────────────────────── */
 function MobileInfo() {
   const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null!);
+
+  // Klik poza popoutem → zamyka
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    window.addEventListener("pointerdown", onDown);
+    return () => window.removeEventListener("pointerdown", onDown);
+  }, [open]);
+
   return (
-    <div className={`cx-minfo ${open ? "is-open" : ""}`}>
+    <div ref={wrapRef} className={`cx-minfo ${open ? "is-open" : ""}`}>
       <button className="cx-minfo-fab" onClick={() => setOpen((v) => !v)} aria-label="Come funziona">
         <span className="cx-minfo-i">{open ? "×" : "i"}</span>
       </button>
@@ -5993,6 +6005,7 @@ function CocktailStyles() {
 
         /* mobilne koło "i" — lewy dół, nad slide-to-shake */
         .cx-minfo { display:block; position:fixed; left:16px; bottom:calc(116px + env(safe-area-inset-bottom)); top:auto; right:auto; transform:none; z-index:42; }
+        .cx-minfo.is-open { z-index:9998; }
         .cx-minfo-fab { display:grid; place-items:center; width:40px; height:40px; border-radius:50%; cursor:pointer;
           background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); color:#fff;
           box-shadow:0 6px 18px rgba(0,0,0,0.35); transition:transform .3s, background .3s; }

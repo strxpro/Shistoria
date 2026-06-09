@@ -351,9 +351,9 @@
 
 ## 🟡 E9. Sterowanie (start over + instrukcje)
 - **Do zrobienia:**
-  - [ ] Wyraźny przycisk **„zacznij od nowa"** (góra-prawo / środek).
-  - [ ] Popup instrukcji → **najwyższy z-index**.
-  - [ ] Kliknięcie **poza popup** → zamyka go.
+  - [x] Wyraźny przycisk **„zacznij od nowa"** (góra-prawo / środek). ✅ *(cx-reset-top inline, wielojęzyczny, widoczny gdy poured>0)*
+  - [x] Popup instrukcji → **najwyższy z-index**. ✅ *(cx-minfo.is-open z-index:9998)*
+  - [x] Kliknięcie **poza popup** → zamyka go. ✅ *(pointerdown listener — klik poza wrapRef zamyka)*
 
 ## 🟡 E10. Hamburger + logo + język przy interakcji
 - **Do zrobienia:**
