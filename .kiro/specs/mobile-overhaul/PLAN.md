@@ -962,3 +962,24 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS image_url text;
 - [ ] **Auto-pobieranie zdjęć dań z wizytówki Google**.
 - [ ] Sekcja N — pełne tłumaczenia + geolokalizacja (fundament).
 - [ ] Kreator 3D — pozostałe punkty E4/E6/E7/E8 (pour, grab-spin, shaker, szkło) do testów na urządzeniu.
+
+---
+
+## 🔧 TURA POPRAWEK (zgłoszone) — STAN
+
+### ✅ NAPRAWIONE w tej turze:
+- [x] **Header (logo+flaga) przesuwał się w menu restauracji** — usunięty `data-cx-menucat` który ruszał nav. Logo/flaga zostają w miejscu (jak w kreatorze).
+- [x] **Polubione dania na górę swojej kategorii** — sort wg likes wewnątrz każdej kategorii (już działało, potwierdzone).
+- [x] **Małe serce w menu ucięte z boku** — przeniesione: wyśrodkowane na DOLE zdjęcia, mały licznik, nie ucina się.
+- [x] **Nagłówki Bar/sekcje rozsypane (litery z innych linii)** — `SplitReveal` grupuje litery w słowa (`.srt-word` inline-block) → słowa nie łamią się w środku, zawijają po słowach, dopasowują się do tłumaczeń.
+- [x] **Community: double-tap zdjęcia drinka** → zostaje serce (burst ❤️) + działa palcem (touch double-tap).
+- [x] **Community: krzyżyk popout** — teraz w prawym górnym rogu wewnątrz popout (dodany `position:relative`).
+- [x] **Lupa wyszukiwania powiększała całą stronę** (iOS) — input ma teraz `font-size:16px` (iOS nie zoomuje pól ≥16px).
+
+### ⏳ DO DOPRACOWANIA NA URZĄDZENIU (kreator 3D — `cocktail-experience.tsx`):
+> To wymaga testów na realnym telefonie (zmiany w scenie R3F/GSAP są ryzykowne „w ciemno").
+- [ ] **Animacja wjazdu szejkera** — sprawdzić czy `shakerEnterFrom` odtwarza się na mobile.
+- [ ] **Brak strumienia przy wyborze butelki** — strumień (`PourStream`) nie pojawia się; sprawdzić trigger pour na mobile.
+- [ ] **Szejker + tło powiększa się przy otwarciu menu butelek** — błąd skalowania sceny gdy otwiera się drawer.
+- [ ] **Strona „teleportuje" w kreatorze** — scroll nie jest płynny (ScrollTrigger scrub / snap).
+- [ ] **Header przesuwa się w kreatorze** — zweryfikować `data-cx-section="creator"` (logo/flaga mają zostać).
