@@ -287,11 +287,11 @@
 
 ## 🟠 E3. Sekcja ALKOHOLI (alignment + etykieta mocy)
 - **Do zrobienia:**
-  - [ ] Zakładki kategorii alkoholi **wyrównane** z przyciskiem „wstecz".
-  - [ ] Zakładki mają **ten sam rozmiar** co kategorie napojów po lewej.
-  - [ ] Gdy kategorii za dużo → **przewijanie w dół** widoczne.
-  - [ ] Element „Tutti" po prawej (= moc) → etykieta **„moc:"** z emoji.
-  - [ ] Moc ekstremalna → emoji **🔥 ognia**.
+  - [x] Zakładki kategorii alkoholi **wyrównane** z przyciskiem „wstecz". ✅ *(cx-drop-row: back+dropdown+lupa+× w jednym rzędzie, align-items:stretch)*
+  - [x] Zakładki mają **ten sam rozmiar** co kategorie napojów po lewej. ✅ *(wspólne style cx-drop dla obu paneli)*
+  - [x] Gdy kategorii za dużo → **przewijanie w dół** widoczne. ✅ *(cx-drop-list max-height:240px overflow auto)*
+  - [x] Element „Tutti" po prawej (= moc) → etykieta **„moc:"** z emoji. ✅ *(cx-drop-strlabel "💪 Forza:")*
+  - [x] Moc ekstremalna → emoji **🔥 ognia**. ✅ *(STRENGTH_OPTS high: "🔥 Extreme 40%+")*
 
 ## 🟠 E4. Nalewanie (pour) — geometria strumienia
 - **Do zrobienia:**
@@ -409,9 +409,9 @@
 
 ## 🟢 F4. Przeglądanie i kategorie
 - **Do zrobienia:**
-  - [ ] **Zwijana** lista kategorii (popolari, più amati).
-  - [ ] Zmienić ikonę siatki (grid) na **czytelniejszą**.
-  - [ ] „scopri altri drink" → doładowuje **4 kolejne** drinki.
+  - [x] **Zwijana** lista kategorii (popolari, più amati). ✅ *(CommunityFilters: desktop inline row + mobile dropdown cx-comm-filter-dropdown)*
+  - [x] Zmienić ikonę siatki (grid) na **czytelniejszą**. ✅ *(cx-comm-grid-toggle ⊞/▬)*
+  - [x] „scopri altri drink" → doładowuje **4 kolejne** drinki. ✅ *(loadMoreDrinks: range offset..offset+3, append bez duplikatów, ukrycie przycisku gdy noMore)*
 
 ## 🟢 F5. Featured drink (drink miesiąca / tygodnia)
 - **Do zrobienia:**

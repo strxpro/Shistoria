@@ -4796,21 +4796,33 @@ function CommunitySection({ sectionRef }: { sectionRef?: React.RefObject<HTMLEle
   const [dbDrinks, setDbDrinks] = useState<any[]>([]);
   const [loadingMore, setLoadingMore] = useState(false);
   const [commFilter, setCommFilter] = useState("all");
+  const [loadOffset, setLoadOffset] = useState(0);
+  const [noMore, setNoMore] = useState(false);
   const [gridMode, setGridMode] = useState<"single" | "grid">(() => {
     return "single";
   });
 
   const loadMoreDrinks = async () => {
+    if (loadingMore || noMore) return;
     setLoadingMore(true);
     try {
+      // Doładowuj po 4 (range offset..offset+3), dopisując do istniejących
       const { data } = await supabase
         .from("community_drinks")
         .select("*")
         .eq("is_published", true)
         .order("likes", { ascending: false })
-        .range(0, 11);
-      if (data && data.length > 0) setDbDrinks(data);
-      // Jeśli brak danych z DB — scrolluj do dodatkowych lokalnych drinków (COMMUNITY jest już wyświetlone)
+        .range(loadOffset, loadOffset + 3);
+      if (data && data.length > 0) {
+        setDbDrinks((prev) => {
+          const seen = new Set(prev.map((d) => d.id));
+          return [...prev, ...data.filter((d) => !seen.has(d.id))];
+        });
+        setLoadOffset((o) => o + 4);
+        if (data.length < 4) setNoMore(true);
+      } else {
+        setNoMore(true);
+      }
     } catch (e) { console.error(e); }
     setLoadingMore(false);
   };
@@ -4949,12 +4961,14 @@ function CommunitySection({ sectionRef }: { sectionRef?: React.RefObject<HTMLEle
           ))}
         </div>
         <div className="cx-comm-more">
-          <button className="cx-comm-more-btn" onClick={loadMoreDrinks} disabled={loadingMore}>
-            <span className="cx-comm-more-fill" style={{ transform: loadingMore ? "scaleY(1)" : "scaleY(0)" }} />
-            <span className="cx-comm-more-label">
-              {loadingMore ? "..." : (() => { const L = {it:"Scopri altri drink",pl:"Zobacz więcej drinków",en:"See more drinks",de:"Mehr Drinks entdecken",fr:"Découvrir plus de cocktails",es:"Ver más drinks"}; return L[((typeof window!=="undefined"&&(window as any).currentLanguage)||"it") as keyof typeof L]??L.it; })()} →
-            </span>
-          </button>
+          {!noMore && (
+            <button className="cx-comm-more-btn" onClick={loadMoreDrinks} disabled={loadingMore}>
+              <span className="cx-comm-more-fill" style={{ transform: loadingMore ? "scaleY(1)" : "scaleY(0)" }} />
+              <span className="cx-comm-more-label">
+                {loadingMore ? "..." : (() => { const L = {it:"Scopri altri drink",pl:"Zobacz więcej drinków",en:"See more drinks",de:"Mehr Drinks entdecken",fr:"Découvrir plus de cocktails",es:"Ver más drinks"}; return L[((typeof window!=="undefined"&&(window as any).currentLanguage)||"it") as keyof typeof L]??L.it; })()} →
+              </span>
+            </button>
+          )}
         </div>
       </div>
     </section>
