@@ -4760,6 +4760,8 @@ function OrganicFlood({ floodRef, grainRef }: { floodRef: React.RefObject<HTMLDi
 function DbDrinkCard({ d }: { d: any }) {
   const [liked, setLiked] = useState(false);
   const [likes, setLikes] = useState(d.likes || 0);
+  // realtime: gdy licznik w DB się zmieni (inni polubili) → zaktualizuj na żywo
+  useEffect(() => { setLikes(d.likes || 0); }, [d.likes]);
   const [popout, setPopout] = useState(false);
   const [orderQR, setOrderQR] = useState<string | null>(null);
   const [burst, setBurst] = useState(false); // serce po double-tap
@@ -5090,7 +5092,26 @@ function CommunitySection({ sectionRef }: { sectionRef?: React.RefObject<HTMLEle
     setLoadingMore(false);
   };
 
-  // Drink del Mese / della Settimana — liczony z DB (średnia like + claimed×2; tydzień: świeże ×1.5)
+  // Pierwsze załadowanie drinków z DB + REALTIME (lajki/odbiory na żywo, bez odświeżania)
+  useEffect(() => {
+    let alive = true;
+    let ch: any = null;
+    (async () => {
+      const { data } = await supabase.from("community_drinks").select("*").eq("is_published", true).order("likes", { ascending: false }).range(0, 11);
+      if (alive && data) { setDbDrinks(data); setLoadOffset(12); if (data.length < 12) setNoMore(true); }
+      ch = supabase.channel("community_rt")
+        .on("postgres_changes", { event: "UPDATE", schema: "public", table: "community_drinks" }, (p: any) => {
+          setDbDrinks((prev) => prev.map((d) => d.id === p.new.id ? { ...d, likes: p.new.likes, claimed_count: p.new.claimed_count } : d));
+        })
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "community_drinks" }, (p: any) => {
+          setDbDrinks((prev) => prev.some((d) => d.id === p.new.id) ? prev : [p.new, ...prev]);
+        })
+        .subscribe();
+    })();
+    return () => { alive = false; try { ch?.unsubscribe?.(); } catch {} };
+  }, []);
+
+  // tytuł w języku strony (z window.currentLanguage); fallback do IT
   const [featured, setFeatured] = useState<any>(null);
   const [featuredPeriod, setFeaturedPeriod] = useState<"week" | "month">("week");
   useEffect(() => {
@@ -5194,7 +5215,7 @@ function CommunitySection({ sectionRef }: { sectionRef?: React.RefObject<HTMLEle
               ))}
             </h2>
           </div>
-          <span className="cx-comm-count">{COMMUNITY.length}</span>
+          <span className="cx-comm-count">{dbDrinks.length}</span>
         </header>
         {/* Pochwal się swoim drinkiem */}
         <div className="cx-comm-share">
@@ -5208,8 +5229,8 @@ function CommunitySection({ sectionRef }: { sectionRef?: React.RefObject<HTMLEle
         {/* Filtry sortowania community */}
         <CommunityFilters filter={commFilter} setFilter={setCommFilter} gridMode={gridMode} setGridMode={setGridMode} />
 
-        {/* Drink del Mese / della Settimana — wyróżniony z koroną (z DB jeśli dostępny) */}
-        {(featured || COMMUNITY.length > 0) && (() => {
+        {/* Drink del Mese / della Settimana — wyróżniony z koroną (liczony automatycznie z DB) */}
+        {featured && (() => {
           const lang = ((typeof window !== "undefined" && (window as any).currentLanguage) || "it") as string;
           const LBL: Record<string, { week: string; month: string }> = {
             it: { week: "Drink della Settimana", month: "Drink del Mese" },
@@ -5219,13 +5240,13 @@ function CommunitySection({ sectionRef }: { sectionRef?: React.RefObject<HTMLEle
             fr: { week: "Cocktail de la Semaine", month: "Cocktail du Mois" },
             es: { week: "Drink de la Semana", month: "Drink del Mes" },
           };
-          const lbl = (LBL[lang] || LBL.it)[featured ? featuredPeriod : "month"];
+          const lbl = (LBL[lang] || LBL.it)[featuredPeriod];
           const f = featured;
-          const name = f ? f.name : COMMUNITY[0].name;
-          const by = f ? (f.author_name || f.by || "—") : COMMUNITY[0].by;
-          const likes = f ? (f.likes || 0) : COMMUNITY[0].likes;
-          const claimed = f ? (f.claimed_count || f.claimed || 0) : 0;
-          const photo = f ? f.photo_url : null;
+          const name = f.name;
+          const by = f.author_name || "—";
+          const likes = f.likes || 0;
+          const claimed = f.claimed_count || 0;
+          const photo = f.photo_url;
           return (
             <div className="cx-featured-drink">
               <span className="cx-featured-crown">👑</span>
@@ -5233,7 +5254,7 @@ function CommunitySection({ sectionRef }: { sectionRef?: React.RefObject<HTMLEle
                 <img src={photo} alt={name} className="cx-featured-photo" />
               ) : (
                 <svg viewBox="0 0 60 90" className="cx-featured-glass">
-                  <defs><linearGradient id="feat-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={(COMMUNITY[0]?.from) || "#E8927C"} /><stop offset="100%" stopColor={(COMMUNITY[0]?.to) || "#5BB8D4"} /></linearGradient></defs>
+                  <defs><linearGradient id="feat-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={f.color || "#E8927C"} /><stop offset="100%" stopColor="#5BB8D4" /></linearGradient></defs>
                   <path d="M10 10 H50 L35 42 V68 H38 V74 H22 V68 H25 V42 Z" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.4)" strokeWidth="1.5" />
                   <path d="M14 13 H46 L35 38 H25 Z" fill="url(#feat-g)" />
                 </svg>
@@ -5248,12 +5269,14 @@ function CommunitySection({ sectionRef }: { sectionRef?: React.RefObject<HTMLEle
         })()}
 
         <div className={`cx-comm-grid ${gridMode === "grid" ? "cx-comm-grid-2col" : ""}`}>
-          {[...COMMUNITY].sort((a, b) => {
-            if (commFilter === "liked") return b.likes - a.likes;
-            if (commFilter === "popular") return b.comments - a.comments;
+          {dbDrinks.slice().sort((a, b) => {
+            if (commFilter === "liked") return (b.likes || 0) - (a.likes || 0);
+            if (commFilter === "popular") return (b.claimed_count || 0) - (a.claimed_count || 0);
             return 0;
-          }).map((c) => <CommunityCard key={c.name} c={c} />)}
-          {dbDrinks.map((d) => <DbDrinkCard key={d.id} d={d} />)}
+          }).map((d) => <DbDrinkCard key={d.id} d={d} />)}
+          {dbDrinks.length === 0 && (
+            <p className="cx-comm-empty">{(() => { const L = {it:"Ancora nessun drink. Crea il tuo e condividilo! 🍸",pl:"Brak drinków. Stwórz swój i pochwal się! 🍸",en:"No drinks yet. Create yours and share it! 🍸",de:"Noch keine Drinks. Erstelle deinen! 🍸",fr:"Aucun cocktail. Crée le tien! 🍸",es:"Aún no hay drinks. ¡Crea el tuyo! 🍸"}; return L[((typeof window!=="undefined"&&(window as any).currentLanguage)||"it") as keyof typeof L]??L.it; })()}</p>
+          )}
         </div>
         <div className="cx-comm-more">
           {!noMore && (
