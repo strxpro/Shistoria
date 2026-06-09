@@ -100,19 +100,12 @@ function MobileFullMenu() {
   };
 
   // Gdy sheet kategorii otwarty → blokada scrolla + hamburger w prawo (cx-sheet).
-  // Gdy tylko jesteśmy w sekcji menu (pasek kategorii widoczny) → przesuń hamburger BEZ blokady scrolla (cx-menucat).
   useEffectM(() => {
     if (typeof document === "undefined") return;
     if (catSheet) document.body.dataset.cxSheet = "open";
     else delete document.body.dataset.cxSheet;
     return () => { delete document.body.dataset.cxSheet; };
   }, [catSheet]);
-  useEffectM(() => {
-    if (typeof document === "undefined") return;
-    if (pillVisible) document.body.dataset.cxMenucat = "on";
-    else delete document.body.dataset.cxMenucat;
-    return () => { delete document.body.dataset.cxMenucat; };
-  }, [pillVisible]);
   const catBarRef = useRefM(null);
   const sectionRef = useRefM(null);
 
@@ -388,11 +381,11 @@ function MobileFullMenu() {
         .mfm-top-badge { position: absolute; bottom: 4px; right: 4px; display: inline-flex; align-items: center; gap: 3px; padding: 2px 6px; border-radius: 999px; background: rgba(0,0,0,0.55); color: #fff; font-size: 10px; font-weight: 700; }
         .mfm-top-badge svg { font-size: 11px; color: #FE2C55; }
         .mfm-top-name { font-family: var(--f-body); font-size: 11px; line-height: 1.25; color: var(--c-deep); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-        /* mała pigułka serca w rogu zdjęcia (TikTok-style) */
-        .mfm-thumb-like { position: absolute; bottom: 3px; right: 3px; display: inline-flex; align-items: center; gap: 3px; padding: 2px 5px; border-radius: 999px; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); cursor: pointer; line-height: 1; }
-        .mfm-thumb-like-ico { font-size: 13px; color: #fff; }
+        /* serce TikTok-style — wyśrodkowane na dole zdjęcia, małe */
+        .mfm-thumb-like { position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 2px; padding: 1px 5px; border-radius: 999px; background: rgba(0,0,0,0.45); backdrop-filter: blur(4px); cursor: pointer; line-height: 1; z-index: 4; }
+        .mfm-thumb-like-ico { font-size: 11px; color: #fff; display: block; }
         .mfm-thumb-like.is-liked .mfm-thumb-like-ico { animation: mfmPulse .3s ease; }
-        .mfm-thumb-like-n { font-size: 10px; font-weight: 700; color: #fff; }
+        .mfm-thumb-like-n { font-size: 9px; font-weight: 700; color: #fff; }
         /* burst — chwilowe duże serce, TYLKO w obrębie miniatury (nie na całym ekranie) */
         .mfm-thumb-burst { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 3; }
         .mfm-thumb-burst svg { font-size: 34px; color: #FE2C55; animation: mfmHeartPop .6s cubic-bezier(.17,.89,.32,1.28); filter: drop-shadow(0 2px 6px rgba(0,0,0,0.4)); }

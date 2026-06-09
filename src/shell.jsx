@@ -574,11 +574,9 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
           body[data-cx-section="creator"] .nav-bg { opacity:0; }
           /* Gdy otwarta szuflada/panel kategorii: logo w lewo, flagi zwinięte (hamburger w prawym górnym rogu) */
           body[data-cx-drawer="open"] .nav-left,
-          body[data-cx-sheet="open"] .nav-left,
-          body[data-cx-menucat="on"] .nav-left { left: 16px; transform: translate(0, -50%); }
+          body[data-cx-sheet="open"] .nav-left { left: 16px; transform: translate(0, -50%); }
           body[data-cx-drawer="open"] .nav-right,
-          body[data-cx-sheet="open"] .nav-right,
-          body[data-cx-menucat="on"] .nav-right { opacity:0; pointer-events:none; }
+          body[data-cx-sheet="open"] .nav-right { opacity:0; pointer-events:none; }
           .btn-nav { display: none; } /* ukryj CTA na mobile — zostają tylko flagi */
           .nav-cta { display: none; }
         }
@@ -644,8 +642,7 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
           }
           /* Gdy otwarta szuflada butelek LUB panel kategorii (FAB) — hamburger przesuwa się w prawo */
           body[data-cx-drawer="open"] .hamburger-mobile,
-          body[data-cx-sheet="open"] .hamburger-mobile,
-          body[data-cx-menucat="on"] .hamburger-mobile { right: 16px; transform: none; }
+          body[data-cx-sheet="open"] .hamburger-mobile { right: 16px; transform: none; }
           body[data-cx-section="creator"] .hamburger-mobile:not(.open) { right: 16px; transform:none; }
           /* hamburger pozostaje widoczny w kreatorze (NIE chowamy podczas scrollu/animacji) */
           /* W sekcji bar (Tramonti) hamburger w kolorze coral — bardziej widoczny */
@@ -809,14 +806,22 @@ function SplitReveal({ children, className = "", as = "h2", invert = false }) {
     };
   }, [children]);
 
-  // Render children: split each text node into chars, keep \n as <br>
+  // Render children: split into WORDS (each word = inline-block, nie łamie się w środku),
+  // każda litera to .char (do animacji wypełnienia). \n → <br>.
   const renderText = (text) => {
     const lines = text.split("\n");
+    let charIdx = 0;
     return lines.flatMap((line, li) => {
-      const chars = [...line].map((c, i) => (
-        <span className="char" key={`${li}-${i}`}>{c === " " ? "\u00A0" : c}</span>
+      const words = line.split(" ");
+      const nodes = words.map((word, wi) => (
+        <span className="srt-word" key={`w-${li}-${wi}`}>
+          {[...word].map((c) => (
+            <span className="char" key={`c-${charIdx++}`}>{c}</span>
+          ))}
+          {wi < words.length - 1 && <span className="char srt-space">{"\u00A0"}</span>}
+        </span>
       ));
-      return li < lines.length - 1 ? [...chars, <br key={`br-${li}`} />] : chars;
+      return li < lines.length - 1 ? [...nodes, <br key={`br-${li}`} />] : nodes;
     });
   };
 
