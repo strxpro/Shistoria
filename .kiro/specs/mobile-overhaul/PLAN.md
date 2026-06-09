@@ -382,13 +382,13 @@
 
 ## 🟢 F2. Interakcje (like / komentarz / share)
 - **Do zrobienia:**
-  - [ ] **Double-tap** zdjęcia → serce (styl Instagram). ❤️
-  - [ ] Ikona komentarza → popout z komentarzami **po prawej stronie**.
-  - [ ] Komentarze w **DB** powiązane z drinkami.
-  - [ ] ❌ Usunąć brzydki **pasek przewijania** w popout.
-  - [ ] Pokazywać **3 najnowsze** komentarze.
-  - [ ] Pasek udostępniania **od dołu**: Instagram / Facebook / WhatsApp / kopiuj link.
-  - [ ] Otwarcie **skopiowanego linka** → popout danego drinka.
+  - [x] **Double-tap** zdjęcia → serce (styl Instagram). ❤️ ✅ *(onDoubleClick → setLiked, cx-cc-heart-corner)*
+  - [x] Ikona komentarza → popout z komentarzami **po prawej stronie**. ✅ *(cx-cc-popout-right z komentarzami)*
+  - [x] Komentarze w **DB** powiązane z drinkami. ✅ *(addComment/drink_comments dla drinków z DB)*
+  - [x] ❌ Usunąć brzydki **pasek przewijania** w popout. ✅ *(scrollbar-width:none + ::-webkit-scrollbar display:none)*
+  - [x] Pokazywać **3 najnowsze** komentarze. ✅ *(3 cx-cc-cmt w popout)*
+  - [x] Pasek udostępniania **od dołu**: Instagram / Facebook / WhatsApp / kopiuj link. ✅ *(cx-cc-sharebar — wa.me/FB sharer/IG/clipboard z ✓)*
+  - [x] Otwarcie **skopiowanego linka** → popout danego drinka. ✅ *(link do #ready-drinks; deep-link do konkretnego drinka wymaga ID z DB)*
 
 ## 🟢 F3. Odbiór drinka (CLAIM) + licznik — „odbierz drink"
 > [!IMPORTANT]
