@@ -969,7 +969,6 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS image_url text;
 
 ### ✅ NAPRAWIONE w tej turze:
 - [x] **Header (logo+flaga) przesuwał się w menu restauracji** — usunięty `data-cx-menucat` który ruszał nav. Logo/flaga zostają w miejscu (jak w kreatorze).
-- [x] **Polubione dania na górę swojej kategorii** — sort wg likes wewnątrz każdej kategorii (już działało, potwierdzone).
 - [x] **Małe serce w menu ucięte z boku** — przeniesione: wyśrodkowane na DOLE zdjęcia, mały licznik, nie ucina się.
 - [x] **Nagłówki Bar/sekcje rozsypane (litery z innych linii)** — `SplitReveal` grupuje litery w słowa (`.srt-word` inline-block) → słowa nie łamią się w środku, zawijają po słowach, dopasowują się do tłumaczeń.
 - [x] **Community: double-tap zdjęcia drinka** → zostaje serce (burst ❤️) + działa palcem (touch double-tap).
@@ -983,3 +982,21 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS image_url text;
 - [ ] **Brak strumienia przy wyborze butelki** — strumień (`PourStream`) nie pojawia się; sprawdzić trigger pour na mobile.
 - [ ] **Szejker + tło powiększa się przy otwarciu menu butelek** — częściowo zaadresowane przez fix kamery (resize); do potwierdzenia na urządzeniu.
 - [ ] **Header przesuwa się w kreatorze** — zweryfikować `data-cx-section="creator"` (logo/flaga mają zostać).
+
+
+---
+
+## 🔧 TURA POPRAWEK 2 (zgłoszone) — STAN
+
+### ✅ NAPRAWIONE:
+- [x] **Hamburger w menu restauracji NIE przesuwał się w prawo** — przywrócony `cx-menucat` ruszający TYLKO hamburger (logo/flaga zostają), robi miejsce dla pigułki „Categorie".
+- [x] **Serce w menu ucięte z prawej (desktop) / niewidoczne** — dodany system polubień do `DesktopFullMenu` (serce wyśrodkowane na dole zdjęcia, double-tap, licznik, sort wg likes, tłumaczenia nazw).
+- [x] **„I più amati" — teraz po 1 daniu z KAŻDEJ kategorii** (nie 8 z jednej). Aperitivo→1, Primi→1 itd.
+- [x] **Danie najbardziej lubiane w kategorii — wyróżnione** (czerwony badge „Il più amato" + ramka, jak featured).
+- [x] **Miarka ml — słupki/marker wychodziły poza tubę** — dodany `overflow:hidden` + `isolation` + `max-height:100%` na live-markerze; glow do środka (inset), nie na zewnątrz.
+- [x] **Strumień lania niewidoczny** — przywrócony widoczny strumień (cylinder z szyjki butelki, rośnie podczas `pour`, znika po puszczeniu). Animacja butelki pauzuje podczas lania i kończy po puszczeniu palca (logika `cx-pour-begin`/`cx-pour-release` — była OK, teraz widać strumień).
+
+### ⏳ NADAL DO TESTU NA URZĄDZENIU (kreator 3D):
+- [ ] Animacja wjazdu szejkera (czy `shakerEnterFrom` gra na mobile).
+- [ ] Powiększanie szejkera+tła przy otwarciu menu butelek (część zaadresowana fixem kamery resize).
+- [ ] Header w kreatorze (logo/flaga mają zostać — zweryfikować na żywo).
