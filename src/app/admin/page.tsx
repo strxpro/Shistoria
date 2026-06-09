@@ -486,17 +486,16 @@ function EventsPanel() {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [editEvt, setEditEvt] = useState<any>(null);
-  const [step, setStep] = useState<"edit" | "preview">("edit"); // krok modala
+  const [step, setStep] = useState<1 | 2 | 3>(1); // 3-krokowy stepper
   const [previewMode, setPreviewMode] = useState<"mobile" | "desktop">("mobile");
   const [uploading, setUploading] = useState(false);
 
+  // 4 szablony (2x2 na telefonie, 4 w rzędzie na komputerze)
   const TEMPLATES = [
     { id: "jazz", label: "🎵 Jazz Night", colors: { bg: "#1a1040", accent: "#9b59b6" } },
     { id: "degustazione", label: "🍷 Degustazione", colors: { bg: "#2d1b0e", accent: "#c0392b" } },
     { id: "cena", label: "🍽 Cena Speciale", colors: { bg: "#0d2818", accent: "#27ae60" } },
     { id: "aperitivo", label: "🌅 Aperitivo", colors: { bg: "#1a2a3a", accent: "#f39c12" } },
-    { id: "estate", label: "🏖 Estate", colors: { bg: "#0e2840", accent: "#0fa3b1" } },
-    { id: "natale", label: "🎄 Festività", colors: { bg: "#1a0e0e", accent: "#e74c3c" } },
   ];
 
   const load = async () => {
@@ -507,9 +506,9 @@ function EventsPanel() {
   };
   useEffect(() => { load(); }, []);
 
-  const openNew = () => { setEditEvt({ title: "", description: "", event_date: "", tag: "", template: "jazz", custom_colors: TEMPLATES[0].colors }); setStep("edit"); };
-  const openEdit = (evt: any) => { setEditEvt({ ...evt, shareInstagram: !!evt.share_instagram, shareFacebook: !!evt.share_facebook }); setStep("edit"); };
-  const close = () => { setEditEvt(null); setStep("edit"); };
+  const openNew = () => { setEditEvt({ title: "", description: "", event_date: "", tag: "", template: "jazz", custom_colors: TEMPLATES[0].colors }); setStep(1); };
+  const openEdit = (evt: any) => { setEditEvt({ ...evt, shareInstagram: !!evt.share_instagram, shareFacebook: !!evt.share_facebook }); setStep(1); };
+  const close = () => { setEditEvt(null); setStep(1); };
 
   const handleImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -557,21 +556,46 @@ function EventsPanel() {
       {editEvt && (
         <div className="admin-modal-overlay" onClick={close}>
           <div className="admin-modal admin-modal-wide" onClick={(e) => e.stopPropagation()}>
-            {step === "edit" ? (
-              <>
-                <h3>{editEvt.id ? "Modifica evento" : "Nuovo evento"}</h3>
-                <div className="admin-form">
-                  <label>Template (colore di sfondo)</label>
-                  <div className="admin-templates">
-                    {TEMPLATES.map((t) => (
-                      <button key={t.id} className={`admin-tpl ${editEvt.template === t.id ? "active" : ""}`}
-                        style={{ background: t.colors.bg, borderColor: t.colors.accent }}
-                        onClick={() => setEditEvt({ ...editEvt, template: t.id, custom_colors: t.colors })}>
-                        {t.label}
-                      </button>
-                    ))}
+            {/* Stepper — 3 kroki */}
+            <div className="ev-stepper">
+              {[{ n: 1, l: "Template" }, { n: 2, l: "Dettagli" }, { n: 3, l: "Anteprima" }].map((s, i) => (
+                <React.Fragment key={s.n}>
+                  <div className={`ev-step ${step === s.n ? "active" : ""} ${step > s.n ? "done" : ""}`} onClick={() => { if (s.n < step) setStep(s.n as 1 | 2 | 3); }}>
+                    <span className="ev-step-num">{step > s.n ? "✓" : s.n}</span>
+                    <span className="ev-step-label">{s.l}</span>
                   </div>
+                  {i < 2 && <div className={`ev-step-line ${step > s.n ? "done" : ""}`} />}
+                </React.Fragment>
+              ))}
+            </div>
 
+            {/* KROK 1 — wybór szablonu (4 w rzędzie na desktop, 2x2 na telefonie) */}
+            {step === 1 && (
+              <>
+                <h3>Scegli un template</h3>
+                <div className="ev-tpl-grid">
+                  {TEMPLATES.map((t) => (
+                    <button key={t.id} className={`ev-tpl-card ${editEvt.template === t.id ? "active" : ""}`}
+                      style={{ background: t.colors.bg }}
+                      onClick={() => setEditEvt({ ...editEvt, template: t.id, custom_colors: t.colors })}>
+                      <span className="ev-tpl-dot" style={{ background: t.colors.accent }} />
+                      <span className="ev-tpl-label">{t.label}</span>
+                      {editEvt.template === t.id && <span className="ev-tpl-check" style={{ color: t.colors.accent }}>✓</span>}
+                    </button>
+                  ))}
+                </div>
+                <div className="admin-modal-actions">
+                  <button className="admin-btn" onClick={() => setStep(2)}>Avanti →</button>
+                  <button className="admin-btn-ghost" onClick={close}>Annulla</button>
+                </div>
+              </>
+            )}
+
+            {/* KROK 2 — dane wydarzenia */}
+            {step === 2 && (
+              <>
+                <h3>Dettagli dell'evento</h3>
+                <div className="admin-form">
                   <label>Foto evento (opzionale)</label>
                   <div className="menu-img-upload">
                     {editEvt.image_url ? (
@@ -586,7 +610,6 @@ function EventsPanel() {
                       </label>
                     )}
                   </div>
-
                   <label>Titolo</label>
                   <input value={editEvt.title} onChange={(e) => setEditEvt({ ...editEvt, title: e.target.value })} placeholder="Nome dell'evento" />
                   <label>Data</label>
@@ -595,20 +618,26 @@ function EventsPanel() {
                   <input value={editEvt.tag || ""} onChange={(e) => setEditEvt({ ...editEvt, tag: e.target.value })} placeholder="es. Live Music, Degustazione..." />
                   <label>Descrizione (italiano — si traduce automaticamente)</label>
                   <textarea value={editEvt.description || ""} onChange={(e) => setEditEvt({ ...editEvt, description: e.target.value })} placeholder="Descrivi l'evento..." />
-                  <label>Condividi sui social (al salvataggio)</label>
+                  <label>Condividi sui social (alla pubblicazione)</label>
                   <div className="admin-form-row" style={{ gap: 16 }}>
                     <label><input type="checkbox" checked={editEvt.shareInstagram || false} onChange={(e) => setEditEvt({ ...editEvt, shareInstagram: e.target.checked })} /> 📸 Instagram Story</label>
                     <label><input type="checkbox" checked={editEvt.shareFacebook || false} onChange={(e) => setEditEvt({ ...editEvt, shareFacebook: e.target.checked })} /> 📘 Facebook Post</label>
                   </div>
+                  {(editEvt.shareInstagram || editEvt.shareFacebook) && (
+                    <p className="ev-social-note">ℹ️ Per pubblicare automaticamente su Instagram/Facebook serve la configurazione (vedi file <strong>SOCIAL_AUTOPOST.md</strong>). Al salvataggio l'evento viene segnato come "da pubblicare".</p>
+                  )}
                 </div>
                 <div className="admin-modal-actions">
-                  <button className="admin-btn" onClick={() => setStep("preview")} disabled={!editEvt.title}>Avanti — Anteprima →</button>
-                  <button className="admin-btn-ghost" onClick={close}>Annulla</button>
+                  <button className="admin-btn" onClick={() => setStep(3)} disabled={!editEvt.title}>Avanti — Anteprima →</button>
+                  <button className="admin-btn-ghost" onClick={() => setStep(1)}>← Indietro</button>
                 </div>
               </>
-            ) : (
+            )}
+
+            {/* KROK 3 — podgląd telefon/komputer */}
+            {step === 3 && (
               <>
-                <h3>Anteprima evento</h3>
+                <h3>Anteprima</h3>
                 <div className="ev-preview-switch">
                   <button className={previewMode === "mobile" ? "active" : ""} onClick={() => setPreviewMode("mobile")}>📱 Telefono</button>
                   <button className={previewMode === "desktop" ? "active" : ""} onClick={() => setPreviewMode("desktop")}>💻 Computer</button>
@@ -625,10 +654,10 @@ function EventsPanel() {
                     </div>
                   </div>
                 </div>
-                <p className="ev-preview-note">Così apparirà sul sito (sezione Eventi). {previewMode === "mobile" ? "Vista mobile." : "Vista desktop."}</p>
+                <p className="ev-preview-note">Così apparirà sul sito (sezione Eventi). {previewMode === "mobile" ? "Vista telefono." : "Vista computer."}</p>
                 <div className="admin-modal-actions">
                   <button className="admin-btn" onClick={() => save(editEvt)}>✓ Salva e pubblica</button>
-                  <button className="admin-btn-ghost" onClick={() => setStep("edit")}>← Modifica</button>
+                  <button className="admin-btn-ghost" onClick={() => setStep(2)}>← Indietro</button>
                 </div>
               </>
             )}
@@ -1601,6 +1630,28 @@ function AdminStyles() {
       .admin-modal-overlay { position:fixed; inset:0; z-index:100; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; padding:24px; }
       .admin-modal { width:min(520px,92vw); max-height:85vh; overflow-y:auto; background:#14181e; border-radius:20px; padding:32px; border:1px solid rgba(255,255,255,0.1); }
       .admin-modal-wide { width:min(640px,94vw); }
+      /* Stepper 3-krokowy (eventy) */
+      .ev-stepper { display:flex; align-items:center; justify-content:center; gap:0; margin:0 0 22px; }
+      .ev-step { display:flex; flex-direction:column; align-items:center; gap:6px; cursor:default; }
+      .ev-step-num { width:34px; height:34px; border-radius:50%; display:grid; place-items:center; font-weight:800; font-size:14px; background:rgba(255,255,255,0.08); border:2px solid rgba(255,255,255,0.18); color:rgba(255,255,255,0.6); transition:all .25s; }
+      .ev-step.active .ev-step-num { background:#E8927C; border-color:#E8927C; color:#fff; transform:scale(1.1); }
+      .ev-step.done .ev-step-num { background:rgba(39,174,96,0.25); border-color:#27ae60; color:#27ae60; cursor:pointer; }
+      .ev-step-label { font-size:11px; letter-spacing:0.05em; opacity:0.7; }
+      .ev-step.active .ev-step-label { opacity:1; color:#E8927C; font-weight:700; }
+      .ev-step-line { flex:1; max-width:80px; height:2px; background:rgba(255,255,255,0.15); margin:0 8px; margin-bottom:18px; }
+      .ev-step-line.done { background:#27ae60; }
+      .admin-theme-light .ev-step-num { background:rgba(0,0,0,0.05); border-color:rgba(0,0,0,0.15); color:rgba(0,0,0,0.5); }
+      .admin-theme-light .ev-step-line { background:rgba(0,0,0,0.12); }
+      /* Siatka szablonów — 4 w rzędzie (desktop), 2x2 (telefon) */
+      .ev-tpl-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:8px 0 4px; }
+      @media (max-width:600px) { .ev-tpl-grid { grid-template-columns:repeat(2,1fr); } }
+      .ev-tpl-card { position:relative; aspect-ratio:1/1.1; border-radius:16px; border:2px solid rgba(255,255,255,0.12); cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; color:#fff; padding:10px; transition:all .2s; }
+      .ev-tpl-card:hover { transform:translateY(-3px); }
+      .ev-tpl-card.active { border-color:#fff; box-shadow:0 8px 28px rgba(0,0,0,0.4); }
+      .ev-tpl-dot { width:30px; height:30px; border-radius:50%; }
+      .ev-tpl-label { font-size:12px; font-weight:700; text-align:center; line-height:1.2; }
+      .ev-tpl-check { position:absolute; top:8px; right:10px; font-size:18px; font-weight:900; }
+      .ev-social-note { font-size:12px; line-height:1.5; padding:10px 12px; border-radius:10px; background:rgba(91,184,212,0.12); border:1px solid rgba(91,184,212,0.3); margin-top:6px; opacity:0.9; }
       /* Anteprima evento */
       .ev-preview-switch { display:flex; gap:8px; margin:0 0 18px; }
       .ev-preview-switch button { flex:1; padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.04); color:#fff; font-size:13px; cursor:pointer; }

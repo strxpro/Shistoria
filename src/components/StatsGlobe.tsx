@@ -1,22 +1,20 @@
 "use client";
 
 /**
- * StatsGlobe — prawdziwy globus 3D (WebGL / three.js) z teksturą mapy Ziemi.
- * - obraca się automatycznie, można go chwycić i obracać palcem / myszą
- * - pinezki krajów odwiedzających (rozmiar = liczba wizyt), świecące słupki
- * - dane na bieżąco (przekazywane z panelu statystyk)
- *
- * Ładowany dynamicznie (ssr:false) z panelu admina, żeby nie obciążać SSR.
+ * StatsGlobe — globus 3D (WebGL) z jasną teksturą Ziemi LUB płaska mapa 2D.
+ * - jasna tekstura (earth-blue-marble), można obracać, przybliżać (zoom)
+ * - klik w pinezkę kraju → pokazuje pełne info (callback onSelect)
+ * - przełącznik globus / mapa płaska
+ * - responsywny, wyśrodkowany
  */
 
 import React, { useRef, useMemo, useState } from "react";
-import { Canvas, useFrame, useLoader } from "@react-three/fiber";
+import { Canvas, useFrame, useLoader, ThreeEvent } from "@react-three/fiber";
 import * as THREE from "three";
 import { OrbitControls } from "@react-three/drei";
 
-// Tekstury Ziemi z CDN (three.js examples — publiczne, lekkie). Bez bundlowania.
-const EARTH_TEX = "https://unpkg.com/three-globe@2.31.0/example/img/earth-night.jpg";
-const EARTH_TOPO = "https://unpkg.com/three-globe@2.31.0/example/img/earth-topology.png";
+// Jasna tekstura Ziemi (blue marble — kolorowa, widać kontynenty). Z CDN, bez bundlowania.
+const EARTH_TEX = "https://unpkg.com/three-globe@2.31.0/example/img/earth-blue-marble.jpg";
 
 const COUNTRY_COORDS: Record<string, [number, number]> = {
   IT: [41.9, 12.5], PL: [52.0, 19.0], DE: [51.0, 9.0], FR: [46.0, 2.0], ES: [40.0, -4.0],
@@ -29,9 +27,9 @@ const COUNTRY_COORDS: Record<string, [number, number]> = {
   TR: [38.9, 35.2], AE: [23.4, 53.8], MA: [31.8, -7.1], TN: [33.9, 9.5], SI: [46.2, 14.8],
 };
 
-const R = 1.6; // promień globusa
+const R = 1.6;
+type Country = { code: string; name: string; count: number };
 
-// lat/lon → pozycja 3D na sferze
 function latLonToVec3(lat: number, lon: number, radius: number): THREE.Vector3 {
   const phi = (90 - lat) * (Math.PI / 180);
   const theta = (lon + 180) * (Math.PI / 180);
@@ -42,49 +40,50 @@ function latLonToVec3(lat: number, lon: number, radius: number): THREE.Vector3 {
   );
 }
 
-function EarthSphere({ countries, autoRotate }: { countries: { code: string; name: string; count: number }[]; autoRotate: boolean }) {
+// ─── GLOBUS 3D ────────────────────────────────────────────────────────────────
+function EarthSphere({ countries, autoRotate, onSelect }: { countries: Country[]; autoRotate: boolean; onSelect: (c: Country) => void }) {
   const groupRef = useRef<THREE.Group>(null!);
-  const [tex, topo] = useLoader(THREE.TextureLoader, [EARTH_TEX, EARTH_TOPO]);
+  const tex = useLoader(THREE.TextureLoader, EARTH_TEX);
   const maxC = Math.max(1, ...countries.map((c) => c.count));
 
   useFrame((_, dt) => {
-    if (autoRotate && groupRef.current) groupRef.current.rotation.y += dt * 0.12;
+    if (autoRotate && groupRef.current) groupRef.current.rotation.y += dt * 0.1;
   });
 
   const pins = useMemo(() => countries.map((c) => {
     const co = COUNTRY_COORDS[c.code?.toUpperCase()];
     if (!co) return null;
     const base = latLonToVec3(co[0], co[1], R);
-    const h = 0.12 + (c.count / maxC) * 0.6; // wysokość słupka wg liczby wizyt
+    const h = 0.14 + (c.count / maxC) * 0.6;
     const top = latLonToVec3(co[0], co[1], R + h);
     const mid = latLonToVec3(co[0], co[1], R + h / 2);
     const dir = top.clone().sub(base).normalize();
     const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
-    return { key: c.code, base, mid, top, h, quat, count: c.count, name: c.name };
+    return { c, base, mid, top, h, quat };
   }).filter(Boolean) as any[], [countries, maxC]);
 
   return (
     <group ref={groupRef}>
-      {/* kula Ziemi */}
       <mesh>
         <sphereGeometry args={[R, 64, 64]} />
-        <meshStandardMaterial map={tex} bumpMap={topo} bumpScale={0.015} metalness={0.1} roughness={0.85} emissive={new THREE.Color("#0a1a2a")} emissiveIntensity={0.35} />
+        <meshStandardMaterial map={tex} metalness={0.05} roughness={0.95} />
       </mesh>
-      {/* delikatna atmosfera */}
-      <mesh scale={1.04}>
+      <mesh scale={1.03}>
         <sphereGeometry args={[R, 32, 32]} />
-        <meshBasicMaterial color="#5BB8D4" transparent opacity={0.08} side={THREE.BackSide} />
+        <meshBasicMaterial color="#9fd6ee" transparent opacity={0.1} side={THREE.BackSide} />
       </mesh>
-      {/* pinezki krajów — świecące słupki + kropka na szczycie */}
       {pins.map((p) => (
-        <group key={p.key}>
+        <group key={p.c.code}
+          onClick={(e: ThreeEvent<MouseEvent>) => { e.stopPropagation(); onSelect(p.c); }}
+          onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = "pointer"; }}
+          onPointerOut={() => { document.body.style.cursor = ""; }}>
           <mesh position={p.mid} quaternion={p.quat}>
-            <cylinderGeometry args={[0.012, 0.012, p.h, 8]} />
-            <meshBasicMaterial color="#E8927C" transparent opacity={0.9} />
+            <cylinderGeometry args={[0.014, 0.014, p.h, 8]} />
+            <meshBasicMaterial color="#E8927C" />
           </mesh>
           <mesh position={p.top}>
-            <sphereGeometry args={[0.03 + (p.count / maxC) * 0.04, 12, 12]} />
-            <meshBasicMaterial color="#FFB39E" />
+            <sphereGeometry args={[0.045 + (p.c.count / maxC) * 0.05, 14, 14]} />
+            <meshBasicMaterial color="#FF6B4A" />
           </mesh>
         </group>
       ))}
@@ -92,27 +91,101 @@ function EarthSphere({ countries, autoRotate }: { countries: { code: string; nam
   );
 }
 
-export default function StatsGlobe({ countries }: { countries: { code: string; name: string; count: number }[] }) {
-  const [dragging, setDragging] = useState(false);
+// ─── MAPA PŁASKA 2D ─────────────────────────────────────────────────────────
+function FlatMap({ countries, onSelect }: { countries: Country[]; onSelect: (c: Country) => void }) {
+  const tex = useLoader(THREE.TextureLoader, EARTH_TEX);
+  const maxC = Math.max(1, ...countries.map((c) => c.count));
+  // płaszczyzna 2:1 (równoprostokątna projekcja)
+  const W = 4, H = 2;
+  const markers = useMemo(() => countries.map((c) => {
+    const co = COUNTRY_COORDS[c.code?.toUpperCase()];
+    if (!co) return null;
+    const [lat, lon] = co;
+    const x = (lon / 180) * (W / 2);
+    const y = (lat / 90) * (H / 2);
+    return { c, x, y };
+  }).filter(Boolean) as any[], [countries]);
   return (
-    <div style={{ width: "100%", aspectRatio: "1 / 1", maxWidth: 320, margin: "0 auto", cursor: dragging ? "grabbing" : "grab" }}>
-      <Canvas camera={{ position: [0, 0, 4.6], fov: 42 }} dpr={[1, 2]} gl={{ antialias: true, alpha: true }}>
-        <ambientLight intensity={0.9} />
-        <directionalLight position={[5, 3, 5]} intensity={1.1} />
-        <directionalLight position={[-5, -2, -3]} intensity={0.3} color="#5BB8D4" />
-        <React.Suspense fallback={null}>
-          <EarthSphere countries={countries} autoRotate={!dragging} />
-        </React.Suspense>
-        <OrbitControls
-          enablePan={false}
-          enableZoom={false}
-          rotateSpeed={0.5}
-          minPolarAngle={0.3}
-          maxPolarAngle={Math.PI - 0.3}
-          onStart={() => setDragging(true)}
-          onEnd={() => setDragging(false)}
-        />
-      </Canvas>
+    <group>
+      <mesh>
+        <planeGeometry args={[W, H]} />
+        <meshBasicMaterial map={tex} />
+      </mesh>
+      {markers.map((m) => (
+        <mesh key={m.c.code} position={[m.x, m.y, 0.02]}
+          onClick={(e: ThreeEvent<MouseEvent>) => { e.stopPropagation(); onSelect(m.c); }}
+          onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = "pointer"; }}
+          onPointerOut={() => { document.body.style.cursor = ""; }}>
+          <circleGeometry args={[0.04 + (m.c.count / maxC) * 0.06, 18]} />
+          <meshBasicMaterial color="#FF6B4A" />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
+const flagEmoji = (code: string) => code && code.length === 2 ? String.fromCodePoint(...[...code.toUpperCase()].map((c) => 127397 + c.charCodeAt(0))) : "🌍";
+
+export default function StatsGlobe({ countries }: { countries: Country[] }) {
+  const [dragging, setDragging] = useState(false);
+  const [flat, setFlat] = useState(false);
+  const [sel, setSel] = useState<Country | null>(null);
+  const total = countries.reduce((s, c) => s + c.count, 0);
+
+  return (
+    <div style={{ width: "100%", maxWidth: 420, margin: "0 auto" }}>
+      {/* przełącznik globus / mapa */}
+      <div style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 10 }}>
+        <button onClick={() => setFlat(false)} style={btn(!flat)}>🌍 Globo</button>
+        <button onClick={() => setFlat(true)} style={btn(flat)}>🗺️ Mappa</button>
+      </div>
+
+      <div style={{ width: "100%", aspectRatio: flat ? "2 / 1" : "1 / 1", cursor: dragging ? "grabbing" : "grab", borderRadius: 16, overflow: "hidden", background: "radial-gradient(circle at 50% 40%, #1a3346, #0a1822)" }}>
+        <Canvas camera={{ position: [0, 0, flat ? 3.2 : 4.4], fov: 42 }} dpr={[1, 2]} gl={{ antialias: true, alpha: true }}>
+          <ambientLight intensity={1.4} />
+          <directionalLight position={[5, 3, 5]} intensity={1.2} />
+          <directionalLight position={[-5, -2, -3]} intensity={0.5} color="#bfe3f5" />
+          <React.Suspense fallback={null}>
+            {flat ? <FlatMap countries={countries} onSelect={setSel} /> : <EarthSphere countries={countries} autoRotate={!dragging && !sel} onSelect={setSel} />}
+          </React.Suspense>
+          <OrbitControls
+            enablePan={false}
+            enableZoom={true}
+            minDistance={flat ? 1.6 : 2.4}
+            maxDistance={flat ? 5 : 8}
+            enableRotate={!flat}
+            rotateSpeed={0.5}
+            minPolarAngle={0.25}
+            maxPolarAngle={Math.PI - 0.25}
+            onStart={() => setDragging(true)}
+            onEnd={() => setDragging(false)}
+          />
+        </Canvas>
+      </div>
+
+      {/* info wybranego kraju */}
+      {sel && (
+        <div style={{ marginTop: 12, padding: "14px 16px", borderRadius: 14, background: "rgba(232,146,124,0.12)", border: "1px solid rgba(232,146,124,0.4)", display: "flex", alignItems: "center", gap: 12 }}>
+          <span style={{ fontSize: 30 }}>{flagEmoji(sel.code)}</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 16, fontWeight: 800 }}>{sel.name}</div>
+            <div style={{ fontSize: 13, opacity: 0.75 }}>{sel.count} visite · {total ? Math.round((sel.count / total) * 100) : 0}% del totale</div>
+          </div>
+          <button onClick={() => setSel(null)} style={{ width: 30, height: 30, borderRadius: "50%", border: "none", background: "rgba(0,0,0,0.3)", color: "#fff", cursor: "pointer" }}>✕</button>
+        </div>
+      )}
+      <p style={{ textAlign: "center", fontSize: 11, opacity: 0.45, marginTop: 8 }}>
+        {flat ? "Trascina per spostare · scorri per zoom · clicca un punto" : "Trascina per ruotare · scorri per zoom · clicca un punto"}
+      </p>
     </div>
   );
+}
+
+function btn(active: boolean): React.CSSProperties {
+  return {
+    padding: "7px 14px", borderRadius: 999, fontSize: 12, fontWeight: 700, cursor: "pointer",
+    border: active ? "1px solid #E8927C" : "1px solid rgba(255,255,255,0.15)",
+    background: active ? "rgba(232,146,124,0.22)" : "rgba(255,255,255,0.05)",
+    color: active ? "#E8927C" : "inherit",
+  };
 }

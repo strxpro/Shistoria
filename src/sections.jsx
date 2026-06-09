@@ -20,20 +20,27 @@ function Eventi({ t }) {
   const remindLabel = ({ it: "Ricordamelo", pl: "Przypomnij mi", en: "Remind me", de: "Erinnere mich", fr: "Rappelle-moi", es: "Recuérdamelo" })[evLang] || "Ricordamelo";
 
   useEffectE(() => {
+    let ch;
     const load = async () => {
       try {
         const { createClient } = await import("@supabase/supabase-js");
         const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://slatelpipxtqveydgslc.supabase.co';
         const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNsYXRlbHBpcHh0cXZleWRnc2xjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODcyNTQsImV4cCI6MjA5NjE2MzI1NH0.5dwE9IStThjC-krTtgg7PtEwmTnr_bQ_TEbQhgMpHdY';
         const sb = createClient(url, key);
-        const { data } = await sb.from("events").select("*").eq("is_published", true).order("event_date", { ascending: true });
-        if (data && data.length > 0) { setEvents(data); return; }
-      } catch {}
-      if (typeof window !== "undefined" && window.EVENTI_DATA && window.EVENTI_DATA.length > 0) {
-        setEvents(window.EVENTI_DATA);
+        const fetchEv = async () => {
+          const { data } = await sb.from("events").select("*").eq("is_published", true).order("event_date", { ascending: true });
+          if (data && data.length > 0) setEvents(data);
+          else if (typeof window !== "undefined" && window.EVENTI_DATA?.length > 0) setEvents(window.EVENTI_DATA);
+        };
+        await fetchEv();
+        // realtime — nowy/zmieniony event pojawia się na stronie BEZ odświeżania
+        ch = sb.channel("events_rt").on("postgres_changes", { event: "*", schema: "public", table: "events" }, fetchEv).subscribe();
+      } catch {
+        if (typeof window !== "undefined" && window.EVENTI_DATA?.length > 0) setEvents(window.EVENTI_DATA);
       }
     };
     load();
+    return () => { try { ch?.unsubscribe?.(); } catch {} };
   }, []);
 
   // Auto-przesuwanie co 4s (tylko gdy playing)
