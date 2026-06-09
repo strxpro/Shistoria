@@ -5733,6 +5733,7 @@ function CocktailStyles() {
         transform:translate(-50%,-50%) scale(.86); transition:opacity .25s ease; will-change:transform,opacity; }
       .cx-scrollpop-label { font-family:var(--f-display,sans-serif); font-weight:800;
         font-size:clamp(30px,6.5vw,78px); letter-spacing:.04em; text-transform:uppercase; line-height:1; color:#eafdff;
+        max-width:92vw; overflow-wrap:anywhere; word-break:break-word; padding:0 12px; box-sizing:border-box;
         text-shadow:0 0 6px #5BE1FF, 0 0 18px #5BE1FF, 0 0 42px rgba(91,225,255,.8);
         transition:filter .6s ease, transform .6s ease, opacity .4s ease; }
       .cx-scrollpop-label[data-morphing] { filter:blur(8px); transform:scale(0.92); opacity:0.4; }
@@ -5923,7 +5924,7 @@ function CocktailStyles() {
         /* cx-col na mobile = display:contents → dzieci (FAB, slide, panel) pozycjonują się względem viewportu, nie kolumny */
         .cx-col { display:contents; }
         /* FAB widoczne TYLKO w sekcji kreatora — płynny wjazd + lekka perspektywa 3D (jak na ścianie) */
-        .cx-col-left .cx-fab, .cx-col-right .cx-fab { position:fixed; top:36%; opacity:0; visibility:hidden; pointer-events:none;
+        .cx-col-left .cx-fab, .cx-col-right .cx-fab { position:fixed; top:32%; opacity:0; visibility:hidden; pointer-events:none;
           transition:transform .8s cubic-bezier(.16,1,.3,1), opacity .55s ease, visibility .55s; }
         .cx-col-left .cx-fab { left:20px; transform:perspective(420px) rotateY(18deg) translateZ(-12px) translateY(-50%) translateX(-130px); }
         .cx-col-right .cx-fab { right:20px; transform:perspective(420px) rotateY(-18deg) translateZ(-12px) translateY(-50%) translateX(130px); }
@@ -5958,8 +5959,8 @@ function CocktailStyles() {
 
         /* SHAKE — suwak wycentrowany na dole */
         .cx-shake-desktop { display:none; }
-        /* gauge — po PRZECIWNEJ stronie lania, wyższa */
-        .cx-gauge { left:16px !important; right:auto !important; top:50% !important; bottom:auto !important; height:min(28vh, 200px) !important; width:36px !important; transform:translateY(-50%) !important; }
+        /* gauge — po PRZECIWNEJ stronie lania, NIŻEJ żeby nie nachodzić na FAB (top:32%) */
+        .cx-gauge { left:16px !important; right:auto !important; top:58% !important; bottom:auto !important; height:min(28vh, 200px) !important; width:36px !important; transform:translateY(-50%) !important; }
         .cx-gauge-right { left:auto !important; right:16px !important; transform:translateY(-50%) !important; }
         /* przycisk reset widoczny na mobile — pod strength indicator (inline) */
         .cx-reset-top { position:static !important; margin-top:8px !important; z-index:42;
