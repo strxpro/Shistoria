@@ -2359,6 +2359,12 @@ function CocktailExperience() {
                 } : null} />
             </Canvas>
           )}
+          {/* Loader — widoczny dopóki scena 3D się nie załaduje (feedback gdy modele wolno wchodzą) */}
+          {!sceneReady && (
+            <div className="cx-canvas-loader" aria-hidden="true">
+              <span className="cx-canvas-spin" />
+            </div>
+          )}
         </div>
 
         {/* flood + grain — w sticky-stage, rośnie spod szejkera */}
@@ -5646,6 +5652,9 @@ function CocktailStyles() {
 
       /* Canvas */
       .cx-canvas { position:absolute; inset:0; z-index:5; touch-action:pan-y; }
+      .cx-canvas-loader { position:absolute; inset:0; display:grid; place-items:center; pointer-events:none; z-index:4; }
+      .cx-canvas-spin { width:46px; height:46px; border-radius:50%; border:3px solid rgba(255,255,255,0.18);
+        border-top-color:var(--cx-accent,#E8927C); animation:cxSpin .9s linear infinite; }
 
       /* Kinowy overlay nalewania — blur tła TYLKO podczas otwierania; potem przezroczyste,
          żeby było widać szejker pod spodem i strumień wpadał do jego wnętrza. */
