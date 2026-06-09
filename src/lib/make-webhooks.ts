@@ -14,18 +14,19 @@
 
 type Json = Record<string, unknown>;
 
-function webhook(key: "contact" | "drink" | "winner"): string | null {
+function webhook(key: "contact" | "drink" | "winner" | "event"): string | null {
   const map: Record<string, string | undefined> = {
     contact: process.env.NEXT_PUBLIC_MAKE_CONTACT_WEBHOOK,
     drink: process.env.NEXT_PUBLIC_MAKE_DRINK_WEBHOOK,
     winner: process.env.NEXT_PUBLIC_MAKE_WINNER_WEBHOOK,
+    event: process.env.NEXT_PUBLIC_MAKE_EVENT_WEBHOOK,
   };
   // Fallback: pojedynczy webhook dla wszystkiego (window override do testów)
   const single = (typeof window !== "undefined" && (window as any).__MAKE_WEBHOOK) || process.env.NEXT_PUBLIC_MAKE_WEBHOOK;
   return map[key] || single || null;
 }
 
-async function send(key: "contact" | "drink" | "winner", payload: Json): Promise<boolean> {
+async function send(key: "contact" | "drink" | "winner" | "event", payload: Json): Promise<boolean> {
   const url = webhook(key);
   if (!url) { console.info(`[make] webhook '${key}' nieskonfigurowany — pomijam`); return false; }
   try {
@@ -99,5 +100,29 @@ export async function announceWinner(data: {
     winner_email: data.winner_email || "",
     recipients: data.recipients, // make.com iteruje, każdy w swoim języku
     link: typeof window !== "undefined" ? `${window.location.origin}/#ready-drinks` : "https://www.shistoria.it/#ready-drinks",
+  });
+}
+
+/* ── 4. Przypomnienie o wydarzeniu (H) ─────────────────────────────────────
+ * Klient zapisuje się na event (imię + email). make.com planuje 2 maile:
+ *   • 3 dni przed wydarzeniem — zapowiedź zbliżającego się eventu
+ *   • 5 godzin przed (w dniu eventu) — przypomnienie tego samego dnia
+ * Oba w języku klienta (`lang`). make.com używa `event_date` do zaplanowania
+ * wysyłki (moduł Sleep/Scheduler albo Data Store + scenariusz cykliczny).
+ */
+export async function subscribeEventReminder(data: {
+  name: string; email: string; lang: string;
+  event_title: string; event_date: string; event_description?: string;
+}): Promise<boolean> {
+  return send("event", {
+    type: "event_reminder",
+    name: data.name,
+    email: data.email,
+    lang: data.lang,
+    event_title: data.event_title,
+    event_date: data.event_date,        // make.com planuje: -3 dni i -5 godzin
+    event_description: data.event_description || "",
+    remind_days_before: 3,
+    remind_hours_before: 5,
   });
 }

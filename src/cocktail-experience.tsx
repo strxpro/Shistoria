@@ -6151,8 +6151,11 @@ function CocktailStyles() {
         transition:border-color .3s, color .3s; }
       .cx-share-upload:hover { border-color:var(--cx-accent,#E8927C); color:#fff; }
       .cx-share-upload span:first-child { font-size:40px; }
-      .cx-share-info { padding:28px; display:flex; flex-direction:column; gap:14px; }
-      .cx-share-info h3 { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:24px; color:#fff; margin:0; }
+      .cx-share-info { padding:28px; display:flex; flex-direction:column; gap:14px; min-width:0; box-sizing:border-box; }
+      .cx-share-info h3 { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:24px; color:#fff; margin:0; overflow-wrap:anywhere; word-break:break-word; }
+      .cx-share-details p { overflow-wrap:anywhere; word-break:break-word; }
+      .cx-share-pills { display:flex; flex-wrap:wrap; gap:6px; min-width:0; }
+      .cx-share-pills .cx-cc-pill { max-width:100%; overflow:hidden; text-overflow:ellipsis; }
       .cx-share-hint { font-size:13px; color:rgba(255,255,255,0.6); line-height:1.5; }
       .cx-share-submit { margin-top:auto; }
       .cx-share-submit:disabled { opacity:0.4; cursor:not-allowed; }

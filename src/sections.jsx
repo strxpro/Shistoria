@@ -1,6 +1,7 @@
 import React from 'react';
 import { SplitReveal, Placeholder, TextClipReveal } from "./shell";
 import AttrazioniMap from "./components/AttrazioniMap";
+import { sendReservation, subscribeEventReminder } from "./lib/make-webhooks";
 
 // Eventi, SocialFeed, Attrazioni, Recensioni, Contatti, Footer
 const { useState: useStateE, useEffect: useEffectE, useRef: useRefE } = React;
@@ -12,6 +13,11 @@ function Eventi({ t }) {
   const [playing, setPlaying] = useStateE(true);
   const intervalRef = useRefE(null);
   const touchRef = useRefE({ startX: 0, startY: 0 });
+  const [reminderEvent, setReminderEvent] = useStateE(null);
+  const [remForm, setRemForm] = useStateE({ name: "", email: "" });
+  const [remSent, setRemSent] = useStateE(false);
+  const evLang = (typeof window !== "undefined" && window.currentLanguage) || "it";
+  const remindLabel = ({ it: "Ricordamelo", pl: "Przypomnij mi", en: "Remind me", de: "Erinnere mich", fr: "Rappelle-moi", es: "Recuérdamelo" })[evLang] || "Ricordamelo";
 
   useEffectE(() => {
     const load = async () => {
@@ -87,10 +93,6 @@ function Eventi({ t }) {
 
         {/* Piramidowa karuzela — klik lewa/prawa = nawigacja */}
         <div className="ev-carousel" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} onClick={onCarouselClick}>
-          {/* Play/Stop w rogu */}
-          <button className="ev-playstop" onClick={(e) => { e.stopPropagation(); setPlaying(p => !p); }} aria-label={playing ? "Pausa" : "Play"}>
-            {playing ? "❚❚" : "▶"}
-          </button>
 
           {events.map((e, i) => {
             const s = getCardStyle(i, events.length);
@@ -99,7 +101,15 @@ function Eventi({ t }) {
             return (
               <article key={e.id || i} className={`ev-card ${isActive ? "ev-card-active" : ""}`}
                 style={{ "--ev-x": `${s.x}px`, "--ev-s": s.scale, "--ev-o": s.opacity, "--ev-z": s.z }}
-                onClick={(ev) => { ev.stopPropagation(); setActiveIdx(i); }}>
+                onClick={(ev) => {
+                  if (!isActive) { ev.stopPropagation(); setActiveIdx(i); return; }
+                  // aktywna karta: klik lewa/prawa połowa = prev/next (ale nie na przyciskach)
+                  if (ev.target.closest("button")) return;
+                  const rect = ev.currentTarget.getBoundingClientRect();
+                  const x = ev.clientX - rect.left;
+                  ev.stopPropagation();
+                  if (x < rect.width / 2) goPrev(); else goNext();
+                }}>
                 {/* Progress indicators (stories style) — tylko na aktywnej */}
                 {isActive && (
                   <div className="ev-progress">
@@ -111,6 +121,12 @@ function Eventi({ t }) {
                     ))}
                   </div>
                 )}
+                {/* Play/Stop — w rogu AKTYWNEJ karty */}
+                {isActive && (
+                  <button className="ev-playstop" onClick={(ev) => { ev.stopPropagation(); setPlaying(p => !p); }} aria-label={playing ? "Pausa" : "Play"}>
+                    {playing ? "❚❚" : "▶"}
+                  </button>
+                )}
                 <div className="ev-card-bg" style={{ background: e.custom_colors?.bg || (e.phType === "food" ? "#2d1b0e" : e.phType === "sea" ? "#0e2840" : "#1a1040") }}>
                   {e.image_url && <img src={e.image_url} alt="" style={{ width:"100%", height:"100%", objectFit:"cover", opacity:0.7 }} />}
                 </div>
@@ -119,6 +135,11 @@ function Eventi({ t }) {
                   <h4 className="ev-card-title">{e.title}</h4>
                   <span className="ev-card-date">{e.event_date || e.date || ""}</span>
                   {e.description && <p className="ev-card-desc">{e.description}</p>}
+                  {isActive && (
+                    <button className="ev-remind-btn" onClick={(ev) => { ev.stopPropagation(); setReminderEvent(e); }}>
+                      🔔 {remindLabel}
+                    </button>
+                  )}
                 </div>
               </article>
             );
@@ -142,6 +163,44 @@ function Eventi({ t }) {
           <a href="#contatti" className="btn btn-ghost">Tutti gli eventi <span className="arrow">→</span></a>
         </div>
       </div>
+
+      {/* Modal przypomnienia o wydarzeniu */}
+      {reminderEvent && (
+        <div className="ev-rem-overlay" onClick={() => { setReminderEvent(null); setRemSent(false); }}>
+          <div className="ev-rem-pop" onClick={(e) => e.stopPropagation()}>
+            <button className="ev-rem-close" onClick={() => { setReminderEvent(null); setRemSent(false); }}>×</button>
+            {remSent ? (
+              <div className="ev-rem-done">
+                <span className="ev-rem-done-ico">✓</span>
+                <h4>{({ it: "Ti ricorderemo!", pl: "Przypomnimy Ci!", en: "We'll remind you!", de: "Wir erinnern dich!", fr: "On te le rappellera!", es: "¡Te lo recordaremos!" })[evLang]}</h4>
+                <p>{({ it: "Riceverai un'email 3 giorni prima e 5 ore prima dell'evento.", pl: "Otrzymasz e-mail 3 dni przed i 5 godzin przed wydarzeniem.", en: "You'll get an email 3 days before and 5 hours before the event.", de: "Du erhältst eine E-Mail 3 Tage und 5 Stunden vor dem Event.", fr: "Tu recevras un e-mail 3 jours et 5 heures avant l'événement.", es: "Recibirás un correo 3 días y 5 horas antes del evento." })[evLang]}</p>
+              </div>
+            ) : (
+              <>
+                <span className="ev-rem-kicker">🔔 {reminderEvent.title}</span>
+                <h4 className="ev-rem-title">{({ it: "Ricevi un promemoria", pl: "Otrzymaj przypomnienie", en: "Get a reminder", de: "Erhalte eine Erinnerung", fr: "Recevoir un rappel", es: "Recibe un recordatorio" })[evLang]}</h4>
+                <p className="ev-rem-sub">{({ it: "Email 3 giorni prima + 5 ore prima dell'evento.", pl: "E-mail 3 dni przed + 5 godzin przed wydarzeniem.", en: "Email 3 days before + 5 hours before the event.", de: "E-Mail 3 Tage + 5 Stunden vor dem Event.", fr: "E-mail 3 jours + 5 heures avant l'événement.", es: "Correo 3 días + 5 horas antes del evento." })[evLang]}</p>
+                <input className="ev-rem-input" placeholder={({ it: "Il tuo nome", pl: "Twoje imię", en: "Your name", de: "Dein Name", fr: "Ton nom", es: "Tu nombre" })[evLang]}
+                  value={remForm.name} onChange={(e) => setRemForm({ ...remForm, name: e.target.value })} />
+                <input className="ev-rem-input" type="email" placeholder="Email"
+                  value={remForm.email} onChange={(e) => setRemForm({ ...remForm, email: e.target.value })} />
+                <button className="btn ev-rem-submit" disabled={!remForm.name.trim() || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(remForm.email)}
+                  onClick={async () => {
+                    await subscribeEventReminder({
+                      name: remForm.name, email: remForm.email, lang: evLang,
+                      event_title: reminderEvent.title,
+                      event_date: reminderEvent.event_date || reminderEvent.date || "",
+                      event_description: reminderEvent.description || "",
+                    });
+                    setRemSent(true);
+                  }}>
+                  {({ it: "Avvisami", pl: "Powiadom mnie", en: "Notify me", de: "Benachrichtigen", fr: "Préviens-moi", es: "Avísame" })[evLang]} →
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
       <style>{`
         .eventi { background: var(--c-bg); padding: 120px 0; overflow:hidden; }
         .ev-head { max-width: 720px; margin-bottom: 64px; text-wrap:balance; }
@@ -155,10 +214,32 @@ function Eventi({ t }) {
           transition:transform .65s cubic-bezier(.22,.9,.36,1), opacity .5s ease;
           box-shadow:0 20px 60px rgba(0,0,0,0.3); will-change:transform,opacity; transform-style:preserve-3d; }
         .ev-card-active { box-shadow:0 30px 80px rgba(0,0,0,0.45); }
-        .ev-playstop { position:absolute; top:0; right:0; z-index:20; width:40px; height:40px; border-radius:50%; border:none;
-          background:rgba(0,0,0,0.5); color:#fff; font-size:13px; cursor:pointer; display:grid; place-items:center; backdrop-filter:blur(6px);
+        .ev-playstop { position:absolute; top:12px; right:12px; z-index:20; width:38px; height:38px; border-radius:50%; border:none;
+          background:rgba(0,0,0,0.5); color:#fff; font-size:12px; cursor:pointer; display:grid; place-items:center; backdrop-filter:blur(6px);
           transition:background .2s; }
         .ev-playstop:hover { background:rgba(0,0,0,0.75); }
+        .ev-remind-btn { margin-top:14px; align-self:flex-start; display:inline-flex; align-items:center; gap:6px; padding:10px 18px;
+          border-radius:999px; border:1px solid rgba(255,255,255,0.3); background:rgba(255,255,255,0.12); color:#fff;
+          font-family:var(--f-body); font-size:13px; font-weight:600; cursor:pointer; backdrop-filter:blur(6px); transition:all .2s; }
+        .ev-remind-btn:hover { background:var(--c-coral,#E8927C); border-color:transparent; }
+        .ev-rem-overlay { position:fixed; inset:0; z-index:5000; background:rgba(10,15,20,0.6); backdrop-filter:blur(8px);
+          display:flex; align-items:center; justify-content:center; padding:24px; }
+        .ev-rem-pop { position:relative; width:min(380px,92vw); background:#fff; border-radius:20px; padding:28px 24px;
+          box-shadow:0 30px 80px rgba(0,0,0,0.3); display:flex; flex-direction:column; gap:12px; box-sizing:border-box; }
+        .ev-rem-close { position:absolute; top:12px; right:12px; width:32px; height:32px; border-radius:50%; border:none;
+          background:var(--c-bg); color:var(--c-deep); font-size:18px; cursor:pointer; }
+        .ev-rem-kicker { font-size:11px; letter-spacing:0.15em; text-transform:uppercase; color:var(--c-coral,#E8927C); font-weight:700; }
+        .ev-rem-title { font-family:var(--f-display); font-weight:800; font-size:22px; color:var(--c-deep); margin:0; overflow-wrap:anywhere; }
+        .ev-rem-sub { font-size:13px; color:var(--c-mute); line-height:1.4; margin:0 0 6px; }
+        .ev-rem-input { width:100%; box-sizing:border-box; padding:12px 14px; border-radius:12px; border:1px solid var(--c-line);
+          background:var(--c-bg); color:var(--c-deep); font-size:14px; font-family:inherit; outline:none; }
+        .ev-rem-input:focus { border-color:var(--c-coral,#E8927C); }
+        .ev-rem-submit { margin-top:6px; width:100%; justify-content:center; }
+        .ev-rem-submit:disabled { opacity:0.45; cursor:not-allowed; }
+        .ev-rem-done { display:flex; flex-direction:column; align-items:center; text-align:center; gap:10px; padding:12px 0; }
+        .ev-rem-done-ico { width:54px; height:54px; border-radius:50%; background:rgba(39,174,96,0.15); color:#27ae60; font-size:26px; display:grid; place-items:center; }
+        .ev-rem-done h4 { font-family:var(--f-display); font-weight:800; font-size:22px; color:var(--c-deep); margin:0; }
+        .ev-rem-done p { font-size:13px; color:var(--c-mute); line-height:1.5; margin:0; }
         .ev-card:hover { box-shadow:0 30px 80px rgba(0,0,0,0.4); }
 
         /* Progress indicators (Framer ReelCarousel style) */
