@@ -718,7 +718,7 @@ function Contatti({ t }) {
   const [errors, setErrors] = useStateE({});
 
   // Godziny do wyboru (wg godzin otwarcia restauracji)
-  const TIME_SLOTS = ["12:00","12:30","13:00","13:30","14:00","14:30","19:00","19:30","20:00","20:30","21:00","21:30","22:00"];
+  const TIME_SLOTS = ["12:00","12:30","13:00","13:30","14:00","14:30","19:00","19:30","20:00","20:30","21:00","21:30","22:00","22:30","23:00"];
 
   const upd = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
@@ -805,10 +805,8 @@ function Contatti({ t }) {
             <div className="cnt-info-block">
               <span className="kicker" style={{ color: "rgba(255,255,255,0.5)" }}>{t("contatti.hoursTitle")}</span>
               <div className="cnt-hours">
-                <div><span>Mar — Gio</span><span>19:00 — 23:00</span></div>
-                <div><span>Ven — Sab</span><span>19:00 — 24:00</span></div>
-                <div><span>Domenica</span><span>12:30 — 16:00 · 19:00 — 23:00</span></div>
-                <div><span>Lunedì</span><span style={{ color: "var(--c-coral)" }}>chiuso</span></div>
+                <div><span>Lun — Dom</span><span>12:00 — 14:30 · 19:00 — 23:00</span></div>
+                <div><span>Martedì</span><span style={{ color: "var(--c-coral)" }}>chiuso</span></div>
               </div>
             </div>
             <div className="cnt-mini-map">

@@ -66,7 +66,7 @@ window.I18N = {
       heading: "Vieni\na trovarci",
       address: "Via Rena Majore — 07028 Santa Teresa Gallura, Sardegna",
       phone: "+39 0789 000 000",
-      email: "ciao@shistoria.it",
+      email: "info@shistoria.it",
       hoursTitle: "Orari",
       formTitle: "Prenota un tavolo",
       submit: "Invia richiesta",
@@ -119,7 +119,7 @@ window.I18N = {
     contatti: {
       eyebrow: "Kontakt", heading: "Odwiedź\nnas",
       address: "Via Rena Majore — 07028 Santa Teresa Gallura, Sardynia",
-      phone: "+39 0789 000 000", email: "ciao@shistoria.it",
+      phone: "+39 0789 000 000", email: "info@shistoria.it",
       hoursTitle: "Godziny", formTitle: "Rezerwacja stolika",
       submit: "Wyślij prośbę", success: "Dziękujemy! Odezwiemy się wkrótce.",
       fields: { name: "Imię", firstName: "Imię", lastName: "Nazwisko", email: "Email", phone: "Telefon", date: "Data", time: "Godzina", people: "Osoby", message: "Wiadomość", language: "Preferowany język" },
@@ -163,7 +163,7 @@ window.I18N = {
     contatti: {
       eyebrow: "Contact", heading: "Come\nfind us",
       address: "Via Rena Majore — 07028 Santa Teresa Gallura, Sardinia",
-      phone: "+39 0789 000 000", email: "ciao@shistoria.it",
+      phone: "+39 0789 000 000", email: "info@shistoria.it",
       hoursTitle: "Hours", formTitle: "Book a table",
       submit: "Send request", success: "Thank you! We'll be in touch soon.",
       fields: { name: "Name", firstName: "First name", lastName: "Last name", email: "Email", phone: "Phone", date: "Date", time: "Time", people: "Guests", message: "Message", language: "Preferred language" },
@@ -207,7 +207,7 @@ window.I18N = {
     contatti: {
       eyebrow: "Kontakt", heading: "Komm\nuns besuchen",
       address: "Via Rena Majore — 07028 Santa Teresa Gallura, Sardinien",
-      phone: "+39 0789 000 000", email: "ciao@shistoria.it",
+      phone: "+39 0789 000 000", email: "info@shistoria.it",
       hoursTitle: "Öffnungszeiten", formTitle: "Tisch reservieren",
       submit: "Anfrage senden", success: "Danke! Wir melden uns bald.",
       fields: { name: "Name", firstName: "Vorname", lastName: "Nachname", email: "Email", phone: "Telefon", date: "Datum", time: "Uhrzeit", people: "Personen", message: "Nachricht", language: "Bevorzugte Sprache" },
@@ -251,7 +251,7 @@ window.I18N = {
     contatti: {
       eyebrow: "Contact", heading: "Venez\nnous voir",
       address: "Via Rena Majore — 07028 Santa Teresa Gallura, Sardaigne",
-      phone: "+39 0789 000 000", email: "ciao@shistoria.it",
+      phone: "+39 0789 000 000", email: "info@shistoria.it",
       hoursTitle: "Heures d'ouverture", formTitle: "Réserver une table",
       submit: "Envoyer la demande", success: "Merci! Nous vous contacterons bientôt.",
       fields: { name: "Nom", firstName: "Prénom", lastName: "Nom", email: "Email", phone: "Téléphone", date: "Date", time: "Heure", people: "Personnes", message: "Message", language: "Langue préférée" },
@@ -295,7 +295,7 @@ window.I18N = {
     contatti: {
       eyebrow: "Contacto", heading: "Ven a\nbuscarnos",
       address: "Via Rena Majore — 07028 Santa Teresa Gallura, Cerdeña",
-      phone: "+39 0789 000 000", email: "ciao@shistoria.it",
+      phone: "+39 0789 000 000", email: "info@shistoria.it",
       hoursTitle: "Horario", formTitle: "Reservar una mesa",
       submit: "Enviar solicitud", success: "¡Gracias! Nos pondremos en contacto pronto.",
       fields: { name: "Nombre", firstName: "Nombre", lastName: "Apellido", email: "Email", phone: "Teléfono", date: "Fecha", time: "Hora", people: "Personas", message: "Mensaje", language: "Idioma preferido" },
