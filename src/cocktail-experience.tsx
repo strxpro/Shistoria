@@ -5080,6 +5080,7 @@ function CommunityCard({ c }: { c: (typeof COMMUNITY)[number] }) {
   const [expanded, setExpanded] = useState(false);
   const [popout, setPopout] = useState(false);
   const [orderQR, setOrderQR] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
   const clickTimer = useRef<number | null>(null);
 
   // Kolor zakładki zależy od "mocy" (ilość alkoholi w przepisie)
@@ -5194,6 +5195,21 @@ function CommunityCard({ c }: { c: (typeof COMMUNITY)[number] }) {
               </div>
               <div className="cx-cc-popout-actions">
                 <button className={`cx-cc-like ${liked ? "on" : ""}`} onClick={() => setLiked((v) => !v)}>♥ {c.likes + (liked ? 1 : 0)}</button>
+              </div>
+              {/* Pasek udostępniania — od dołu */}
+              <div className="cx-cc-sharebar">
+                {(() => {
+                  const link = `${typeof window !== "undefined" ? window.location.origin : "https://www.shistoria.it"}/#ready-drinks`;
+                  const text = encodeURIComponent(`${c.name} — S'Historia`);
+                  return (
+                    <>
+                      <a className="cx-cc-share-ico" href={`https://wa.me/?text=${text}%20${encodeURIComponent(link)}`} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp">🟢</a>
+                      <a className="cx-cc-share-ico" href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(link)}`} target="_blank" rel="noopener noreferrer" aria-label="Facebook">📘</a>
+                      <a className="cx-cc-share-ico" href="https://www.instagram.com/" target="_blank" rel="noopener noreferrer" aria-label="Instagram">📷</a>
+                      <button className="cx-cc-share-ico" onClick={() => { try { navigator.clipboard?.writeText(link); setCopied(true); setTimeout(() => setCopied(false), 1800); } catch {} }} aria-label="Copia link">{copied ? "✓" : "🔗"}</button>
+                    </>
+                  );
+                })()}
               </div>
             </div>
           </div>
@@ -6171,7 +6187,9 @@ function CocktailStyles() {
       .cx-cc-popout-close:hover { background:#fff; color:#000; }
       .cx-cc-popout-left { display:flex; align-items:center; justify-content:center; padding:40px; background:rgba(0,0,0,0.3); }
       .cx-cc-popout-glass { width:80%; max-width:200px; filter:drop-shadow(0 20px 40px rgba(0,0,0,0.5)); }
-      .cx-cc-popout-right { padding:32px; display:flex; flex-direction:column; gap:20px; overflow-y:auto; }
+      .cx-cc-popout-right { padding:32px; display:flex; flex-direction:column; gap:20px; overflow-y:auto; scrollbar-width:none; -ms-overflow-style:none; }
+      .cx-cc-popout-right::-webkit-scrollbar { display:none; }
+      .cx-cc-popout::-webkit-scrollbar { display:none; }
       .cx-cc-popout-by { font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color:rgba(255,255,255,0.5); }
       .cx-cc-popout-name { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:28px; letter-spacing:-0.02em; color:#fff; margin:4px 0; }
       .cx-cc-popout-strength { display:flex; align-items:center; gap:8px; font-size:12px; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; }
@@ -6180,6 +6198,10 @@ function CocktailStyles() {
       .cx-cc-popout-pills { display:flex; flex-wrap:wrap; gap:6px; }
       .cx-cc-popout-comments { display:flex; flex-direction:column; gap:8px; padding-top:16px; border-top:1px solid rgba(255,255,255,0.08); }
       .cx-cc-popout-actions { padding-top:16px; border-top:1px solid rgba(255,255,255,0.08); display:flex; gap:12px; flex-wrap:wrap; }
+      .cx-cc-sharebar { display:flex; gap:10px; justify-content:center; padding-top:14px; margin-top:4px; border-top:1px solid rgba(255,255,255,0.08); }
+      .cx-cc-share-ico { width:44px; height:44px; border-radius:50%; display:grid; place-items:center; font-size:18px; cursor:pointer;
+        background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.14); color:#fff; text-decoration:none; transition:all .2s; }
+      .cx-cc-share-ico:hover { background:rgba(255,255,255,0.16); transform:translateY(-2px); }
       .cx-cc-claim-btn { padding:10px 18px; border-radius:999px; background:var(--cx-accent,#E8927C); color:#fff; font-weight:700; font-size:12px; letter-spacing:0.04em; border:none; cursor:pointer; transition:all .25s; }
       .cx-cc-claim-btn:hover { background:#d9745c; transform:translateY(-1px); }
       .cx-cc-claim-top { width:100%; margin:12px 0; padding:14px; font-size:13px; }
