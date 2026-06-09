@@ -5,7 +5,7 @@ import { toggleMenuLike, getMenuLikes } from "./lib/supabase";
 // Serce w stylu TikTok (SVG, nie emoji) — wypełnione gdy liked
 function HeartIcon({ filled, className = "", style }) {
   return (
-    <svg className={className} style={style} viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true">
+    <svg className={className} style={{ width: "1em", height: "1em", display: "block", ...style }} viewBox="0 0 24 24" aria-hidden="true">
       <path d="M12 21s-7.5-4.6-10-9.2C.4 8.5 1.8 5 5.2 5c2 0 3.3 1.1 4.1 2.3C10.1 6.1 11.4 5 13.4 5c3.4 0 4.8 3.5 3.2 6.8C19.5 16.4 12 21 12 21z"
         fill={filled ? "#FE2C55" : "none"} stroke={filled ? "#FE2C55" : "currentColor"} strokeWidth="2" strokeLinejoin="round" />
     </svg>
@@ -85,7 +85,7 @@ function MobileFullMenu() {
     const id = likesMap[itemKey(it)]?.id;
     return id ? likedSet.has(id) : false;
   };
-  // toggle (polub / cofnij). burst tylko gdy DODAJEMY polubienie.
+  // toggle (polub / cofnij) — używany przez PRZYCISK serca. burst tylko gdy DODAJEMY.
   const toggleLike = async (it) => {
     const k = itemKey(it);
     const rec = likesMap[k];
@@ -96,6 +96,17 @@ function MobileFullMenu() {
     setLikedSet((prev) => { const n = new Set(prev); if (wasLiked) n.delete(rec.id); else n.add(rec.id); return n; });
     setLikesMap((p) => ({ ...p, [k]: { ...p[k], likes: Math.max(0, (p[k]?.likes || 0) + delta) } }));
     if (!wasLiked) { setBurstKey(k); setTimeout(() => setBurstKey((cur) => (cur === k ? null : cur)), 650); }
+    await toggleMenuLike(rec.id);
+  };
+  // double-tap w zdjęcie → ZAWSZE polub (nigdy nie odlajkowuje, jak Instagram). Zawsze burst.
+  const likeOnly = async (it) => {
+    const k = itemKey(it);
+    const rec = likesMap[k];
+    if (!rec?.id) return;
+    setBurstKey(k); setTimeout(() => setBurstKey((cur) => (cur === k ? null : cur)), 650);
+    if (likedSet.has(rec.id)) return; // już polubione → tylko animacja, bez zmiany licznika
+    setLikedSet((prev) => { const n = new Set(prev); n.add(rec.id); return n; });
+    setLikesMap((p) => ({ ...p, [k]: { ...p[k], likes: (p[k]?.likes || 0) + 1 } }));
     await toggleMenuLike(rec.id);
   };
 
@@ -232,10 +243,10 @@ function MobileFullMenu() {
                 <li key={i} className={`mfm-item ${it.featured ? "feat" : ""} ${isTopLiked ? "top-liked" : ""}`} onClick={() => setDishPopout({ ...it, icon: cat.icon })}>
                   {isTopLiked && <span className="mfm-topliked-badge"><HeartIcon filled /> {({ it:"Il più amato", en:"Most loved", pl:"Najczęściej lubiane", de:"Beliebtest", fr:"Le plus aimé", es:"El más amado" })[lang] || "Il più amato"}</span>}
                   <div className="mfm-item-thumb"
-                    onDoubleClick={(e) => { e.stopPropagation(); toggleLike(it); }}
+                    onDoubleClick={(e) => { e.stopPropagation(); likeOnly(it); }}
                     onTouchEnd={(e) => {
                       const now = Date.now(); const last = e.currentTarget._lt || 0; e.currentTarget._lt = now;
-                      if (now - last < 320) { e.preventDefault(); e.stopPropagation(); toggleLike(it); }
+                      if (now - last < 320) { e.preventDefault(); e.stopPropagation(); likeOnly(it); }
                     }}>
                     {it.img ? <img src={it.img} alt="" loading="lazy" /> : <span className="mfm-item-thumb-ph">{cat.icon}</span>}
                     {burstKey === itemKey(it) && <span className="mfm-thumb-burst"><HeartIcon filled /></span>}
@@ -323,10 +334,10 @@ function MobileFullMenu() {
         <div className="mfm-pop-overlay" onClick={() => setDishPopout(null)}>
           <div className="mfm-pop" onClick={(e) => e.stopPropagation()}>
             <div className="mfm-pop-img"
-              onDoubleClick={(e) => { e.stopPropagation(); toggleLike(dishPopout); }}
+              onDoubleClick={(e) => { e.stopPropagation(); likeOnly(dishPopout); }}
               onTouchEnd={(e) => {
                 const now = Date.now(); const last = e.currentTarget._lt || 0; e.currentTarget._lt = now;
-                if (now - last < 320) { e.preventDefault(); e.stopPropagation(); toggleLike(dishPopout); }
+                if (now - last < 320) { e.preventDefault(); e.stopPropagation(); likeOnly(dishPopout); }
               }}>
               {dishPopout.img ? <img src={dishPopout.img} alt={dishPopout.name} /> : <span className="mfm-pop-ph">{dishPopout.icon}</span>}
               {burstKey === itemKey(dishPopout) && <span className="mfm-pop-burst"><HeartIcon filled /></span>}
@@ -405,9 +416,9 @@ function MobileFullMenu() {
         .mfm-top-badge { position: absolute; bottom: 4px; right: 4px; display: inline-flex; align-items: center; gap: 3px; padding: 2px 6px; border-radius: 999px; background: rgba(0,0,0,0.55); color: #fff; font-size: 10px; font-weight: 700; }
         .mfm-top-badge svg { font-size: 11px; color: #FE2C55; }
         .mfm-top-name { font-family: var(--f-body); font-size: 11px; line-height: 1.25; color: var(--c-deep); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-        /* serce TikTok-style — wyśrodkowane na dole zdjęcia, małe */
-        .mfm-thumb-like { position: absolute; bottom: 2px; left: 50%; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 2px; padding: 1px 5px; border-radius: 999px; background: rgba(0,0,0,0.45); backdrop-filter: blur(4px); cursor: pointer; line-height: 1; z-index: 4; }
-        .mfm-thumb-like-ico { font-size: 11px; color: #fff; display: block; }
+        /* serce TikTok-style — wyśrodkowane na dole zdjęcia, małe, NIE ucięte */
+        .mfm-thumb-like { position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); display: inline-flex; align-items: center; justify-content: center; gap: 2px; padding: 2px 6px; border-radius: 999px; background: rgba(0,0,0,0.55); backdrop-filter: blur(4px); cursor: pointer; line-height: 1; z-index: 4; max-width: calc(100% - 8px); box-sizing: border-box; }
+        .mfm-thumb-like-ico { font-size: 11px; width: 11px; height: 11px; color: #fff; display: block; flex-shrink: 0; }
         .mfm-thumb-like.is-liked .mfm-thumb-like-ico { animation: mfmPulse .3s ease; }
         .mfm-thumb-like-n { font-size: 9px; font-weight: 700; color: #fff; }
         /* burst — chwilowe duże serce, TYLKO w obrębie miniatury (nie na całym ekranie) */
@@ -505,6 +516,14 @@ function DesktopFullMenu() {
     setLikedSet((p) => { const n = new Set(p); if (was) n.delete(rec.id); else n.add(rec.id); return n; });
     setLikesMap((p) => ({ ...p, [k]: { ...p[k], likes: Math.max(0, (p[k]?.likes || 0) + delta) } }));
     if (!was) { setBurstKey(k); setTimeout(() => setBurstKey((c) => (c === k ? null : c)), 650); }
+    await toggleMenuLike(rec.id);
+  };
+  const likeOnly = async (it) => {
+    const k = itemKey(it); const rec = likesMap[k]; if (!rec?.id) return;
+    setBurstKey(k); setTimeout(() => setBurstKey((c) => (c === k ? null : c)), 650);
+    if (likedSet.has(rec.id)) return;
+    setLikedSet((p) => { const n = new Set(p); n.add(rec.id); return n; });
+    setLikesMap((p) => ({ ...p, [k]: { ...p[k], likes: (p[k]?.likes || 0) + 1 } }));
     await toggleMenuLike(rec.id);
   };
   const [catPopout, setCatPopout] = useStateM(false);
@@ -740,7 +759,7 @@ function DesktopFullMenu() {
                       {/* Miniatura zdjęcia dania (placeholder do czasu prawdziwych zdjęć) — klik otwiera podgląd */}
                       <div className="fmenu-row-thumb"
                         onClick={(e) => { e.stopPropagation(); setDishPopout({ ...it, icon: cat.icon }); }}
-                        onDoubleClick={(e) => { e.stopPropagation(); toggleLike(it); }}>
+                        onDoubleClick={(e) => { e.stopPropagation(); likeOnly(it); }}>
                         {it.img ? (
                           <img src={it.img} alt="" loading="lazy" />
                         ) : (
