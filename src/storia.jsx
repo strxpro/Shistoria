@@ -242,6 +242,8 @@ function StoriaArc({ data }) {
   useEffectS(() => {
     const sec = sectionRef.current;
     if (!sec) return;
+    // Mobile: WYŁĄCZ magnetyczny snap (powodował teleportację — walczył z natywnym momentum scrollem).
+    const isTouch = typeof window !== "undefined" && (window.matchMedia("(pointer:coarse)").matches || window.innerWidth < 768);
     let raf = 0;
     let snapTimer = 0;
     let animId = 0;
@@ -296,6 +298,7 @@ function StoriaArc({ data }) {
     let lastY = window.scrollY;
     let stableCount = 0;
     const doSnap = () => {
+      if (isTouch) return; // mobile: bez snapu (anti-teleportacja)
       if (snapping) return;
       if (!isPinned()) return; // tylko gdy sekcja przypięta — inaczej blokuje scroll całej strony
       // upewnij się, że scroll naprawdę stoi (nie momentum) — pozycja niezmienna
