@@ -1654,6 +1654,18 @@ function CocktailExperience() {
   }, [pouring, stage]);
   useEffect(() => () => { if (typeof document !== "undefined") { delete document.body.dataset.cxPouring; delete document.body.dataset.cxScrolling; } }, []);
 
+  // Blokada zaznaczania tekstu / menu kontekstowego podczas lania (long-press) w kreatorze
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const block = (e: Event) => { if (pouring) e.preventDefault(); };
+    document.addEventListener("selectstart", block);
+    document.addEventListener("contextmenu", block);
+    return () => {
+      document.removeEventListener("selectstart", block);
+      document.removeEventListener("contextmenu", block);
+    };
+  }, [pouring]);
+
   const mixedColor = useMemo(
     () => mixColorsWeighted(poured), [poured],
   );
@@ -5454,6 +5466,7 @@ function CocktailStyles() {
 
       /* Boks butelki — SOLIDNY (bez glass), z modelem 3D w środku */
       .cx-bcard { position:relative; display:flex; flex-direction:column; align-items:center; gap:6px; padding:16px 10px 14px; cursor:pointer;
+        -webkit-user-select:none; user-select:none; -webkit-touch-callout:none; touch-action:manipulation; -webkit-tap-highlight-color:transparent;
         border-radius:20px; background:radial-gradient(ellipse at 50% 70%, color-mix(in srgb, var(--bcard-liq, #888) 12%, transparent), transparent 70%), rgba(12,10,14,0.85);
         border:1px solid color-mix(in srgb, var(--bcard-strength, rgba(255,255,255,0.1)) 40%, transparent); color:#fff; text-align:center;
         box-shadow:0 8px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.06); transition:transform .35s cubic-bezier(.2,.8,.2,1), box-shadow .35s, border-color .3s, background .3s; }
