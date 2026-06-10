@@ -47,8 +47,8 @@ Odhaczam `[x]` w miarę robienia.
 - [x] **D1.** Popout drinka przetłumaczony (NameCard + DbDrinkCard popout + ShareDrinkBtn — 6 języków). ✅
 - [x] **D2.** Zdjęcie wypełnia cały panel popoutu (`has-photo`, object-fit:cover) + czarny gradient od dołu. ✅
 - [x] **D3.** Komentarze jak na IG: 3 najnowsze (`getComments`), pogrubiony autor, pole „Aggiungi un commento…" + „Pubblica" od razu widoczne, Enter wysyła. ✅
-- [ ] **D4.** Edytor zdjęcia: kadrowanie, obrót, proste filtry (jak iPhone — pokrętła). ⏱60min 🔵duże
-- [ ] **D5.** Udostępnij na social → większa szansa na drink miesiąca + auto szablon IG story/post z linkiem. ⏱30min 🔵konfiguracja
+- [x] **D4.** Edytor zdjęcia (PhotoEditor): przeciągnij=kadr, zoom, obrót 90°, pokrętła jasność/kontrast/nasycenie, siatka 3×3, zapis 1080×1080; ✏️ na zdjęciu = ponowna edycja. 6 jęz. ✅
+- [x] **D5.** Po publikacji: pasek social (Web Share / IG (kopiuje szablon + otwiera IG) / FB sharer / WhatsApp / kopiuj link) z szablonem „nazwa drinka + link" w języku strony + hint o Drinku Miesiąca. ✅ *(pełny auto-post na IG/FB wymaga API — sekcja O w PLAN.md)*
 - [x] **D6.** Brak opcji wgrania zdjęcia jeśli nie zrobiło się drinka wcześniej — upload ukryty gdy brak drinka. ✅
 - [x] **D7.** Popout drinka na telefonie przesuwany palcem W BOK (scroll-snap: zdjęcie ⇄ szczegóły/komentarze); komentarze przewijalne dotykiem. ✅
 
