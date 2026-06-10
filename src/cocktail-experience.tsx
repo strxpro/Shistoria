@@ -2366,7 +2366,7 @@ function CocktailExperience() {
           </button>
           <div className="cx-slide-wrap">
             <SlideToShake enabled={canShake} onConfirm={doShake} />
-            {!canShake && stage === "build" && <span className="cx-slide-hint">Versa almeno 2 ingredienti per shakerare</span>}
+            {!canShake && stage === "build" && <span className="cx-slide-hint">{cxLabel("pourHint")}</span>}
           </div>
         </div>
 
@@ -2381,7 +2381,7 @@ function CocktailExperience() {
                 /* QR schowany — drink zostaje; mini-karta z powrotem do QR + jawny reset */
                 <div className="cx-name cx-name-done">
                   <div className="cx-name-info">
-                    <span className="cx-mini-kicker">Ordine confermato ✓</span>
+                    <span className="cx-mini-kicker">{cxLabel("confirmed")}</span>
                     <h4>{directOrder.name}</h4>
                   </div>
                   <button className="cx-qr-mini" onClick={() => setDirectQrOpen(true)} aria-label="Mostra QR">
@@ -2398,7 +2398,7 @@ function CocktailExperience() {
             )
           ) : poured.length > 0 ? (
             <>
-              <div className="cx-table-head"><span>Nel bicchiere</span><span>{totalMl} ml</span></div>
+              <div className="cx-table-head"><span>{cxLabel("inGlass")}</span><span>{totalMl} ml</span></div>
               <ul>
                 {poured.map((p) => (
                   <li key={p.ing.id}>
@@ -3595,6 +3595,18 @@ function LazyBottle3D({ id, name, color, shape, ml, real }: { id: string; name: 
  * ──────────────────────────────────────────────────────────────────────── */
 const HOLD_DURATION = 1500; // ms — przytrzymaj 1.5s żeby zaczęło lać
 
+/* E7: krótkie etykiety UI kreatora w języku strony (6 języków) */
+function cxLabel(key: "pourHint" | "inGlass" | "claimGift" | "confirmed"): string {
+  const lang = (typeof window !== "undefined" && (window as unknown as { currentLanguage?: string }).currentLanguage) || "it";
+  const L: Record<string, Record<string, string>> = {
+    pourHint: { it: "Versa almeno 2 ingredienti per shakerare", pl: "Nalej co najmniej 2 składniki, aby szejkować", en: "Pour at least 2 ingredients to shake", de: "Gieße mindestens 2 Zutaten ein, um zu shaken", fr: "Verse au moins 2 ingrédients pour shaker", es: "Vierte al menos 2 ingredientes para agitar" },
+    inGlass: { it: "Nel bicchiere", pl: "W szklance", en: "In the glass", de: "Im Glas", fr: "Dans le verre", es: "En el vaso" },
+    claimGift: { it: "Ritira il tuo drink", pl: "Odbierz swojego drinka", en: "Claim your drink", de: "Hol dir deinen Drink", fr: "Récupère ton cocktail", es: "Recoge tu trago" },
+    confirmed: { it: "Ordine confermato ✓", pl: "Zamówienie potwierdzone ✓", en: "Order confirmed ✓", de: "Bestellung bestätigt ✓", fr: "Commande confirmée ✓", es: "Pedido confirmado ✓" },
+  };
+  return L[key]?.[lang] ?? L[key]?.it ?? "";
+}
+
 /* Wielojęzyczny napis nalewania (wg window.currentLanguage) */
 function getPourLabel(): string {
   const L: Record<string, string> = {
@@ -4602,7 +4614,7 @@ function DrinkFound({ drink, searching, onOrderNow, onContinue }: {
  * ──────────────────────────────────────────────────────────────────────── */
 function GiftClaim({ onClaim }: { onClaim: () => void }) {
   return (
-    <button className="cx-gift" onClick={onClaim} aria-label="Ritira il tuo drink">
+    <button className="cx-gift" onClick={onClaim} aria-label={cxLabel("claimGift")}>
       <span className="cx-gift-stars" aria-hidden="true">
         <span>✦</span><span>✧</span><span>✦</span>
       </span>
@@ -4611,7 +4623,7 @@ function GiftClaim({ onClaim }: { onClaim: () => void }) {
         <span className="cx-gift-body" />
         <span className="cx-gift-ribbon" />
       </span>
-      <span className="cx-gift-label">Ritira il tuo drink</span>
+      <span className="cx-gift-label">{cxLabel("claimGift")}</span>
     </button>
   );
 }
@@ -5265,14 +5277,24 @@ function ShareDrinkBtn() {
 
 function CommunityFilters({ filter, setFilter, gridMode, setGridMode }: { filter: string; setFilter: (f: string) => void; gridMode: "single" | "grid"; setGridMode: (m: "single" | "grid") => void }) {
   const [dropOpen, setDropOpen] = useState(false);
+  // E7: etykiety filtrów w języku strony
+  const fLang = (typeof window !== "undefined" && (window as any).currentLanguage) || "it";
+  const FL = ({
+    it: ["Tutti", "🔥 Popolari", "❤️ Più amati", "⭐ In evidenza", "💪 Per forza"],
+    pl: ["Wszystkie", "🔥 Popularne", "❤️ Najbardziej lubiane", "⭐ Wyróżnione", "💪 Wg mocy"],
+    en: ["All", "🔥 Popular", "❤️ Most loved", "⭐ Featured", "💪 By strength"],
+    de: ["Alle", "🔥 Beliebt", "❤️ Meistgeliebt", "⭐ Empfohlen", "💪 Nach Stärke"],
+    fr: ["Tous", "🔥 Populaires", "❤️ Préférés", "⭐ En vedette", "💪 Par force"],
+    es: ["Todos", "🔥 Populares", "❤️ Más queridos", "⭐ Destacados", "💪 Por fuerza"],
+  } as Record<string, string[]>)[fLang] ?? ["Tutti", "🔥 Popolari", "❤️ Più amati", "⭐ In evidenza", "💪 Per forza"];
   const filters = [
-    { id: "all", label: "Tutti" },
-    { id: "popular", label: "🔥 Popolari" },
-    { id: "liked", label: "❤️ Più amati" },
-    { id: "featured", label: "⭐ In evidenza" },
-    { id: "strong", label: "💪 Per forza" },
+    { id: "all", label: FL[0] },
+    { id: "popular", label: FL[1] },
+    { id: "liked", label: FL[2] },
+    { id: "featured", label: FL[3] },
+    { id: "strong", label: FL[4] },
   ];
-  const activeLabel = filters.find((f) => f.id === filter)?.label ?? "Tutti";
+  const activeLabel = filters.find((f) => f.id === filter)?.label ?? FL[0];
   return (
     <div className="cx-comm-filters">
       {/* Desktop: inline row */}

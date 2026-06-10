@@ -420,6 +420,25 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
     else delete document.body.dataset.cxSection;
   }, [activeSection]);
 
+  // E2: footer w kadrze → hamburger ucieka (animowany) do góry, nie zasłania stopki
+  useEffect(() => {
+    if (typeof document === "undefined" || typeof IntersectionObserver === "undefined") return;
+    let io = null;
+    let tries = 0;
+    let retryId = 0;
+    const attach = () => {
+      const el = document.querySelector("footer.footer");
+      if (!el) { if (tries++ < 6) retryId = window.setTimeout(attach, 800); return; }
+      io = new IntersectionObserver((entries) => {
+        if (entries.some((e) => e.isIntersecting)) document.body.dataset.shFooter = "on";
+        else delete document.body.dataset.shFooter;
+      }, { threshold: 0.1 });
+      io.observe(el);
+    };
+    attach();
+    return () => { if (io) io.disconnect(); clearTimeout(retryId); delete document.body.dataset.shFooter; };
+  }, []);
+
   const links = [
     { id: "storia", label: t("nav.storia") },
     { id: "ristorante", label: t("nav.ristorante") },
@@ -648,6 +667,17 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
           /* hamburger pozostaje widoczny w kreatorze (NIE chowamy podczas scrollu/animacji) */
           /* W sekcji bar (Tramonti) hamburger w kolorze coral — bardziej widoczny */
           body[data-cx-section="bar"] .hamburger-mobile { background: var(--c-coral, #E8927C); }
+          /* E2: przy stopce hamburger przesuwa się (animowany) do góry */
+          body[data-sh-footer="on"] .hamburger-mobile:not(.open) {
+            bottom: auto;
+            top: calc(16px + env(safe-area-inset-top));
+            right: 16px;
+            animation: hamToTop 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+          }
+          @keyframes hamToTop {
+            from { opacity: 0; transform: translateY(-22px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
         }
         /* Nav CTA przesuwa się kolorystycznie w stronę różu tylko w sekcji Tramonti/bar */
         .nav .btn-nav { transition: background .5s var(--ease-out), color .3s; }
