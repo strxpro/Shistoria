@@ -11,14 +11,17 @@ Odhaczam `[x]` w miarę robienia.
 
 ## 🔴 GRUPA A — SZYBKIE, PEWNE FIXY CSS/UI (najpierw, ~zrobione od ręki)
 
-- [ ] **A1.** Serca ucięte w miniaturce + popout menu restauracji — overflow/pozycja. ⏱5min
-- [ ] **A2.** Kilka klików w miniaturkę → serce ZAWSZE zaznaczone (toggle stabilny). ⏱5min
-- [ ] **A3.** Bar: dodać polubienia TYLKO dla alkoholi (nie piwa/kawy/bezalkoholowe). ⏱15min
-- [ ] **A4.** Header (logo+flaga) przesuwa się w kreatorze — przywrócić stałą pozycję. ⏱10min
-- [ ] **A5.** Dropdown butelek w kreatorze — napisy jeden pod drugim, mają być w 1 linii. ⏱10min
-- [ ] **A6.** Neonowy napis niewyśrodkowany / wychodzi poza ekran przy długich językach. ⏱10min
-- [ ] **A7.** Footer mobile niewyrównany + mapa wychodzi poza ekran + formularz rezerwacji niewyśrodkowany. ⏱15min
-- [ ] **A8.** Sticky przycisk QR (ikona QR w kółku) po prawej gdy została sama szklanka + FAB zniknął. ⏱10min
+- [x] **A1.** Serca ucięte w miniaturce + popout — naprawione (max-width, jawny rozmiar SVG). ✅
+- [x] **A2.** Kilka klików → serce ZAWSZE zaznaczone (double-tap = like only, jak IG). ✅
+- [ ] **A3.** Bar: polubienia TYLKO dla alkoholi (nie piwa/kawy/bezalkoholowe). ⏱15min
+- [x] **A4.** Header (logo+flaga) — stała pozycja. ✅
+- [x] **A5.** Dropdown butelek — napisy w 1 linii (nowrap+ellipsis). ✅
+- [x] **A6.** Neon napis — zawija się, mieści na ekranie. ✅
+- [x] **A7.** Footer mobile + mapa + formularz kontakt responsywne. ✅
+- [ ] **A8.** Sticky przycisk QR gdy została sama szklanka. ⏱10min
+- [x] **E1.** Footer: kredyt „Creato da shardananuragici@gmail.com". ✅
+- [x] **E3.** Footer: sekcja prawna (privacy/regulamin/cookie + dane firmy) 6 jęz. ✅
+- [x] **E4.** Newsletter: rozwija imię + „Iscriviti" → toast (6 jęz). ✅
 
 ## 🟠 GRUPA B — KREATOR 3D (ostrożnie, logika sceny)
 
