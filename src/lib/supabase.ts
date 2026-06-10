@@ -101,9 +101,22 @@ export async function addComment(drinkId: string, author: string, content: strin
     .insert({ drink_id: drinkId, author, content })
     .select()
     .single();
-  
+
   if (error) console.error('Comment error:', error);
   return data;
+}
+
+// D3: najnowsze komentarze drinka (styl IG — 3 ostatnie pod postem)
+export async function getComments(drinkId: string, limit = 3) {
+  const { data, error } = await supabase
+    .from('drink_comments')
+    .select('*')
+    .eq('drink_id', drinkId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  if (error) console.error('Get comments error:', error);
+  return data || [];
 }
 
 // ─── Orders (QR barman) ───────────────────────────────────────────────────────

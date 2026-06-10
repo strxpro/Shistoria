@@ -68,7 +68,7 @@ if (typeof window !== "undefined") {
   try { ScrollTrigger.config({ ignoreMobileResize: true }); } catch { /* ignore */ }
 }
 
-import { supabase, getSessionId, createOrder, publishDrink, likeDrink, addComment, claimDrink as claimDrinkApi } from "./lib/supabase";
+import { supabase, getSessionId, createOrder, publishDrink, likeDrink, addComment, getComments, claimDrink as claimDrinkApi } from "./lib/supabase";
 import { findCocktailByIngredients } from "./lib/cocktail-db";
 import { PersonalizedQR } from "./components/PersonalizedQR";
 
@@ -4956,14 +4956,34 @@ function DbDrinkCard({ d }: { d: any }) {
   // D1: tłumaczenia popout community (6 języków)
   const lang = (typeof window !== "undefined" && (window as any).currentLanguage) || "it";
   const T = ({
-    it: { order: "🍸 Ordina questo drink", retired: "volte ritirato", ingredients: "Ingredienti", barman: "Mostralo al barman", by: "by" },
-    pl: { order: "🍸 Zamów ten drink", retired: "razy odebrano", ingredients: "Składniki", barman: "Pokaż barmanowi", by: "od" },
-    en: { order: "🍸 Order this drink", retired: "times claimed", ingredients: "Ingredients", barman: "Show it to the barman", by: "by" },
-    de: { order: "🍸 Diesen Drink bestellen", retired: "mal abgeholt", ingredients: "Zutaten", barman: "Zeig es dem Barkeeper", by: "von" },
-    fr: { order: "🍸 Commander ce cocktail", retired: "fois retiré", ingredients: "Ingrédients", barman: "Montre-le au barman", by: "par" },
-    es: { order: "🍸 Pedir este trago", retired: "veces retirado", ingredients: "Ingredientes", barman: "Muéstralo al barman", by: "de" },
+    it: { order: "🍸 Ordina questo drink", retired: "volte ritirato", ingredients: "Ingredienti", barman: "Mostralo al barman", by: "by", comments: "Commenti", noComments: "Nessun commento — sii il primo!", addComment: "Aggiungi un commento…", publishCmt: "Pubblica" },
+    pl: { order: "🍸 Zamów ten drink", retired: "razy odebrano", ingredients: "Składniki", barman: "Pokaż barmanowi", by: "od", comments: "Komentarze", noComments: "Brak komentarzy — bądź pierwszy!", addComment: "Dodaj komentarz…", publishCmt: "Opublikuj" },
+    en: { order: "🍸 Order this drink", retired: "times claimed", ingredients: "Ingredients", barman: "Show it to the barman", by: "by", comments: "Comments", noComments: "No comments — be the first!", addComment: "Add a comment…", publishCmt: "Post" },
+    de: { order: "🍸 Diesen Drink bestellen", retired: "mal abgeholt", ingredients: "Zutaten", barman: "Zeig es dem Barkeeper", by: "von", comments: "Kommentare", noComments: "Keine Kommentare — sei der Erste!", addComment: "Kommentar hinzufügen…", publishCmt: "Posten" },
+    fr: { order: "🍸 Commander ce cocktail", retired: "fois retiré", ingredients: "Ingrédients", barman: "Montre-le au barman", by: "par", comments: "Commentaires", noComments: "Aucun commentaire — sois le premier!", addComment: "Ajoute un commentaire…", publishCmt: "Publier" },
+    es: { order: "🍸 Pedir este trago", retired: "veces retirado", ingredients: "Ingredientes", barman: "Muéstralo al barman", by: "de", comments: "Comentarios", noComments: "Sin comentarios — ¡sé el primero!", addComment: "Añade un comentario…", publishCmt: "Publicar" },
   } as Record<string, Record<string, string>>)[lang] ?? ({} as Record<string, string>);
   const tt = (k: string, it: string) => T[k] ?? it;
+
+  // D3: komentarze jak na IG — 3 najnowsze pod postem + pole "dodaj komentarz"
+  const [comments, setComments] = useState<any[]>([]);
+  const [cmtText, setCmtText] = useState("");
+  useEffect(() => {
+    if (!popout || !d.id) return;
+    getComments(d.id, 3).then(setComments).catch(() => {});
+  }, [popout, d.id]);
+  const submitComment = async () => {
+    const t = cmtText.trim();
+    if (!t) return;
+    setCmtText("");
+    let author = "Guest";
+    try {
+      const h = JSON.parse(localStorage.getItem("sh-my-drinks") || "[]");
+      if (h.length > 0 && h[h.length - 1].author) author = h[h.length - 1].author;
+    } catch {}
+    setComments((prev) => [{ id: `tmp-${Date.now()}`, author, content: t, created_at: new Date().toISOString() }, ...prev].slice(0, 3));
+    try { await addComment(d.id, author, t); } catch {}
+  };
 
   const doLike = async () => {
     if (liked) return;
@@ -5019,8 +5039,8 @@ function DbDrinkCard({ d }: { d: any }) {
         <div className="cx-cc-popout-overlay" onClick={() => setPopout(false)}>
           <div className="cx-cc-popout" onClick={(e) => e.stopPropagation()}>
             <button className="cx-cc-popout-close" onClick={() => setPopout(false)}>×</button>
-            <div className="cx-cc-popout-left">
-              {d.photo_url ? <img src={d.photo_url} alt={d.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <div style={{ fontSize: 60 }}>🍸</div>}
+            <div className={`cx-cc-popout-left ${d.photo_url ? "has-photo" : ""}`}>
+              {d.photo_url ? <img src={d.photo_url} alt={d.name} /> : <div style={{ fontSize: 60 }}>🍸</div>}
             </div>
             <div className="cx-cc-popout-right">
               <div className="cx-cc-popout-header">
@@ -5040,6 +5060,20 @@ function DbDrinkCard({ d }: { d: any }) {
               </div>
               <div className="cx-cc-popout-actions">
                 <button className={`cx-cc-like ${liked ? "on" : ""}`} onClick={doLike}>♥ {likes}</button>
+              </div>
+              {/* D3: komentarze jak na Instagramie — 3 najnowsze + pole na nowy */}
+              <div className="cx-cc-popout-comments">
+                <span className="cx-cc-popout-label">💬 {tt("comments", "Commenti")}</span>
+                {comments.length === 0 && <p className="cx-cc-cmt cx-cc-cmt-empty">{tt("noComments", "Nessun commento — sii il primo!")}</p>}
+                {comments.map((c: any) => (
+                  <p key={c.id} className="cx-cc-cmt cx-cc-cmt-ig"><strong>{c.author}</strong>{c.content}</p>
+                ))}
+                <div className="cx-cc-cmt-row">
+                  <input className="cx-cc-cmt-input" value={cmtText} onChange={(e) => setCmtText(e.target.value)}
+                    placeholder={tt("addComment", "Aggiungi un commento…")} maxLength={180}
+                    onKeyDown={(e) => { if (e.key === "Enter") submitComment(); }} />
+                  <button className={`cx-cc-cmt-send ${cmtText.trim() ? "on" : ""}`} onClick={submitComment}>{tt("publishCmt", "Pubblica")}</button>
+                </div>
               </div>
             </div>
           </div>
@@ -6662,6 +6696,32 @@ function CocktailStyles() {
       /* Strength color bar on card */
       .cx-cc-strength-bar { position:absolute; top:0; left:0; right:0; height:3px; background:var(--cc-strength,#E8927C); border-radius:3px 3px 0 0; z-index:2; }
       .cx-cc { position:relative; }
+
+      /* D2: zdjęcie wypełnia cały panel + czarny gradient od dołu (pod komentarze) */
+      .cx-cc-popout-left.has-photo { padding:0; position:relative; min-height:340px; overflow:hidden; }
+      .cx-cc-popout-left.has-photo img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+      .cx-cc-popout-left.has-photo::after { content:""; position:absolute; left:0; right:0; bottom:0; height:46%;
+        background:linear-gradient(180deg, transparent, rgba(0,0,0,0.55) 55%, rgba(0,0,0,0.92)); pointer-events:none; }
+
+      /* D3: komentarze jak na Instagramie */
+      .cx-cc-cmt-ig { font-style:normal; color:rgba(255,255,255,0.78); font-size:13px; line-height:1.45; }
+      .cx-cc-cmt-ig strong { color:#fff; font-weight:700; margin-right:6px; }
+      .cx-cc-cmt-empty { opacity:0.55; }
+      .cx-cc-cmt-row { display:flex; align-items:center; gap:8px; border-top:1px solid rgba(255,255,255,0.08); padding-top:10px; margin-top:2px; }
+      .cx-cc-cmt-input { flex:1; min-width:0; background:none; border:none; outline:none; color:#fff; font-size:13px; padding:8px 0; }
+      .cx-cc-cmt-input::placeholder { color:rgba(255,255,255,0.38); }
+      .cx-cc-cmt-send { background:none; border:none; color:rgba(232,146,124,0.45); font-weight:700; font-size:13px; cursor:pointer; padding:6px 4px; transition:color .2s; }
+      .cx-cc-cmt-send.on { color:var(--cx-accent,#E8927C); }
+
+      /* D7: mobile — popout drinka przesuwany palcem W BOK (zdjęcie ⇄ szczegóły/komentarze) */
+      @media (max-width:768px) {
+        .cx-cc-popout { display:flex !important; grid-template-columns:none !important; overflow-x:auto !important; overflow-y:hidden !important;
+          scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; touch-action:pan-x pan-y; }
+        .cx-cc-popout > .cx-cc-popout-left, .cx-cc-popout > .cx-cc-popout-right { flex:0 0 100%; width:100%; box-sizing:border-box; scroll-snap-align:start; }
+        .cx-cc-popout-left.has-photo { min-height:62vh; }
+        .cx-cc-popout-right { max-height:92vh; overflow-y:auto; touch-action:pan-y; }
+        .cx-cc-popout-close { position:fixed; top:max(14px, env(safe-area-inset-top)); right:14px; }
+      }
 
       
       /* Share drink popout */
