@@ -565,6 +565,25 @@ function mixColorsWeighted(poured: { ing: Ingredient; ml: number }[]): string {
   return `#${c.getHexString()}`;
 }
 
+/* B4: ustaw kolor cieczy; gdy kolor jest bliski białego → wygląd czystego,
+ * przezroczystego spirytusu (lekko chłodny tint, niska nieprzezroczystość)
+ * zamiast mlecznej bieli. Dla pozostałych kolorów normalna, gęsta ciecz. */
+function applyLiquidColor(mat: THREE.MeshStandardMaterial, hex: string, baseOpacity = 0.92) {
+  const c = new THREE.Color(hex);
+  const lum = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b; // postrzegana jasność
+  if (lum > 0.82) {
+    mat.color.set("#dcebf2");     // chłodny, szklisty tint czystego alkoholu
+    mat.opacity = 0.34;
+    mat.transparent = true;
+    mat.roughness = 0.05;
+  } else {
+    mat.color.set(hex);
+    mat.opacity = baseOpacity;
+    mat.transparent = true;
+  }
+  mat.needsUpdate = true;
+}
+
 /* dodaj objętość składnika do przepisu (czysta funkcja, bez efektów ubocznych) */
 function addMlPure(prev: { ing: Ingredient; ml: number }[], ing: Ingredient, amount: number) {
   const i = prev.findIndex((p) => p.ing.id === ing.id);
@@ -967,7 +986,7 @@ function Bottle({
     if (label) { const m = label.material as THREE.MeshStandardMaterial; if (m) m.roughness = 0.5; }
     [glass, label, cork, liquid].forEach((m) => { if (m) m.castShadow = true; });
     normalize(root, CONFIG.bottleHeight);
-    onReady({ root, liquid, cork, clip, setColor: (hex) => liquidMat.color.set(hex) });
+    onReady({ root, liquid, cork, clip, setColor: (hex) => applyLiquidColor(liquidMat, hex, 0.92) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [glass, label, cork, liquid]);
 
@@ -1061,7 +1080,7 @@ function Shaker({
 
     onReady({
       root, base: baseRef.current, top: topRef.current, liquid: liquidRef.current,
-      topRestY, setColor: (hex) => liquidMat.color.set(hex),
+      topRestY, setColor: (hex) => applyLiquidColor(liquidMat, hex, 0.95),
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseObj, topObj]);
@@ -1121,7 +1140,7 @@ function Glass({
       shellRef.current.geometry = lathe(g, 1);
       liquidRef.current.geometry.dispose();
       liquidRef.current.geometry = lathe(g, 0.92);
-      liquidMat.color.set(color);
+      applyLiquidColor(liquidMat, color, 0.94);
       rootRef.current.position.y = -g.h / 2;
     };
     setGlass(GLASSES[0], "#E85C3A");
@@ -1641,6 +1660,7 @@ function CocktailExperience() {
   const [drinkName, setDrinkName] = useState("");
   const [customerName, setCustomerName] = useState("");
   const busyRef = useRef(false);
+  const pendingChoiceRef = useRef(false); // C1: modal "jest taki drink" odroczony do końca animacji shake
 
   // ── Historia drinków (localStorage) ──────────────────────────────────
   // Wczytaj imię z ostatniego drinka (wygoda — user nie musi wpisywać ponownie)
@@ -1849,13 +1869,21 @@ function CocktailExperience() {
     const api = sceneApiRef.current;
     if (!api || busyRef.current || stageRef.current !== "build" || poured.length < 2) return;
 
+    // C5: rozgrzej generator QR w tle już przy SHAKE (dynamiczny import biblioteki
+    // bywa najwolniejszym krokiem na telefonie) — później QR pokazuje się od razu
+    import("qrcode").catch(() => {});
+
     // Szukaj pasującego drinka w lokalnej bazie (asynchronicznie)
     setApiDrink(null);
     setApiSearching(true);
     findCocktailByIngredients(poured.map((p) => p.ing.id))
       .then((d) => {
         setApiDrink(d);
-        if (d) setDrinkChoiceOpen(true); // znaleziono → pokaż modal wyboru
+        if (d) {
+          // C1: modal pokazujemy dopiero PO animacji wstrząsania (nie w jej trakcie)
+          if (stageRef.current === "shaking") pendingChoiceRef.current = true;
+          else setDrinkChoiceOpen(true);
+        }
       })
       .catch(() => {})
       .finally(() => setApiSearching(false));
@@ -1879,20 +1907,23 @@ function CocktailExperience() {
     gsap.set(api.shakerRoot.scale, { x: 1, y: 1, z: 1 });
     api.invalidate();
 
+    // po animacji: przejście do wyboru + ewentualny odroczony modal "jest taki drink"
+    const finishShake = () => {
+      busyRef.current = false; setStage("pickGlass"); api.invalidate();
+      if (typeof window !== "undefined" && (window as any).lenis) (window as any).lenis.start();
+      if (pendingChoiceRef.current) { pendingChoiceRef.current = false; setDrinkChoiceOpen(true); }
+    };
+
     // Safety timeout — jeśli animacja nie skończy się w 4s, przejdź dalej
     const safety = setTimeout(() => {
-      if (stageRef.current === "shaking") {
-        busyRef.current = false; setStage("pickGlass"); api.invalidate();
-        if (typeof window !== "undefined" && (window as any).lenis) (window as any).lenis.start();
-      }
+      if (stageRef.current === "shaking") finishShake();
     }, 4000);
 
     const tl = gsap.timeline({
       onUpdate: api.invalidate,
       onComplete: () => {
         clearTimeout(safety);
-        busyRef.current = false; setStage("pickGlass"); api.invalidate();
-        if (typeof window !== "undefined" && (window as any).lenis) (window as any).lenis.start();
+        finishShake();
       },
     });
     tl.to(top.position, { y: restY, duration: 0.2, ease: "power4.in" }, 0)
@@ -1966,6 +1997,7 @@ function CocktailExperience() {
     setPoured([]); setChosenGlass(null); setDrinkName(""); setCustomerName(""); setStage("build");
     setGlassPourOpen(false); setGlassFilled(false); setClaimed(false); setConfetti(0); setDirectOrder(null);
     inSceneGlassRef.current = null;
+    if (typeof window !== "undefined") (window as any).__sh_orderId = null;
     // Safety: odblokuj scroll (mógł zostać zablokowany przez doShake)
     if (typeof window !== "undefined" && (window as any).lenis) (window as any).lenis.start();
     document.body.style.overflow = "";
@@ -2116,7 +2148,7 @@ function CocktailExperience() {
         trigger: scrollRef.current,
         start: "top top",
         end: "bottom bottom",
-        scrub: reduce ? 0.6 : (isMobileCx ? 0.8 : true),
+        scrub: reduce ? 0.5 : (isMobileCx ? 0.4 : true),
         invalidateOnRefresh: true,
         onRefresh: () => api.invalidate(),
         // gdy całkowicie opuścimy sekcję (w dół lub w górę) — wyczyść flagę scrollu,
@@ -2204,7 +2236,7 @@ function CocktailExperience() {
         trigger: rootRef.current,
         start: "top bottom",
         end: "top top",
-        scrub: reduce ? 0.6 : (isMobileCx ? 0.8 : true),
+        scrub: reduce ? 0.5 : (isMobileCx ? 0.4 : true),
         invalidateOnRefresh: true,
         onUpdate: (self) => {
           if (phase === "hold" || phase === "exit") return; // pin już steruje sceną
@@ -2404,7 +2436,9 @@ function CocktailExperience() {
           <DrinkFound drink={apiDrink} searching={false}
             onOrderNow={async () => {
               setDrinkChoiceOpen(false);
-              // "Wybierz ten" → twórz order, oznacz directOrder; potem wybór szkła → QR (bez formularza)
+              // C1: "Zamów teraz" → QR OD RAZU (bez wyboru szklanki); order dociąga się w tle
+              setDirectOrder({ name: apiDrink.name });
+              setStage("glassReady");
               try {
                 const order = await createOrder({
                   drink_name: apiDrink.name,
@@ -2415,8 +2449,7 @@ function CocktailExperience() {
                 });
                 setDirectOrder({ name: apiDrink.name, orderId: order?.id });
                 if (order?.id) (window as any).__sh_orderId = order.id;
-              } catch (e) { console.error(e); setDirectOrder({ name: apiDrink.name }); }
-              // przejdź do wyboru szkła (stage już pickGlass) — po nalaniu pokaże się QR
+              } catch (e) { console.error(e); }
             }}
             onContinue={() => setDrinkChoiceOpen(false)}
           />
@@ -2447,6 +2480,15 @@ function CocktailExperience() {
 
       {/* konfetti przy odbiorze drinka */}
       <Confetti fireKey={confetti} />
+
+      {/* A8: sticky przycisk QR (kółko po prawej) — gdy została sama szklanka */}
+      {stage === "glassReady" && !directOrder && (
+        <StickyQR color={mixedColor} drinkName={drinkName}
+          onNeedForm={() => {
+            setClaimed(true);
+            tableRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+          }} />
+      )}
 
       {/* Sekcja community — wjeżdża od dołu podczas wyjścia (scrollytelling) */}
       <CommunitySection sectionRef={communityRef} />
@@ -2813,10 +2855,17 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
     return new THREE.Vector3(r.x, r.y - 0.2, r.z - 0.3);
   }, []);
 
-  const liquidMat = useMemo(() => new THREE.MeshStandardMaterial({
-    color: new THREE.Color(color), roughness: 0.2, metalness: 0, transparent: false, side: THREE.DoubleSide,
-    emissive: new THREE.Color(color), emissiveIntensity: 0.3,
-  }), [color]);
+  const liquidMat = useMemo(() => {
+    const c = new THREE.Color(color);
+    const lum = 0.299 * c.r + 0.587 * c.g + 0.114 * c.b;
+    const isClear = lum > 0.82;
+    return new THREE.MeshStandardMaterial({
+      color: new THREE.Color(isClear ? "#dcebf2" : color),
+      roughness: isClear ? 0.05 : 0.2, metalness: 0,
+      transparent: isClear, opacity: isClear ? 0.4 : 1, side: THREE.DoubleSide,
+      emissive: new THREE.Color(isClear ? "#dcebf2" : color), emissiveIntensity: isClear ? 0.05 : 0.3,
+    });
+  }, [color]);
   const glassMat = useMemo(() => new THREE.MeshStandardMaterial({
     color: "#b8d8e8", roughness: 0.1, metalness: 0.05, transparent: true, opacity: 0.5, depthWrite: false, side: THREE.FrontSide,
   }), []);
@@ -3054,7 +3103,7 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
   });
 
   // długość strumienia (lokalna, sięga w stronę środka shakera)
-  const STREAM_LEN = 2.6;
+  const STREAM_LEN = 4.2;
   return (
     <group>
       <group ref={outer}>
@@ -3164,7 +3213,8 @@ function HoldRing() {
 
   const apply = useCallback(() => {
     const w = wrapRef.current;
-    if (w) w.style.transform = `translate(${st.current.x}px, ${st.current.y}px) translate(-50%, -50%) scale(${st.current.scale})`;
+    // pierścień NAD palcem (offset w górę), żeby nie chował się pod kciukiem podczas nalewania
+    if (w) w.style.transform = `translate(${st.current.x}px, ${st.current.y}px) translate(-50%, -160%) scale(${st.current.scale})`;
   }, []);
   const setArc = useCallback((p: number) => {
     const e = 1 - Math.pow(1 - clamp01(p), 3); // szybko → wolno
@@ -3445,12 +3495,18 @@ function shapeFor(ing: Ingredient): "wine" | "spirit" | "can" | "round" {
 // Globalny tracker aktywnych kontekstów 3D (limit jednoczesnych canvasów WebGL).
 // Mobile (iOS/Android) ma niski limit kontekstów → trzymamy max 3 naraz, reszta = SVG.
 const _active3D: Set<string> = typeof window !== "undefined" ? ((window as any).__sh3d || ((window as any).__sh3d = new Set())) : new Set();
-const MAX_DESKTOP_3D = 8;
-const MAX_MOBILE_3D = 3;
+const MAX_DESKTOP_3D = 10;
+const MAX_MOBILE_3D = 6;
+
+// Powiadom czekające karty, że zwolnił się slot kontekstu WebGL.
+function notify3DSlotFree() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("cx-3d-slot-free"));
+}
 
 function LazyBottle3D({ id, name, color, shape, ml, real }: { id: string; name: string; color: string; shape: "wine" | "spirit" | "can" | "round"; ml: number; real: boolean }) {
   const ref = useRef<HTMLDivElement>(null!);
   const [visible, setVisible] = useState(false);
+  const wantsRef = useRef(false); // karta jest w viewport i chce render 3D
   const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
   const maxCtx = isMobile ? MAX_MOBILE_3D : MAX_DESKTOP_3D;
   const uid = `${id}-${color}`;
@@ -3458,26 +3514,35 @@ function LazyBottle3D({ id, name, color, shape, ml, real }: { id: string; name: 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    // Spróbuj zająć slot WebGL; jeśli pełny — zostaje SVG, ale ponowi gdy slot się zwolni.
+    const tryAcquire = () => {
+      if (!wantsRef.current) return;
+      if (_active3D.has(uid)) { setVisible(true); return; }
+      if (_active3D.size < maxCtx) { _active3D.add(uid); setVisible(true); }
+    };
+    const release = () => {
+      const had = _active3D.delete(uid);
+      setVisible(false);
+      if (had) notify3DSlotFree(); // pozwól innym WIDOCZNYM kartom przejąć zwolniony kontekst
+    };
     const io = new IntersectionObserver(
       (entries) => {
         const isVis = entries[0]?.isIntersecting ?? false;
-        if (isVis) {
-          // Limit jednoczesnych kontekstów WebGL — gdy przekroczony, zostaje SVG
-          if (_active3D.size >= maxCtx && !_active3D.has(uid)) {
-            setVisible(false); return;
-          }
-          _active3D.add(uid);
-          setVisible(true);
-        } else {
-          _active3D.delete(uid);
-          setVisible(false);
-        }
+        wantsRef.current = isVis;
+        if (isVis) tryAcquire(); else release();
       },
       // mobile: węższy margines (mniej canvasów naraz), desktop: szerszy
       { rootMargin: isMobile ? "0px" : "50px 0px 50px 0px", threshold: 0.2 }
     );
     io.observe(el);
-    return () => { io.disconnect(); _active3D.delete(uid); };
+    // gdy inna karta zwolni slot, spróbuj przejąć (jeśli wciąż widoczni, ale bez 3D)
+    const onSlotFree = () => { if (wantsRef.current && !_active3D.has(uid)) tryAcquire(); };
+    window.addEventListener("cx-3d-slot-free", onSlotFree);
+    return () => {
+      io.disconnect();
+      window.removeEventListener("cx-3d-slot-free", onSlotFree);
+      if (_active3D.delete(uid)) notify3DSlotFree();
+    };
   }, [isMobile, maxCtx, uid]);
 
   return (
@@ -4337,11 +4402,17 @@ function GlassMini3D({ url, color }: { url: string; color: string }) {
   );
 }
 
-/* przełącznik z lodem / bez lodu (styl iPhone) */
+/* przełącznik z lodem / bez lodu (styl iPhone) — etykiety w języku strony (C4) */
 function IceToggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void }) {
+  const lang = (typeof window !== "undefined" && (window as any).currentLanguage) || "it";
+  const L: Record<string, [string, string]> = {
+    it: ["Con ghiaccio", "Senza ghiaccio"], pl: ["Z lodem", "Bez lodu"], en: ["With ice", "Without ice"],
+    de: ["Mit Eis", "Ohne Eis"], fr: ["Avec glaçons", "Sans glaçons"], es: ["Con hielo", "Sin hielo"],
+  };
+  const [withIceLbl, noIceLbl] = L[lang] ?? L.it;
   return (
     <div className="cx-ice-row">
-      <span className="cx-ice-label">{on ? "Con ghiaccio" : "Senza ghiaccio"}</span>
+      <span className="cx-ice-label">{on ? withIceLbl : noIceLbl}</span>
       <button className={`cx-ice-switch ${on ? "on" : ""}`} role="switch" aria-checked={on} onClick={() => onChange(!on)}>
         <span className="cx-ice-ico cx-ice-left" aria-hidden="true">
           <svg viewBox="0 0 24 24" width="13" height="13"><rect x="5" y="5" width="14" height="14" rx="3" fill="none" stroke="currentColor" strokeWidth="2"/><line x1="3" y1="3" x2="21" y2="21" stroke="currentColor" strokeWidth="2"/></svg>
@@ -4367,6 +4438,19 @@ function GlassPicker({ open, color, withIce, onIceChange, onPick }: {
   // Reset na "video" gdy popout się otwiera
   useEffect(() => { if (open) setStep("video"); }, [open]);
 
+  // C4: pełne tłumaczenia wyboru szklanki (6 języków)
+  const lang = (typeof window !== "undefined" && (window as any).currentLanguage) || "it";
+  const L: Record<string, { kicker: string; title: string; hint: string; rocks: string; highball: string }> = {
+    it: { kicker: "Scegli il bicchiere", title: "Il tuo bicchiere", hint: "Tocca per continuare", rocks: "Bicchiere basso", highball: "Bicchiere alto" },
+    pl: { kicker: "Wybierz szklankę", title: "Twoja szklanka", hint: "Dotknij, aby kontynuować", rocks: "Szklanka niska", highball: "Szklanka wysoka" },
+    en: { kicker: "Choose your glass", title: "Your glass", hint: "Tap to continue", rocks: "Lowball glass", highball: "Highball glass" },
+    de: { kicker: "Wähle dein Glas", title: "Dein Glas", hint: "Tippe, um fortzufahren", rocks: "Niedriges Glas", highball: "Hohes Glas" },
+    fr: { kicker: "Choisis ton verre", title: "Ton verre", hint: "Touche pour continuer", rocks: "Verre bas", highball: "Verre haut" },
+    es: { kicker: "Elige tu vaso", title: "Tu vaso", hint: "Toca para continuar", rocks: "Vaso bajo", highball: "Vaso alto" },
+  };
+  const tr = L[lang] ?? L.it;
+  const glassName = (g: GlassDef) => (g.id === "rocks" ? tr.rocks : tr.highball);
+
   return (
     <div className={`cx-popout ${open ? "show" : ""}`} role="dialog" aria-hidden={!open}>
       <div className="cx-popout-inner">
@@ -4374,19 +4458,19 @@ function GlassPicker({ open, color, withIce, onIceChange, onPick }: {
           <div className="cx-video-step" onClick={() => setStep("glass")}>
             <div className="cx-video-placeholder">
               <div className="cx-video-finger">👆</div>
-              <span className="cx-video-hint">Tieni premuto per continuare</span>
+              <span className="cx-video-hint">{tr.hint}</span>
             </div>
           </div>
         ) : (
           <>
-            <span className="cx-mini-kicker">Scegli il bicchiere</span>
-            <h3 className="cx-popout-title">Il tuo bicchiere</h3>
+            <span className="cx-mini-kicker">{tr.kicker}</span>
+            <h3 className="cx-popout-title">{tr.title}</h3>
             <IceToggle on={withIce} onChange={onIceChange} />
             <div className="cx-glass-grid">
               {GLASSES.map((g) => (
                 <button className="cx-glass-card" key={g.id} onClick={() => onPick(g, withIce)}>
                   <span className="cx-glass-art">{open && <GlassMini3D url={g.url} color={color} />}</span>
-                  <span>{g.name}</span>
+                  <span>{glassName(g)}</span>
                 </button>
               ))}
             </div>
@@ -4580,6 +4664,47 @@ function DirectOrderQR({ name, orderId, color, onReset }: { name: string; orderI
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
+ * StickyQR (A8) — okrągły, przyklejony przycisk QR po prawej stronie ekranu.
+ * Widoczny gdy drink gotowy (glassReady) — nawet gdy karta/FAB poza ekranem.
+ * Klik: jest order → pokazuje QR; nie ma → otwiera formularz (scroll do karty).
+ * ──────────────────────────────────────────────────────────────────────── */
+function StickyQR({ color, drinkName, onNeedForm }: { color: string; drinkName: string; onNeedForm: () => void }) {
+  const [open, setOpen] = useState(false);
+  const lang = (typeof window !== "undefined" && (window as any).currentLanguage) || "it";
+  const tr = ({
+    it: { show: "Mostralo al barman" }, pl: { show: "Pokaż barmanowi" }, en: { show: "Show it to the barman" },
+    de: { show: "Zeig es dem Barkeeper" }, fr: { show: "Montre-le au barman" }, es: { show: "Muéstralo al barman" },
+  } as Record<string, { show: string }>)[lang] ?? { show: "Mostralo al barman" };
+  const handleClick = () => {
+    const id = typeof window !== "undefined" ? (window as any).__sh_orderId : null;
+    if (id) setOpen(true);
+    else onNeedForm();
+  };
+  const orderId = typeof window !== "undefined" ? (window as any).__sh_orderId : null;
+  const orderUrl = orderId ? `${window.location.origin}/order/${orderId}` : "";
+  return (
+    <>
+      <button className="cx-qr-sticky" onClick={handleClick} aria-label="QR">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/></svg>
+      </button>
+      {open && typeof document !== "undefined" && createPortal(
+        <div className="cx-qr-overlay" onClick={() => setOpen(false)}>
+          <div className="cx-qr-card" onClick={(e) => e.stopPropagation()}>
+            <button className="cx-qr-close" onClick={() => setOpen(false)}>×</button>
+            <span className="cx-mini-kicker">{tr.show}</span>
+            <div className="cx-qr-box">
+              {orderUrl && <PersonalizedQR url={orderUrl} color={color} size={200} icon="🍸" />}
+            </div>
+            {drinkName && <h4 style={{ margin: "8px 0 0", color: "#fff" }}>{drinkName}</h4>}
+          </div>
+        </div>,
+        document.body,
+      )}
+    </>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
  * NameCard — nazwij drink + imię + QR (w dolnej karcie).
  * ──────────────────────────────────────────────────────────────────────── */
 function NameCard({
@@ -4614,7 +4739,7 @@ function NameCard({
         total_ml: Math.round(poured.reduce((s,p)=>s+p.ml,0)),
         strength_label: "—",
       });
-      if (order?.id) setOrderId(order.id);
+      if (order?.id) { setOrderId(order.id); (window as any).__sh_orderId = order.id; }
     } catch (e) { console.error("Order creation failed:", e); }
   };
 
@@ -5877,6 +6002,17 @@ function CocktailStyles() {
       .cx-btn-ghost:hover { border-color:var(--c-coral,#E8927C); color:#fff; }
       .cx-name-qr { display:flex; flex-direction:column; gap:16px; align-items:center; text-align:center; }
       .cx-name-done { display:flex; flex-direction:column; gap:12px; align-items:center; text-align:center; }
+      /* A8: sticky QR — przyklejone kółko po prawej, gdy drink gotowy */
+      .cx-qr-sticky { position:fixed; right:14px; top:50%; transform:translateY(-50%); z-index:64;
+        width:54px; height:54px; border-radius:50%; border:1.5px solid rgba(255,255,255,0.25);
+        background:rgba(20,16,14,0.82); color:var(--cx-accent,#E8927C); cursor:pointer;
+        display:grid; place-items:center; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+        box-shadow:0 8px 28px rgba(0,0,0,0.45); transition:transform 0.25s ease, box-shadow 0.25s ease;
+        animation:cxQrStickyIn 0.5s cubic-bezier(0.22,1,0.36,1) both; }
+      .cx-qr-sticky svg { width:26px; height:26px; }
+      .cx-qr-sticky:hover { transform:translateY(-50%) scale(1.08); box-shadow:0 12px 32px rgba(232,146,124,0.4); }
+      @keyframes cxQrStickyIn { from { opacity:0; transform:translateY(-50%) translateX(20px); } to { opacity:1; transform:translateY(-50%) translateX(0); } }
+      body:not([data-cx-section="creator"]) .cx-qr-sticky { display:none; }
       .cx-qr-mini { width:56px; height:56px; border-radius:50%; background:var(--cx-accent,#E8927C); border:none; color:#fff; cursor:pointer;
         display:grid; place-items:center; box-shadow:0 8px 24px rgba(232,146,124,0.4); transition:transform .3s, box-shadow .3s; }
       .cx-qr-mini:hover { transform:scale(1.1); box-shadow:0 12px 32px rgba(232,146,124,0.6); }

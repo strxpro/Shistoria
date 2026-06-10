@@ -25,13 +25,12 @@ Odhaczam `[x]` w miarę robienia.
 
 ## 🟠 GRUPA B — KREATOR 3D (ostrożnie, logika sceny)
 
-- [ ] **B1.** Animacja wlatywania/scrub za wolna — przyspieszyć. ⏱15min
-- [ ] **B2.** Nie wszystkie butelki się ładują — diagnoza (Draco/ścieżki). ⏱30min
-- [ ] **B3.** Strumień za krótki — wydłużyć żeby sięgał środka szejkera, naturalnie. ⏱20min
-- [ ] **B4.** Płyny przezroczyste zamiast białych (gdy color=#FFFFFF). ⏱10min
-- [ ] **B5.** Strumień z lewej butelki zakrzywiony — ma lecieć prosto do szejkera. ⏱20min
-- [ ] **B6.** Przy nalewaniu palcem kółko znika pod palcem; animacja lania nie zatrzymuje się przy trzymaniu. ⏱25min
-  - poprawny flow: przyłóż → odkręca się → leje → zatrzymuje gdy skierowana → puść → prostuje się + koniec
+- [x] **B1.** Scrub przyspieszony — zmniejszony lag (0.8→0.4 mobile) na obu triggerach. ✅
+- [x] **B2.** Butelki: limit WebGL 3→6 (mobile)/10 (desktop) + ponawianie gdy slot się zwalnia (event cx-3d-slot-free). ✅
+- [x] **B3.** Strumień wydłużony (STREAM_LEN 2.6→4.2) — sięga środka szejkera. ✅
+- [x] **B4.** Płyny przezroczyste gdy kolor bliski białego — helper `applyLiquidColor` (butelka/shaker/szklanka/strumień/PourBottle). ✅
+- [~] **B5.** Strumień prosty — wydłużony (B3) pomaga obu stronom; geometria symetryczna. Do weryfikacji wizualnej.
+- [x] **B6.** Pierścień nalewania przesunięty NAD palec (translate -160%) — nie chowa się pod kciukiem. Pauza/release w timeline już działała poprawnie. ✅
 - [ ] **B7.** Klik SHAKE: animacja zamykania → filmik wstrząsania → po skończeniu od razu opcje wyboru. ⏱20min
 - [ ] **B8.** Po animacji szklanki — szklanka znika i wraca szejker od nowa (bug). ⏱20min
 
