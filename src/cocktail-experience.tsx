@@ -5951,8 +5951,8 @@ function CocktailStyles() {
         display:flex; flex-direction:column; align-items:center; gap:14px; text-align:center;
         transform:translate(-50%,-50%) scale(.86); transition:opacity .25s ease; will-change:transform,opacity; }
       .cx-scrollpop-label { font-family:var(--f-display,sans-serif); font-weight:800;
-        font-size:clamp(26px,6vw,78px); letter-spacing:.04em; text-transform:uppercase; line-height:1; color:#eafdff;
-        white-space:nowrap; max-width:96vw; box-sizing:border-box;
+        font-size:clamp(24px,6vw,78px); letter-spacing:.04em; text-transform:uppercase; line-height:1.05; color:#eafdff;
+        white-space:normal; overflow-wrap:break-word; word-break:break-word; max-width:90vw; box-sizing:border-box; text-align:center;
         text-shadow:0 0 6px #5BE1FF, 0 0 18px #5BE1FF, 0 0 42px rgba(91,225,255,.8);
         transition:filter .6s ease, transform .6s ease, opacity .4s ease; }
       .cx-scrollpop-label[data-morphing] { filter:blur(8px); transform:scale(0.92); opacity:0.4; }
@@ -6321,7 +6321,9 @@ function CocktailStyles() {
         .cx-drop-opt { display:flex; align-items:center; gap:10px; width:100%; padding:12px 14px; cursor:pointer;
           color:rgba(255,255,255,0.82); background:none; border:none; border-bottom:1px solid rgba(255,255,255,0.06);
           font-family:var(--f-display,"Syne",serif); font-weight:700; font-size:13px; text-align:left;
-          white-space:normal; overflow-wrap:anywhere; word-break:break-word; line-height:1.25; }
+          white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.25; }
+        .cx-drop-opt > span:not(.cx-drop-emoji):not(.cx-drop-cnt):not(.cx-drop-dot) { overflow:hidden; text-overflow:ellipsis; }
+        .cx-drop-emoji, .cx-drop-dot { flex-shrink:0; }
         .cx-drop-opt:last-child { border-bottom:none; }
         .cx-drop-opt.active { background:rgba(232,146,124,0.16); color:#fff; }
         .cx-drop-cnt { margin-left:auto; font-size:11px; opacity:0.55; flex-shrink:0; }

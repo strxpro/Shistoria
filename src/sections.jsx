@@ -1087,8 +1087,17 @@ function Contatti({ t }) {
         .cnt-hours { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
         .cnt-hours div { display: flex; justify-content: space-between; gap: 16px; font-size: 14px; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.08); }
         .cnt-hours span:first-child { color: rgba(255,255,255,0.6); }
-        .cnt-mini-map { height: 180px; border-radius: 16px; overflow: hidden; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); margin-top: 8px; }
+        .cnt-mini-map { height: 180px; border-radius: 16px; overflow: hidden; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); margin-top: 8px; max-width: 100%; box-sizing: border-box; }
+        .cnt-mini-map iframe { width: 100%; height: 100%; border: 0; display: block; }
         .cnt-form { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); border-radius: 24px; padding: 40px; backdrop-filter: blur(20px); }
+        @media (max-width: 768px) {
+          .contatti { padding: 80px 0; overflow: hidden; }
+          .cnt-split { gap: 40px; }
+          .cnt-form { padding: 24px 18px; border-radius: 18px; }
+          .cnt-form-title { font-size: 24px; margin-bottom: 22px; }
+          .cnt-info, .cnt-form-wrap { max-width: 100%; min-width: 0; }
+          .cnt-info-text, .cnt-info-link { overflow-wrap: anywhere; word-break: break-word; max-width: 100%; }
+        }
         .cnt-form-title { font-family: var(--f-display); font-weight: 800; font-size: 32px; letter-spacing: -0.02em; margin-bottom: 32px; }
         .cnt-form-grid { display: grid; grid-template-columns: 1fr; gap: 24px; }
         @media (min-width: 640px) { .cnt-form-grid { grid-template-columns: 1fr 1fr; } }
@@ -1172,6 +1181,32 @@ function Contatti({ t }) {
 
 // ─── Footer ───────────────────────────────────────────────────────────────────
 function Footer({ t }) {
+  const lang = (typeof window !== "undefined" && window.currentLanguage) || "it";
+  const [news, setNews] = useStateE({ email: "", name: "", open: false, sent: false });
+  const L = {
+    news: { it:"Una mail al mese. Stagioni, eventi, ricette.", pl:"Jeden mail miesięcznie. Sezony, wydarzenia, przepisy.", en:"One email a month. Seasons, events, recipes.", de:"Eine Mail im Monat. Saisons, Events, Rezepte.", fr:"Un e-mail par mois. Saisons, événements, recettes.", es:"Un correo al mes. Temporadas, eventos, recetas." },
+    name: { it:"Il tuo nome", pl:"Twoje imię", en:"Your name", de:"Dein Name", fr:"Ton nom", es:"Tu nombre" },
+    sub: { it:"Iscriviti", pl:"Zapisz się", en:"Subscribe", de:"Abonnieren", fr:"S'inscrire", es:"Suscribirse" },
+    done: { it:"Iscritto! Grazie 🍸", pl:"Zapisano! Dziękujemy 🍸", en:"Subscribed! Thanks 🍸", de:"Angemeldet! Danke 🍸", fr:"Inscrit ! Merci 🍸", es:"¡Suscrito! Gracias 🍸" },
+    legal: { it:"Note legali", pl:"Informacje prawne", en:"Legal", de:"Rechtliches", fr:"Mentions légales", es:"Legal" },
+    privacy: { it:"Privacy", pl:"Prywatność", en:"Privacy", de:"Datenschutz", fr:"Confidentialité", es:"Privacidad" },
+    terms: { it:"Termini", pl:"Regulamin", en:"Terms", de:"AGB", fr:"Conditions", es:"Términos" },
+    cookie: { it:"Cookie", pl:"Cookies", en:"Cookies", de:"Cookies", fr:"Cookies", es:"Cookies" },
+  };
+  const tr = (k) => (L[k]?.[lang]) || L[k]?.it || "";
+  const submitNews = async () => {
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(news.email)) return;
+    if (!news.open) { setNews((n) => ({ ...n, open: true })); return; }
+    try {
+      const { createClient } = await import("@supabase/supabase-js");
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://slatelpipxtqveydgslc.supabase.co';
+      const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNsYXRlbHBpcHh0cXZleWRnc2xjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODcyNTQsImV4cCI6MjA5NjE2MzI1NH0.5dwE9IStThjC-krTtgg7PtEwmTnr_bQ_TEbQhgMpHdY';
+      const sb = createClient(url, key);
+      await sb.from("newsletter").insert({ email: news.email, name: news.name || null, language: lang });
+    } catch { /* tabela opcjonalna */ }
+    setNews((n) => ({ ...n, sent: true }));
+    setTimeout(() => setNews({ email: "", name: "", open: false, sent: false }), 4000);
+  };
   return (
     <footer className="footer">
       <div className="footer-bg">
@@ -1208,26 +1243,49 @@ function Footer({ t }) {
           <div>
             <span className="kicker">{t("footer.follow")}</span>
             <ul>
-              <li><a href="#">Instagram</a></li>
-              <li><a href="#">Facebook</a></li>
-              <li><a href="#">TripAdvisor</a></li>
-              <li><a href="#">Google</a></li>
+              <li><a href="https://instagram.com" target="_blank" rel="noopener">Instagram</a></li>
+              <li><a href="https://facebook.com" target="_blank" rel="noopener">Facebook</a></li>
+              <li><a href="https://tripadvisor.com" target="_blank" rel="noopener">TripAdvisor</a></li>
+              <li><a href="https://g.page/r/CVK_gqHsp7TMEAE" target="_blank" rel="noopener">Google</a></li>
             </ul>
           </div>
           <div>
             <span className="kicker">Newsletter</span>
-            <p className="footer-news">Una mail al mese. Stagioni, eventi, ricette.</p>
-            <div className="footer-input">
-              <input placeholder="la-tua-mail@esempio.com" />
-              <button>→</button>
-            </div>
+            <p className="footer-news">{tr("news")}</p>
+            {news.sent ? (
+              <div className="footer-news-done">✓ {tr("done")}</div>
+            ) : (
+              <div className="footer-news-form">
+                <div className="footer-input">
+                  <input placeholder="la-tua-mail@esempio.com" value={news.email} onChange={(e) => setNews((n) => ({ ...n, email: e.target.value }))} />
+                  {!news.open && <button onClick={submitNews}>→</button>}
+                </div>
+                <div className={`footer-news-expand ${news.open ? "open" : ""}`}>
+                  <input className="footer-news-name" placeholder={tr("name")} value={news.name} onChange={(e) => setNews((n) => ({ ...n, name: e.target.value }))} />
+                  <button className="footer-news-sub" onClick={submitNews}>{tr("sub")} →</button>
+                </div>
+              </div>
+            )}
           </div>
+        </div>
+
+        {/* Sekcja prawna */}
+        <div className="footer-legal">
+          <span className="footer-legal-title">{tr("legal")}</span>
+          <div className="footer-legal-links">
+            <a href="#">{tr("privacy")}</a>
+            <a href="#">{tr("terms")}</a>
+            <a href="#">{tr("cookie")}</a>
+          </div>
+          <p className="footer-legal-info">S'Historia di Giovanni Taras · P.IVA 01234567890 · Via Delfino, 07020 Rena Majore (OT), Italia</p>
         </div>
 
         <div className="footer-bottom">
           <span>© 2026 S'Historia · Rena Majore · Sardegna</span>
-          <span>P.IVA 01234567890</span>
           <span style={{ fontFamily: "var(--f-serif)", fontStyle: "italic" }}>Con amore, dal 1996.</span>
+        </div>
+        <div className="footer-credit">
+          <a href="mailto:shardananuragici@gmail.com">Creato da shardananuragici@gmail.com</a>
         </div>
       </div>
       <style>{`
@@ -1249,7 +1307,31 @@ function Footer({ t }) {
         .footer-input input::placeholder { color: rgba(255,255,255,0.3); }
         .footer-input button { width: 40px; height: 40px; color: #fff; }
         .footer-input button:hover { color: var(--c-coral); }
-        .footer-bottom { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding-top: 32px; margin-top: 64px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 11px; letter-spacing: 0.1em; color: rgba(255,255,255,0.5); }
+        /* Newsletter — rozwijane pole imię + przycisk */
+        .footer-news-expand { max-height:0; overflow:hidden; opacity:0; transition:max-height .35s cubic-bezier(.2,.85,.2,1), opacity .3s; }
+        .footer-news-expand.open { max-height:140px; opacity:1; margin-top:12px; }
+        .footer-news-name { width:100%; box-sizing:border-box; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.15); border-radius:10px; color:#fff; font-size:14px; padding:11px 14px; outline:none; }
+        .footer-news-name::placeholder { color:rgba(255,255,255,0.4); }
+        .footer-news-sub { margin-top:10px; width:100%; padding:12px; border-radius:10px; border:none; background:var(--c-coral,#E8927C); color:#fff; font-weight:700; font-size:13px; cursor:pointer; }
+        .footer-news-done { padding:14px; border-radius:12px; background:rgba(39,174,96,0.18); border:1px solid rgba(39,174,96,0.5); color:#5fd38a; font-weight:700; font-size:14px; }
+        /* Sekcja prawna */
+        .footer-legal { padding-top:32px; margin-top:48px; border-top:1px solid rgba(255,255,255,0.1); }
+        .footer-legal-title { display:block; font-size:11px; letter-spacing:0.15em; text-transform:uppercase; color:var(--c-sky); margin-bottom:12px; }
+        .footer-legal-links { display:flex; gap:20px; flex-wrap:wrap; }
+        .footer-legal-links a { font-size:13px; color:rgba(255,255,255,0.7); transition:color .2s; }
+        .footer-legal-links a:hover { color:var(--c-coral); }
+        .footer-legal-info { font-size:11px; opacity:0.5; margin-top:14px; line-height:1.6; overflow-wrap:anywhere; }
+        .footer-bottom { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding-top: 32px; margin-top: 40px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 11px; letter-spacing: 0.1em; color: rgba(255,255,255,0.5); }
+        .footer-credit { text-align:center; padding-top:18px; }
+        .footer-credit a { font-size:11px; color:rgba(255,255,255,0.35); letter-spacing:0.05em; transition:color .2s; }
+        .footer-credit a:hover { color:var(--c-coral); }
+        @media (max-width:768px) {
+          .footer { padding:80px 0 32px; }
+          .footer-bottom { flex-direction:column; align-items:center; text-align:center; gap:8px; }
+          .footer-legal-links { justify-content:center; }
+          .footer-legal { text-align:center; }
+          .footer-legal-title { text-align:center; }
+        }
       `}</style>
     </footer>
   );
