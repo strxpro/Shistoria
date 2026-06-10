@@ -1656,6 +1656,7 @@ function CocktailExperience() {
   const [glassFilled, setGlassFilled] = useState(false); // szklanka zostaje napełniona na środku
   const [claimed, setClaimed] = useState(false);
   const [directOrder, setDirectOrder] = useState<null | { name: string; orderId?: string }>(null); // "Wybierz ten" → QR bez formularza
+  const [directQrOpen, setDirectQrOpen] = useState(true); // overlay QR widoczny (tło/× tylko chowa, nie resetuje)
   const [confetti, setConfetti] = useState(0);
   const [drinkName, setDrinkName] = useState("");
   const [customerName, setCustomerName] = useState("");
@@ -1996,6 +1997,7 @@ function CocktailExperience() {
     const api = sceneApiRef.current;
     setPoured([]); setChosenGlass(null); setDrinkName(""); setCustomerName(""); setStage("build");
     setGlassPourOpen(false); setGlassFilled(false); setClaimed(false); setConfetti(0); setDirectOrder(null);
+    setDirectQrOpen(true);
     inSceneGlassRef.current = null;
     if (typeof window !== "undefined") (window as any).__sh_orderId = null;
     // Safety: odblokuj scroll (mógł zostać zablokowany przez doShake)
@@ -2372,7 +2374,22 @@ function CocktailExperience() {
         <div ref={tableRef} className={`cx-table ${(glassPourOpen && !glassFilled) || (stage !== "glassReady" && poured.length === 0) ? "is-hidden" : ""} ${stage === "glassReady" && !claimed ? "is-gift" : ""} ${stage === "glassReady" && claimed ? "cx-table-glassready" : ""}`}>
           {stage === "glassReady" ? (
             directOrder ? (
-              <DirectOrderQR name={directOrder.name} orderId={directOrder.orderId} color={mixedColor} onReset={reset} />
+              directQrOpen ? (
+                <DirectOrderQR name={directOrder.name} orderId={directOrder.orderId} color={mixedColor}
+                  onReset={reset} onClose={() => setDirectQrOpen(false)} />
+              ) : (
+                /* QR schowany — drink zostaje; mini-karta z powrotem do QR + jawny reset */
+                <div className="cx-name cx-name-done">
+                  <div className="cx-name-info">
+                    <span className="cx-mini-kicker">Ordine confermato ✓</span>
+                    <h4>{directOrder.name}</h4>
+                  </div>
+                  <button className="cx-qr-mini" onClick={() => setDirectQrOpen(true)} aria-label="Mostra QR">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/></svg>
+                  </button>
+                  <button className="cx-btn-ghost" onClick={reset}>↺ Ricomincia</button>
+                </div>
+              )
             ) : claimed ? (
               <NameCard color={mixedColor} drinkName={drinkName} setDrinkName={setDrinkName}
                 customerName={customerName} setCustomerName={setCustomerName} poured={poured} onReset={reset} />
@@ -2438,6 +2455,7 @@ function CocktailExperience() {
               setDrinkChoiceOpen(false);
               // C1: "Zamów teraz" → QR OD RAZU (bez wyboru szklanki); order dociąga się w tle
               setDirectOrder({ name: apiDrink.name });
+              setDirectQrOpen(true);
               setStage("glassReady");
               try {
                 const order = await createOrder({
@@ -2482,9 +2500,10 @@ function CocktailExperience() {
       <Confetti fireKey={confetti} />
 
       {/* A8: sticky przycisk QR (kółko po prawej) — gdy została sama szklanka */}
-      {stage === "glassReady" && !directOrder && (
-        <StickyQR color={mixedColor} drinkName={drinkName}
+      {stage === "glassReady" && (
+        <StickyQR color={mixedColor} drinkName={directOrder?.name || drinkName}
           onNeedForm={() => {
+            if (directOrder) { setDirectQrOpen(true); return; }
             setClaimed(true);
             tableRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
           }} />
@@ -2871,7 +2890,9 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
   }), []);
   const corkMat = useMemo(() => new THREE.MeshStandardMaterial({ color: model.metalCork ? "#c9ccce" : "#7a5230", roughness: model.metalCork ? 0.25 : 0.85, metalness: model.metalCork ? 0.9 : 0 }), [model.metalCork]);
   const streamMat = useMemo(() => {
-    const isTransp = color.toUpperCase() === "#FFFFFF" || color.toUpperCase() === "#FFF";
+    // B4: jasne/białawe płyny (czysty spirytus, tonik) = szklisty, przezroczysty strumień
+    const _sc = new THREE.Color(color);
+    const isTransp = (0.299 * _sc.r + 0.587 * _sc.g + 0.114 * _sc.b) > 0.82;
     const streamColor = isTransp ? "#c8dce8" : color;
     return new THREE.MeshStandardMaterial({
       color: new THREE.Color(streamColor),
@@ -3064,6 +3085,8 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
   const tailRef = useRef({ v: 0 }); // 0..1 ogon strumienia (lag za head)
   const _neck = useMemo(() => new THREE.Vector3(), []);
   const _ctrl = useMemo(() => new THREE.Vector3(), []);
+  const _dir = useMemo(() => new THREE.Vector3(), []);
+  const _up = useMemo(() => new THREE.Vector3(0, 1, 0), []);
   const fullCurve = useMemo(() => new THREE.QuadraticBezierCurve3(new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()), []);
   const N_STREAM_PTS = 24;
   const _pts = useMemo(() => Array.from({ length: N_STREAM_PTS + 1 }, () => new THREE.Vector3()), []);
@@ -3088,21 +3111,29 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
 
     const s = streamRef.current;
     if (!s) return;
-    // Strumień: cienki walec wychodzący z szyjki, widoczny TYLKO podczas lania.
-    // Jest dzieckiem znormalizowanej butelki (inner) — gdy butelka przechyla się do lania,
-    // strumień naturalnie kieruje się w dół (do szejkera).
-    if (pouringRef.current) {
-      s.visible = true;
-      // płynne "wydłużanie" strumienia
-      const tgt = 1;
-      s.scale.y = THREE.MathUtils.lerp(s.scale.y, tgt, 0.25);
+    // B3/B5: strumień w przestrzeni ŚWIATA — prosta linia od szyjki do wlotu szejkera.
+    // Niezależnie od przechyłu modelu (butelka 145°, puszka/sok 70°) strumień zawsze
+    // celuje we wlot — nie "ucieka" w bok, nie zakrzywia się i sięga środka szejkera.
+    // head = czoło strumienia (0=szyjka → 1=wlot), tail = ogon (rośnie po puszczeniu).
+    const head = headRef.current.v, tail = tailRef.current.v;
+    const len = Math.max(0, head - tail);
+    if (len > 0.005 && neckRef.current) {
+      neckRef.current.getWorldPosition(_neck);
+      _dir.subVectors(target, _neck);
+      const dist = _dir.length();
+      if (dist > 0.001) {
+        _dir.divideScalar(dist);
+        s.visible = true;
+        s.quaternion.setFromUnitVectors(_up, _dir);
+        s.position.copy(_neck).addScaledVector(_dir, dist * (head + tail) / 2);
+        s.scale.set(0.6, (dist * len) / STREAM_LEN, 0.6);
+      }
     } else {
-      s.scale.y = THREE.MathUtils.lerp(s.scale.y, 0, 0.3);
-      if (s.scale.y < 0.02) s.visible = false;
+      s.visible = false;
     }
   });
 
-  // długość strumienia (lokalna, sięga w stronę środka shakera)
+  // bazowa długość geometrii strumienia (skalowana do realnego dystansu szyjka→wlot)
   const STREAM_LEN = 4.2;
   return (
     <group>
@@ -3111,12 +3142,12 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
           <primitive object={cloned} />
           {/* marker czubka szyjki (lokalnie na górze znormalizowanej butelki) */}
           <object3D ref={neckRef} position={[0, NORM_H / 2, 0]} />
-          {/* strumień — z szyjki na zewnątrz (lokalne +Y); skala Y animowana podczas lania */}
-          <mesh ref={streamRef} material={streamMat} visible={false} position={[0, NORM_H / 2 + STREAM_LEN / 2, 0]} scale={[1, 0, 1]}>
-            <cylinderGeometry args={[0.035, 0.05, STREAM_LEN, 10, 1, true]} />
-          </mesh>
         </group>
       </group>
+      {/* strumień — WORLD-SPACE: orientowany co klatkę wzdłuż prostej szyjka→wlot szejkera */}
+      <mesh ref={streamRef} material={streamMat} visible={false}>
+        <cylinderGeometry args={[0.035, 0.05, STREAM_LEN, 10, 1, true]} />
+      </mesh>
     </group>
   );
 }
@@ -3640,7 +3671,7 @@ function BottleCard({
   const [holdActive, setHoldActive] = useState(false);
   const [holdPos, setHoldPos] = useState({ x: 0, y: 0 });
   const btnRef = useRef<HTMLButtonElement>(null!);
-  const holdRef = useRef<{ raf: number | null; startTime: number; fired: boolean; cx: number; cy: number; showRingTimer?: number }>({ raf: null, startTime: 0, fired: false, cx: 0, cy: 0 });
+  const holdRef = useRef<{ raf: number | null; startTime: number; fired: boolean; cx: number; cy: number; showRingTimer?: number; preventScroll?: (e: TouchEvent) => void }>({ raf: null, startTime: 0, fired: false, cx: 0, cy: 0 });
   const playTimerRef = useRef<number | null>(null);
 
   // odpal natywną animację butelki (korek/butelka/ciecz) i auto-reset po jej czasie
@@ -3666,6 +3697,7 @@ function BottleCard({
   const cancelHold = () => {
     if (holdRef.current.raf) { cancelAnimationFrame(holdRef.current.raf); holdRef.current.raf = null; }
     if (holdRef.current.showRingTimer) { clearTimeout(holdRef.current.showRingTimer); holdRef.current.showRingTimer = undefined; }
+    if (holdRef.current.preventScroll) { window.removeEventListener("touchmove", holdRef.current.preventScroll); holdRef.current.preventScroll = undefined; }
     setHoldActive(false);
     setHoldProgress(0);
     if (!holdRef.current.fired) window.dispatchEvent(new Event("cx-hold-end")); // schowaj kółko (gdy nie odpalono lania)
@@ -3675,7 +3707,16 @@ function BottleCard({
     if (disabled) return;
     holdRef.current.startTime = Date.now();
     holdRef.current.fired = false;
-    
+
+    // B6: na czas trzymania blokujemy scroll strony (non-passive preventDefault).
+    // Bez tego ruch palcem odpala scroll → przeglądarka wysyła pointercancel →
+    // kółko znika pod palcem i nalewanie urywa się samo.
+    if (!holdRef.current.preventScroll) {
+      const preventScroll = (e: TouchEvent) => { e.preventDefault(); };
+      window.addEventListener("touchmove", preventScroll, { passive: false });
+      holdRef.current.preventScroll = preventScroll;
+    }
+
     // Oblicz pozycję wewnątrz kafelka (bounding box)
     const rect = btnRef.current?.getBoundingClientRect();
     const bx = rect ? clientX! - rect.left : 0;
@@ -3711,11 +3752,15 @@ function BottleCard({
         const release = () => {
           window.removeEventListener("pointerup", release);
           window.removeEventListener("pointercancel", release);
+          window.removeEventListener("cx-pour-release", release);
+          // B6: zdejmij blokadę scrolla (karta mogła się już odmontować — sprzątamy tutaj)
+          if (holdRef.current.preventScroll) { window.removeEventListener("touchmove", holdRef.current.preventScroll); holdRef.current.preventScroll = undefined; }
           window.dispatchEvent(new Event("cx-pour-release"));
           window.dispatchEvent(new Event("cx-hold-end")); // schowaj kółko
         };
         window.addEventListener("pointerup", release);
         window.addEventListener("pointercancel", release);
+        window.addEventListener("cx-pour-release", release); // np. szejker pełny / safety
         return;
       }
       if (p < 1) holdRef.current.raf = requestAnimationFrame(tick);
@@ -4609,7 +4654,7 @@ function Confetti({ fireKey }: { fireKey: number }) {
  * DirectOrderQR — "Wybierz ten" → od razu QR (bez formularza nazwy/imienia).
  * Krzyżyk zamyka (→ reset). Tło blur, blokada scrolla strony gdy otwarty.
  * ──────────────────────────────────────────────────────────────────────── */
-function DirectOrderQR({ name, orderId, color, onReset }: { name: string; orderId?: string; color: string; onReset: () => void }) {
+function DirectOrderQR({ name, orderId, color, onReset, onClose }: { name: string; orderId?: string; color: string; onReset: () => void; onClose?: () => void }) {
   const orderUrl = orderId ? `${typeof window !== "undefined" ? window.location.origin : ""}/order/${orderId}` : "";
   const [full, setFull] = useState(false);
   // Blokada scrolla strony gdy QR otwarty (ekran nie skroluje)
@@ -4632,10 +4677,13 @@ function DirectOrderQR({ name, orderId, color, onReset }: { name: string; orderI
   } as Record<string, { show: string; full: string }>)[lang] ?? { show: "Mostralo al barman", full: "⛶ Schermo intero" };
 
   if (typeof document === "undefined") return null;
+  // B8: tło/× tylko CHOWA QR (drink zostaje!) — pełny reset wyłącznie jawnym przyciskiem.
+  // Wcześniej tapnięcie w tło robiło reset → szklanka znikała i wracał szejker "od nowa".
+  const dismiss = onClose ?? onReset;
   return createPortal(
-    <div className="cx-qr-overlay" onClick={onReset}>
+    <div className="cx-qr-overlay" onClick={dismiss}>
       <div className="cx-qr-card" onClick={(e) => e.stopPropagation()}>
-        <button className="cx-qr-close" onClick={onReset}>×</button>
+        <button className="cx-qr-close" onClick={dismiss}>×</button>
         <span className="cx-mini-kicker">{tr.show}</span>
         <div className="cx-qr-box">
           {orderUrl ? (
@@ -4722,6 +4770,18 @@ function NameCard({
   const canSubmit = drinkName.trim().length > 1 && customerName.trim().length > 1 && emailOk;
   const orderUrl = orderId ? `${typeof window !== "undefined" ? window.location.origin : ""}/order/${orderId}` : "";
 
+  // D1: pełne tłumaczenia karty drinka (6 języków)
+  const lang = (typeof window !== "undefined" && (window as any).currentLanguage) || "it";
+  const T = ({
+    it: { confirmed: "Ordine confermato ✓", by: "di", ingredients: "ingredienti", withIce: "🧊 Con ghiaccio", noIce: "☀️ Senza ghiaccio", showQr: "Mostra QR", restart: "↺ Ricomincia", showBarman: "Mostralo al barman", yourDrink: "Il tuo drink", drinkName: "Nome del drink", drinkPh: "es. Tramonto Sardo…", yourName: "Il tuo nome", namePh: "es. Marco", emailOpt: "· facoltativa", emailPh: "per ricevere la ricetta", genQr: "Genera QR", fullscreen: "Schermo intero" },
+    pl: { confirmed: "Zamówienie potwierdzone ✓", by: "od", ingredients: "składniki", withIce: "🧊 Z lodem", noIce: "☀️ Bez lodu", showQr: "Pokaż QR", restart: "↺ Od nowa", showBarman: "Pokaż barmanowi", yourDrink: "Twój drink", drinkName: "Nazwa drinka", drinkPh: "np. Sardyński Zachód…", yourName: "Twoje imię", namePh: "np. Marek", emailOpt: "· opcjonalnie", emailPh: "aby otrzymać przepis", genQr: "Generuj QR", fullscreen: "Pełny ekran" },
+    en: { confirmed: "Order confirmed ✓", by: "by", ingredients: "ingredients", withIce: "🧊 With ice", noIce: "☀️ Without ice", showQr: "Show QR", restart: "↺ Start over", showBarman: "Show it to the barman", yourDrink: "Your drink", drinkName: "Drink name", drinkPh: "e.g. Sardinian Sunset…", yourName: "Your name", namePh: "e.g. Marco", emailOpt: "· optional", emailPh: "to receive the recipe", genQr: "Generate QR", fullscreen: "Fullscreen" },
+    de: { confirmed: "Bestellung bestätigt ✓", by: "von", ingredients: "Zutaten", withIce: "🧊 Mit Eis", noIce: "☀️ Ohne Eis", showQr: "QR zeigen", restart: "↺ Neustart", showBarman: "Zeig es dem Barkeeper", yourDrink: "Dein Drink", drinkName: "Name des Drinks", drinkPh: "z.B. Sardischer Sonnenuntergang…", yourName: "Dein Name", namePh: "z.B. Marco", emailOpt: "· optional", emailPh: "um das Rezept zu erhalten", genQr: "QR erstellen", fullscreen: "Vollbild" },
+    fr: { confirmed: "Commande confirmée ✓", by: "par", ingredients: "ingrédients", withIce: "🧊 Avec glaçons", noIce: "☀️ Sans glaçons", showQr: "Voir le QR", restart: "↺ Recommencer", showBarman: "Montre-le au barman", yourDrink: "Ton cocktail", drinkName: "Nom du cocktail", drinkPh: "ex. Coucher de soleil sarde…", yourName: "Ton nom", namePh: "ex. Marco", emailOpt: "· facultatif", emailPh: "pour recevoir la recette", genQr: "Générer le QR", fullscreen: "Plein écran" },
+    es: { confirmed: "Pedido confirmado ✓", by: "de", ingredients: "ingredientes", withIce: "🧊 Con hielo", noIce: "☀️ Sin hielo", showQr: "Ver QR", restart: "↺ Empezar de nuevo", showBarman: "Muéstralo al barman", yourDrink: "Tu trago", drinkName: "Nombre del trago", drinkPh: "ej. Atardecer sardo…", yourName: "Tu nombre", namePh: "ej. Marco", emailOpt: "· opcional", emailPh: "para recibir la receta", genQr: "Generar QR", fullscreen: "Pantalla completa" },
+  } as Record<string, Record<string, string>>)[lang] ?? ({} as Record<string, string>);
+  const tt = (k: string, it: string) => T[k] ?? it;
+
   const handleSubmit = async () => {
     setDone(true);
     // Zapisz lokalnie
@@ -4767,16 +4827,16 @@ function NameCard({
         {/* Mini przycisk QR (kółko) — zawsze widoczny po wysłaniu */}
         <div className="cx-name cx-name-done">
           <div className="cx-name-info">
-            <span className="cx-mini-kicker">Ordine confermato ✓</span>
+            <span className="cx-mini-kicker">{tt("confirmed", "Ordine confermato ✓")}</span>
             <h4>{drinkName}</h4>
-            <p>di {customerName} · {poured.length} ingredienti</p>
-            <p className="cx-name-ice">{(window as any).__sh_withIce !== false ? "🧊 Con ghiaccio" : "☀️ Senza ghiaccio"}</p>
+            <p>{tt("by", "di")} {customerName} · {poured.length} {tt("ingredients", "ingredienti")}</p>
+            <p className="cx-name-ice">{(window as any).__sh_withIce !== false ? tt("withIce", "🧊 Con ghiaccio") : tt("noIce", "☀️ Senza ghiaccio")}</p>
           </div>
           {/* Kółko QR — klik otwiera kartę */}
-          <button className="cx-qr-mini" onClick={() => setQrOpen(true)} aria-label="Mostra QR">
+          <button className="cx-qr-mini" onClick={() => setQrOpen(true)} aria-label={tt("showQr", "Mostra QR")}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/></svg>
           </button>
-          <button className="cx-btn-ghost" onClick={onReset}>↺ Ricomincia</button>
+          <button className="cx-btn-ghost" onClick={onReset}>{tt("restart", "↺ Ricomincia")}</button>
         </div>
 
         {/* Karta QR — overlay z animacją */}
@@ -4784,7 +4844,7 @@ function NameCard({
           <div className="cx-qr-overlay" onClick={() => setQrOpen(false)}>
             <div className="cx-qr-card" onClick={(e) => e.stopPropagation()}>
               <button className="cx-qr-close" onClick={() => setQrOpen(false)}>×</button>
-              <span className="cx-mini-kicker">Mostralo al barman</span>
+              <span className="cx-mini-kicker">{tt("showBarman", "Mostralo al barman")}</span>
               <div className="cx-qr-box">
                 {orderUrl ? (
                   <PersonalizedQR url={orderUrl} color={color} size={180} icon="🍸" />
@@ -4795,11 +4855,11 @@ function NameCard({
                 )}
               </div>
               <h4>{drinkName}</h4>
-              <p>di {customerName} · {poured.length} ingredienti · {(window as any).__sh_withIce !== false ? "🧊" : "☀️"}</p>
+              <p>{tt("by", "di")} {customerName} · {poured.length} {tt("ingredients", "ingredienti")} · {(window as any).__sh_withIce !== false ? "🧊" : "☀️"}</p>
               {email.trim() && <p className="cx-name-email">📧 {email}</p>}
               {/* Strzałka — otwiera QR na pełen ekran */}
-              <button className="cx-qr-expand" onClick={() => setQrFull(true)} aria-label="Schermo intero">
-                ⛶ Schermo intero
+              <button className="cx-qr-expand" onClick={() => setQrFull(true)} aria-label={tt("fullscreen", "Schermo intero")}>
+                ⛶ {tt("fullscreen", "Schermo intero")}
               </button>
             </div>
           </div>,
@@ -4819,7 +4879,7 @@ function NameCard({
                 </div>
               )}
             </div>
-            <p className="cx-qr-full-label">{drinkName} · Mostralo al barman</p>
+            <p className="cx-qr-full-label">{drinkName} · {tt("showBarman", "Mostralo al barman")}</p>
           </div>,
           document.body,
         )}
@@ -4829,23 +4889,23 @@ function NameCard({
   return (
     <div className="cx-name">
       <div className="cx-name-head">
-        <span className="cx-mini-kicker">Il tuo drink</span>
+        <span className="cx-mini-kicker">{tt("yourDrink", "Il tuo drink")}</span>
         <span className="cx-name-ml" style={{ color }}>{Math.round(poured.reduce((s, p) => s + p.ml, 0))} ml</span>
       </div>
       <div className="cx-field">
-        <label>Nome del drink</label>
-        <input className="cx-input" placeholder="es. Tramonto Sardo…" value={drinkName} onChange={(e) => setDrinkName(e.target.value)} maxLength={28} />
+        <label>{tt("drinkName", "Nome del drink")}</label>
+        <input className="cx-input" placeholder={tt("drinkPh", "es. Tramonto Sardo…")} value={drinkName} onChange={(e) => setDrinkName(e.target.value)} maxLength={28} />
       </div>
       <div className="cx-field">
-        <label>Il tuo nome</label>
-        <input className="cx-input" placeholder="es. Marco" value={customerName} onChange={(e) => setCustomerName(e.target.value)} maxLength={24} />
+        <label>{tt("yourName", "Il tuo nome")}</label>
+        <input className="cx-input" placeholder={tt("namePh", "es. Marco")} value={customerName} onChange={(e) => setCustomerName(e.target.value)} maxLength={24} />
       </div>
       <div className="cx-field">
-        <label>Email <em>· facoltativa</em></label>
-        <input className={`cx-input ${!emailOk ? "is-err" : ""}`} type="email" placeholder="per ricevere la ricetta" value={email} onChange={(e) => setEmail(e.target.value)} maxLength={60} />
+        <label>Email <em>{tt("emailOpt", "· facoltativa")}</em></label>
+        <input className={`cx-input ${!emailOk ? "is-err" : ""}`} type="email" placeholder={tt("emailPh", "per ricevere la ricetta")} value={email} onChange={(e) => setEmail(e.target.value)} maxLength={60} />
       </div>
       <button className="cx-btn cx-btn-full" disabled={!canSubmit} onClick={handleSubmit} style={{ background: color, color: '#000' }}>
-        Genera QR <span className="arrow">→</span>
+        {tt("genQr", "Genera QR")} <span className="arrow">→</span>
       </button>
     </div>
   );
@@ -4893,6 +4953,18 @@ function DbDrinkCard({ d }: { d: any }) {
   const clickTimer = useRef<number | null>(null);
   const strengthColor = d.strength_value > 0.3 ? "#C8102E" : d.strength_value > 0.15 ? "#E8927C" : "#F4D03F";
 
+  // D1: tłumaczenia popout community (6 języków)
+  const lang = (typeof window !== "undefined" && (window as any).currentLanguage) || "it";
+  const T = ({
+    it: { order: "🍸 Ordina questo drink", retired: "volte ritirato", ingredients: "Ingredienti", barman: "Mostralo al barman", by: "by" },
+    pl: { order: "🍸 Zamów ten drink", retired: "razy odebrano", ingredients: "Składniki", barman: "Pokaż barmanowi", by: "od" },
+    en: { order: "🍸 Order this drink", retired: "times claimed", ingredients: "Ingredients", barman: "Show it to the barman", by: "by" },
+    de: { order: "🍸 Diesen Drink bestellen", retired: "mal abgeholt", ingredients: "Zutaten", barman: "Zeig es dem Barkeeper", by: "von" },
+    fr: { order: "🍸 Commander ce cocktail", retired: "fois retiré", ingredients: "Ingrédients", barman: "Montre-le au barman", by: "par" },
+    es: { order: "🍸 Pedir este trago", retired: "veces retirado", ingredients: "Ingredientes", barman: "Muéstralo al barman", by: "de" },
+  } as Record<string, Record<string, string>>)[lang] ?? ({} as Record<string, string>);
+  const tt = (k: string, it: string) => T[k] ?? it;
+
   const doLike = async () => {
     if (liked) return;
     setLiked(true); setLikes((n: number) => n + 1);
@@ -4925,8 +4997,8 @@ function DbDrinkCard({ d }: { d: any }) {
         <span className="cx-cc-heart-corner">♥</span>
         {burst && <span className="cx-cc-burst" aria-hidden="true">❤️</span>}
         <div className="cx-cc-vis" style={{ background: `radial-gradient(120% 90% at 30% 10%, ${d.color}22, transparent 60%)` }}>
-          <span className="cx-cc-by">by {d.author_name}</span>
-          {d.photo_url && <img src={d.photo_url} style={{ width: "70%", height: "82%", objectFit: "cover", borderRadius: 12 }} alt={d.name} />}
+          <span className="cx-cc-by">{tt("by", "by")} {d.author_name}</span>
+          {d.photo_url && <img src={d.photo_url} style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 12 }} alt={d.name} />}
         </div>
         <div className="cx-cc-body">
           <h3>{d.name}</h3>
@@ -4952,14 +5024,14 @@ function DbDrinkCard({ d }: { d: any }) {
             </div>
             <div className="cx-cc-popout-right">
               <div className="cx-cc-popout-header">
-                <span className="cx-cc-popout-by">by {d.author_name}</span>
+                <span className="cx-cc-popout-by">{tt("by", "by")} {d.author_name}</span>
                 <h3 className="cx-cc-popout-name">{d.name}</h3>
                 <div className="cx-cc-popout-strength" style={{ color: strengthColor }}><span className="cx-cc-popout-dot" style={{ background: strengthColor }} />{d.strength_label}</div>
               </div>
-              <button className="cx-cc-claim-btn cx-cc-claim-top" onClick={handleOrder}>🍸 Ordina questo drink</button>
-              <div className="cx-cc-claimed-count">🍸 {d.claimed_count || 0} volte ritirato</div>
+              <button className="cx-cc-claim-btn cx-cc-claim-top" onClick={handleOrder}>{tt("order", "🍸 Ordina questo drink")}</button>
+              <div className="cx-cc-claimed-count">🍸 {d.claimed_count || 0} {tt("retired", "volte ritirato")}</div>
               <div className="cx-cc-popout-ingr">
-                <span className="cx-cc-popout-label">Ingredienti</span>
+                <span className="cx-cc-popout-label">{tt("ingredients", "Ingredienti")}</span>
                 <div className="cx-cc-popout-pills">
                   {(d.ingredients || []).map((ing: any, i: number) => (
                     <span key={i} className="cx-cc-pill"><span style={{ background: ing.color }} />{ing.name}</span>
@@ -4979,7 +5051,7 @@ function DbDrinkCard({ d }: { d: any }) {
         <div className="cx-qr-overlay" onClick={() => setOrderQR(null)}>
           <div className="cx-qr-card" onClick={(e) => e.stopPropagation()}>
             <button className="cx-qr-close" onClick={() => setOrderQR(null)}>×</button>
-            <span className="cx-mini-kicker">Mostralo al barman</span>
+            <span className="cx-mini-kicker">{tt("barman", "Mostralo al barman")}</span>
             <div className="cx-qr-box"><PersonalizedQR url={orderQR} color={d.color || "#E8927C"} size={180} icon="🍸" /></div>
             <h4 style={{ margin: "8px 0 0", color: "#fff" }}>{d.name}</h4>
           </div>
@@ -5017,6 +5089,18 @@ function ShareDrinkBtn() {
 
   // Sprawdź czy użytkownik już wysłał
   const alreadySent = typeof localStorage !== "undefined" && localStorage.getItem("sh-drink-shared") === "true";
+
+  // D1/D5: tłumaczenia popout udostępniania (6 języków)
+  const sLang = (typeof window !== "undefined" && (window as any).currentLanguage) || "it";
+  const ST = ({
+    it: { thanks: "Grazie!", sentMsg: "Il tuo drink è stato inviato. Vinci il Drink del Mese e ricevi un drink GRATIS a tua scelta! 🍸", livePreview: "Anteprima live", drinkName: "Nome del drink", yourName: "Il tuo nome", yourDrink: "Il tuo drink", noDrink: "Non hai ancora creato un drink!", createDrink: "Crea il tuo drink →", publish: "Pubblica nella community →" },
+    pl: { thanks: "Dziękujemy!", sentMsg: "Twój drink został wysłany. Wygraj Drink Miesiąca i odbierz DARMOWY dowolny drink! 🍸", livePreview: "Podgląd na żywo", drinkName: "Nazwa drinka", yourName: "Twoje imię", yourDrink: "Twój drink", noDrink: "Nie stworzyłeś jeszcze drinka!", createDrink: "Stwórz swój drink →", publish: "Opublikuj w community →" },
+    en: { thanks: "Thank you!", sentMsg: "Your drink has been sent. Win Drink of the Month and get a FREE drink of your choice! 🍸", livePreview: "Live preview", drinkName: "Drink name", yourName: "Your name", yourDrink: "Your drink", noDrink: "You haven't created a drink yet!", createDrink: "Create your drink →", publish: "Publish to community →" },
+    de: { thanks: "Danke!", sentMsg: "Dein Drink wurde gesendet. Gewinne den Drink des Monats und erhalte einen GRATIS-Drink deiner Wahl! 🍸", livePreview: "Live-Vorschau", drinkName: "Name des Drinks", yourName: "Dein Name", yourDrink: "Dein Drink", noDrink: "Du hast noch keinen Drink erstellt!", createDrink: "Erstelle deinen Drink →", publish: "In der Community veröffentlichen →" },
+    fr: { thanks: "Merci!", sentMsg: "Ton cocktail a été envoyé. Gagne le Cocktail du Mois et reçois un cocktail GRATUIT au choix! 🍸", livePreview: "Aperçu en direct", drinkName: "Nom du cocktail", yourName: "Ton nom", yourDrink: "Ton cocktail", noDrink: "Tu n'as pas encore créé de cocktail!", createDrink: "Crée ton cocktail →", publish: "Publier dans la communauté →" },
+    es: { thanks: "¡Gracias!", sentMsg: "Tu trago ha sido enviado. ¡Gana el Drink del Mes y recibe un trago GRATIS a tu elección! 🍸", livePreview: "Vista previa en vivo", drinkName: "Nombre del trago", yourName: "Tu nombre", yourDrink: "Tu trago", noDrink: "¡Aún no has creado un trago!", createDrink: "Crea tu trago →", publish: "Publicar en la comunidad →" },
+  } as Record<string, Record<string, string>>)[sLang] ?? ({} as Record<string, string>);
+  const st = (k: string, it: string) => ST[k] ?? it;
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -5077,35 +5161,37 @@ function ShareDrinkBtn() {
             {sent ? (
               <div className="cx-share-success">
                 <span className="cx-share-success-ico">🎉</span>
-                <h3>Grazie!</h3>
-                <p>Il tuo drink è stato inviato. Vinci il <strong>Drink del Mese</strong> e ricevi un <strong>drink GRATIS</strong> a tua scelta! 🍸</p>
+                <h3>{st("thanks", "Grazie!")}</h3>
+                <p>{st("sentMsg", "Il tuo drink è stato inviato. Vinci il Drink del Mese e ricevi un drink GRATIS a tua scelta! 🍸")}</p>
               </div>
             ) : (
               <div className="cx-share-form">
+                {myDrink && (
                 <div className="cx-share-preview">
                   {photo ? (
                     <img src={photo} alt="Drink preview" className="cx-share-photo" />
                   ) : (
                     <label className="cx-share-upload">
                       <span>📷</span>
-                      <span>Carica una foto del tuo drink</span>
+                      <span>{(() => { const L: Record<string,string> = {it:"Carica una foto del tuo drink",pl:"Wgraj zdjęcie swojego drinka",en:"Upload a photo of your drink",de:"Lade ein Foto deines Drinks hoch",fr:"Télécharge une photo de ton cocktail",es:"Sube una foto de tu trago"}; return L[((typeof window!=="undefined"&&(window as any).currentLanguage)||"it") as keyof typeof L]??L.it; })()}</span>
                       <input type="file" accept="image/*" onChange={handleFile} hidden />
                     </label>
                   )}
                 </div>
+                )}
                 <div className="cx-share-info">
-                  <span className="cx-mini-kicker">Anteprima live</span>
+                  <span className="cx-mini-kicker">{st("livePreview", "Anteprima live")}</span>
                   {myDrink ? (
                     <>
                       <label className="cx-share-edit">
                         <span className="cx-share-edit-ico">✏️</span>
                         <input className="cx-share-edit-name" value={editName} onChange={(e) => setEditName(e.target.value)}
-                          placeholder="Nome del drink" maxLength={40} />
+                          placeholder={st("drinkName", "Nome del drink")} maxLength={40} />
                       </label>
                       <div className="cx-share-details">
                         <label className="cx-share-edit cx-share-edit-author">
                           <span className="cx-share-edit-ico">✏️</span>
-                          <input value={editAuthor} onChange={(e) => setEditAuthor(e.target.value)} placeholder="Il tuo nome" maxLength={30} />
+                          <input value={editAuthor} onChange={(e) => setEditAuthor(e.target.value)} placeholder={st("yourName", "Il tuo nome")} maxLength={30} />
                           <span className="cx-share-meta">· {myDrink.ml}ml · {myDrink.strength}</span>
                         </label>
                         <div className="cx-share-pills">
@@ -5116,20 +5202,20 @@ function ShareDrinkBtn() {
                       </div>
                     </>
                   ) : (
-                    <h3>Il tuo drink</h3>
+                    <h3>{st("yourDrink", "Il tuo drink")}</h3>
                   )}
                   {!myDrink && (
                     <div className="cx-share-nodrink">
-                      <p>Non hai ancora creato un drink!</p>
+                      <p>{st("noDrink", "Non hai ancora creato un drink!")}</p>
                       <button className="cx-btn" onClick={() => { setOpen(false); document.getElementById("cocktail-rise")?.scrollIntoView({behavior:"smooth"}); }}>
-                        Crea il tuo drink →
+                        {st("createDrink", "Crea il tuo drink →")}
                       </button>
                     </div>
                   )}
                   {myDrink && <p className="cx-share-hint">{(() => { const L = { it:"La foto apparirà nella community. Vinci il Drink del Mese e ricevi un drink GRATIS a tua scelta! 🍸", pl:"Zdjęcie pojawi się w community. Wygraj Drink Miesiąca i odbierz DARMOWY dowolny drink! 🍸", en:"Your photo joins the community. Win Drink of the Month and get a FREE drink of your choice! 🍸", de:"Dein Foto erscheint in der Community. Gewinne den Drink des Monats und erhalte einen GRATIS-Drink deiner Wahl! 🍸", fr:"Ta photo rejoint la communauté. Gagne le Cocktail du Mois et reçois un cocktail GRATUIT au choix! 🍸", es:"Tu foto se une a la comunidad. ¡Gana el Drink del Mes y recibe un trago GRATIS a tu elección! 🍸" }; return L[((typeof window!=="undefined"&&(window as any).currentLanguage)||"it") as keyof typeof L]??L.it; })()}</p>}
                   {myDrink && (
                     <button className="cx-btn cx-share-submit" disabled={!photo} onClick={handleSend}>
-                      Pubblica nella community →
+                      {st("publish", "Pubblica nella community →")}
                     </button>
                   )}
                 </div>
