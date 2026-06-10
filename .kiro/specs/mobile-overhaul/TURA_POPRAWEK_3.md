@@ -13,7 +13,7 @@ Odhaczam `[x]` w miarę robienia.
 
 - [x] **A1.** Serca ucięte w miniaturce + popout — naprawione (max-width, jawny rozmiar SVG). ✅
 - [x] **A2.** Kilka klików → serce ZAWSZE zaznaczone (double-tap = like only, jak IG). ✅
-- [ ] **A3.** Bar: polubienia TYLKO dla alkoholi (nie piwa/kawy/bezalkoholowe). ⏱15min
+- [ ] **A3.** Bar: polubienia TYLKO dla alkoholi (nie piwa/kawy/bezalkoholowe). ⏱15min ✅ ZROBIONE
 - [x] **A4.** Header (logo+flaga) — stała pozycja. ✅
 - [x] **A5.** Dropdown butelek — napisy w 1 linii (nowrap+ellipsis). ✅
 - [x] **A6.** Neon napis — zawija się, mieści na ekranie. ✅
