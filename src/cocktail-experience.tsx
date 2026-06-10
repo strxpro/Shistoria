@@ -5109,12 +5109,113 @@ function DbDrinkCard({ d }: { d: any }) {
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
+ * PhotoEditor (D4) — prosty, intuicyjny edytor zdjęcia przed publikacją:
+ * przeciągnij = kadruj, suwak = zoom, obrót 90°, pokrętła jasność/kontrast/
+ * nasycenie (jak w iPhone). Zapis = canvas 1080×1080 JPEG.
+ * ──────────────────────────────────────────────────────────────────────── */
+function PhotoEditor({ src, onDone, onCancel }: { src: string; onDone: (dataUrl: string) => void; onCancel: () => void }) {
+  const [rot, setRot] = useState(0);
+  const [zoom, setZoom] = useState(1);
+  const [bri, setBri] = useState(100);
+  const [con, setCon] = useState(100);
+  const [sat, setSat] = useState(100);
+  const [off, setOff] = useState({ x: 0, y: 0 });
+  const drag = useRef({ on: false, sx: 0, sy: 0, ox: 0, oy: 0 });
+  const imgRef = useRef<HTMLImageElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  const peLang = (typeof window !== "undefined" && (window as any).currentLanguage) || "it";
+  const PE = ({
+    it: { title: "Modifica la foto", drag: "Trascina per inquadrare", zoom: "Zoom", bri: "Luminosità", con: "Contrasto", sat: "Saturazione", rotate: "Ruota", reset: "Reset", done: "✓ Fatto", cancel: "Annulla" },
+    pl: { title: "Edytuj zdjęcie", drag: "Przeciągnij, aby wykadrować", zoom: "Zoom", bri: "Jasność", con: "Kontrast", sat: "Nasycenie", rotate: "Obróć", reset: "Reset", done: "✓ Gotowe", cancel: "Anuluj" },
+    en: { title: "Edit photo", drag: "Drag to frame", zoom: "Zoom", bri: "Brightness", con: "Contrast", sat: "Saturation", rotate: "Rotate", reset: "Reset", done: "✓ Done", cancel: "Cancel" },
+    de: { title: "Foto bearbeiten", drag: "Ziehen zum Ausrichten", zoom: "Zoom", bri: "Helligkeit", con: "Kontrast", sat: "Sättigung", rotate: "Drehen", reset: "Reset", done: "✓ Fertig", cancel: "Abbrechen" },
+    fr: { title: "Modifier la photo", drag: "Glisse pour cadrer", zoom: "Zoom", bri: "Luminosité", con: "Contraste", sat: "Saturation", rotate: "Pivoter", reset: "Réinitialiser", done: "✓ Terminé", cancel: "Annuler" },
+    es: { title: "Editar foto", drag: "Arrastra para encuadrar", zoom: "Zoom", bri: "Brillo", con: "Contraste", sat: "Saturación", rotate: "Girar", reset: "Restablecer", done: "✓ Listo", cancel: "Cancelar" },
+  } as Record<string, Record<string, string>>)[peLang] ?? ({} as Record<string, string>);
+  const pt = (k: string, it: string) => PE[k] ?? it;
+
+  const filterCss = `brightness(${bri}%) contrast(${con}%) saturate(${sat}%)`;
+
+  const onDown = (e: React.PointerEvent) => {
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    drag.current = { on: true, sx: e.clientX, sy: e.clientY, ox: off.x, oy: off.y };
+  };
+  const onMove = (e: React.PointerEvent) => {
+    if (!drag.current.on) return;
+    const lim = (boxRef.current?.clientWidth ?? 300) * 0.6;
+    setOff({
+      x: Math.max(-lim, Math.min(lim, drag.current.ox + (e.clientX - drag.current.sx))),
+      y: Math.max(-lim, Math.min(lim, drag.current.oy + (e.clientY - drag.current.sy))),
+    });
+  };
+  const onUp = () => { drag.current.on = false; };
+
+  const save = () => {
+    const img = imgRef.current, box = boxRef.current;
+    if (!img || !box || !img.naturalWidth) { onDone(src); return; }
+    const OUT = 1080;
+    const canvas = document.createElement("canvas");
+    canvas.width = OUT; canvas.height = OUT;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) { onDone(src); return; }
+    ctx.filter = filterCss;
+    const bw = box.clientWidth || 300;
+    const k = OUT / bw;
+    const iw = img.naturalWidth, ih = img.naturalHeight;
+    const coverScale = Math.max(bw / iw, bw / ih) * zoom * k;
+    ctx.translate(OUT / 2 + off.x * k, OUT / 2 + off.y * k);
+    ctx.rotate((rot * Math.PI) / 180);
+    ctx.scale(coverScale, coverScale);
+    ctx.drawImage(img, -iw / 2, -ih / 2);
+    try { onDone(canvas.toDataURL("image/jpeg", 0.88)); } catch { onDone(src); }
+  };
+
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="cx-pedit-overlay" onClick={onCancel}>
+      <div className="cx-pedit" onClick={(e) => e.stopPropagation()}>
+        <div className="cx-pedit-head">
+          <span className="cx-mini-kicker">{pt("title", "Modifica la foto")}</span>
+          <button className="cx-cc-popout-close" onClick={onCancel} aria-label={pt("cancel", "Annulla")}>×</button>
+        </div>
+        <div ref={boxRef} className="cx-pedit-box" onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
+          <img ref={imgRef} src={src} alt="" draggable={false}
+            style={{ filter: filterCss, transform: `translate(${off.x}px, ${off.y}px) rotate(${rot}deg) scale(${zoom})` }} />
+          <span className="cx-pedit-draghint">{pt("drag", "Trascina per inquadrare")}</span>
+          <span className="cx-pedit-grid" aria-hidden="true" />
+        </div>
+        <div className="cx-pedit-controls">
+          <label className="cx-pedit-dial"><span>🔍 {pt("zoom", "Zoom")}</span>
+            <input type="range" min={100} max={250} value={zoom * 100} onChange={(e) => setZoom(Number(e.target.value) / 100)} /></label>
+          <label className="cx-pedit-dial"><span>☀️ {pt("bri", "Luminosità")}</span>
+            <input type="range" min={50} max={150} value={bri} onChange={(e) => setBri(Number(e.target.value))} /></label>
+          <label className="cx-pedit-dial"><span>◐ {pt("con", "Contrasto")}</span>
+            <input type="range" min={50} max={150} value={con} onChange={(e) => setCon(Number(e.target.value))} /></label>
+          <label className="cx-pedit-dial"><span>🎨 {pt("sat", "Saturazione")}</span>
+            <input type="range" min={0} max={200} value={sat} onChange={(e) => setSat(Number(e.target.value))} /></label>
+        </div>
+        <div className="cx-pedit-actions">
+          <button className="cx-btn-ghost" onClick={() => setRot((r) => (r + 90) % 360)}>↻ {pt("rotate", "Ruota")}</button>
+          <button className="cx-btn-ghost" onClick={() => { setRot(0); setZoom(1); setBri(100); setCon(100); setSat(100); setOff({ x: 0, y: 0 }); }}>{pt("reset", "Reset")}</button>
+          <button className="cx-btn cx-pedit-done" onClick={save}>{pt("done", "✓ Fatto")}</button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
  * ShareDrinkBtn — popout z podglądem live + upload zdjęcia.
  * ──────────────────────────────────────────────────────────────────────── */
 function ShareDrinkBtn() {
   const [open, setOpen] = useState(false);
   const [photo, setPhoto] = useState<string | null>(null);
+  const [rawPhoto, setRawPhoto] = useState<string | null>(null); // D4: oryginał do ponownej edycji
+  const [editorOpen, setEditorOpen] = useState(false);
   const [sent, setSent] = useState(false);
+  const [sentName, setSentName] = useState(""); // D5: nazwa do szablonu udostępniania
   const [myDrink, setMyDrink] = useState<any>(null);
   const [editName, setEditName] = useState("");
   const [editAuthor, setEditAuthor] = useState("");
@@ -5152,7 +5253,8 @@ function ShareDrinkBtn() {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
-      reader.onload = (ev) => setPhoto(ev.target?.result as string);
+      // D4: po wybraniu zdjęcia najpierw otwiera się edytor (kadr/obrót/filtry)
+      reader.onload = (ev) => { setRawPhoto(ev.target?.result as string); setEditorOpen(true); };
       reader.readAsDataURL(file);
     }
   };
@@ -5189,7 +5291,37 @@ function ShareDrinkBtn() {
       } catch (e) { console.error("Make drink webhook error:", e); }
     }
     if (typeof localStorage !== "undefined") localStorage.setItem("sh-drink-shared", "true");
+    setSentName(finalName);
     setSent(true);
+  };
+
+  // D5: udostępnianie w social media — gotowy szablon (nazwa drinka + link do strony)
+  const shareText = (() => {
+    const L: Record<string, (n: string) => string> = {
+      it: (n) => `Ho creato "${n}" da S'Historia! 🍸 Crea il tuo drink e vota il mio:`,
+      pl: (n) => `Stworzyłem "${n}" w S'Historia! 🍸 Stwórz swój drink i zagłosuj na mój:`,
+      en: (n) => `I created "${n}" at S'Historia! 🍸 Make your own drink and vote for mine:`,
+      de: (n) => `Ich habe "${n}" bei S'Historia kreiert! 🍸 Mix deinen Drink und stimme für meinen:`,
+      fr: (n) => `J'ai créé "${n}" chez S'Historia! 🍸 Crée ton cocktail et vote pour le mien:`,
+      es: (n) => `¡Creé "${n}" en S'Historia! 🍸 Crea tu trago y vota por el mío:`,
+    };
+    return (L[sLang] ?? L.it)(sentName || editName || "Drink");
+  })();
+  const siteUrl = typeof window !== "undefined" ? `${window.location.origin}/#community` : "https://www.shistoria.it/#community";
+  const [linkCopied, setLinkCopied] = useState(false);
+  const copyShare = async () => {
+    try { await navigator.clipboard.writeText(`${shareText} ${siteUrl}`); setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); } catch {}
+  };
+  const shareNative = async () => {
+    if (typeof navigator !== "undefined" && (navigator as any).share) {
+      try { await (navigator as any).share({ title: "S'Historia", text: shareText, url: siteUrl }); return; } catch {}
+    }
+    copyShare();
+  };
+  const shareIG = async () => {
+    // IG nie pozwala na pre-fill z webu — kopiujemy szablon i otwieramy Instagram
+    await copyShare();
+    window.open("https://www.instagram.com/", "_blank");
   };
 
   if (alreadySent && !open) {
@@ -5209,13 +5341,31 @@ function ShareDrinkBtn() {
                 <span className="cx-share-success-ico">🎉</span>
                 <h3>{st("thanks", "Grazie!")}</h3>
                 <p>{st("sentMsg", "Il tuo drink è stato inviato. Vinci il Drink del Mese e ricevi un drink GRATIS a tua scelta! 🍸")}</p>
+                {/* D5: udostępnij w social = większa szansa na Drink Miesiąca */}
+                <p className="cx-share-social-hint">{(() => { const L: Record<string, string> = { it: "Condividi sui social → più voti → più chance di vincere il Drink del Mese! 📣", pl: "Udostępnij w social mediach → więcej głosów → większa szansa na Drink Miesiąca! 📣", en: "Share on socials → more votes → better chance to win Drink of the Month! 📣", de: "Teile es in Social Media → mehr Stimmen → bessere Chance auf den Drink des Monats! 📣", fr: "Partage sur les réseaux → plus de votes → plus de chances de gagner le Cocktail du Mois! 📣", es: "Comparte en redes → más votos → ¡más chances de ganar el Drink del Mes! 📣" }; return L[sLang] ?? L.it; })()}</p>
+                <div className="cx-cc-sharebar cx-share-socialbar">
+                  <button className="cx-cc-share-ico" onClick={shareNative} aria-label="Share" title="Share">📤</button>
+                  <button className="cx-cc-share-ico" onClick={shareIG} aria-label="Instagram" title="Instagram">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg>
+                  </button>
+                  <a className="cx-cc-share-ico" href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(siteUrl)}&quote=${encodeURIComponent(shareText)}`} target="_blank" rel="noreferrer" aria-label="Facebook" title="Facebook">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M13.5 21v-7h2.4l.4-3h-2.8V9.1c0-.9.3-1.5 1.6-1.5h1.3V4.9c-.2 0-1-.1-1.9-.1-1.9 0-3.2 1.2-3.2 3.3V11H9v3h2.3v7h2.2z"/></svg>
+                  </a>
+                  <a className="cx-cc-share-ico" href={`https://wa.me/?text=${encodeURIComponent(`${shareText} ${siteUrl}`)}`} target="_blank" rel="noreferrer" aria-label="WhatsApp" title="WhatsApp">
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm5 14.2c-.2.6-1.2 1.2-1.7 1.2-.4.1-1 .1-1.6-.1-.4-.1-.9-.3-1.5-.6-2.6-1.1-4.3-3.8-4.4-4-.1-.2-1.1-1.4-1.1-2.7 0-1.3.7-1.9.9-2.2.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.4.2.5.7 1.8.8 1.9.1.1.1.3 0 .5-.1.2-.1.3-.3.5l-.4.5c-.1.1-.3.3-.1.6.2.3.7 1.2 1.6 1.9 1.1 1 2 1.3 2.3 1.4.3.1.5.1.6-.1.2-.2.7-.8.9-1.1.2-.3.4-.2.6-.1.3.1 1.7.8 2 .9.3.2.5.2.5.4.1.1.1.7-.1 1.3z"/></svg>
+                  </a>
+                  <button className="cx-cc-share-ico" onClick={copyShare} aria-label="Copia link" title="Copia link">{linkCopied ? "✓" : "🔗"}</button>
+                </div>
               </div>
             ) : (
               <div className="cx-share-form">
                 {myDrink && (
                 <div className="cx-share-preview">
                   {photo ? (
-                    <img src={photo} alt="Drink preview" className="cx-share-photo" />
+                    <button className="cx-share-photo-btn" onClick={() => rawPhoto && setEditorOpen(true)} title="✏️">
+                      <img src={photo} alt="Drink preview" className="cx-share-photo" />
+                      <span className="cx-share-photo-edit">✏️</span>
+                    </button>
                   ) : (
                     <label className="cx-share-upload">
                       <span>📷</span>
@@ -5270,6 +5420,12 @@ function ShareDrinkBtn() {
           </div>
         </div>,
         document.body,
+      )}
+      {/* D4: edytor zdjęcia (kadr/zoom/obrót/filtry) — otwiera się po wyborze pliku lub klik ✏️ */}
+      {editorOpen && rawPhoto && (
+        <PhotoEditor src={rawPhoto}
+          onDone={(edited) => { setPhoto(edited); setEditorOpen(false); }}
+          onCancel={() => { setEditorOpen(false); if (!photo) setRawPhoto(null); }} />
       )}
     </>
   );
@@ -6746,6 +6902,40 @@ function CocktailStyles() {
       }
 
       
+      /* D4: edytor zdjęcia */
+      .cx-pedit-overlay { position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,0.85); backdrop-filter:blur(10px);
+        display:flex; align-items:center; justify-content:center; padding:18px; animation:cxFade .25s ease; }
+      .cx-pedit { width:min(440px, 94vw); max-height:94vh; overflow-y:auto; background:#12171e; border:1px solid rgba(255,255,255,0.1);
+        border-radius:20px; padding:16px; display:flex; flex-direction:column; gap:14px; animation:cxFadeUp .35s ease;
+        scrollbar-width:none; }
+      .cx-pedit::-webkit-scrollbar { display:none; }
+      .cx-pedit-head { display:flex; align-items:center; justify-content:space-between; }
+      .cx-pedit-head .cx-cc-popout-close { position:static; }
+      .cx-pedit-box { position:relative; width:100%; aspect-ratio:1/1; border-radius:14px; overflow:hidden; background:#000;
+        cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none; }
+      .cx-pedit-box:active { cursor:grabbing; }
+      .cx-pedit-box img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; will-change:transform;
+        pointer-events:none; }
+      .cx-pedit-grid { position:absolute; inset:0; pointer-events:none; opacity:0.35;
+        background:linear-gradient(rgba(255,255,255,0.35) 1px, transparent 1px) 0 0/100% 33.4%,
+                   linear-gradient(90deg, rgba(255,255,255,0.35) 1px, transparent 1px) 0 0/33.4% 100%; }
+      .cx-pedit-draghint { position:absolute; bottom:8px; left:50%; transform:translateX(-50%); font-size:11px; color:rgba(255,255,255,0.7);
+        background:rgba(0,0,0,0.45); padding:4px 10px; border-radius:999px; pointer-events:none; white-space:nowrap; }
+      .cx-pedit-controls { display:flex; flex-direction:column; gap:10px; }
+      .cx-pedit-dial { display:grid; grid-template-columns:120px 1fr; align-items:center; gap:10px; font-size:12px; color:rgba(255,255,255,0.75); }
+      .cx-pedit-dial input[type="range"] { width:100%; accent-color:var(--cx-accent,#E8927C); height:22px; }
+      .cx-pedit-actions { display:flex; gap:10px; align-items:center; justify-content:flex-end; flex-wrap:wrap; }
+      .cx-pedit-done { background:var(--cx-accent,#E8927C); color:#000; }
+
+      /* D4: klik w gotowe zdjęcie → ponowna edycja */
+      .cx-share-photo-btn { position:relative; padding:0; border:none; background:none; cursor:pointer; width:100%; height:100%; display:block; }
+      .cx-share-photo-edit { position:absolute; right:10px; bottom:10px; width:34px; height:34px; border-radius:50%;
+        background:rgba(0,0,0,0.55); display:grid; place-items:center; font-size:15px; border:1px solid rgba(255,255,255,0.25); }
+
+      /* D5: pasek social po publikacji */
+      .cx-share-socialbar { border-top:none; padding-top:6px; }
+      .cx-share-social-hint { font-size:12.5px; color:rgba(255,255,255,0.65); margin:10px 0 2px; }
+
       /* Share drink popout */
       .cx-share-overlay { position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.75); backdrop-filter:blur(8px);
         display:flex; align-items:center; justify-content:center; padding:24px; animation:cxFade .3s ease; }
