@@ -962,6 +962,8 @@ function DrinksList({ dark = true }) {
 
 // kategorie, które mają sens ze zdjęciem (gotowe drinki, piwa, kawy, bibite)
 const DRINKS_WITH_PHOTO = new Set(["cocktails", "analcolici", "smoothie", "bibite", "birre-spina", "birre-bottiglia", "birre-artigianali", "caffe"]);
+// kategorie ALKOHOLI z polubieniem (NIE piwa, NIE kawy, NIE bibite/analcolici)
+const ALCOHOL_LIKE_CATS = new Set(["cocktails", "vodka", "gin", "rum", "whisky", "tequila", "grappe", "grappa", "liquori", "amari", "distillati", "bianchi", "rossi", "rosati", "bollicine", "vini", "vino", "brandy", "cognac"]);
 
 // ─── MOBILE: menu napojów — zdjęcia dla drinków/piw, lista dla czystych alkoholi ──
 function MobileDrinksList({ dark = true }) {
@@ -974,6 +976,32 @@ function MobileDrinksList({ dark = true }) {
     [filter, drinksMenu.items]
   );
   const withPhoto = DRINKS_WITH_PHOTO.has(filter);
+  const canLike = ALCOHOL_LIKE_CATS.has(filter); // polubienia TYLKO dla alkoholi
+
+  // system polubień (wspólny z menu jedzenia — match po nazwie)
+  const [likesMap, setLikesMap] = useStateM({});
+  const [likedSet, setLikedSet] = useStateM(() => { try { return new Set(JSON.parse(localStorage.getItem("sh-menu-liked") || "[]")); } catch { return new Set(); } });
+  const [burstKey, setBurstKey] = useStateM(null);
+  useEffectM(() => { let a = true; getMenuLikes().then((m) => { if (a) setLikesMap(m); }).catch(() => {}); return () => { a = false; }; }, []);
+  const dKey = (it) => String(it.name || "").trim().toLowerCase();
+  const dLikes = (it) => (likesMap[dKey(it)]?.likes || 0);
+  const dLiked = (it) => { const id = likesMap[dKey(it)]?.id; return id ? likedSet.has(id) : false; };
+  const dLikeOnly = async (it) => {
+    const k = dKey(it); const rec = likesMap[k]; if (!rec?.id) return;
+    setBurstKey(k); setTimeout(() => setBurstKey((c) => (c === k ? null : c)), 650);
+    if (likedSet.has(rec.id)) return;
+    setLikedSet((p) => { const n = new Set(p); n.add(rec.id); return n; });
+    setLikesMap((p) => ({ ...p, [k]: { ...p[k], likes: (p[k]?.likes || 0) + 1 } }));
+    await toggleMenuLike(rec.id);
+  };
+  const dToggle = async (it) => {
+    const k = dKey(it); const rec = likesMap[k]; if (!rec?.id) return;
+    const was = likedSet.has(rec.id); const delta = was ? -1 : 1;
+    setLikedSet((p) => { const n = new Set(p); if (was) n.delete(rec.id); else n.add(rec.id); return n; });
+    setLikesMap((p) => ({ ...p, [k]: { ...p[k], likes: Math.max(0, (p[k]?.likes || 0) + delta) } }));
+    if (!was) { setBurstKey(k); setTimeout(() => setBurstKey((c) => (c === k ? null : c)), 650); }
+    await toggleMenuLike(rec.id);
+  };
 
   return (
     <div className={`mdr ${dark ? "mdr-dark" : ""}`}>
@@ -995,8 +1023,16 @@ function MobileDrinksList({ dark = true }) {
         <div className="mdr-grid">
           {items.map((it, i) => (
             <div key={`${filter}-${i}`} className="mdr-card">
-              <div className="mdr-card-img">
+              <div className="mdr-card-img"
+                onDoubleClick={canLike ? (e) => { e.stopPropagation(); dLikeOnly(it); } : undefined}
+                onTouchEnd={canLike ? (e) => { const now = Date.now(); const last = e.currentTarget._lt || 0; e.currentTarget._lt = now; if (now - last < 320) { e.preventDefault(); e.stopPropagation(); dLikeOnly(it); } } : undefined}>
                 {it.img ? <img src={it.img} alt={it.name} loading="lazy" /> : <DrinkGlassSVG cat={it.cat} />}
+                {canLike && burstKey === dKey(it) && <span className="mdr-burst"><HeartIcon filled /></span>}
+                {canLike && (
+                  <span className={`mdr-like ${dLiked(it) ? "is-liked" : ""}`} onClick={(e) => { e.stopPropagation(); dToggle(it); }}>
+                    <HeartIcon filled={dLiked(it)} /> {dLikes(it) > 0 && <span>{dLikes(it)}</span>}
+                  </span>
+                )}
               </div>
               <div className="mdr-card-body">
                 <h4 className="mdr-card-name">{it.name}</h4>
@@ -1017,6 +1053,11 @@ function MobileDrinksList({ dark = true }) {
                 <span className="mdr-row-name">{it.name}</span>
                 {it.desc && <span className="mdr-row-desc">{it.desc}</span>}
               </div>
+              {canLike && (
+                <button className={`mdr-row-like ${dLiked(it) ? "is-liked" : ""}`} onClick={() => dToggle(it)} aria-label="Mi piace">
+                  <HeartIcon filled={dLiked(it)} />{dLikes(it) > 0 && <span>{dLikes(it)}</span>}
+                </button>
+              )}
               <span className="mdr-row-price">
                 {it.price}{conv(it.price) && <span className="mdr-card-conv"> {conv(it.price)}</span>}
               </span>
@@ -1040,6 +1081,14 @@ function MobileDrinksList({ dark = true }) {
         .mdr-card-img { position: relative; aspect-ratio: 4/3; background: ${dark ? "linear-gradient(135deg,#1a3d52,#0e2230)" : "linear-gradient(135deg, var(--c-sand), #E8DDC8)"}; display: grid; place-items: center; overflow: hidden; }
         .mdr-card-img img { width: 100%; height: 100%; object-fit: cover; }
         .mdr-card-img svg { width: 56%; height: 70%; }
+        /* serce na karcie drinka (tylko alkohole) */
+        .mdr-like { position: absolute; bottom: 6px; right: 6px; display: inline-flex; align-items: center; gap: 3px; padding: 3px 7px; border-radius: 999px; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); color: #fff; font-size: 11px; font-weight: 700; cursor: pointer; line-height: 1; z-index: 3; }
+        .mdr-like svg { font-size: 12px; width: 12px; height: 12px; display: block; }
+        .mdr-burst { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 4; }
+        .mdr-burst svg { font-size: 48px; color: #FE2C55; animation: fmenuHeartPop .6s cubic-bezier(.17,.89,.32,1.28); }
+        .mdr-row-like { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 3px; padding: 4px 9px; border-radius: 999px; border: 1px solid ${dark ? "rgba(255,255,255,0.18)" : "var(--c-line)"}; background: ${dark ? "rgba(255,255,255,0.06)" : "#fff"}; color: ${dark ? "#fff" : "var(--c-deep)"}; font-size: 11px; font-weight: 700; cursor: pointer; line-height: 1; }
+        .mdr-row-like svg { font-size: 13px; width: 13px; height: 13px; display: block; }
+        .mdr-row-like.is-liked { border-color: #FE2C55; color: #FE2C55; }
         .mdr-card-body { padding: 12px; display: flex; flex-direction: column; gap: 4px; flex: 1; }
         .mdr-card-name { font-family: var(--f-display); font-weight: 700; font-size: 15px; line-height: 1.2; color: ${dark ? "#fff" : "var(--c-deep)"}; overflow-wrap: anywhere; }
         .mdr-card-desc { font-family: var(--f-serif); font-style: italic; font-size: 12px; line-height: 1.35; color: ${dark ? "rgba(255,255,255,0.6)" : "var(--c-mute)"}; overflow-wrap: anywhere; flex: 1; }
