@@ -44,12 +44,12 @@ Odhaczam `[x]` w miarę robienia.
 
 ## 🟢 GRUPA D — COMMUNITY / SHARE (zdjęcia, komentarze)
 
-- [ ] **D1.** Popout drinka — przetłumaczyć na wszystkie języki. ⏱15min
+- [x] **D1.** Popout drinka przetłumaczony (NameCard + DbDrinkCard popout + ShareDrinkBtn — 6 języków). ✅
 - [ ] **D2.** Zdjęcie dopasowane (wypełnia kadr) + czarny gradient od dołu na komentarze. ⏱15min
 - [ ] **D3.** Komentarze jak na IG: 3 najnowsze pod postem + pole „zostaw wiadomość". ⏱20min
 - [ ] **D4.** Edytor zdjęcia: kadrowanie, obrót, proste filtry (jak iPhone — pokrętła). ⏱60min 🔵duże
 - [ ] **D5.** Udostępnij na social → większa szansa na drink miesiąca + auto szablon IG story/post z linkiem. ⏱30min 🔵konfiguracja
-- [ ] **D6.** Brak opcji wgrania zdjęcia jeśli nie zrobiło się drinka wcześniej. ⏱10min
+- [x] **D6.** Brak opcji wgrania zdjęcia jeśli nie zrobiło się drinka wcześniej — upload ukryty gdy brak drinka. ✅
 - [ ] **D7.** Komentarze — swipe palcem w bok (przewijanie). ⏱10min
 
 ## 🟢 GRUPA E — FOOTER / NEWSLETTER / TŁUMACZENIA
