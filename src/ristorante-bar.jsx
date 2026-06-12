@@ -1,6 +1,7 @@
 import React from 'react';
 import { DrinksList } from "./full-menu";
 import { SplitReveal, Placeholder, TextClipReveal, Marquee } from "./shell";
+import { ScrollReveal } from "./components/ScrollReveal";
 
 // Ristorante + Bar sections
 import { motion, useScroll, useTransform } from "framer-motion";
@@ -97,7 +98,8 @@ function Ristorante({ t }) {
   const dishIngredients = useStateR(() => buildDishIngredients())[0];
   const fallback = Array.isArray(t("ristorante.ingredientsList")) ? t("ristorante.ingredientsList") : window.INGREDIENTS;
   const ingredients = dishIngredients && dishIngredients.length > 6 ? dishIngredients : fallback;
-  const ScrollReveal = window.ScrollReveal || (({ children }) => <>{children}</>);
+  // G1: prawdziwy ScrollReveal z importu — wcześniej window.ScrollReveal nigdy nie istniał,
+  // więc fallback renderował GOŁY tekst (bez <p>) przyklejony do nagłówka.
 
   return (
     <section className="ristorante" id="ristorante">
@@ -177,13 +179,17 @@ function Ristorante({ t }) {
         .rist-chef-img { position: relative; height: 540px; border-radius: 20px; overflow: hidden; }
         @media (max-width: 768px) { .rist-chef { padding: 56px 0; gap: 28px; } .rist-chef-img { height: 300px; } }
         .rist-chef-play { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 80px; height: 80px; border-radius: 50%; background: rgba(255,255,255,0.95); color: var(--c-deep); display: flex; align-items: center; justify-content: center; font-size: 22px; padding-left: 4px; backdrop-filter: blur(6px); }
-        .rist-chef-body { font-size: 18px; line-height: 1.6; color: var(--c-deep); margin: 24px 0 32px; max-width: 460px; text-wrap: pretty; display: block; clear: both; }
+        .rist-chef-body { font-size: 18px; line-height: 1.6; color: var(--c-deep); margin: 0 0 32px; max-width: 460px; text-wrap: pretty; display: block; clear: both; }
         .rist-chef-cta { margin-top: 16px; }
+        /* G1: akapit "Il vino…" zaczyna się od nowej linii, z wyraźnym odstępem od nagłówka
+           (margines na kontenerze ScrollReveal — sam <p> jest w środku rotowanego diva) */
+        .rist-chef-text .scroll-reveal-container { display: block; margin-top: 22px; }
         /* tytuł "Al tavolo, davanti a voi" — zawija się, nie ucina (różne długości tłumaczeń) */
         @media (max-width: 768px) {
           .rist-chef-text .srt { white-space: normal !important; overflow-wrap: anywhere; word-break: break-word; max-width: 100%; }
           .rist-chef-text .h3 { font-size: clamp(24px, 7vw, 36px); line-height: 1.1; }
-          .rist-chef-body { font-size: 16px; margin: 18px 0 24px; max-width: 100%; }
+          .rist-chef-body { font-size: 16px; margin: 0 0 24px; max-width: 100%; }
+          .rist-chef-text .scroll-reveal-container { margin-top: 18px; }
         }
         .rist-gallery-masonry { padding: 96px 0; }
         .rist-gallery-mobile { padding: 96px 0; }

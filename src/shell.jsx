@@ -591,10 +591,12 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
           .nav-right { position: absolute; right: 18px; left: auto; top: 50%; transform: translateY(-50%); gap: 10px; transition: opacity 0.3s; will-change: opacity; }
           /* W sekcji kreatora: header WIDOCZNY (logo + flagi), tylko tło nav schowane */
           body[data-cx-section="creator"] .nav-bg { opacity:0; }
-          /* Gdy otwarta szuflada/panel kategorii: logo w lewo, flagi zwinięte (hamburger w prawym górnym rogu) */
+          /* Gdy otwarta szuflada/panel kategorii: logo w lewo */
           body[data-cx-drawer="open"] .nav-left,
           body[data-cx-sheet="open"] .nav-left { left: 16px; transform: translate(0, -50%); }
-          body[data-cx-drawer="open"] .nav-right,
+          /* G8: przy otwartym drawerze (FAB) flagi ZOSTAJĄ widoczne na samym prawym brzegu
+             jako zwinięty dropdown — hamburger ląduje tuż na lewo od nich */
+          body[data-cx-drawer="open"] .nav-right { opacity:1; pointer-events:auto; z-index:2200; }
           body[data-cx-sheet="open"] .nav-right { opacity:0; pointer-events:none; }
           .btn-nav { display: none; } /* ukryj CTA na mobile — zostają tylko flagi */
           .nav-cta { display: none; }
@@ -659,11 +661,20 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
             box-shadow: 0 8px 30px rgba(0,0,0,0.4);
             z-index: 2100;
           }
-          /* Gdy otwarta szuflada butelek LUB panel kategorii (FAB) — hamburger przesuwa się w prawo */
-          body[data-cx-drawer="open"] .hamburger-mobile,
+          /* Gdy otwarty panel kategorii menu — hamburger przesuwa się w prawo (dół) */
           body[data-cx-sheet="open"] .hamburger-mobile,
           body[data-cx-menucat="on"] .hamburger-mobile { right: 16px; transform: none; }
           body[data-cx-section="creator"] .hamburger-mobile:not(.open) { right: 16px; transform:none; }
+          /* G8: klik FAB (drawer butelek) → hamburger płynnie do PRAWEGO GÓRNEGO rogu,
+             tuż na lewo od flag (animacja po "bottom", więc przejście jest smooth) */
+          body[data-cx-drawer="open"] .hamburger-mobile:not(.open) {
+            right: 64px;
+            bottom: calc(100vh - 62px);
+            bottom: calc(100dvh - 62px);
+            width: 48px; height: 48px;
+            transform: none;
+            z-index: 2200;
+          }
           /* hamburger pozostaje widoczny w kreatorze (NIE chowamy podczas scrollu/animacji) */
           /* W sekcji bar (Tramonti) hamburger w kolorze coral — bardziej widoczny */
           body[data-cx-section="bar"] .hamburger-mobile { background: var(--c-coral, #E8927C); }

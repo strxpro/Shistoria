@@ -1228,7 +1228,10 @@ function InSceneGlassPour({ url, withIce, color, onReveal, onDone, onModelReady 
     if (liquidMesh && liquidMesh.material) {
       const lm = (liquidMesh.material as THREE.MeshStandardMaterial).clone();
       lm.transparent = false; lm.side = THREE.DoubleSide;
+      // G6: tekstura (map) nadpisywała kolor → ciecz nie miała koloru mieszanki.
+      lm.map = null; lm.roughness = 0.12; lm.metalness = 0;
       lm.color.set(colorRefLocal.current); lm.emissive = new THREE.Color(colorRefLocal.current); lm.emissiveIntensity = 0.3;
+      lm.needsUpdate = true;
       liquidMesh.material = lm;
     }
     cloned.updateMatrixWorld(true);
@@ -1291,7 +1294,13 @@ function InSceneGlassPour({ url, withIce, color, onReveal, onDone, onModelReady 
     const tween = gsap.to(scrub, {
       t: end, duration: Math.max(3.5, end - start), ease: "power2.inOut", // wolniejsza, bardziej kinowa
       onUpdate: () => setTime(scrub.t),
-      onComplete: onDone,
+      onComplete: () => {
+        // G7: po nalaniu ukryj WBUDOWANY w model shaker — przy wylocie/scrollu
+        // ma się ruszać TYLKO szklanka (bez "cienia" szejkera lecącego razem z nią)
+        cloned.traverse((o) => { if (/shaker/i.test(o.name)) o.visible = false; });
+        invalidate();
+        onDone();
+      },
     });
     return () => { tween.kill(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2091,9 +2100,10 @@ function CocktailExperience() {
           const g = inSceneGlassRef.current;
           if (g) {
             const t = easeInCubic(e);
-            // Ukryj łopatkę/lód podczas wylotu — obraca się tylko szklanka z cieczą
+            // Ukryj łopatkę/lód/wbudowany shaker podczas wylotu — rusza się TYLKO szklanka z cieczą
             g.traverse((o: THREE.Object3D) => {
               if (/ice|scoop/i.test(o.name)) o.visible = e < 0.05;
+              if (/shaker/i.test(o.name)) o.visible = false;
             });
             g.rotation.y = -Math.PI * 2.5 * e;              // obrót w prawo
             g.rotation.z = deg(-10) * smooth(clamp01(e * 1.4));
@@ -2392,7 +2402,8 @@ function CocktailExperience() {
               )
             ) : claimed ? (
               <NameCard color={mixedColor} drinkName={drinkName} setDrinkName={setDrinkName}
-                customerName={customerName} setCustomerName={setCustomerName} poured={poured} onReset={reset} />
+                customerName={customerName} setCustomerName={setCustomerName} poured={poured} onReset={reset}
+                onClose={() => setClaimed(false)} />
             ) : (
               <GiftClaim onClaim={claimDrink} />
             )
@@ -2866,13 +2877,21 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
   const { actions, mixer } = useAnimations(animations, inner);
 
   // CEL = punkt w przestrzeni overlay gdzie strumień powinien trafiać = OTWÓR wlotu szejkera.
-  // Kamera overlay = kamera sceny (CONFIG.camPos), więc współrzędne pokrywają się z realnym
-  // szejkerem widocznym pod spodem. Szejker spoczywa w shakerRest, wlot ~górna krawędź.
+  // G4: celujemy w ŚRODEK OTWORU (góra szejkera: rest.y + height/2), lekko poniżej krawędzi,
+  // żeby strumień wizualnie wchodził DO środka — nie w korpus i nie obok.
   const target = useMemo(() => {
     const r = CONFIG.shakerRest;
-    // strumień wpada WEWNĄTRZ shakera — dalej od kamery (niższy Z) + nisko
-    return new THREE.Vector3(r.x, r.y - 0.2, r.z - 0.3);
+    return new THREE.Vector3(r.x, r.y + CONFIG.shakerHeight / 2 - 0.35, r.z);
   }, []);
+
+  // G4: wyrównanie kamery overlay z kamerą głównej sceny (ta patrzy na camTargetRest).
+  // Bez tego lookAt światy overlay/scena są przesunięte na ekranie i strumień
+  // ląduje obok widocznego szejkera.
+  useLayoutEffect(() => {
+    camera.position.set(CONFIG.camPos.x, CONFIG.camPos.y, CONFIG.camPos.z);
+    camera.lookAt(CONFIG.camTargetRest.x, CONFIG.camTargetRest.y, CONFIG.camTargetRest.z);
+    camera.updateProjectionMatrix();
+  }, [camera]);
 
   const liquidMat = useMemo(() => {
     const c = new THREE.Color(color);
@@ -3244,8 +3263,8 @@ function HoldRing() {
 
   const apply = useCallback(() => {
     const w = wrapRef.current;
-    // pierścień NAD palcem (offset w górę), żeby nie chował się pod kciukiem podczas nalewania
-    if (w) w.style.transform = `translate(${st.current.x}px, ${st.current.y}px) translate(-50%, -160%) scale(${st.current.scale})`;
+    // pierścień DOKŁADNIE pod palcem (wyśrodkowany na punkcie dotyku) — wg życzenia
+    if (w) w.style.transform = `translate(${st.current.x}px, ${st.current.y}px) translate(-50%, -50%) scale(${st.current.scale})`;
   }, []);
   const setArc = useCallback((p: number) => {
     const e = 1 - Math.pow(1 - clamp01(p), 3); // szybko → wolno
@@ -3335,8 +3354,11 @@ function GlassPourModel({ url, withIce, color, opacity, onReveal, onDone }: {
     if (liquidMesh && liquidMesh.material) {
       const lm = (liquidMesh.material as THREE.MeshStandardMaterial).clone();
       lm.transparent = false; lm.side = THREE.DoubleSide;
+      // G6: tekstura nadpisywała kolor mieszanki
+      lm.map = null; lm.roughness = 0.12; lm.metalness = 0;
       lm.color.set(color); lm.opacity = opacity;
       lm.emissive = new THREE.Color(color); lm.emissiveIntensity = 0.3;
+      lm.needsUpdate = true;
       liquidMesh.material = lm;
     }
     // skala wg całej sceny, ale ŚRODEK liczony na SZKLANCE (żeby była na środku ekranu)
@@ -3881,6 +3903,18 @@ function AccordionPanel({
   // "Wszystkie" mode: show all items from all groups
   const isAll = active === "__all__";
 
+  // E7/G10: etykiety panelu w języku strony
+  const apLang = (typeof window !== "undefined" && (window as any).currentLanguage) || "it";
+  const AL = ({
+    it: { searchPh: "Cerca ingrediente...", empty: "Niente in questa categoria", foundOther: "Trovato in", otherPanel: "cerca nell'altro pannello!", noResults: "Nessun risultato per", all: "Tutti", hint: "Tocca per una dose · tieni premuto per versare", items: "ingredienti", categories: "Categorie" },
+    pl: { searchPh: "Szukaj składnika...", empty: "Nic w tej kategorii", foundOther: "Znaleziono w", otherPanel: "sprawdź drugi panel!", noResults: "Brak wyników dla", all: "Wszystkie", hint: "Dotknij = jedna porcja · przytrzymaj = nalewanie", items: "pozycji", categories: "Kategorie" },
+    en: { searchPh: "Search ingredient...", empty: "Nothing in this category", foundOther: "Found in", otherPanel: "check the other panel!", noResults: "No results for", all: "All", hint: "Tap for one dose · hold to pour", items: "items", categories: "Categories" },
+    de: { searchPh: "Zutat suchen...", empty: "Nichts in dieser Kategorie", foundOther: "Gefunden in", otherPanel: "im anderen Panel suchen!", noResults: "Keine Ergebnisse für", all: "Alle", hint: "Tippen = eine Dosis · halten = gießen", items: "Positionen", categories: "Kategorien" },
+    fr: { searchPh: "Chercher un ingrédient...", empty: "Rien dans cette catégorie", foundOther: "Trouvé dans", otherPanel: "regarde l'autre panneau!", noResults: "Aucun résultat pour", all: "Tous", hint: "Touche = une dose · maintiens = verser", items: "éléments", categories: "Catégories" },
+    es: { searchPh: "Buscar ingrediente...", empty: "Nada en esta categoría", foundOther: "Encontrado en", otherPanel: "¡mira el otro panel!", noResults: "Sin resultados para", all: "Todos", hint: "Toca = una dosis · mantén = verter", items: "posiciones", categories: "Categorías" },
+  } as Record<string, Record<string, string>>)[apLang] ?? ({} as Record<string, string>);
+  const al = (k: string, it: string) => AL[k] ?? it;
+
   // Wyszukiwanie składników w TYM panelu + podpowiedź gdy w drugim panelu
   const searchResults = useMemo(() => {
     const q = searchQ.trim().toLowerCase();
@@ -4033,7 +4067,7 @@ function AccordionPanel({
         {/* Pasek wyszukiwania składników */}
         {searchOpen && !collapsed && (
           <div className="cx-search-wrap">
-            <input className="cx-search-input" autoFocus placeholder="Cerca ingrediente..." value={searchQ}
+            <input className="cx-search-input" autoFocus placeholder={al("searchPh", "Cerca ingrediente...")} value={searchQ}
               onChange={(e) => setSearchQ(e.target.value)} />
             {searchResults && (
               <div className="cx-search-results">
@@ -4050,10 +4084,10 @@ function AccordionPanel({
                   ))
                 ) : searchResults.inOther > 0 ? (
                   <div className="cx-search-hint">
-                    💡 Trovato in <strong>{searchResults.otherSideName}</strong> — cerca nell'altro pannello!
+                    💡 {al("foundOther", "Trovato in")} <strong>{searchResults.otherSideName}</strong> — {al("otherPanel", "cerca nell'altro pannello!")}
                   </div>
                 ) : searchQ.trim() ? (
-                  <div className="cx-search-hint">Nessun risultato per "{searchQ}"</div>
+                  <div className="cx-search-hint">{al("noResults", "Nessun risultato per")} "{searchQ}"</div>
                 ) : null}
               </div>
             )}
@@ -4092,7 +4126,7 @@ function AccordionPanel({
       {!collapsed && (current || isAll) && typeof document !== "undefined" && createPortal(
         <div className="cx-drawer-wrap" data-side={side} onClick={(e) => { if (e.target === e.currentTarget) closeCat(); }}>
           <div className="cx-drawer-backdrop" onClick={closeCat} aria-hidden="true" />
-          <div className="cx-drawer" role="dialog" aria-label={isAll ? "Tutti" : current!.group}
+          <div className="cx-drawer" role="dialog" aria-label={isAll ? al("all", "Tutti") : current!.group}
             onClick={(e) => e.stopPropagation()}
             onTouchStart={(e) => { (e.currentTarget as any)._sy = e.touches[0].clientY; }}
             onTouchMove={(e) => {
@@ -4150,7 +4184,7 @@ function AccordionPanel({
                 </button>
                 <div className="cx-drop-list">
                   <button className={`cx-drop-opt ${isAll ? "active" : ""}`} onClick={() => { setActive("__all__"); setStrengthFilter("all"); onOpenChange?.(true); setCatDropOpen(false); }}>
-                    <span className="cx-drop-emoji">✦</span> Tutti <span className="cx-drop-cnt">{groups.reduce((s, g) => s + g.items.length, 0)}</span>
+                    <span className="cx-drop-emoji">✦</span> {al("all", "Tutti")} <span className="cx-drop-cnt">{groups.reduce((s, g) => s + g.items.length, 0)}</span>
                   </button>
                   {groups.map((g) => (
                     <button key={g.group} className={`cx-drop-opt ${active === g.group ? "active" : ""}`} onClick={() => { setActive(g.group); setStrengthFilter("all"); onOpenChange?.(true); setCatDropOpen(false); }}>
@@ -4188,40 +4222,50 @@ function AccordionPanel({
               <button className="cx-drop-close" onClick={closeCat} aria-label="Chiudi">×</button>
             </div>
 
-            {/* Pasek wyszukiwania składników (mobile) */}
-            {searchOpen && (
-              <div className="cx-search-wrap cx-search-wrap-mobile">
-                <input className="cx-search-input" autoFocus placeholder="Cerca ingrediente..." value={searchQ}
-                  onChange={(e) => setSearchQ(e.target.value)} />
-                {searchResults && (
-                  <div className="cx-search-results">
-                    {searchResults.inThis.length > 0 ? (
-                      searchResults.inThis.map(({ ing, group }) => (
-                        <button key={ing.id} className="cx-search-item" onClick={(e) => {
-                          const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
-                          onPour(ing, { x: r.left + r.width / 2, y: r.top }, "tap");
-                        }}>
-                          <span className="cx-search-dot" style={{ background: ing.color }} />
-                          <span className="cx-search-name">{ing.name}</span>
-                          <span className="cx-search-grp">{group}</span>
-                        </button>
-                      ))
-                    ) : searchResults.inOther > 0 ? (
-                      <div className="cx-search-hint">
-                        💡 Trovato in <strong>{searchResults.otherSideName}</strong> — cerca nell'altro pannello!
-                      </div>
-                    ) : searchQ.trim() ? (
-                      <div className="cx-search-hint">Nessun risultato per "{searchQ}"</div>
-                    ) : null}
+            {/* G3: wyszukiwarka (mobile) = mały popout w PORTALU do body.
+                Wcześniej input żył w przeskalowanym drawerze → efektywny font <16px
+                → iOS przybliżał całą stronę przy fokusie. Portal = brak transformu,
+                font 16px = zero zoomu. */}
+            {searchOpen && typeof document !== "undefined" && createPortal(
+              <div className="cx-search-pop-overlay" onClick={() => { setSearchOpen(false); setSearchQ(""); }}>
+                <div className="cx-search-pop" onClick={(e) => e.stopPropagation()}>
+                  <div className="cx-search-pop-row">
+                    <input className="cx-search-input" autoFocus placeholder={al("searchPh", "Cerca ingrediente...")} value={searchQ}
+                      onChange={(e) => setSearchQ(e.target.value)} />
+                    <button className="cx-search-pop-close" onClick={() => { setSearchOpen(false); setSearchQ(""); }} aria-label="Chiudi">×</button>
                   </div>
-                )}
-              </div>
+                  {searchResults && (
+                    <div className="cx-search-results">
+                      {searchResults.inThis.length > 0 ? (
+                        searchResults.inThis.map(({ ing, group }) => (
+                          <button key={ing.id} className="cx-search-item" onClick={(e) => {
+                            const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                            setSearchOpen(false); setSearchQ("");
+                            onPour(ing, { x: r.left + r.width / 2, y: r.top }, "tap");
+                          }}>
+                            <span className="cx-search-dot" style={{ background: ing.color }} />
+                            <span className="cx-search-name">{ing.name}</span>
+                            <span className="cx-search-grp">{group}</span>
+                          </button>
+                        ))
+                      ) : searchResults.inOther > 0 ? (
+                        <div className="cx-search-hint">
+                          💡 {al("foundOther", "Trovato in")} <strong>{searchResults.otherSideName}</strong> — {al("otherPanel", "cerca nell'altro pannello!")}
+                        </div>
+                      ) : searchQ.trim() ? (
+                        <div className="cx-search-hint">{al("noResults", "Nessun risultato per")} "{searchQ}"</div>
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+              </div>,
+              document.body,
             )}
             <div className="cx-drawer-head">
               <button className="cx-back" onClick={closeCat}>
-                <span className="cx-back-ico">←</span> Categorie
+                <span className="cx-back-ico">←</span> {al("categories", "Categorie")}
               </button>
-              <span className="cx-drawer-title">{isAll ? "Tutti" : current!.group} <em>· {items.length}</em></span>
+              <span className="cx-drawer-title">{isAll ? al("all", "Tutti") : current!.group} <em>· {items.length}</em></span>
               <div className="cx-drawer-arrows">
                 <button className="cx-car-nav" disabled={!canLeft} onClick={() => scrollBy(-1)} aria-label="Precedente">‹</button>
                 <button className="cx-car-nav" disabled={!canRight} onClick={() => scrollBy(1)} aria-label="Successivo">›</button>
@@ -4256,9 +4300,9 @@ function AccordionPanel({
               }) : items.map((i) => (
                 <BottleCard key={i.id} ing={i} count={countOf(i.id)} disabled={disabled} onPour={onPour} onStop={closeCat} onHoldAdd={onHoldAdd} onHoverReal={onHoverReal} />
               ))}
-              {items.length === 0 && <div style={{padding:'40px',color:'rgba(255,255,255,0.5)',fontStyle:'italic',textAlign:'center',width:'100%'}}>Brak pozycji w tej kategorii</div>}
+              {items.length === 0 && <div style={{padding:'40px',color:'rgba(255,255,255,0.5)',fontStyle:'italic',textAlign:'center',width:'100%'}}>{al("empty", "Niente in questa categoria")}</div>}
             </div>
-            <span className="cx-drawer-hint">Tocca per una dose · tieni premuto per versare · {items.length} pozycji</span>
+            <span className="cx-drawer-hint">{al("hint", "Tocca per una dose · tieni premuto per versare")} · {items.length} {al("items", "ingredienti")}</span>
           </div>
         </div>,
         document.body,
@@ -4768,12 +4812,12 @@ function StickyQR({ color, drinkName, onNeedForm }: { color: string; drinkName: 
  * NameCard — nazwij drink + imię + QR (w dolnej karcie).
  * ──────────────────────────────────────────────────────────────────────── */
 function NameCard({
-  color, drinkName, setDrinkName, customerName, setCustomerName, poured, onReset,
+  color, drinkName, setDrinkName, customerName, setCustomerName, poured, onReset, onClose,
 }: {
   color: string;
   drinkName: string; setDrinkName: (v: string) => void;
   customerName: string; setCustomerName: (v: string) => void;
-  poured: Poured[]; onReset: () => void;
+  poured: Poured[]; onReset: () => void; onClose?: () => void;
 }) {
   const [done, setDone] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
@@ -4817,9 +4861,9 @@ function NameCard({
 
   const [qrOpen, setQrOpen] = useState(false);
   const [qrFull, setQrFull] = useState(false);
-  // Blokada scrolla strony gdy QR/fullscreen otwarty
+  // Blokada scrolla strony gdy QR/fullscreen otwarty LUB formularz-modal (G7)
   useEffect(() => {
-    const lock = qrOpen || qrFull;
+    const lock = qrOpen || qrFull || !done;
     if (lock) {
       if (typeof window !== "undefined" && (window as any).lenis) (window as any).lenis.stop();
       document.body.style.overflow = "hidden";
@@ -4831,7 +4875,7 @@ function NameCard({
       if (typeof window !== "undefined" && (window as any).lenis) (window as any).lenis.start();
       document.body.style.overflow = "";
     };
-  }, [qrOpen, qrFull]);
+  }, [qrOpen, qrFull, done]);
 
   if (done) {
     return (
@@ -4898,28 +4942,35 @@ function NameCard({
       </>
     );
   }
-  return (
-    <div className="cx-name">
-      <div className="cx-name-head">
-        <span className="cx-mini-kicker">{tt("yourDrink", "Il tuo drink")}</span>
-        <span className="cx-name-ml" style={{ color }}>{Math.round(poured.reduce((s, p) => s + p.ml, 0))} ml</span>
+  // G7: formularz "Il tuo drink" = POPOUT (portal, blokada scrolla, × zamyka).
+  // Wcześniej był inline w cx-table — dało się scrollować stronę pod spodem.
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="cx-qr-overlay cx-name-overlay" onClick={onClose}>
+      <div className="cx-name cx-name-modal" onClick={(e) => e.stopPropagation()}>
+        {onClose && <button className="cx-qr-close" onClick={onClose} aria-label="Chiudi">×</button>}
+        <div className="cx-name-head">
+          <span className="cx-mini-kicker">{tt("yourDrink", "Il tuo drink")}</span>
+          <span className="cx-name-ml" style={{ color }}>{Math.round(poured.reduce((s, p) => s + p.ml, 0))} ml</span>
+        </div>
+        <div className="cx-field">
+          <label>{tt("drinkName", "Nome del drink")}</label>
+          <input className="cx-input" placeholder={tt("drinkPh", "es. Tramonto Sardo…")} value={drinkName} onChange={(e) => setDrinkName(e.target.value)} maxLength={28} />
+        </div>
+        <div className="cx-field">
+          <label>{tt("yourName", "Il tuo nome")}</label>
+          <input className="cx-input" placeholder={tt("namePh", "es. Marco")} value={customerName} onChange={(e) => setCustomerName(e.target.value)} maxLength={24} />
+        </div>
+        <div className="cx-field">
+          <label>Email <em>{tt("emailOpt", "· facoltativa")}</em></label>
+          <input className={`cx-input ${!emailOk ? "is-err" : ""}`} type="email" placeholder={tt("emailPh", "per ricevere la ricetta")} value={email} onChange={(e) => setEmail(e.target.value)} maxLength={60} />
+        </div>
+        <button className="cx-btn cx-btn-full" disabled={!canSubmit} onClick={handleSubmit} style={{ background: color, color: '#000' }}>
+          {tt("genQr", "Genera QR")} <span className="arrow">→</span>
+        </button>
       </div>
-      <div className="cx-field">
-        <label>{tt("drinkName", "Nome del drink")}</label>
-        <input className="cx-input" placeholder={tt("drinkPh", "es. Tramonto Sardo…")} value={drinkName} onChange={(e) => setDrinkName(e.target.value)} maxLength={28} />
-      </div>
-      <div className="cx-field">
-        <label>{tt("yourName", "Il tuo nome")}</label>
-        <input className="cx-input" placeholder={tt("namePh", "es. Marco")} value={customerName} onChange={(e) => setCustomerName(e.target.value)} maxLength={24} />
-      </div>
-      <div className="cx-field">
-        <label>Email <em>{tt("emailOpt", "· facoltativa")}</em></label>
-        <input className={`cx-input ${!emailOk ? "is-err" : ""}`} type="email" placeholder={tt("emailPh", "per ricevere la ricetta")} value={email} onChange={(e) => setEmail(e.target.value)} maxLength={60} />
-      </div>
-      <button className="cx-btn cx-btn-full" disabled={!canSubmit} onClick={handleSubmit} style={{ background: color, color: '#000' }}>
-        {tt("genQr", "Genera QR")} <span className="arrow">→</span>
-      </button>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -5975,6 +6026,16 @@ function CocktailStyles() {
       .cx-search-hint { padding:14px; border-radius:12px; background:rgba(241,196,15,0.12); border:1px solid rgba(241,196,15,0.3);
         color:rgba(255,255,255,0.85); font-size:13px; text-align:center; line-height:1.5; }
       .cx-search-hint strong { color:#f1c40f; }
+      /* G3: mały popout wyszukiwarki (portal, bez transformów → iOS nie zoomuje) */
+      .cx-search-pop-overlay { position:fixed; inset:0; z-index:10010; background:rgba(0,0,0,0.5);
+        display:flex; align-items:flex-start; justify-content:center; padding:max(64px, env(safe-area-inset-top)) 16px 16px; animation:cxFade .2s ease; }
+      .cx-search-pop { width:min(380px, 94vw); background:#14181f; border:1px solid rgba(255,255,255,0.12);
+        border-radius:16px; padding:12px; box-shadow:0 24px 70px rgba(0,0,0,0.55); animation:cxFadeUp .25s ease; }
+      .cx-search-pop-row { display:flex; gap:8px; align-items:center; }
+      .cx-search-pop-row .cx-search-input { flex:1; min-width:0; font-size:16px; }
+      .cx-search-pop-close { width:42px; height:42px; flex-shrink:0; border-radius:12px; border:1px solid rgba(255,255,255,0.14);
+        background:rgba(255,255,255,0.06); color:#fff; font-size:20px; cursor:pointer; }
+      .cx-search-pop .cx-search-results { max-height:44vh; }
       .cx-collapse:hover { background:rgba(255,255,255,0.12); }
       .cx-collapse-ico { position:relative; width:12px; height:12px; }
       .cx-collapse-ico::before, .cx-collapse-ico::after { content:""; position:absolute; background:rgba(255,255,255,0.8); border-radius:2px; transition:transform .3s; }
@@ -6300,6 +6361,15 @@ function CocktailStyles() {
       .cx-btn-ghost:hover { border-color:var(--c-coral,#E8927C); color:#fff; }
       .cx-name-qr { display:flex; flex-direction:column; gap:16px; align-items:center; text-align:center; }
       .cx-name-done { display:flex; flex-direction:column; gap:12px; align-items:center; text-align:center; }
+      /* G7: formularz "Il tuo drink" jako modal (portal) */
+      .cx-name-overlay { align-items:center; }
+      .cx-name-modal { position:relative; width:min(380px, 92vw); max-height:86vh; overflow-y:auto;
+        background:#14181f; border:1px solid rgba(255,255,255,0.12); border-radius:20px; padding:20px 18px;
+        box-shadow:0 30px 80px rgba(0,0,0,0.55); animation:cxFadeUp .3s ease; scrollbar-width:none; }
+      .cx-name-modal::-webkit-scrollbar { display:none; }
+      .cx-name-modal .cx-qr-close { position:absolute; top:10px; right:10px; }
+      .cx-name-modal .cx-input { font-size:16px; } /* iOS: bez auto-zoomu przy fokusie */
+
       /* A8: sticky QR — przyklejone kółko po prawej, gdy drink gotowy */
       .cx-qr-sticky { position:fixed; right:14px; top:50%; transform:translateY(-50%); z-index:64;
         width:54px; height:54px; border-radius:50%; border:1.5px solid rgba(255,255,255,0.25);
@@ -6750,8 +6820,13 @@ function CocktailStyles() {
           background:#16131d; border:1px solid rgba(255,255,255,0.14); border-radius:14px; overflow:hidden auto;
           max-height:0; opacity:0; visibility:hidden; transform:translateY(-6px);
           transition:max-height .35s cubic-bezier(.2,.85,.2,1), opacity .25s, transform .3s, visibility .35s;
-          box-shadow:0 18px 50px rgba(0,0,0,0.55); }
-        .cx-drop.is-open .cx-drop-list { max-height:240px; opacity:1; visibility:visible; transform:none; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
+          box-shadow:0 18px 50px rgba(0,0,0,0.55);
+          scrollbar-width:none; }
+        .cx-drop-list::-webkit-scrollbar { display:none; }
+        /* G3: lista szersza niż wąski trigger — pełne nazwy, nic nie ucięte */
+        .cx-drop-cat .cx-drop-list { left:0; right:auto; min-width:min(250px, calc(100vw - 44px)); }
+        .cx-drop-str .cx-drop-list { right:0; left:auto; min-width:min(230px, calc(100vw - 44px)); }
+        .cx-drop.is-open .cx-drop-list { max-height:288px; opacity:1; visibility:visible; transform:none; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
         .cx-drop-opt { display:flex; align-items:center; gap:10px; width:100%; padding:12px 14px; cursor:pointer;
           color:rgba(255,255,255,0.82); background:none; border:none; border-bottom:1px solid rgba(255,255,255,0.06);
           font-family:var(--f-display,"Syne",serif); font-weight:700; font-size:13px; text-align:left;

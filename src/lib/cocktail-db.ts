@@ -67,52 +67,53 @@ function parseDrink(d: RawDrink): ApiDrink {
   };
 }
 
+// Składniki-dekoracje (garnish) — NIE wymagamy ich nalania, żeby uznać przepis
+const GARNISH = new Set([
+  "ice", "crushed ice", "salt", "sugar", "brown sugar", "powdered sugar", "sugar cube",
+  "lemon", "lime", "orange", "mint", "cherry", "maraschino cherry", "olive",
+  "lemon peel", "lime peel", "orange peel", "lemon twist", "orange spiral", "lemon zest",
+  "nutmeg", "celery salt", "black pepper", "water", "whipped cream", "cinnamon",
+]);
+
 /**
- * Znajduje drink pasujący do podanych ID składników (nasze ID).
- * Scoring: dla każdego drinka liczy ile wybranych baz alkoholowych/składników pasuje.
- * Zwraca drink z najlepszym dopasowaniem (min. wszystkie alkohole bazowe muszą pasować).
+ * G5: ŚCISŁE dopasowanie drinka do nalanych składników.
+ * Popout „hai creato un classico" pokazuje się TYLKO gdy:
+ *  1) każdy nalany składnik jest mapowalny i występuje w przepisie,
+ *  2) każdy ISTOTNY składnik przepisu (poza dekoracjami) został nalany.
+ * Czyli: zestaw składników = zestaw przepisu (modulo lód/skórka/sól itp.).
+ * Wcześniejszy luźny scoring (min. 2 trafienia) dawał „klasyka" przy KAŻDEJ mieszance.
  */
 export async function findCocktailByIngredients(ingredientIds: string[]): Promise<ApiDrink | null> {
   const db = await loadDB();
   if (db.length === 0) return null;
 
-  // Zbierz angielskie nazwy szukanych składników
-  const wanted: string[][] = ingredientIds.map((id) => ING_MAP[id]).filter(Boolean) as string[][];
-  if (wanted.length === 0) return null;
+  // Każdy nalany składnik musi być znany (mapowalny) — inaczej nie potwierdzimy przepisu
+  const wanted: string[][] = [];
+  for (const id of ingredientIds) {
+    const m = ING_MAP[id];
+    if (!m) return null; // nalano coś spoza bazy (np. piwo, brzoskwinia) → to nie klasyk
+    wanted.push(m);
+  }
+  if (wanted.length < 2) return null;
+
+  const matchesAlt = (alts: string[], di: string) => alts.some((alt) => di.includes(alt) || alt.includes(di));
 
   let best: RawDrink | null = null;
-  let bestScore = 0;
+  let bestCore = -1;
+  let bestExtra = Infinity;
 
   for (const drink of db) {
-    const drinkIngs = drink.ingredients.map((i) => i.n.toLowerCase());
-    let matched = 0;
-    for (const alternatives of wanted) {
-      // składnik pasuje jeśli którakolwiek z alternatyw jest w drinku (substring match)
-      const hit = alternatives.some((alt) => drinkIngs.some((di) => di.includes(alt) || alt.includes(di)));
-      if (hit) matched++;
-    }
-    // Score = ile naszych składników znaleziono w drinku.
-    // Preferuj drinki gdzie dopasowano WSZYSTKIE wybrane składniki.
-    const score = matched;
-    // Bonus: drink ma podobną liczbę składników (nie za dużo dodatkowych)
-    const extraPenalty = Math.max(0, drink.ingredients.length - wanted.length) * 0.15;
-    const finalScore = score - extraPenalty;
-
-    if (matched >= wanted.length && finalScore > bestScore) {
-      bestScore = finalScore;
-      best = drink;
-    }
-  }
-
-  // Jeśli nie ma idealnego (wszystkie składniki) — znajdź najlepsze częściowe (min 2 dopasowania)
-  if (!best) {
-    for (const drink of db) {
-      const drinkIngs = drink.ingredients.map((i) => i.n.toLowerCase());
-      let matched = 0;
-      for (const alternatives of wanted) {
-        if (alternatives.some((alt) => drinkIngs.some((di) => di.includes(alt) || alt.includes(di)))) matched++;
-      }
-      if (matched >= 2 && matched > bestScore) { bestScore = matched; best = drink; }
+    const dIngs = drink.ingredients.map((i) => i.n.toLowerCase().trim());
+    // 1) wszystkie NASZE składniki są w przepisie
+    if (!wanted.every((alts) => dIngs.some((di) => matchesAlt(alts, di)))) continue;
+    // 2) wszystkie ISTOTNE składniki przepisu zostały nalane
+    const core = dIngs.filter((di) => !GARNISH.has(di));
+    if (core.length < 2) continue;
+    if (core.some((di) => !wanted.some((alts) => matchesAlt(alts, di)))) continue;
+    // preferuj przepis o największej liczbie istotnych składników, potem najmniej dekoracji
+    const extra = dIngs.length - core.length;
+    if (core.length > bestCore || (core.length === bestCore && extra < bestExtra)) {
+      best = drink; bestCore = core.length; bestExtra = extra;
     }
   }
 

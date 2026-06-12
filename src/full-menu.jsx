@@ -99,8 +99,14 @@ function MobileFullMenu() {
     await toggleMenuLike(rec.id);
   };
   // double-tap w zdjęcie → ZAWSZE polub (nigdy nie odlajkowuje, jak Instagram). Zawsze burst.
+  // Guard anty-dubel: na telefonie double-tap odpala i onTouchEnd, i zsyntetyzowany dblclick —
+  // bez guarda serce "podwajało się" (dwa bursty + podwójna animacja).
+  const lastLikeRef = useRefM({ k: null, t: 0 });
   const likeOnly = async (it) => {
     const k = itemKey(it);
+    const now = Date.now();
+    if (lastLikeRef.current.k === k && now - lastLikeRef.current.t < 600) return;
+    lastLikeRef.current = { k, t: now };
     const rec = likesMap[k];
     if (!rec?.id) return;
     setBurstKey(k); setTimeout(() => setBurstKey((cur) => (cur === k ? null : cur)), 650);
@@ -108,6 +114,15 @@ function MobileFullMenu() {
     setLikedSet((prev) => { const n = new Set(prev); n.add(rec.id); return n; });
     setLikesMap((p) => ({ ...p, [k]: { ...p[k], likes: (p[k]?.likes || 0) + 1 } }));
     await toggleMenuLike(rec.id);
+  };
+
+  // TikTok-style: serduszka wylatujące z miejsca tapnięcia (popout zdjęcia)
+  const [floatHearts, setFloatHearts] = useStateM([]);
+  const spawnHeart = (x, y) => {
+    const id = `${Date.now()}-${Math.random()}`;
+    const rot = Math.round(Math.random() * 50 - 25);
+    setFloatHearts((p) => [...p.slice(-14), { id, x, y, rot }]);
+    setTimeout(() => setFloatHearts((p) => p.filter((h) => h.id !== id)), 1150);
   };
 
   // Gdy sheet kategorii otwarty → blokada scrolla + hamburger w prawo (cx-sheet).
@@ -242,14 +257,17 @@ function MobileFullMenu() {
                   return (
                 <li key={i} className={`mfm-item ${it.featured ? "feat" : ""} ${isTopLiked ? "top-liked" : ""}`} onClick={() => setDishPopout({ ...it, icon: cat.icon })}>
                   {isTopLiked && <span className="mfm-topliked-badge"><HeartIcon filled /> {({ it:"Il più amato", en:"Most loved", pl:"Najczęściej lubiane", de:"Beliebtest", fr:"Le plus aimé", es:"El más amado" })[lang] || "Il più amato"}</span>}
-                  <div className="mfm-item-thumb"
-                    onDoubleClick={(e) => { e.stopPropagation(); likeOnly(it); }}
-                    onTouchEnd={(e) => {
-                      const now = Date.now(); const last = e.currentTarget._lt || 0; e.currentTarget._lt = now;
-                      if (now - last < 320) { e.preventDefault(); e.stopPropagation(); likeOnly(it); }
-                    }}>
-                    {it.img ? <img src={it.img} alt="" loading="lazy" /> : <span className="mfm-item-thumb-ph">{cat.icon}</span>}
-                    {burstKey === itemKey(it) && <span className="mfm-thumb-burst"><HeartIcon filled /></span>}
+                  {/* wrap BEZ overflow:hidden — pigułka serca nigdy nie jest ucięta przez zaokrąglenie zdjęcia */}
+                  <div className="mfm-thumb-wrap">
+                    <div className="mfm-item-thumb"
+                      onDoubleClick={(e) => { e.stopPropagation(); likeOnly(it); }}
+                      onTouchEnd={(e) => {
+                        const now = Date.now(); const last = e.currentTarget._lt || 0; e.currentTarget._lt = now;
+                        if (now - last < 320) { e.preventDefault(); e.stopPropagation(); likeOnly(it); }
+                      }}>
+                      {it.img ? <img src={it.img} alt="" loading="lazy" /> : <span className="mfm-item-thumb-ph">{cat.icon}</span>}
+                      {burstKey === itemKey(it) && <span className="mfm-thumb-burst"><HeartIcon filled /></span>}
+                    </div>
                     <span className={`mfm-thumb-like ${isLiked(it) ? "is-liked" : ""}`}
                       onClick={(e) => { e.stopPropagation(); toggleLike(it); }}>
                       <HeartIcon filled={isLiked(it)} className="mfm-thumb-like-ico" />
@@ -295,7 +313,7 @@ function MobileFullMenu() {
 
       {/* floating pill — wysuwany przycisk kategorii (gdy pasek wyjechał górą) */}
       <button className={`mfm-pill ${pillVisible && !catSheet ? "show" : ""}`} onClick={() => setCatSheet(true)}>
-        <span className="mfm-pill-icon">☰</span> Categorie
+        <span className="mfm-pill-icon">☰</span> {({ it: "Categorie", pl: "Kategorie", en: "Categories", de: "Kategorien", fr: "Catégories", es: "Categorías" })[lang] || "Categorie"}
       </button>
 
       {/* bottom sheet z kategoriami — wysuwa się z dołu */}
@@ -315,7 +333,7 @@ function MobileFullMenu() {
               if (dy > 80) setCatSheet(false); // pociągnięcie w dół > 80px → zamknij
             }}>
             <div className="mfm-sheet-handle" />
-            <span className="mfm-sheet-title">Categorie</span>
+            <span className="mfm-sheet-title">{({ it: "Categorie", pl: "Kategorie", en: "Categories", de: "Kategorien", fr: "Catégories", es: "Categorías" })[lang] || "Categorie"}</span>
             <div className="mfm-sheet-list">
               {window.FULL_MENU.map((c) => (
                 <button key={c.id} className={`mfm-sheet-btn ${activeCat === c.id ? "active" : ""}`} onClick={() => goToCat(c.id)}>
@@ -334,13 +352,19 @@ function MobileFullMenu() {
         <div className="mfm-pop-overlay" onClick={() => setDishPopout(null)}>
           <div className="mfm-pop" onClick={(e) => e.stopPropagation()}>
             <div className="mfm-pop-img"
-              onDoubleClick={(e) => { e.stopPropagation(); likeOnly(dishPopout); }}
-              onTouchEnd={(e) => {
-                const now = Date.now(); const last = e.currentTarget._lt || 0; e.currentTarget._lt = now;
-                if (now - last < 320) { e.preventDefault(); e.stopPropagation(); likeOnly(dishPopout); }
+              onPointerUp={(e) => {
+                // TikTok-style: każde tapnięcie w zdjęcie = serduszko wylatujące z miejsca dotyku
+                e.stopPropagation();
+                const r = e.currentTarget.getBoundingClientRect();
+                spawnHeart(e.clientX - r.left, e.clientY - r.top);
+                likeOnly(dishPopout); // polub raz (guard anty-dubel; nigdy nie odlajkowuje)
               }}>
               {dishPopout.img ? <img src={dishPopout.img} alt={dishPopout.name} /> : <span className="mfm-pop-ph">{dishPopout.icon}</span>}
-              {burstKey === itemKey(dishPopout) && <span className="mfm-pop-burst"><HeartIcon filled /></span>}
+              {floatHearts.map((h) => (
+                <span key={h.id} className="mfm-float-heart" style={{ left: h.x, top: h.y, "--rot": `${h.rot}deg` }}>
+                  <HeartIcon filled />
+                </span>
+              ))}
               <button className="mfm-pop-close" onClick={() => setDishPopout(null)}>×</button>
               <button className={`mfm-pop-like ${isLiked(dishPopout) ? "is-liked" : ""}`} onClick={(e) => { e.stopPropagation(); toggleLike(dishPopout); }}>
                 <HeartIcon filled={isLiked(dishPopout)} className="mfm-pop-like-ico" /> <span>{getLikes(dishPopout)}</span>
@@ -417,7 +441,9 @@ function MobileFullMenu() {
         .mfm-top-badge svg { font-size: 11px; color: #FE2C55; }
         .mfm-top-name { font-family: var(--f-body); font-size: 11px; line-height: 1.25; color: var(--c-deep); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
         /* serce TikTok-style — wyśrodkowane na dole zdjęcia, małe, NIE ucięte */
-        .mfm-thumb-like { position: absolute; bottom: 3px; left: 50%; transform: translateX(-50%); display: inline-flex; align-items: center; justify-content: center; gap: 2px; padding: 2px 6px; border-radius: 999px; background: rgba(0,0,0,0.55); backdrop-filter: blur(4px); cursor: pointer; line-height: 1; z-index: 4; max-width: calc(100% - 8px); box-sizing: border-box; }
+        /* wrap bez overflow — serce "wystaje" poza zdjęcie i nigdy nie jest ucięte */
+        .mfm-thumb-wrap { position: relative; flex: 0 0 auto; }
+        .mfm-thumb-like { position: absolute; bottom: -7px; left: 50%; transform: translateX(-50%); display: inline-flex; align-items: center; justify-content: center; gap: 2px; padding: 3px 7px; border-radius: 999px; background: rgba(0,0,0,0.62); backdrop-filter: blur(4px); cursor: pointer; line-height: 1; z-index: 4; white-space: nowrap; box-sizing: border-box; box-shadow: 0 2px 8px rgba(0,0,0,0.25); }
         .mfm-thumb-like-ico { font-size: 11px; width: 11px; height: 11px; color: #fff; display: block; flex-shrink: 0; }
         .mfm-thumb-like.is-liked .mfm-thumb-like-ico { animation: mfmPulse .3s ease; }
         .mfm-thumb-like-n { font-size: 9px; font-weight: 700; color: #fff; }
@@ -455,7 +481,15 @@ function MobileFullMenu() {
         /* popout */
         .mfm-pop-overlay { position: fixed; inset: 0; z-index: 200; background: rgba(14,34,48,0.55); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; padding: 20px; }
         .mfm-pop { width: 100%; max-width: 400px; background: #fff; border-radius: 20px; overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,0.3); }
-        .mfm-pop-img { position: relative; height: 200px; background: linear-gradient(135deg, var(--c-sand), #E8DDC8); display: flex; align-items: center; justify-content: center; }
+        .mfm-pop-img { position: relative; height: 200px; background: linear-gradient(135deg, var(--c-sand), #E8DDC8); display: flex; align-items: center; justify-content: center; overflow: hidden; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+        /* TikTok floating hearts — wylatują z miejsca tapnięcia */
+        .mfm-float-heart { position: absolute; pointer-events: none; z-index: 6; color: #FE2C55; transform: translate(-50%, -50%); animation: mfmFloatUp 1.1s ease-out forwards; }
+        .mfm-float-heart svg { width: 36px; height: 36px; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.35)); }
+        @keyframes mfmFloatUp {
+          0% { opacity: 0; transform: translate(-50%, -50%) scale(0.4) rotate(var(--rot, 0deg)); }
+          14% { opacity: 1; transform: translate(-50%, -70%) scale(1.18) rotate(var(--rot, 0deg)); }
+          100% { opacity: 0; transform: translate(-50%, -380%) scale(0.95) rotate(var(--rot, 0deg)); }
+        }
         .mfm-pop-img img { width: 100%; height: 100%; object-fit: cover; }
         .mfm-pop-ph { font-size: 56px; opacity: 0.4; }
         .mfm-pop-close { position: absolute; top: 12px; right: 12px; width: 38px; height: 38px; border-radius: 50%; background: rgba(0,0,0,0.45); border: 1px solid rgba(255,255,255,0.4); color: #fff; font-size: 22px; display: grid; place-items: center; cursor: pointer; }
@@ -986,14 +1020,28 @@ function MobileDrinksList({ dark = true }) {
   const dKey = (it) => String(it.name || "").trim().toLowerCase();
   const dLikes = (it) => (likesMap[dKey(it)]?.likes || 0);
   const dLiked = (it) => { const id = likesMap[dKey(it)]?.id; return id ? likedSet.has(id) : false; };
+  const dLastLike = useRefM({ k: null, t: 0 }); // anty-dubel (touchend + dblclick)
   const dLikeOnly = async (it) => {
-    const k = dKey(it); const rec = likesMap[k]; if (!rec?.id) return;
+    const k = dKey(it);
+    const now = Date.now();
+    if (dLastLike.current.k === k && now - dLastLike.current.t < 600) return;
+    dLastLike.current = { k, t: now };
+    const rec = likesMap[k]; if (!rec?.id) return;
     setBurstKey(k); setTimeout(() => setBurstKey((c) => (c === k ? null : c)), 650);
     if (likedSet.has(rec.id)) return;
     setLikedSet((p) => { const n = new Set(p); n.add(rec.id); return n; });
     setLikesMap((p) => ({ ...p, [k]: { ...p[k], likes: (p[k]?.likes || 0) + 1 } }));
     await toggleMenuLike(rec.id);
   };
+
+  // 👑 Ulubieniec baru: pozycje z sercami sortowane malejąco, lider z koroną na rogu
+  const sortedItems = useMemoM(() => {
+    if (!canLike) return items;
+    return items.slice().sort((a, b) => dLikes(b) - dLikes(a));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, canLike, likesMap]);
+  const topKey = canLike && sortedItems.length > 0 && dLikes(sortedItems[0]) > 0 ? dKey(sortedItems[0]) : null;
+  const crownLabel = ({ it: "Il preferito del bar", pl: "Ulubieniec baru", en: "Bar favorite", de: "Bar-Favorit", fr: "Préféré du bar", es: "Favorito del bar" })[lang] || "Il preferito del bar";
   const dToggle = async (it) => {
     const k = dKey(it); const rec = likesMap[k]; if (!rec?.id) return;
     const was = likedSet.has(rec.id); const delta = was ? -1 : 1;
@@ -1021,8 +1069,9 @@ function MobileDrinksList({ dark = true }) {
       {/* siatka — ze zdjęciami (drinki/piwa) lub prosta lista (alkohole) */}
       {withPhoto ? (
         <div className="mdr-grid">
-          {items.map((it, i) => (
-            <div key={`${filter}-${i}`} className="mdr-card">
+          {sortedItems.map((it, i) => (
+            <div key={`${filter}-${i}`} className={`mdr-card ${topKey === dKey(it) ? "mdr-top" : ""}`}>
+              {topKey === dKey(it) && <span className="mdr-crown">👑 {crownLabel}</span>}
               <div className="mdr-card-img"
                 onDoubleClick={canLike ? (e) => { e.stopPropagation(); dLikeOnly(it); } : undefined}
                 onTouchEnd={canLike ? (e) => { const now = Date.now(); const last = e.currentTarget._lt || 0; e.currentTarget._lt = now; if (now - last < 320) { e.preventDefault(); e.stopPropagation(); dLikeOnly(it); } } : undefined}>
@@ -1047,8 +1096,9 @@ function MobileDrinksList({ dark = true }) {
         </div>
       ) : (
         <ul className="mdr-list">
-          {items.map((it, i) => (
-            <li key={`${filter}-${i}`} className="mdr-row">
+          {sortedItems.map((it, i) => (
+            <li key={`${filter}-${i}`} className={`mdr-row ${topKey === dKey(it) ? "mdr-top-row" : ""}`}>
+              {topKey === dKey(it) && <span className="mdr-crown mdr-crown-row">👑 {crownLabel}</span>}
               <div className="mdr-row-main">
                 <span className="mdr-row-name">{it.name}</span>
                 {it.desc && <span className="mdr-row-desc">{it.desc}</span>}
@@ -1065,7 +1115,7 @@ function MobileDrinksList({ dark = true }) {
           ))}
         </ul>
       )}
-      {items.length === 0 && <div className="mdr-empty">Niente in questa categoria.</div>}
+      {items.length === 0 && <div className="mdr-empty">{({ it: "Niente in questa categoria.", pl: "Nic w tej kategorii.", en: "Nothing in this category.", de: "Nichts in dieser Kategorie.", fr: "Rien dans cette catégorie.", es: "Nada en esta categoría." })[lang] || "Niente in questa categoria."}</div>}
 
       <style>{`
         .mdr { margin-top: 8px; }
@@ -1086,6 +1136,13 @@ function MobileDrinksList({ dark = true }) {
         .mdr-like svg { font-size: 12px; width: 12px; height: 12px; display: block; }
         .mdr-burst { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; z-index: 4; }
         .mdr-burst svg { font-size: 48px; color: #FE2C55; animation: fmenuHeartPop .6s cubic-bezier(.17,.89,.32,1.28); }
+        /* 👑 Ulubieniec baru — lider polubień wyróżniony złotem + korona na rogu */
+        .mdr-card.mdr-top { position: relative; overflow: visible; border: 1.5px solid rgba(244,208,63,0.7); box-shadow: 0 10px 30px rgba(244,208,63,0.22), 0 6px 20px rgba(0,0,0,0.18); }
+        .mdr-crown { position: absolute; top: -11px; right: 10px; z-index: 5; display: inline-flex; align-items: center; gap: 4px;
+          padding: 3px 10px; border-radius: 999px; background: linear-gradient(135deg, #F4D03F, #E0A92E); color: #3a2a05;
+          font-size: 10px; font-weight: 800; letter-spacing: 0.02em; white-space: nowrap; box-shadow: 0 4px 14px rgba(244,208,63,0.5); }
+        .mdr-row.mdr-top-row { position: relative; border: 1px solid rgba(244,208,63,0.55); border-radius: 12px; background: rgba(244,208,63,0.08); margin-top: 16px; padding: 16px 12px 12px; }
+        .mdr-crown-row { top: -10px; left: 10px; right: auto; }
         .mdr-row-like { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 3px; padding: 4px 9px; border-radius: 999px; border: 1px solid ${dark ? "rgba(255,255,255,0.18)" : "var(--c-line)"}; background: ${dark ? "rgba(255,255,255,0.06)" : "#fff"}; color: ${dark ? "#fff" : "var(--c-deep)"}; font-size: 11px; font-weight: 700; cursor: pointer; line-height: 1; }
         .mdr-row-like svg { font-size: 13px; width: 13px; height: 13px; display: block; }
         .mdr-row-like.is-liked { border-color: #FE2C55; color: #FE2C55; }

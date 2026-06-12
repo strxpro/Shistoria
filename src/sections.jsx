@@ -14,6 +14,7 @@ function Eventi({ t }) {
   const intervalRef = useRefE(null);
   const touchRef = useRefE({ startX: 0, startY: 0 });
   const [reminderEvent, setReminderEvent] = useStateE(null);
+  const [eventPopout, setEventPopout] = useStateE(null); // G9: fullscreen popout eventu
   const [remForm, setRemForm] = useStateE({ name: "", email: "" });
   const [remSent, setRemSent] = useStateE(false);
   const evLang = (typeof window !== "undefined" && window.currentLanguage) || "it";
@@ -43,14 +44,30 @@ function Eventi({ t }) {
     return () => { try { ch?.unsubscribe?.(); } catch {} };
   }, []);
 
-  // Auto-przesuwanie co 4s (tylko gdy playing)
+  // Auto-przesuwanie co 4s (tylko gdy playing i bez otwartego popoutu)
   useEffectE(() => {
-    if (events.length <= 1 || !playing) return;
+    if (events.length <= 1 || !playing || eventPopout) return;
     intervalRef.current = setInterval(() => {
       setActiveIdx(i => (i + 1) % events.length);
     }, 4000);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [events.length, playing]);
+  }, [events.length, playing, eventPopout]);
+
+  // G9: blokada scrolla gdy fullscreen popout eventu otwarty
+  useEffectE(() => {
+    if (typeof document === "undefined") return;
+    if (eventPopout) {
+      document.body.style.overflow = "hidden";
+      if (typeof window !== "undefined" && window.lenis) window.lenis.stop();
+    } else {
+      document.body.style.overflow = "";
+      if (typeof window !== "undefined" && window.lenis) window.lenis.start();
+    }
+    return () => {
+      document.body.style.overflow = "";
+      if (typeof window !== "undefined" && window.lenis) window.lenis.start();
+    };
+  }, [eventPopout]);
 
   const goNext = () => setActiveIdx(i => (i + 1) % events.length);
   const goPrev = () => setActiveIdx(i => (i - 1 + events.length) % events.length);
@@ -110,12 +127,10 @@ function Eventi({ t }) {
                 style={{ "--ev-x": `${s.x}px`, "--ev-s": s.scale, "--ev-o": s.opacity, "--ev-z": s.z }}
                 onClick={(ev) => {
                   if (!isActive) { ev.stopPropagation(); setActiveIdx(i); return; }
-                  // aktywna karta: klik lewa/prawa połowa = prev/next (ale nie na przyciskach)
+                  // G9: klik w AKTYWNĄ (środkową) kartę → fullscreen popout z detalami
                   if (ev.target.closest("button")) return;
-                  const rect = ev.currentTarget.getBoundingClientRect();
-                  const x = ev.clientX - rect.left;
                   ev.stopPropagation();
-                  if (x < rect.width / 2) goPrev(); else goNext();
+                  setEventPopout(e);
                 }}>
                 {/* Progress indicators (stories style) — tylko na aktywnej */}
                 {isActive && (
@@ -167,9 +182,30 @@ function Eventi({ t }) {
         </div>
 
         <div className="ev-cta reveal">
-          <a href="#contatti" className="btn btn-ghost">Tutti gli eventi <span className="arrow">→</span></a>
+          <a href="#contatti" className="btn btn-ghost">{({ it: "Tutti gli eventi", pl: "Wszystkie wydarzenia", en: "All events", de: "Alle Events", fr: "Tous les événements", es: "Todos los eventos" })[evLang] || "Tutti gli eventi"} <span className="arrow">→</span></a>
         </div>
       </div>
+
+      {/* G9: fullscreen popout eventu — klik środkowej karty */}
+      {eventPopout && (
+        <div className="ev-full-overlay" onClick={() => setEventPopout(null)}>
+          <div className="ev-full" onClick={(ev) => ev.stopPropagation()}>
+            <button className="ev-rem-close ev-full-close" onClick={() => setEventPopout(null)} aria-label="Chiudi">×</button>
+            <div className="ev-full-img" style={{ background: eventPopout.custom_colors?.bg || (eventPopout.phType === "food" ? "#2d1b0e" : eventPopout.phType === "sea" ? "#0e2840" : "#1a1040") }}>
+              {eventPopout.image_url && <img src={eventPopout.image_url} alt={eventPopout.title} />}
+              <span className="ev-card-tag ev-full-tag">{eventPopout.tag || "Evento"}</span>
+            </div>
+            <div className="ev-full-body">
+              <span className="ev-full-date">{eventPopout.event_date || eventPopout.date || ""}</span>
+              <h3 className="ev-full-title">{eventPopout.title}</h3>
+              {eventPopout.description && <p className="ev-full-desc">{eventPopout.description}</p>}
+              <button className="ev-remind-btn ev-full-remind" onClick={() => { setEventPopout(null); setReminderEvent(eventPopout); }}>
+                🔔 {remindLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal przypomnienia o wydarzeniu */}
       {reminderEvent && (
@@ -229,6 +265,28 @@ function Eventi({ t }) {
           border-radius:999px; border:1px solid rgba(255,255,255,0.3); background:rgba(255,255,255,0.12); color:#fff;
           font-family:var(--f-body); font-size:13px; font-weight:600; cursor:pointer; backdrop-filter:blur(6px); transition:all .2s; }
         .ev-remind-btn:hover { background:var(--c-coral,#E8927C); border-color:transparent; }
+        /* G9: fullscreen popout eventu */
+        .ev-full-overlay { position:fixed; inset:0; z-index:5000; background:rgba(6,10,16,0.94); backdrop-filter:blur(10px);
+          display:flex; align-items:center; justify-content:center; animation:evFadeIn .25s ease; }
+        .ev-full { position:relative; width:100%; height:100%; max-width:760px; background:#0f1620; overflow-y:auto;
+          animation:evPopIn .35s cubic-bezier(.2,.85,.2,1); scrollbar-width:none; }
+        .ev-full::-webkit-scrollbar { display:none; }
+        @media (min-width:768px) { .ev-full { height:auto; max-height:92vh; border-radius:24px; } }
+        .ev-full-close { position:absolute; top:max(14px, env(safe-area-inset-top)); right:14px; z-index:6;
+          background:rgba(0,0,0,0.5); color:#fff; border:1px solid rgba(255,255,255,0.25); }
+        .ev-full-img { position:relative; height:46vh; min-height:240px; overflow:hidden; }
+        .ev-full-img img { width:100%; height:100%; object-fit:cover; }
+        .ev-full-img::after { content:""; position:absolute; left:0; right:0; bottom:0; height:55%;
+          background:linear-gradient(180deg, transparent, #0f1620); pointer-events:none; }
+        .ev-full-tag { position:absolute; top:max(16px, env(safe-area-inset-top)); left:16px; z-index:5; }
+        .ev-full-body { position:relative; padding:6px 24px calc(40px + env(safe-area-inset-bottom)); margin-top:-30px;
+          color:#fff; display:flex; flex-direction:column; gap:14px; }
+        .ev-full-date { font-size:12px; letter-spacing:0.18em; text-transform:uppercase; opacity:0.65; }
+        .ev-full-title { font-family:var(--f-display); font-weight:800; font-size:clamp(30px, 7.5vw, 46px); line-height:1.05; margin:0; letter-spacing:-0.02em; }
+        .ev-full-desc { font-size:16px; line-height:1.65; opacity:0.85; margin:0; max-width:560px; }
+        .ev-full-remind { align-self:flex-start; margin-top:6px; }
+        @keyframes evFadeIn { from { opacity:0; } to { opacity:1; } }
+        @keyframes evPopIn { from { opacity:0; transform:scale(0.96) translateY(18px); } to { opacity:1; transform:none; } }
         .ev-rem-overlay { position:fixed; inset:0; z-index:5000; background:rgba(10,15,20,0.6); backdrop-filter:blur(8px);
           display:flex; align-items:center; justify-content:center; padding:24px; }
         .ev-rem-pop { position:relative; width:min(380px,92vw); background:#fff; border-radius:20px; padding:28px 24px;
