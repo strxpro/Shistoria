@@ -68,7 +68,7 @@ if (typeof window !== "undefined") {
   try { ScrollTrigger.config({ ignoreMobileResize: true }); } catch { /* ignore */ }
 }
 
-import { supabase, getSessionId, createOrder, publishDrink, likeDrink, addComment, getComments, claimDrink as claimDrinkApi } from "./lib/supabase";
+import { supabase, getSessionId, createOrder, newOrderId, publishDrink, likeDrink, addComment, getComments, claimDrink as claimDrinkApi } from "./lib/supabase";
 import { findCocktailByIngredients } from "./lib/cocktail-db";
 import { PersonalizedQR } from "./components/PersonalizedQR";
 
@@ -2518,23 +2518,23 @@ function CocktailExperience() {
         {/* Modal: znaleziono klasyczny drink → 2 opcje (zamów od razu / kontynuuj) */}
         {drinkChoiceOpen && apiDrink && (
           <DrinkFound drink={apiDrink} searching={false}
-            onOrderNow={async () => {
+            onOrderNow={() => {
               setDrinkChoiceOpen(false);
-              // C1: "Zamów teraz" → QR OD RAZU (bez wyboru szklanki); order dociąga się w tle
-              setDirectOrder({ name: apiDrink.name });
+              // C1: "Zamów teraz" → QR OD RAZU. ID generujemy po stronie klienta,
+              // więc QR pokazuje się natychmiast; zapis do Supabase leci w tle.
+              const oid = newOrderId();
+              if (typeof window !== "undefined") (window as any).__sh_orderId = oid;
+              setDirectOrder({ name: apiDrink.name, orderId: oid });
               setDirectQrOpen(true);
               setStage("glassReady");
-              try {
-                const order = await createOrder({
-                  drink_name: apiDrink.name,
-                  author_name: customerName || "Anonimo",
-                  ingredients: poured.map(p => ({ id: p.ing.id, name: p.ing.name, color: p.ing.color, ml: Math.round(p.ml) })),
-                  total_ml: totalMl,
-                  strength_label: strength.label,
-                });
-                setDirectOrder({ name: apiDrink.name, orderId: order?.id });
-                if (order?.id) (window as any).__sh_orderId = order.id;
-              } catch (e) { console.error(e); }
+              createOrder({
+                id: oid,
+                drink_name: apiDrink.name,
+                author_name: customerName || "Anonimo",
+                ingredients: poured.map(p => ({ id: p.ing.id, name: p.ing.name, color: p.ing.color, ml: Math.round(p.ml) })),
+                total_ml: totalMl,
+                strength_label: strength.label,
+              }).catch((e) => console.error(e));
             }}
             onContinue={() => setDrinkChoiceOpen(false)}
           />
@@ -4942,23 +4942,26 @@ function NameCard({
 
   const handleSubmit = async () => {
     setDone(true);
+    // QR OD RAZU: generujemy ID po stronie klienta — QR renderuje się natychmiast,
+    // a zapis do Supabase leci w tle (bez czekania na round-trip = bez klepsydry).
+    const oid = newOrderId();
+    setOrderId(oid);
+    if (typeof window !== "undefined") (window as any).__sh_orderId = oid;
     // Zapisz lokalnie
     if (typeof localStorage !== "undefined") {
       const drinks = JSON.parse(localStorage.getItem("sh-my-drinks") || "[]");
       drinks.push({ name: drinkName, author: customerName, ingredients: poured.map(p => ({id: p.ing.id, name: p.ing.name, color: p.ing.color, ml: Math.round(p.ml)})), ml: Math.round(poured.reduce((s,p)=>s+p.ml,0)), strength: "—", color, saved_at: new Date().toISOString() });
       localStorage.setItem("sh-my-drinks", JSON.stringify(drinks));
     }
-    // Utwórz order w Supabase → prawdziwy QR z linkiem
-    try {
-      const order = await createOrder({
-        drink_name: drinkName,
-        author_name: customerName,
-        ingredients: poured.map(p => ({id: p.ing.id, name: p.ing.name, color: p.ing.color, ml: Math.round(p.ml)})),
-        total_ml: Math.round(poured.reduce((s,p)=>s+p.ml,0)),
-        strength_label: "—",
-      });
-      if (order?.id) { setOrderId(order.id); (window as any).__sh_orderId = order.id; }
-    } catch (e) { console.error("Order creation failed:", e); }
+    // Utwórz order w Supabase w tle (z tym samym ID co QR)
+    createOrder({
+      id: oid,
+      drink_name: drinkName,
+      author_name: customerName,
+      ingredients: poured.map(p => ({id: p.ing.id, name: p.ing.name, color: p.ing.color, ml: Math.round(p.ml)})),
+      total_ml: Math.round(poured.reduce((s,p)=>s+p.ml,0)),
+      strength_label: "—",
+    }).catch((e) => console.error("Order creation failed:", e));
   };
 
   const [qrOpen, setQrOpen] = useState(false);
@@ -5169,11 +5172,11 @@ function DbDrinkCard({ d }: { d: any }) {
     if (now - lastTap.current < 320) { e.preventDefault(); if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; } showBurst(); doLike(); }
     lastTap.current = now;
   };
-  const handleOrder = async () => {
-    try {
-      const order = await createOrder({ drink_id: d.id, drink_name: d.name, author_name: d.author_name, ingredients: d.ingredients || [], total_ml: d.total_ml || 0, strength_label: d.strength_label || "—" });
-      if (order?.id) setOrderQR(`${typeof window !== "undefined" ? window.location.origin : ""}/order/${order.id}`);
-    } catch {}
+  const handleOrder = () => {
+    // QR od razu: kliencki ID, zapis do Supabase w tle
+    const oid = newOrderId();
+    setOrderQR(`${typeof window !== "undefined" ? window.location.origin : ""}/order/${oid}`);
+    createOrder({ id: oid, drink_id: d.id, drink_name: d.name, author_name: d.author_name, ingredients: d.ingredients || [], total_ml: d.total_ml || 0, strength_label: d.strength_label || "—" }).catch(() => {});
   };
 
   return (
@@ -5885,10 +5888,11 @@ function CommunityCard({ c }: { c: (typeof COMMUNITY)[number] }) {
   const handleOrder = () => {
     const ingredients = c.ingr.map(id => { const ing = ingById(id); return ing ? { id: ing.id, name: ing.name, color: ing.color, ml: ing.ml } : null; }).filter(Boolean);
     const totalMl = ingredients.reduce((s: number, i: any) => s + (i?.ml || 0), 0);
-    createOrder({ drink_name: c.name, author_name: c.by, ingredients: ingredients as any[], total_ml: totalMl, strength_label: alcCount === 0 ? "Analcolico" : alcCount <= 1 ? "Leggero" : "Forte" })
-      .then(order => {
-        if (order?.id) setOrderQR(`${typeof window !== "undefined" ? window.location.origin : ""}/order/${order.id}`);
-      });
+    // QR od razu: kliencki ID, zapis w tle
+    const oid = newOrderId();
+    setOrderQR(`${typeof window !== "undefined" ? window.location.origin : ""}/order/${oid}`);
+    createOrder({ id: oid, drink_name: c.name, author_name: c.by, ingredients: ingredients as any[], total_ml: totalMl, strength_label: alcCount === 0 ? "Analcolico" : alcCount <= 1 ? "Leggero" : "Forte" })
+      .catch(() => {});
   };
 
   const handleClick = () => {

@@ -121,7 +121,20 @@ export async function getComments(drinkId: string, limit = 3) {
 
 // ─── Orders (QR barman) ───────────────────────────────────────────────────────
 
+export function newOrderId(): string {
+  try {
+    if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  } catch { /* fallback poniżej */ }
+  // Fallback UUID v4 (starsze przeglądarki)
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
 export async function createOrder(drink: {
+  id?: string;
   drink_id?: string;
   drink_name: string;
   author_name: string;
