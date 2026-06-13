@@ -2922,22 +2922,33 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
   const cloned = useMemo(() => scene.clone(true), [scene]);
   const { actions, mixer } = useAnimations(animations, inner);
 
-  // CEL = punkt w przestrzeni overlay gdzie strumień powinien trafiać = OTWÓR wlotu szejkera.
-  // G4: celujemy w ŚRODEK OTWORU (góra szejkera: rest.y + height/2), lekko poniżej krawędzi,
-  // żeby strumień wizualnie wchodził DO środka — nie w korpus i nie obok.
-  const target = useMemo(() => {
-    const r = CONFIG.shakerRest;
-    return new THREE.Vector3(r.x, r.y + CONFIG.shakerHeight / 2 - 0.35, r.z);
-  }, []);
+  // CEL = punkt świata gdzie strumień ma trafić = REALNY otwór szejkera.
+  // Główna scena mierzy otwór na żywo i przekazuje go jako NDC (tx, ty). Tu odtwarzamy
+  // punkt świata przez UN-PROJEKCJĘ NDC w kamerze overlayu i przecięcie z płaszczyzną
+  // głębi szejkera (z = shakerRest.z). Dzięki temu strumień ZAWSZE ląduje dokładnie
+  // tam, gdzie widać otwór — niezależnie od rozmiaru/aspect canvasu (NDC.y nie zależy
+  // od aspect, a szejker jest wyśrodkowany w X). To naprawia "strumień obok szejkera".
+  const target = useMemo(() => new THREE.Vector3(CONFIG.shakerRest.x, CONFIG.shakerRest.y + 0.4, CONFIG.shakerRest.z), []);
+  const _aim = useMemo(() => new THREE.Vector3(), []);
+  const recomputeTarget = useCallback(() => {
+    // NDC → promień z kamery → przecięcie z płaszczyzną z = shakerRest.z
+    _aim.set(tx, ty, 0.5).unproject(camera);
+    _aim.sub(camera.position);
+    const dz = _aim.z;
+    if (Math.abs(dz) > 1e-4) {
+      const t = (CONFIG.shakerRest.z - camera.position.z) / dz;
+      target.copy(camera.position).addScaledVector(_aim, t);
+    }
+  }, [tx, ty, camera, _aim, target]);
 
-  // G4: wyrównanie kamery overlay z kamerą głównej sceny (ta patrzy na camTargetRest).
-  // Bez tego lookAt światy overlay/scena są przesunięte na ekranie i strumień
-  // ląduje obok widocznego szejkera.
+  // G4/H: wyrównanie kamery overlay z kamerą głównej sceny (ta patrzy na camTargetRest),
+  // żeby un-projekcja NDC odtworzyła dokładnie ten sam punkt ekranu co realny otwór.
   useLayoutEffect(() => {
     camera.position.set(CONFIG.camPos.x, CONFIG.camPos.y, CONFIG.camPos.z);
     camera.lookAt(CONFIG.camTargetRest.x, CONFIG.camTargetRest.y, CONFIG.camTargetRest.z);
     camera.updateProjectionMatrix();
-  }, [camera]);
+    recomputeTarget();
+  }, [camera, recomputeTarget]);
 
   const liquidMat = useMemo(() => {
     const c = new THREE.Color(color);
@@ -3157,7 +3168,8 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
   const _pts = useMemo(() => Array.from({ length: N_STREAM_PTS + 1 }, () => new THREE.Vector3()), []);
   useFrame(() => {
     invalidate();
-    
+    recomputeTarget(); // cel = realny otwór szejkera (z NDC) — odporne na rozmiar canvasu
+
     // Ruch butelki — NA MOBILE wyłączony (strumień musi być stabilny i przyklejony do szyjki)
     const isMob2 = typeof window !== "undefined" && window.innerWidth < 768;
     if (pouringRef.current && outer.current && !isMob2) {
