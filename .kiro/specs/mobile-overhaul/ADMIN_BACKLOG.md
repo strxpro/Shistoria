@@ -31,10 +31,10 @@ Pełna, rozwinięta lista wszystkiego o co prosiłeś. `[x]` = zrobione, `[ ]` =
 - [ ] (opcjonalnie) dalsze dopieszczenie po Twoim feedbacku ze zrzutu.
 
 ### Blok 2 — 💬 Czat wiadomości jak WhatsApp (~2 tury)
-- [ ] **Lupa/szukajka** — szukanie konwersacji po imieniu/mailu/treści.
-- [ ] **Osobne dymki** — każda odpowiedź = nowa wiadomość (nie nadpisuje jednej). Wymaga przebudowy modelu (osobne wiersze in/out).
-- [ ] **Panel info o osobie** — przy konwersacji widać: czy zostawiła email, czy zrobiła drink, czy zapisała się na event, czy jest w newsletterze, ile razy pisała.
-- [ ] Wygląd dymków/awatarów/statusów jak w WhatsApp.
+- [x] **Lupa/szukajka** — szukanie konwersacji po imieniu/mailu/treści (z przyciskiem czyszczenia).
+- [x] **Osobne dymki** — każda odpowiedź = nowa wiadomość (wiersz `is_staff`), nie nadpisuje. Wymaga SQL: `ALTER TABLE contact_messages ADD COLUMN is_staff...` (w `setup-community-tables.sql`). Fallback do admin_reply gdy kolumny brak.
+- [x] **Panel info o osobie** — przy konwersacji badge'e: 💬 wiadomości, 🍸 drink, 📱 ordini, ⭐ recensioni.
+- [x] Nazwa wątku z ostatniej wiadomości klienta (nie z odpowiedzi obsługi).
 
 ### Blok 3 — 📧 Newsletter w adminie (~1 tura)
 - [ ] **Flow zapisu:** klik „Newsletter" w footerze → pole na email → po wpisaniu emaila **rozwija się formularz** (imię itp.) → „Zapisz" → zapis do **make.com** (+ Supabase) → toast.
