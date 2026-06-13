@@ -37,6 +37,33 @@ export default function AdminPage() {
   const [pinErr, setPinErr] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [notif, setNotif] = useState<{ messages: number; reviews: number; orders: number }>({ messages: 0, reviews: 0, orders: 0 });
+  const [bellOpen, setBellOpen] = useState(false);
+
+  // Liczniki powiadomień (nieprzeczytane wiadomości, recenzje do zatwierdzenia, nowe zamówienia dziś)
+  useEffect(() => {
+    if (!authed) return;
+    const loadNotif = async () => {
+      try {
+        const since = new Date(Date.now() - 86400000).toISOString();
+        const [m, r, o] = await Promise.all([
+          supabase.from("contact_messages").select("id", { count: "exact", head: true }).eq("is_read", false),
+          supabase.from("reviews").select("id", { count: "exact", head: true }).eq("is_approved", false),
+          supabase.from("drink_orders").select("id", { count: "exact", head: true }).gte("created_at", since),
+        ]);
+        setNotif({ messages: m.count || 0, reviews: r.count || 0, orders: o.count || 0 });
+      } catch { /* ignore */ }
+    };
+    loadNotif();
+    const ch = supabase.channel("admin_notif")
+      .on("postgres_changes", { event: "*", schema: "public", table: "contact_messages" }, loadNotif)
+      .on("postgres_changes", { event: "*", schema: "public", table: "reviews" }, loadNotif)
+      .on("postgres_changes", { event: "*", schema: "public", table: "drink_orders" }, loadNotif)
+      .subscribe();
+    const poll = setInterval(loadNotif, 30000);
+    return () => { supabase.removeChannel(ch); clearInterval(poll); };
+  }, [authed]);
+  const totalNotif = notif.messages + notif.reviews;
 
   // Wczytaj zapamiętany motyw
   useEffect(() => {
@@ -88,16 +115,20 @@ export default function AdminPage() {
             { id: "newsletter", label: "Newsletter", ico: "📧" },
             { id: "reviews", label: "Recensioni", ico: "⭐" },
             { id: "stats", label: "Statistiche", ico: "📊" },
-          ] as { id: Tab; label: string; ico: string }[]).map((t) => (
-            <button
-              key={t.id}
-              className={tab === t.id ? "active" : ""}
-              onClick={() => { setTab(t.id); setNavOpen(false); }}
-            >
-              <span className="admin-nav-ico">{t.ico}</span>
-              <span className="admin-nav-label">{t.label}</span>
-            </button>
-          ))}
+          ] as { id: Tab; label: string; ico: string }[]).map((t) => {
+            const badge = t.id === "messages" ? notif.messages : t.id === "reviews" ? notif.reviews : t.id === "drinks" ? notif.orders : 0;
+            return (
+              <button
+                key={t.id}
+                className={tab === t.id ? "active" : ""}
+                onClick={() => { setTab(t.id); setNavOpen(false); }}
+              >
+                <span className="admin-nav-ico">{t.ico}</span>
+                <span className="admin-nav-label">{t.label}</span>
+                {badge > 0 && <span className="admin-nav-badge">{badge > 99 ? "99+" : badge}</span>}
+              </button>
+            );
+          })}
         </nav>
         {/* Przełącznik motywu jasny/ciemny */}
         <button className="admin-theme-toggle" onClick={toggleTheme}>
@@ -105,6 +136,37 @@ export default function AdminPage() {
         </button>
       </aside>
       <button className="admin-nav-toggle" onClick={() => setNavOpen((o) => !o)} aria-label="Menu">{navOpen ? "✕" : "☰"}</button>
+
+      {/* 🔔 Dzwonek powiadomień — prawy górny róg */}
+      <div className="admin-bell-wrap">
+        <button className="admin-bell" onClick={() => setBellOpen((o) => !o)} aria-label="Notifiche">
+          🔔{totalNotif > 0 && <span className="admin-bell-badge">{totalNotif > 99 ? "99+" : totalNotif}</span>}
+        </button>
+        {bellOpen && (
+          <>
+            <div className="admin-bell-backdrop" onClick={() => setBellOpen(false)} />
+            <div className="admin-bell-pop">
+              <div className="admin-bell-head">Notifiche</div>
+              {totalNotif === 0 && notif.orders === 0 && <div className="admin-bell-empty">Tutto in ordine ✓</div>}
+              {notif.messages > 0 && (
+                <button className="admin-bell-item" onClick={() => { setTab("messages"); setBellOpen(false); }}>
+                  💬 <span><strong>{notif.messages}</strong> messaggi non letti</span>
+                </button>
+              )}
+              {notif.reviews > 0 && (
+                <button className="admin-bell-item" onClick={() => { setTab("reviews"); setBellOpen(false); }}>
+                  ⭐ <span><strong>{notif.reviews}</strong> recensioni da approvare</span>
+                </button>
+              )}
+              {notif.orders > 0 && (
+                <button className="admin-bell-item" onClick={() => { setTab("drinks"); setBellOpen(false); }}>
+                  📱 <span><strong>{notif.orders}</strong> ordini nelle 24h</span>
+                </button>
+              )}
+            </div>
+          </>
+        )}
+      </div>
       <main className="admin-main">
         {tab === "menu" && <MenuHoursPanel />}
         {tab === "events" && <EventsPanel />}
@@ -1043,7 +1105,19 @@ function MessagesPanel() {
     setSending(true);
     const target = activeThread.last;
     const replyIt = draft.trim();
-    const lang = (target.language || "it").slice(0, 2);
+    // Wykryj JĘZYK KLIENTA z jego ostatniej wiadomości (kontakt z IMAP ma zapisane "it",
+    // więc nie ufamy temu — wykrywamy realny język tekstu klienta).
+    let lang = (target.language || "it").slice(0, 2);
+    const clientMsg = ([...activeThread.msgs].reverse().find((m: any) => !m.is_staff)?.message) || "";
+    if (clientMsg) {
+      try {
+        const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=${encodeURIComponent(clientMsg.slice(0, 200))}`);
+        const j = await r.json();
+        const detected = j?.[2];
+        if (detected && ["it", "pl", "en", "de", "fr", "es"].includes(detected)) lang = detected;
+      } catch { /* zostaw domyślny */ }
+    }
+    if (!["it", "pl", "en", "de", "fr", "es"].includes(lang)) lang = "it";
     // Zapis odpowiedzi jako OSOBNY dymek (nowy wiersz is_staff=true). Fallback: stare admin_reply.
     let inserted = false;
     try {
@@ -1053,10 +1127,9 @@ function MessagesPanel() {
     if (!inserted) {
       await supabase.from("contact_messages").update({ admin_reply: replyIt, is_read: true }).eq("id", target.id);
     } else {
-      // oznacz wiadomości klienta jako przeczytane
       await supabase.from("contact_messages").update({ is_read: true }).eq("email", activeThread.email);
     }
-    // Pre-tłumaczenie odpowiedzi na język klienta (make tylko wysyła gotowy tekst)
+    // Pre-tłumaczenie odpowiedzi na język klienta
     let replyTranslated = replyIt;
     if (lang !== "it") {
       try {
@@ -1065,24 +1138,16 @@ function MessagesPanel() {
         replyTranslated = (j?.[0] || []).map((s: any) => s[0]).join("") || replyIt;
       } catch { replyTranslated = replyIt; }
     }
-    const subjMap: Record<string, string> = { it: "Risposta da S'Historia", pl: "Odpowiedź od S'Historia", en: "Reply from S'Historia", de: "Antwort von S'Historia", fr: "Réponse de S'Historia", es: "Respuesta de S'Historia" };
-    const noteMap: Record<string, string> = {
-      it: "Puoi rispondere direttamente a questa email — ti risponderemo presto.",
-      pl: "Możesz odpowiedzieć bezpośrednio na tego maila — wkrótce się odezwiemy.",
-      en: "You can reply directly to this email — we'll get back to you soon.",
-      de: "Du kannst direkt auf diese E-Mail antworten — wir melden uns bald.",
-      fr: "Tu peux répondre directement à cet e-mail — nous te répondrons bientôt.",
-      es: "Puedes responder directamente a este correo — te responderemos pronto.",
-    };
-    const replySubject = subjMap[lang] || subjMap.it;
-    const replyNote = noteMap[lang] || noteMap.it;
-    const replyHtml = `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#15202b;">
-      <p style="font-size:15px;line-height:1.6;">${replyTranslated.replace(/\n/g, "<br>")}</p>
-      <p style="font-size:13px;color:#E8927C;margin-top:18px;">↩︎ ${replyNote}</p>
-      <hr style="border:none;border-top:1px solid #eee;margin:20px 0;">
-      <p style="font-size:12px;color:#888;">S'Historia · Rena Majore (OT), Sardegna · <a href="https://www.shistoria.it">www.shistoria.it</a></p>
-    </div>`;
-    // Webhook make.com → wyśle e-mail do klienta w jego języku (gotowy tekst + HTML)
+    // Markowy, ładny HTML w języku klienta (logo, kolory) — make wysyła gotowe pola
+    let replySubject = "Risposta da S'Historia";
+    let replyHtml = replyTranslated;
+    try {
+      const { adminReplyHTML } = await import("../../lib/email-templates");
+      const mail = adminReplyHTML({ name: target.name, replyText: replyTranslated, lang: lang as any });
+      replySubject = mail.subject;
+      replyHtml = mail.html;
+    } catch { /* fallback: czysty tekst */ }
+    // Webhook make.com → wyśle e-mail do klienta w jego języku (gotowy markowy HTML)
     try {
       const url = process.env.NEXT_PUBLIC_MAKE_REPLY_WEBHOOK || process.env.NEXT_PUBLIC_MAKE_CONTACT_WEBHOOK;
       if (url) {
@@ -2139,7 +2204,40 @@ function AdminStyles() {
       .stats-chart-card h3 { margin:0 0 14px; font-size:15px; font-weight:700; }
       .stats-chart-canvas { position:relative; height:240px; }
       @media (max-width:768px) { .stats-charts { grid-template-columns:1fr; } .stats-chart-canvas { height:220px; } }
+
+      /* ═══ LIQUID GLASS + DZWONEK + BADGE'E ═══ */
+      /* Liquid glass na sidebarze i kartach */
+      .admin-theme-dark .admin-nav { background:linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02)) !important; backdrop-filter:blur(22px) saturate(1.4); -webkit-backdrop-filter:blur(22px) saturate(1.4); }
+      .admin-theme-light .admin-nav { background:linear-gradient(180deg, rgba(255,255,255,0.92), rgba(255,255,255,0.7)) !important; backdrop-filter:blur(22px) saturate(1.4); -webkit-backdrop-filter:blur(22px) saturate(1.4); }
+      .admin-nav nav button { position:relative; }
+      /* Badge licznika przy zakładce */
+      .admin-nav-badge { margin-left:auto; min-width:20px; height:20px; padding:0 6px; border-radius:999px; background:#E8927C; color:#1a1a1a;
+        font-size:11px; font-weight:800; display:inline-flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(232,146,124,0.5); }
+      /* Dzwonek */
+      .admin-bell-wrap { position:fixed; top:16px; right:18px; z-index:240; }
+      .admin-bell { position:relative; width:46px; height:46px; border-radius:16px; border:1px solid rgba(255,255,255,0.14); cursor:pointer; font-size:20px;
+        background:linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04)); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+        box-shadow:0 8px 24px rgba(0,0,0,0.25); transition:transform .25s var(--spring,cubic-bezier(.22,1,.36,1)); }
+      .admin-bell:hover { transform:scale(1.06); }
+      .admin-bell:active { transform:scale(.94); }
+      .admin-theme-light .admin-bell { background:rgba(255,255,255,0.8); border-color:rgba(0,0,0,0.08); }
+      .admin-bell-badge { position:absolute; top:-4px; right:-4px; min-width:20px; height:20px; padding:0 5px; border-radius:999px; background:#C8102E; color:#fff;
+        font-size:11px; font-weight:800; display:flex; align-items:center; justify-content:center; border:2px solid #0a0e14; }
+      .admin-theme-light .admin-bell-badge { border-color:#eef1f6; }
+      .admin-bell-backdrop { position:fixed; inset:0; z-index:241; }
+      .admin-bell-pop { position:absolute; top:56px; right:0; z-index:242; width:280px; border-radius:18px; overflow:hidden; padding:8px;
+        background:linear-gradient(180deg, rgba(28,40,54,0.96), rgba(16,26,38,0.96)); backdrop-filter:blur(20px); -webkit-backdrop-filter:blur(20px);
+        border:1px solid rgba(255,255,255,0.12); box-shadow:0 24px 70px rgba(0,0,0,0.5); animation:adminPanelIn .3s var(--spring,ease) both; }
+      .admin-theme-light .admin-bell-pop { background:rgba(255,255,255,0.98); border-color:rgba(0,0,0,0.08); }
+      .admin-bell-head { font-size:12px; font-weight:800; letter-spacing:0.08em; text-transform:uppercase; opacity:0.6; padding:8px 10px 6px; }
+      .admin-bell-empty { padding:18px 12px; text-align:center; opacity:0.55; font-size:14px; }
+      .admin-bell-item { display:flex; align-items:center; gap:10px; width:100%; padding:11px 12px; border-radius:12px; border:none; cursor:pointer;
+        background:transparent; color:inherit; font-size:14px; text-align:left; transition:background .2s; }
+      .admin-bell-item:hover { background:rgba(232,146,124,0.14); }
+      .admin-bell-item strong { color:#E8927C; }
+      @media (max-width:768px) { .admin-bell-wrap { top:14px; right:14px; } .admin-bell { width:42px; height:42px; } }
     `}</style>
+
 
 
 

@@ -200,11 +200,17 @@ export async function subscribeEventReminder(data: {
 export async function subscribeNewsletter(data: {
   email: string; name?: string; lang: string;
 }): Promise<boolean> {
+  const { newsletterWelcomeHTML } = await import("./email-templates");
+  const lang = (["it","pl","en","de","fr","es"].includes(data.lang) ? data.lang : "it") as import("./email-templates").Lang;
+  const mail = newsletterWelcomeHTML({ name: data.name, lang });
   return send("newsletter", {
     type: "newsletter_signup",
     email: data.email,
     name: data.name || "",
     lang: data.lang,
+    // GOTOWY, markowy mail powitalny (make mapuje tylko te pola)
+    email_subject: mail.subject,
+    email_html: mail.html,
   });
 }
 

@@ -347,3 +347,47 @@ export function eventReminderHTML(v: EventVars, kind: "3d" | "5h"): { subject: s
   `;
   return { subject, html: shell(inner) };
 }
+
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * ODPOWIEDŹ Z ADMINA (czat) — markowy e-mail w języku klienta.
+ * ──────────────────────────────────────────────────────────────────────── */
+const REPLY_T: Record<Lang, { subject: string; hi: string; note: string }> = {
+  it: { subject: "Risposta da S'Historia", hi: "Ciao", note: "Puoi rispondere direttamente a questa email — ti risponderemo qui." },
+  pl: { subject: "Odpowiedź od S'Historia", hi: "Cześć", note: "Możesz odpowiedzieć bezpośrednio na tego maila — odpiszemy tutaj." },
+  en: { subject: "Reply from S'Historia", hi: "Hi", note: "You can reply directly to this email — we'll answer you here." },
+  de: { subject: "Antwort von S'Historia", hi: "Hallo", note: "Du kannst direkt auf diese E-Mail antworten — wir antworten dir hier." },
+  fr: { subject: "Réponse de S'Historia", hi: "Bonjour", note: "Tu peux répondre directement à cet e-mail — nous te répondrons ici." },
+  es: { subject: "Respuesta de S'Historia", hi: "Hola", note: "Puedes responder directamente a este correo — te contestaremos aquí." },
+};
+export function adminReplyHTML(v: { name?: string; replyText: string; lang: Lang }): { subject: string; html: string } {
+  const tr = REPLY_T[v.lang] ?? REPLY_T.it;
+  const inner = `
+    <h1 style="margin:0 0 14px;font-size:22px;color:${BRAND.cream};font-weight:800;">${tr.hi}${v.name ? ` ${v.name}` : ""},</h1>
+    <div style="font-size:16px;line-height:1.65;color:${BRAND.cream};white-space:pre-wrap;">${v.replyText.replace(/</g, "&lt;").replace(/\n/g, "<br>")}</div>
+    <div style="margin:22px 0 0;padding:14px 16px;background:rgba(232,146,124,0.1);border:1px solid rgba(232,146,124,0.3);border-radius:12px;font-size:13px;color:${BRAND.coral};">↩︎ ${tr.note}</div>
+  `;
+  return { subject: tr.subject, html: shell(inner) };
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * NEWSLETTER — markowy mail powitalny w języku subskrybenta.
+ * ──────────────────────────────────────────────────────────────────────── */
+const NEWS_T: Record<Lang, { subject: string; hi: string; body: string; cta: string }> = {
+  it: { subject: "Benvenuto nella newsletter S'Historia 🍸", hi: "Ciao", body: "Grazie per esserti iscritto! Riceverai novità su menu, eventi e i cocktail della community — una bella mail, non spam.", cta: "Visita il sito" },
+  pl: { subject: "Witaj w newsletterze S'Historia 🍸", hi: "Cześć", body: "Dziękujemy za zapis! Będziesz dostawać nowości o menu, wydarzeniach i drinkach społeczności — ładny mail, nie spam.", cta: "Odwiedź stronę" },
+  en: { subject: "Welcome to the S'Historia newsletter 🍸", hi: "Hi", body: "Thanks for subscribing! You'll get news about our menu, events and community cocktails — a nice email, not spam.", cta: "Visit the website" },
+  de: { subject: "Willkommen beim S'Historia Newsletter 🍸", hi: "Hallo", body: "Danke für deine Anmeldung! Du bekommst News zu Menü, Events und Community-Cocktails — eine schöne Mail, kein Spam.", cta: "Website besuchen" },
+  fr: { subject: "Bienvenue dans la newsletter S'Historia 🍸", hi: "Bonjour", body: "Merci de t'être inscrit ! Tu recevras des nouvelles sur le menu, les événements et les cocktails de la communauté — un bel e-mail, pas du spam.", cta: "Visiter le site" },
+  es: { subject: "Bienvenido a la newsletter de S'Historia 🍸", hi: "Hola", body: "¡Gracias por suscribirte! Recibirás novedades sobre el menú, eventos y cócteles de la comunidad — un correo bonito, no spam.", cta: "Visitar el sitio" },
+};
+export function newsletterWelcomeHTML(v: { name?: string; lang: Lang }): { subject: string; html: string } {
+  const tr = NEWS_T[v.lang] ?? NEWS_T.it;
+  const inner = `
+    <div style="text-align:center;font-size:42px;margin-bottom:6px;">📧</div>
+    <h1 style="margin:0 0 10px;font-size:24px;color:${BRAND.cream};text-align:center;font-weight:800;">${tr.hi}${v.name ? ` ${v.name}` : ""}!</h1>
+    <p style="margin:0 0 6px;font-size:16px;line-height:1.6;color:${BRAND.cream};text-align:center;">${tr.body}</p>
+    ${ctaButton(tr.cta, BRAND.site)}
+  `;
+  return { subject: tr.subject, html: shell(inner) };
+}
