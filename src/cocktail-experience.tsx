@@ -3062,7 +3062,7 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
     // pozycja "obok szejkera": butelka WYŻEJ — dłuższy, bardziej widoczny strumień
     const offX = isMob ? 0.7 : 1.0;
     const bodyX = side === "right" ? offX : -offX;
-    const bodyY = isMob ? 2.15 : 2.45;     // wyżej nad wlotem → dłuższy łuk strumienia
+    const bodyY = isMob ? 2.55 : 2.9;      // wyżej nad wlotem → dłuższy łuk strumienia
     const bodyZ = CONFIG.shakerRest.z;      // ta sama głębia co szejker → strumień trafia do otworu
     const tilt = side === "right" ? deg(isMob ? 145 : 140) : deg(isMob ? -145 : -140);
     const sPour = isMob ? 0.5 : 0.6;
