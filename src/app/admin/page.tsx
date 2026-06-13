@@ -949,6 +949,8 @@ function MessagesPanel() {
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [trMap, setTrMap] = useState<Record<string, string>>({});
+  const [search, setSearch] = useState("");
+  const [personInfo, setPersonInfo] = useState<{ msgs: number; drinks: number; orders: number; reviews: number } | null>(null);
 
   const load = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -982,6 +984,38 @@ function MessagesPanel() {
   }, [messages]);
 
   const activeThread = threads.find((t) => t.email === activeEmail) || threads[0] || null;
+
+  // Szukajka — filtruj wątki po imieniu / mailu / treści
+  const filteredThreads = React.useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return threads;
+    return threads.filter((t) =>
+      (t.name || "").toLowerCase().includes(q) ||
+      (t.email || "").toLowerCase().includes(q) ||
+      t.msgs.some((m: any) => (m.message || "").toLowerCase().includes(q))
+    );
+  }, [threads, search]);
+
+  // Panel info o osobie — z czym jest powiązana (drink / zamówienia / recenzje)
+  useEffect(() => {
+    if (!activeThread) { setPersonInfo(null); return; }
+    let cancelled = false;
+    const email = activeThread.email;
+    const name = activeThread.name;
+    const msgs = activeThread.msgs.length;
+    (async () => {
+      try {
+        const [drk, ord, rev] = await Promise.all([
+          supabase.from("community_drinks").select("id", { count: "exact", head: true }).eq("author_name", name),
+          supabase.from("drink_orders").select("id", { count: "exact", head: true }).eq("author_name", name),
+          supabase.from("reviews").select("id", { count: "exact", head: true }).eq("email", email),
+        ]);
+        if (!cancelled) setPersonInfo({ msgs, drinks: drk.count || 0, orders: ord.count || 0, reviews: rev.count || 0 });
+      } catch { if (!cancelled) setPersonInfo({ msgs, drinks: 0, orders: 0, reviews: 0 }); }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeThread?.email]);
 
   // Tłumacz KAŻDĄ wiadomość klienta na włoski (auto-wykrywanie języka źródłowego)
   useEffect(() => {
@@ -1065,20 +1099,27 @@ function MessagesPanel() {
 
       {loading ? <Skeleton /> : (
         <div className="amsg-chat">
-          {/* Lewa kolumna: lista konwersacji */}
-          <div className="amsg-list">
-            {threads.map((t) => (
-              <button key={t.email} className={`amsg-thread ${activeThread?.email === t.email ? "active" : ""} ${t.unread ? "unread" : ""}`}
-                onClick={() => { setActiveEmail(t.email); if (t.unread) markThreadRead(t.email); }}>
-                <span className="amsg-avatar">{(t.name || "?").charAt(0).toUpperCase()}</span>
-                <span className="amsg-thread-info">
-                  <span className="amsg-thread-name">{t.name}</span>
-                  <span className="amsg-thread-preview">{t.last.message || "—"}</span>
-                </span>
-                {t.unread && <span className="amsg-dot" />}
-              </button>
-            ))}
-            {threads.length === 0 && <p className="admin-empty">Nessun messaggio.</p>}
+          {/* Lewa kolumna: szukajka + lista konwersacji */}
+          <div className="amsg-listcol">
+            <div className="amsg-search">
+              <span className="amsg-search-ico">🔍</span>
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cerca per nome, email o testo…" />
+              {search && <button className="amsg-search-clear" onClick={() => setSearch("")} aria-label="Pulisci">✕</button>}
+            </div>
+            <div className="amsg-list">
+              {filteredThreads.map((t) => (
+                <button key={t.email} className={`amsg-thread ${activeThread?.email === t.email ? "active" : ""} ${t.unread ? "unread" : ""}`}
+                  onClick={() => { setActiveEmail(t.email); if (t.unread) markThreadRead(t.email); }}>
+                  <span className="amsg-avatar">{(t.name || "?").charAt(0).toUpperCase()}</span>
+                  <span className="amsg-thread-info">
+                    <span className="amsg-thread-name">{t.name}</span>
+                    <span className="amsg-thread-preview">{t.last.message || "—"}</span>
+                  </span>
+                  {t.unread && <span className="amsg-dot" />}
+                </button>
+              ))}
+              {filteredThreads.length === 0 && <p className="admin-empty">{search ? "Nessun risultato." : "Nessun messaggio."}</p>}
+            </div>
           </div>
 
           {/* Prawa kolumna: czat */}
@@ -1089,6 +1130,14 @@ function MessagesPanel() {
                   <div>
                     <strong>{activeThread.name}</strong>
                     <span className="amsg-conv-meta">{activeThread.email} · 🌐 {activeThread.last.language}</span>
+                    {personInfo && (
+                      <div className="amsg-person">
+                        <span className="amsg-badge">💬 {personInfo.msgs} msg</span>
+                        {personInfo.drinks > 0 && <span className="amsg-badge amsg-badge-coral">🍸 {personInfo.drinks} drink</span>}
+                        {personInfo.orders > 0 && <span className="amsg-badge amsg-badge-sky">📱 {personInfo.orders} ordini</span>}
+                        {personInfo.reviews > 0 && <span className="amsg-badge amsg-badge-gold">⭐ {personInfo.reviews} recensioni</span>}
+                      </div>
+                    )}
                   </div>
                   <button className="admin-btn-sm admin-btn-danger" onClick={() => removeThread(activeThread.email)}>🗑</button>
                 </div>
@@ -1894,7 +1943,26 @@ function AdminStyles() {
         .admin-main { padding:64px 14px 24px; }
         .admin-panel-head h1 { font-size:24px; }
       }
+
+      /* ── Czat: szukajka + kolumna listy + panel info o osobie ── */
+      .amsg-listcol { display:flex; flex-direction:column; gap:10px; min-height:0; }
+      .amsg-search { display:flex; align-items:center; gap:8px; padding:9px 12px; border-radius:14px; flex-shrink:0;
+        background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); transition:border-color .2s, box-shadow .2s; }
+      .amsg-search:focus-within { border-color:#E8927C; box-shadow:0 0 0 4px rgba(232,146,124,0.15); }
+      .amsg-search-ico { font-size:14px; opacity:0.6; }
+      .amsg-search input { flex:1; background:none; border:none; outline:none; color:inherit; font-size:14px; font-family:inherit; }
+      .amsg-search-clear { background:none; border:none; color:inherit; opacity:0.5; cursor:pointer; font-size:13px; }
+      .amsg-search-clear:hover { opacity:1; }
+      .admin-theme-light .amsg-search { background:#f4f6f9; border-color:rgba(0,0,0,0.1); }
+      .amsg-person { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+      .amsg-badge { font-size:11px; font-weight:700; padding:4px 10px; border-radius:999px;
+        background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); color:inherit; }
+      .amsg-badge-coral { background:rgba(232,146,124,0.18); border-color:rgba(232,146,124,0.4); color:#E8927C; }
+      .amsg-badge-sky { background:rgba(91,184,212,0.18); border-color:rgba(91,184,212,0.4); color:#5BB8D4; }
+      .amsg-badge-gold { background:rgba(241,196,15,0.18); border-color:rgba(241,196,15,0.4); color:#f1c40f; }
+      .admin-theme-light .amsg-badge { background:rgba(0,0,0,0.05); border-color:rgba(0,0,0,0.1); }
     `}</style>
+
 
 
   );
