@@ -5152,6 +5152,11 @@ function DbDrinkCard({ d }: { d: any }) {
     } catch {}
     setComments((prev) => [{ id: `tmp-${Date.now()}`, author, content: t, created_at: new Date().toISOString() }, ...prev].slice(0, 3));
     try { await addComment(d.id, author, t); } catch {}
+    // Powiadomienie make.com o nowym komentarzu (best-effort, nieblokujące)
+    try {
+      const { notifyComment } = await import("./lib/make-webhooks");
+      notifyComment({ drink_id: d.id, drink_name: d.name, author, content: t, lang });
+    } catch {}
   };
 
   const doLike = async () => {

@@ -14,20 +14,21 @@
 
 type Json = Record<string, unknown>;
 
-function webhook(key: "contact" | "drink" | "winner" | "event" | "newsletter"): string | null {
+function webhook(key: "contact" | "drink" | "winner" | "event" | "newsletter" | "comment"): string | null {
   const map: Record<string, string | undefined> = {
     contact: process.env.NEXT_PUBLIC_MAKE_CONTACT_WEBHOOK,
     drink: process.env.NEXT_PUBLIC_MAKE_DRINK_WEBHOOK,
     winner: process.env.NEXT_PUBLIC_MAKE_WINNER_WEBHOOK,
     event: process.env.NEXT_PUBLIC_MAKE_EVENT_WEBHOOK,
     newsletter: process.env.NEXT_PUBLIC_MAKE_NEWSLETTER_WEBHOOK,
+    comment: process.env.NEXT_PUBLIC_MAKE_COMMENT_WEBHOOK,
   };
   // Fallback: pojedynczy webhook dla wszystkiego (window override do testów)
   const single = (typeof window !== "undefined" && (window as any).__MAKE_WEBHOOK) || process.env.NEXT_PUBLIC_MAKE_WEBHOOK;
   return map[key] || single || null;
 }
 
-async function send(key: "contact" | "drink" | "winner" | "event" | "newsletter", payload: Json): Promise<boolean> {
+async function send(key: "contact" | "drink" | "winner" | "event" | "newsletter" | "comment", payload: Json): Promise<boolean> {
   const url = webhook(key);
   if (!url) { console.info(`[make] webhook '${key}' nieskonfigurowany — pomijam`); return false; }
   try {
@@ -204,5 +205,23 @@ export async function subscribeNewsletter(data: {
     email: data.email,
     name: data.name || "",
     lang: data.lang,
+  });
+}
+
+
+/* ── 6. Komentarz do drinka (community) ────────────────────────────────────
+ * → make.com: powiadomienie (np. e-mail/WhatsApp do właściciela o nowym
+ *   komentarzu) lub moderacja. Nieblokujące — best effort.
+ */
+export async function notifyComment(data: {
+  drink_id: string; drink_name?: string; author: string; content: string; lang?: string;
+}): Promise<boolean> {
+  return send("comment", {
+    type: "new_comment",
+    drink_id: data.drink_id,
+    drink_name: data.drink_name || "",
+    author: data.author,
+    content: data.content,
+    lang: data.lang || "it",
   });
 }

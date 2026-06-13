@@ -157,3 +157,26 @@ $body = @{
 Invoke-RestMethod -Method POST -Uri "PASTE_REPLY_WEBHOOK_URL" -ContentType "application/json" -Body $body
 ```
 (Najpierw „Run once" w make, potem odpal komendę.)
+
+
+---
+
+## 💭 KOMENTARZE — powiadomienie o nowym komentarzu (new_comment)
+
+Webhook: `NEXT_PUBLIC_MAKE_COMMENT_WEBHOOK` (jeśli brak → fallback na CONTACT)
+
+Gdy ktoś doda komentarz pod drinkiem w community, strona wysyła JSON:
+- `type` = `new_comment`
+- `drink_id`, `drink_name`, `author`, `content`, `lang`
+
+### Scenariusz (2 moduły — opcjonalny)
+1. **Webhooks → Custom webhook** (comment webhook). Redetermine structure + dodaj testowy komentarz.
+2. Co chcesz z tym zrobić, np.:
+   - **Email → Send an email** do właściciela: „Nuovo commento su {{drink_name}} da {{author}}: {{content}}" (SMTP OVH), albo
+   - **WhatsApp** (callmebot) z tą samą treścią, albo
+   - **Data store** do moderacji.
+
+Bez webhooka komentarz i tak zapisuje się w Supabase (`drink_comments`) i pokazuje pod drinkiem — webhook to tylko powiadomienie.
+
+### Env w Vercel (opcjonalnie)
+`NEXT_PUBLIC_MAKE_COMMENT_WEBHOOK` → Redeploy. Jeśli pominiesz, użyje webhooka CONTACT.

@@ -49,9 +49,9 @@ Pełna, rozwinięta lista wszystkiego o co prosiłeś. `[x]` = zrobione, `[ ]` =
 - [ ] Przyspieszenie ładowania zakładek (limity zapytań, mniej danych na raz, brak zbędnych pobrań).
 
 ### Blok 6 — 🔗 Komentarze → make.com (~1 tura)
-- [ ] Podłączenie komentarzy (drink_comments) do make.com (powiadomienia / przetwarzanie).
+- [x] Podłączenie komentarzy (drink_comments) do make.com — `notifyComment` wysyła `new_comment` (drink, autor, treść, język) przy publikacji. Best-effort, nieblokujące. Instrukcja w `MAKE_SETUP.md`.
 
-### 🔢 Szacunek łącznie: **~8–9 tur**
+### 🔢 Szacunek łącznie: **~8–9 tur** — ✅ UKOŃCZONE
 
 ---
 
