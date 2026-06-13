@@ -11,7 +11,7 @@ const StatsGlobe = dynamic(() => import("../../components/StatsGlobe"), {
   loading: () => <div className="stats-globe-loading">🌍</div>,
 });
 
-type Tab = "menu" | "events" | "drinks" | "orders" | "messages" | "reviews" | "stats" | "hours" | "newsletter";
+type Tab = "menu" | "events" | "drinks" | "orders" | "messages" | "reviews" | "stats" | "hours" | "newsletter" | "ospiti";
 
 // Skeleton loading — animowane „kości" zamiast napisu Caricamento
 function Skeleton({ rows = 5 }: { rows?: number }) {
@@ -39,6 +39,7 @@ export default function AdminPage() {
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [notif, setNotif] = useState<{ messages: number; reviews: number; orders: number }>({ messages: 0, reviews: 0, orders: 0 });
   const [bellOpen, setBellOpen] = useState(false);
+  const [composeGuest, setComposeGuest] = useState<{ email: string; name?: string; lang?: string } | null>(null);
 
   // Liczniki powiadomień (nieprzeczytane wiadomości, recenzje do zatwierdzenia, nowe zamówienia dziś)
   useEffect(() => {
@@ -112,6 +113,7 @@ export default function AdminPage() {
             { id: "events", label: "Eventi", ico: "🎭" },
             { id: "drinks", label: "Drink & Ordini", ico: "🍸" },
             { id: "messages", label: "Messaggi", ico: "💬" },
+            { id: "ospiti", label: "Ospiti", ico: "👥" },
             { id: "newsletter", label: "Newsletter", ico: "📧" },
             { id: "reviews", label: "Recensioni", ico: "⭐" },
             { id: "stats", label: "Statistiche", ico: "📊" },
@@ -171,7 +173,8 @@ export default function AdminPage() {
         {tab === "menu" && <MenuHoursPanel />}
         {tab === "events" && <EventsPanel />}
         {tab === "drinks" && <DrinksOrdersPanel />}
-        {tab === "messages" && <MessagesPanel />}
+        {tab === "messages" && <MessagesPanel compose={composeGuest} onComposeUsed={() => setComposeGuest(null)} />}
+        {tab === "ospiti" && <OspitiPanel onWrite={(g) => { setComposeGuest(g); setTab("messages"); }} />}
         {tab === "newsletter" && <NewsletterPanel />}
         {tab === "reviews" && <ReviewsPanel />}
         {tab === "stats" && <StatsPanel />}
@@ -1006,7 +1009,7 @@ async function toItalian(text: string): Promise<string> {
   } catch { return text; }
 }
 
-function MessagesPanel() {
+function MessagesPanel({ compose, onComposeUsed }: { compose?: { email: string; name?: string; lang?: string } | null; onComposeUsed?: () => void } = {}) {
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeEmail, setActiveEmail] = useState<string | null>(null);
@@ -1050,7 +1053,12 @@ function MessagesPanel() {
       .sort((a, b) => new Date(b.last.created_at).getTime() - new Date(a.last.created_at).getTime());
   }, [messages]);
 
-  const activeThread = threads.find((t) => t.email === activeEmail) || threads[0] || null;
+  // Compose z zakładki Ospiti — otwórz wątek (nawet pusty/wirtualny) dla wskazanej osoby
+  useEffect(() => { if (compose?.email) setActiveEmail(compose.email); }, [compose?.email]);
+  const virtualThread = (compose?.email && !threads.some((t) => t.email === compose.email))
+    ? { email: compose.email, name: compose.name || compose.email, msgs: [] as any[], last: { language: compose.lang || "it", name: compose.name }, unread: false }
+    : null;
+  const activeThread = threads.find((t) => t.email === activeEmail) || virtualThread || threads[0] || null;
 
   // Szukajka — filtruj wątki po imieniu / mailu / treści
   const filteredThreads = React.useMemo(() => {
@@ -1159,6 +1167,7 @@ function MessagesPanel() {
     } catch (e) { console.error(e); }
     setDraft("");
     setSending(false);
+    onComposeUsed?.();
     load(true);
   };
 
@@ -1262,6 +1271,76 @@ function MessagesPanel() {
               </>
             ) : <p className="admin-empty">Seleziona una conversazione.</p>}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Ospiti Panel (CRM — wszyscy ludzie z mailami + powiązania) ───────────────
+function OspitiPanel({ onWrite }: { onWrite: (g: { email: string; name?: string; lang?: string }) => void }) {
+  const [guests, setGuests] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
+    const [nl, msg, rev] = await Promise.all([
+      supabase.from("newsletter").select("email,name,language,created_at").limit(2000),
+      supabase.from("contact_messages").select("email,name,language,created_at").limit(2000),
+      supabase.from("reviews").select("email,name,created_at").limit(2000),
+    ]);
+    const map: Record<string, any> = {};
+    const add = (email: string, name: string, lang: string, tag: string, at?: string) => {
+      const key = (email || "").trim().toLowerCase();
+      if (!key || !key.includes("@")) return;
+      const g = (map[key] ||= { email: key, name: name || key, lang: lang || "it", tags: new Set<string>(), last: at || "" });
+      if (name && (!g.name || g.name === key)) g.name = name;
+      if (lang) g.lang = lang;
+      g.tags.add(tag);
+      if (at && at > g.last) g.last = at;
+    };
+    (nl.data || []).forEach((x: any) => add(x.email, x.name, x.language, "newsletter", x.created_at));
+    (msg.data || []).forEach((x: any) => { if (x.name !== "S'Historia") add(x.email, x.name, x.language, "messaggi", x.created_at); });
+    (rev.data || []).forEach((x: any) => add(x.email, x.name, "it", "recensione", x.created_at));
+    const list = Object.values(map).sort((a: any, b: any) => (b.last || "").localeCompare(a.last || ""));
+    setGuests(list);
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, []);
+
+  const q = search.trim().toLowerCase();
+  const filtered = q ? guests.filter((g) => g.email.includes(q) || (g.name || "").toLowerCase().includes(q)) : guests;
+  const tagCls: Record<string, string> = { newsletter: "amsg-badge", messaggi: "amsg-badge-sky", recensione: "amsg-badge-gold" };
+  const flag = (c: string) => ({ it: "🇮🇹", pl: "🇵🇱", en: "🇬🇧", de: "🇩🇪", fr: "🇫🇷", es: "🇪🇸" } as Record<string, string>)[c] || "🌐";
+
+  return (
+    <div className="admin-panel">
+      <header className="admin-panel-head">
+        <h1>Ospiti</h1>
+        <span className="admin-count">{guests.length} contatti</span>
+      </header>
+      <div className="amsg-search" style={{ maxWidth: 360, marginBottom: 18 }}>
+        <span className="amsg-search-ico">🔍</span>
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cerca per nome o email…" />
+        {search && <button className="amsg-search-clear" onClick={() => setSearch("")}>✕</button>}
+      </div>
+      {loading ? <Skeleton /> : (
+        <div className="admin-orders">
+          {filtered.map((g) => (
+            <div key={g.email} className="admin-order">
+              <span className="amsg-avatar">{(g.name || "?").charAt(0).toUpperCase()}</span>
+              <div className="admin-order-info" style={{ flex: 1 }}>
+                <h4>{g.name} <span style={{ opacity: 0.5, fontWeight: 400, fontSize: 13 }}>{flag(g.lang)}</span></h4>
+                <p style={{ opacity: 0.7 }}>{g.email}</p>
+                <div className="amsg-person" style={{ marginTop: 6 }}>
+                  {[...g.tags].map((tg: string) => <span key={tg} className={`amsg-badge ${tagCls[tg] || ""}`}>{tg === "newsletter" ? "📧 Newsletter" : tg === "messaggi" ? "💬 Messaggi" : "⭐ Recensione"}</span>)}
+                </div>
+              </div>
+              <button className="admin-btn" style={{ flexShrink: 0 }} onClick={() => onWrite({ email: g.email, name: g.name, lang: g.lang })}>✉️ Scrivi</button>
+            </div>
+          ))}
+          {filtered.length === 0 && <p className="admin-empty">{search ? "Nessun risultato." : "Nessun contatto ancora."}</p>}
         </div>
       )}
     </div>
