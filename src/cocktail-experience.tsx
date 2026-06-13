@@ -1250,12 +1250,22 @@ function InSceneGlassPour({ url, withIce, color, onReveal, onDone, onModelReady 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cloned, invalidate]);
 
+  // H6: mały strumień z (wbudowanego) szejkera do szklanki — widoczny podczas nalewania
+  const pourStreamRef = useRef<THREE.Mesh>(null!);
+  const pourStreamMat = useMemo(() => new THREE.MeshStandardMaterial({
+    color: new THREE.Color(colorRefLocal.current), transparent: true, opacity: 0.85,
+    roughness: 0.05, metalness: 0, emissive: new THREE.Color(colorRefLocal.current),
+    emissiveIntensity: 0.25, depthWrite: false, side: THREE.DoubleSide,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), []);
+
   useEffect(() => {
     if (!liquidMesh) return;
     const lm = liquidMesh.material as THREE.MeshStandardMaterial;
     lm.color.set(color); lm.emissive.set(color); lm.needsUpdate = true;
+    pourStreamMat.color.set(color); pourStreamMat.emissive.set(color);
     invalidate();
-  }, [liquidMesh, color, invalidate]);
+  }, [liquidMesh, color, invalidate, pourStreamMat]);
 
   // „Bez lodu" → schowaj kostki lodu i łopatkę (Ice Cube*, Ice Scoop). Dzięki temu
   // wysoka szklanka, która ma jedną wspólną animację cieczy, wygląda poprawnie w
@@ -1293,8 +1303,23 @@ function InSceneGlassPour({ url, withIce, color, onReveal, onDone, onModelReady 
     const scrub = { t: start };
     const tween = gsap.to(scrub, {
       t: end, duration: Math.max(3.5, end - start), ease: "power2.inOut", // wolniejsza, bardziej kinowa
-      onUpdate: () => setTime(scrub.t),
+      onUpdate: () => {
+        setTime(scrub.t);
+        // H6: strumień widoczny w środkowej fazie nalewania (wjazd/wyjazd wygaszany)
+        const s = pourStreamRef.current;
+        if (s) {
+          const prog = (scrub.t - start) / ((end - start) || 1);
+          const on = prog > 0.06 && prog < 0.72;
+          s.visible = on;
+          if (on) {
+            const edge = Math.min((prog - 0.06) / 0.08, (0.72 - prog) / 0.1, 1);
+            const w = Math.max(0.18, edge);
+            s.scale.set(w, 1, w);
+          }
+        }
+      },
       onComplete: () => {
+        if (pourStreamRef.current) pourStreamRef.current.visible = false;
         // G7: po nalaniu ukryj WBUDOWANY w model shaker — przy wylocie/scrollu
         // ma się ruszać TYLKO szklanka (bez "cienia" szejkera lecącego razem z nią)
         cloned.traverse((o) => { if (/shaker/i.test(o.name)) o.visible = false; });
@@ -1310,6 +1335,10 @@ function InSceneGlassPour({ url, withIce, color, onReveal, onDone, onModelReady 
   return (
     <group ref={rootRef}>
       <primitive object={cloned} />
+      {/* H6: strumień nalewania (szejker → szklanka), kolor = mieszanka */}
+      <mesh ref={pourStreamRef} material={pourStreamMat} visible={false} position={[0, 1.15, 0]}>
+        <cylinderGeometry args={[0.02, 0.035, 0.85, 8, 1, true]} />
+      </mesh>
       <directionalLight position={[2, 4, 3]} intensity={0.4} />
       <directionalLight position={[-2, 3, 2]} intensity={0.2} color="#bfe6ff" />
     </group>
@@ -1454,6 +1483,9 @@ function Scene({
   }, [camera, cameraTarget, shakerClip, glassClip, bottleDrain, shakerFill, glassFill, invalidate, onReady]);
 
   // grab handlers — obrót wokół własnej osi Y (mysz + palec), z bezwładnością.
+  // H7: blokada scrolla strony na czas chwytu szejkera — bez tego ruch palcem
+  // odpalał scroll → pointercancel i obrót palcem nie działał na telefonie.
+  const dragPreventScroll = useRef<((e: TouchEvent) => void) | null>(null);
   const onPointerDown = useCallback((e: ThreeEvent<PointerEvent>) => {
     if (!drag.current.follow) return;
     e.stopPropagation();
@@ -1462,6 +1494,11 @@ function Scene({
     drag.current.vel = 0;
     drag.current.idle = 0;
     try { (e.target as Element).setPointerCapture?.(e.pointerId); } catch { /* ignore */ }
+    if (!dragPreventScroll.current) {
+      const prevent = (te: TouchEvent) => { te.preventDefault(); };
+      window.addEventListener("touchmove", prevent, { passive: false });
+      dragPreventScroll.current = prevent;
+    }
     gl.domElement.style.cursor = "grabbing";
     invalidate();
   }, [gl, invalidate]);
@@ -1483,6 +1520,11 @@ function Scene({
     const up = () => {
       if (!drag.current.active) return;
       drag.current.active = false;
+      // H7: zdejmij blokadę scrolla po puszczeniu szejkera
+      if (dragPreventScroll.current) {
+        window.removeEventListener("touchmove", dragPreventScroll.current);
+        dragPreventScroll.current = null;
+      }
       gl.domElement.style.cursor = drag.current.follow ? "grab" : "auto";
       const sh = handles.current.shaker?.root;
       // Po puszczeniu: bezwładność shakera + miękki powrót do 0 (snap), napędzane GSAP-em
@@ -1505,6 +1547,10 @@ function Scene({
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", up);
+      if (dragPreventScroll.current) {
+        window.removeEventListener("touchmove", dragPreventScroll.current);
+        dragPreventScroll.current = null;
+      }
     };
   }, [gl, invalidate]);
 
@@ -3105,7 +3151,7 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
   const _neck = useMemo(() => new THREE.Vector3(), []);
   const _ctrl = useMemo(() => new THREE.Vector3(), []);
   const _dir = useMemo(() => new THREE.Vector3(), []);
-  const _up = useMemo(() => new THREE.Vector3(0, 1, 0), []);
+  const _q = useMemo(() => new THREE.Quaternion(), []);
   const fullCurve = useMemo(() => new THREE.QuadraticBezierCurve3(new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()), []);
   const N_STREAM_PTS = 24;
   const _pts = useMemo(() => Array.from({ length: N_STREAM_PTS + 1 }, () => new THREE.Vector3()), []);
@@ -3130,23 +3176,31 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
 
     const s = streamRef.current;
     if (!s) return;
-    // B3/B5: strumień w przestrzeni ŚWIATA — prosta linia od szyjki do wlotu szejkera.
-    // Niezależnie od przechyłu modelu (butelka 145°, puszka/sok 70°) strumień zawsze
-    // celuje we wlot — nie "ucieka" w bok, nie zakrzywia się i sięga środka szejkera.
+    // H2: strumień jako ŁUK Beziera w przestrzeni świata — realistyczne lanie:
+    // ciecz wychodzi WZDŁUŻ osi butelki (kontynuacja ruchu z szyjki), grawitacja
+    // zagina łuk w dół i strumień wpada dokładnie we wlot szejkera.
     // head = czoło strumienia (0=szyjka → 1=wlot), tail = ogon (rośnie po puszczeniu).
     const head = headRef.current.v, tail = tailRef.current.v;
     const len = Math.max(0, head - tail);
     if (len > 0.005 && neckRef.current) {
       neckRef.current.getWorldPosition(_neck);
-      _dir.subVectors(target, _neck);
-      const dist = _dir.length();
-      if (dist > 0.001) {
-        _dir.divideScalar(dist);
-        s.visible = true;
-        s.quaternion.setFromUnitVectors(_up, _dir);
-        s.position.copy(_neck).addScaledVector(_dir, dist * (head + tail) / 2);
-        s.scale.set(0.6, (dist * len) / STREAM_LEN, 0.6);
+      neckRef.current.getWorldQuaternion(_q);
+      _dir.set(0, 1, 0).applyQuaternion(_q); // kierunek wylotu = oś butelki (świat)
+      const dist = _neck.distanceTo(target);
+      // punkt kontrolny: kontynuacja pędu z szyjki + opad grawitacyjny
+      _ctrl.copy(_neck).addScaledVector(_dir, dist * 0.45);
+      _ctrl.y -= dist * 0.12;
+      fullCurve.v0.copy(_neck); fullCurve.v1.copy(_ctrl); fullCurve.v2.copy(target);
+      for (let i = 0; i <= N_STREAM_PTS; i++) {
+        fullCurve.getPoint(tail + (len * i) / N_STREAM_PTS, _pts[i]);
       }
+      const tube = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(_pts), N_STREAM_PTS, 0.034, 8, false);
+      s.geometry.dispose();
+      s.geometry = tube;
+      s.position.set(0, 0, 0);
+      s.quaternion.identity();
+      s.scale.set(1, 1, 1);
+      s.visible = true;
     } else {
       s.visible = false;
     }
@@ -4741,7 +4795,8 @@ function DirectOrderQR({ name, orderId, color, onReset, onClose }: { name: strin
       <div className="cx-qr-card" onClick={(e) => e.stopPropagation()}>
         <button className="cx-qr-close" onClick={dismiss}>×</button>
         <span className="cx-mini-kicker">{tr.show}</span>
-        <div className="cx-qr-box">
+        {/* H3: klik w QR → pełny ekran */}
+        <div className="cx-qr-box" onClick={() => orderUrl && setFull(true)} style={{ cursor: orderUrl ? "pointer" : "default" }}>
           {orderUrl ? (
             <PersonalizedQR url={orderUrl} color={color} size={200} icon="🍸" />
           ) : (
@@ -4901,7 +4956,8 @@ function NameCard({
             <div className="cx-qr-card" onClick={(e) => e.stopPropagation()}>
               <button className="cx-qr-close" onClick={() => setQrOpen(false)}>×</button>
               <span className="cx-mini-kicker">{tt("showBarman", "Mostralo al barman")}</span>
-              <div className="cx-qr-box">
+              {/* H3: klik w QR → pełny ekran */}
+              <div className="cx-qr-box" onClick={() => orderUrl && setQrFull(true)} style={{ cursor: orderUrl ? "pointer" : "default" }}>
                 {orderUrl ? (
                   <PersonalizedQR url={orderUrl} color={color} size={180} icon="🍸" />
                 ) : (
@@ -6596,6 +6652,13 @@ function CocktailStyles() {
       .cx-comm-share-btn { padding:10px 18px; border-radius:999px; background:var(--cx-accent,#E8927C); color:#fff;
         font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:12px; letter-spacing:0.08em; cursor:pointer; transition:all .25s; }
       .cx-comm-share-btn:hover { background:#fff; color:var(--c-deep,#1A3D52); }
+      /* H4: na telefonie box "pochwal się drinkiem" pionowo i WYŚRODKOWANY (nie krzywy) */
+      @media (max-width: 768px) {
+        .cx-comm-share { flex-direction:column; align-items:center; text-align:center; gap:10px;
+          padding:18px 16px; width:100%; box-sizing:border-box; }
+        .cx-comm-share-txt { align-items:center; }
+        .cx-comm-share-btn { width:100%; max-width:260px; padding:12px 18px; }
+      }
       .cx-comm-filters { display:flex; gap:8px; flex-wrap:wrap; margin:20px 0; align-items:center; justify-content:space-between; }
       .cx-comm-filter-row { display:flex; gap:8px; flex-wrap:wrap; }
       .cx-comm-filter-dropdown { display:none; position:relative; }

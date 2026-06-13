@@ -87,7 +87,7 @@ export default function AdminPage() {
             { id: "orders", label: "Ordini QR", ico: "📱" },
             { id: "messages", label: "Messaggi", ico: "💬" },
             { id: "reviews", label: "Recensioni", ico: "⭐" },
-            { id: "hours", label: "Orari", ico: "🕐" },
+            { id: "hours", label: "Orari & Date", ico: "🕐" },
             { id: "stats", label: "Statistiche", ico: "📊" },
           ] as { id: Tab; label: string; ico: string }[]).map((t) => (
             <button
@@ -1471,6 +1471,15 @@ function AdminStyles() {
         .admin-modal-overlay { align-items:flex-end; padding:0; }
         .admin-table table { min-width:520px; }
         .admin-panel-head > div { flex-wrap:wrap; }
+        /* H8: telefon — karty/rankingi w kolumnie, pełna szerokość, nic nie ucieka */
+        .drk-ranking { flex-direction:column; }
+        .drk-rank { min-width:0; width:100%; box-sizing:border-box; }
+        .admin-table { -webkit-overflow-scrolling:touch; overscroll-behavior-x:contain;
+          mask-image:linear-gradient(90deg, #000 92%, transparent); }
+        .admin-event-card { width:100%; box-sizing:border-box; }
+        .ord-filter { flex-wrap:wrap; }
+        .admin-main > section, .admin-main > div { max-width:100%; box-sizing:border-box; }
+        .stats-pop-grid { grid-template-columns:1fr 1fr; }
       }
       .admin-nav { padding:32px 20px; background:rgba(255,255,255,0.04); border-right:1px solid rgba(255,255,255,0.1); display:flex; flex-direction:column; gap:32px; }
       .admin-logo h2 { font-size:24px; margin:0; color:#fff; } .admin-logo span { font-size:11px; opacity:0.55; letter-spacing:0.15em; text-transform:uppercase; }

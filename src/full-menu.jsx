@@ -2,12 +2,14 @@ import React from 'react';
 import { SplitReveal } from "./shell";
 import { toggleMenuLike, getMenuLikes } from "./lib/supabase";
 
-// Serce w stylu TikTok (SVG, nie emoji) — wypełnione gdy liked
+// Serce w stylu TikTok (SVG, nie emoji) — wypełnione gdy liked.
+// H1: symetryczny path (Material) — poprzedni był przekrzywiony w lewo,
+// przez co prawy płatek wyglądał na ucięty.
 function HeartIcon({ filled, className = "", style }) {
   return (
-    <svg className={className} style={{ width: "1em", height: "1em", display: "block", ...style }} viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M12 21s-7.5-4.6-10-9.2C.4 8.5 1.8 5 5.2 5c2 0 3.3 1.1 4.1 2.3C10.1 6.1 11.4 5 13.4 5c3.4 0 4.8 3.5 3.2 6.8C19.5 16.4 12 21 12 21z"
-        fill={filled ? "#FE2C55" : "none"} stroke={filled ? "#FE2C55" : "currentColor"} strokeWidth="2" strokeLinejoin="round" />
+    <svg className={className} style={{ width: "1em", height: "1em", display: "block", overflow: "visible", ...style }} viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+        fill={filled ? "#FE2C55" : "none"} stroke={filled ? "#FE2C55" : "currentColor"} strokeWidth="1.8" strokeLinejoin="round" />
     </svg>
   );
 }

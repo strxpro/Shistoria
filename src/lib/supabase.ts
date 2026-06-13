@@ -136,8 +136,17 @@ export async function createOrder(drink: {
     .insert({ ...drink, pickup_code: code })
     .select()
     .single();
-  
-  if (error) console.error('Order error:', error);
+
+  if (error) {
+    // Baza może nie mieć kolumny pickup_code (migracja setup-community-tables.sql
+    // nieuruchomiona) — bez retry KAŻDE zamówienie padało i QR nigdy się nie generował.
+    if (error.code === 'PGRST204' || /pickup_code/.test(error.message || '')) {
+      const retry = await supabase.from('drink_orders').insert({ ...drink }).select().single();
+      if (retry.error) console.error('Order error (retry):', retry.error);
+      return retry.data;
+    }
+    console.error('Order error:', error);
+  }
   return data;
 }
 

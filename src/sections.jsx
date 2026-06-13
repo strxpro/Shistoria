@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { SplitReveal, Placeholder, TextClipReveal } from "./shell";
 import AttrazioniMap from "./components/AttrazioniMap";
 import { sendReservation, subscribeEventReminder } from "./lib/make-webhooks";
@@ -186,8 +187,10 @@ function Eventi({ t }) {
         </div>
       </div>
 
-      {/* G9: fullscreen popout eventu — klik środkowej karty */}
-      {eventPopout && (
+      {/* G9: fullscreen popout eventu — klik środkowej karty.
+          H5: PORTAL do body — transform na przodkach (reveal/parallax) łamał
+          position:fixed i popout otwierał się "krzywo"/przycięty. */}
+      {eventPopout && typeof document !== "undefined" && createPortal(
         <div className="ev-full-overlay" onClick={() => setEventPopout(null)}>
           <div className="ev-full" onClick={(ev) => ev.stopPropagation()}>
             <button className="ev-rem-close ev-full-close" onClick={() => setEventPopout(null)} aria-label="Chiudi">×</button>
@@ -204,11 +207,12 @@ function Eventi({ t }) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
-      {/* Modal przypomnienia o wydarzeniu */}
-      {reminderEvent && (
+      {/* Modal przypomnienia o wydarzeniu — też portal (transform przodka psuł fixed) */}
+      {reminderEvent && typeof document !== "undefined" && createPortal(
         <div className="ev-rem-overlay" onClick={() => { setReminderEvent(null); setRemSent(false); }}>
           <div className="ev-rem-pop" onClick={(e) => e.stopPropagation()}>
             <button className="ev-rem-close" onClick={() => { setReminderEvent(null); setRemSent(false); }}>×</button>
@@ -242,7 +246,8 @@ function Eventi({ t }) {
               </>
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
       <style>{`
         .eventi { background: var(--c-bg); padding: 120px 0; overflow:hidden; }
