@@ -162,3 +162,9 @@ ALTER TABLE drink_orders ADD COLUMN IF NOT EXISTS pickup_code text;
 CREATE INDEX IF NOT EXISTS idx_orders_pickup_code ON drink_orders(pickup_code);
 -- Realtime dla zamówień (panel admin na żywo)
 ALTER PUBLICATION supabase_realtime ADD TABLE drink_orders;
+
+
+-- ─── Czat: odpowiedzi obsługi jako osobne wiadomości (dymki) ──────────────────
+-- Każda odpowiedź z admina to nowy wiersz z is_staff=true (nie nadpisuje starego).
+ALTER TABLE contact_messages ADD COLUMN IF NOT EXISTS is_staff boolean DEFAULT false;
+CREATE INDEX IF NOT EXISTS idx_contact_messages_email ON contact_messages(email);

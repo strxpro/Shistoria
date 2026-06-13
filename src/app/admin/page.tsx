@@ -979,7 +979,10 @@ function MessagesPanel() {
       (map[k] ||= []).push(m);
     }
     return Object.entries(map)
-      .map(([email, msgs]) => ({ email, msgs, last: msgs[msgs.length - 1], name: msgs[msgs.length - 1]?.name || email, unread: msgs.some((x) => !x.is_read) }))
+      .map(([email, msgs]) => {
+        const lastClient = [...msgs].reverse().find((x: any) => !x.is_staff) || msgs[msgs.length - 1];
+        return { email, msgs, last: msgs[msgs.length - 1], name: lastClient?.name || email, unread: msgs.some((x: any) => !x.is_read && !x.is_staff) };
+      })
       .sort((a, b) => new Date(b.last.created_at).getTime() - new Date(a.last.created_at).getTime());
   }, [messages]);
 
@@ -1021,7 +1024,7 @@ function MessagesPanel() {
   useEffect(() => {
     if (!activeThread) return;
     activeThread.msgs.forEach(async (m: any) => {
-      if (m.message && !trMap[m.id]) {
+      if (m.message && !m.is_staff && !trMap[m.id]) {
         const it = await toItalian(m.message);
         if (it && it !== m.message) setTrMap((prev) => ({ ...prev, [m.id]: it }));
       }
@@ -1039,8 +1042,18 @@ function MessagesPanel() {
     const target = activeThread.last;
     const replyIt = draft.trim();
     const lang = (target.language || "it").slice(0, 2);
-    // Zapisz odpowiedź admina + oznacz przeczytane
-    await supabase.from("contact_messages").update({ admin_reply: replyIt, is_read: true }).eq("id", target.id);
+    // Zapis odpowiedzi jako OSOBNY dymek (nowy wiersz is_staff=true). Fallback: stare admin_reply.
+    let inserted = false;
+    try {
+      const { error } = await supabase.from("contact_messages").insert({ email: activeThread.email, name: "S'Historia", message: replyIt, language: lang, is_read: true, is_staff: true });
+      if (!error) inserted = true;
+    } catch { /* kolumna is_staff może nie istnieć — fallback poniżej */ }
+    if (!inserted) {
+      await supabase.from("contact_messages").update({ admin_reply: replyIt, is_read: true }).eq("id", target.id);
+    } else {
+      // oznacz wiadomości klienta jako przeczytane
+      await supabase.from("contact_messages").update({ is_read: true }).eq("email", activeThread.email);
+    }
     // Pre-tłumaczenie odpowiedzi na język klienta (make tylko wysyła gotowy tekst)
     let replyTranslated = replyIt;
     if (lang !== "it") {
@@ -1144,22 +1157,32 @@ function MessagesPanel() {
                 <div className="amsg-bubbles">
                   {activeThread.msgs.map((m: any) => (
                     <React.Fragment key={m.id}>
-                      {/* Wiadomość klienta — po lewej */}
-                      {m.message && (
-                        <div className="amsg-bubble amsg-in">
-                          <p>{m.message}</p>
-                          {trMap[m.id] && (
-                            <p className="amsg-tr">🇮🇹 {trMap[m.id]}</p>
-                          )}
-                          <span className="amsg-time">{new Date(m.created_at).toLocaleString("it-IT")}</span>
-                        </div>
-                      )}
-                      {/* Odpowiedź admina — po prawej */}
-                      {m.admin_reply && (
+                      {m.is_staff ? (
+                        /* Odpowiedź obsługi — osobny dymek po prawej */
                         <div className="amsg-bubble amsg-out">
-                          <p>{m.admin_reply}</p>
-                          <span className="amsg-time">Tu · inviato</span>
+                          <p>{m.message}</p>
+                          <span className="amsg-time">Tu · {new Date(m.created_at).toLocaleString("it-IT")}</span>
                         </div>
+                      ) : (
+                        <>
+                          {/* Wiadomość klienta — po lewej */}
+                          {m.message && (
+                            <div className="amsg-bubble amsg-in">
+                              <p>{m.message}</p>
+                              {trMap[m.id] && (
+                                <p className="amsg-tr">🇮🇹 {trMap[m.id]}</p>
+                              )}
+                              <span className="amsg-time">{new Date(m.created_at).toLocaleString("it-IT")}</span>
+                            </div>
+                          )}
+                          {/* Legacy: odpowiedź zapisana w admin_reply (stare wiersze) */}
+                          {m.admin_reply && (
+                            <div className="amsg-bubble amsg-out">
+                              <p>{m.admin_reply}</p>
+                              <span className="amsg-time">Tu · inviato</span>
+                            </div>
+                          )}
+                        </>
                       )}
                     </React.Fragment>
                   ))}
