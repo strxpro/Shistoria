@@ -1755,6 +1755,15 @@ function CocktailExperience() {
     };
   }, [pouring]);
 
+  // I2: dopasuj rozmiar neonowego napisu (1 linia) po montażu, zmianie języka i resize
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const fit = () => { if (popLabelRef.current) { popLabelRef.current.textContent = getScrollPopLabel(); fitNeonLabel(popLabelRef.current); } };
+    const id = setTimeout(fit, 100);
+    window.addEventListener("resize", fit);
+    return () => { clearTimeout(id); window.removeEventListener("resize", fit); };
+  }, []);
+
   const mixedColor = useMemo(
     () => mixColorsWeighted(poured), [poured],
   );
@@ -2279,6 +2288,7 @@ function CocktailExperience() {
                   if (popLabelRef.current) {
                     popLabelRef.current.textContent = newText;
                     popLabelRef.current.removeAttribute("data-morphing");
+                    fitNeonLabel(popLabelRef.current); // I2: dopasuj rozmiar do 1 linii
                   }
                 }, 300);
               }
@@ -3049,10 +3059,10 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
     const startY = 0;
     const isMob = typeof window !== "undefined" && window.innerWidth < 768;
 
-    // pozycja "obok szejkera": butelka niżej — cała widoczna, dopasowana do mobile
+    // pozycja "obok szejkera": butelka WYŻEJ — dłuższy, bardziej widoczny strumień
     const offX = isMob ? 0.7 : 1.0;
     const bodyX = side === "right" ? offX : -offX;
-    const bodyY = isMob ? 1.4 : 1.7;       // nad wlotem szejkera (target ~y0.35) — szyjka leje w dół
+    const bodyY = isMob ? 2.15 : 2.45;     // wyżej nad wlotem → dłuższy łuk strumienia
     const bodyZ = CONFIG.shakerRest.z;      // ta sama głębia co szejker → strumień trafia do otworu
     const tilt = side === "right" ? deg(isMob ? 145 : 140) : deg(isMob ? -145 : -140);
     const sPour = isMob ? 0.5 : 0.6;
@@ -3206,7 +3216,7 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
       for (let i = 0; i <= N_STREAM_PTS; i++) {
         fullCurve.getPoint(tail + (len * i) / N_STREAM_PTS, _pts[i]);
       }
-      const tube = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(_pts), N_STREAM_PTS, 0.034, 8, false);
+      const tube = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(_pts), N_STREAM_PTS, 0.042, 8, false);
       s.geometry.dispose();
       s.geometry = tube;
       s.position.set(0, 0, 0);
@@ -3722,6 +3732,17 @@ function getScrollPopLabelUp(): string {
   return L[lang] ?? "Crea Cocktail";
 }
 
+/* I2: dociśnij rozmiar neonowego napisu tak, by zmieścił się w JEDNEJ linii (≤92vw).
+ * Długie tłumaczenia (FR/ES/PL) przy nowrap wystawały poza ekran — tu skalujemy font. */
+function fitNeonLabel(el: HTMLElement | null) {
+  if (!el || typeof window === "undefined") return;
+  el.style.fontSize = ""; // reset do wartości z CSS (clamp)
+  const max = window.innerWidth * 0.92;
+  let fs = parseFloat(getComputedStyle(el).fontSize) || 40;
+  let guard = 0;
+  while (el.scrollWidth > max && fs > 12 && guard < 60) { fs -= 1; el.style.fontSize = `${fs}px`; guard++; }
+}
+
 function HoldTimerRing({ progress, active, x, y }: { progress: number; active: boolean; x: number; y: number }) {
   if (!active) return null;
   const r = 46;                 // promień łuku postępu
@@ -3807,15 +3828,9 @@ function BottleCard({
     if (disabled) return;
     holdRef.current.startTime = Date.now();
     holdRef.current.fired = false;
-
-    // B6: na czas trzymania blokujemy scroll strony (non-passive preventDefault).
-    // Bez tego ruch palcem odpala scroll → przeglądarka wysyła pointercancel →
-    // kółko znika pod palcem i nalewanie urywa się samo.
-    if (!holdRef.current.preventScroll) {
-      const preventScroll = (e: TouchEvent) => { e.preventDefault(); };
-      window.addEventListener("touchmove", preventScroll, { passive: false });
-      holdRef.current.preventScroll = preventScroll;
-    }
+    // I4: NIE blokujemy globalnie scrolla (to uniemożliwiało przewijanie listy gdy palec
+    // ląduje na karcie). Trzymanie BEZ ruchu i tak działa (brak scrolla → brak pointercancel);
+    // wyraźny przeciąg = scroll listy / pull-to-close obsługiwany przez szufladę.
 
     // Oblicz pozycję wewnątrz kafelka (bounding box)
     const rect = btnRef.current?.getBoundingClientRect();
@@ -4194,18 +4209,38 @@ function AccordionPanel({
           <div className="cx-drawer-backdrop" onClick={closeCat} aria-hidden="true" />
           <div className="cx-drawer" role="dialog" aria-label={isAll ? al("all", "Tutti") : current!.group}
             onClick={(e) => e.stopPropagation()}
-            onTouchStart={(e) => { (e.currentTarget as any)._sy = e.touches[0].clientY; }}
+            /* I5/I4: zamykanie swipe-em w dół jak TikTok — ALE tylko gdy lista jest już
+               przewinięta na samą górę i ciągniemy wyraźnie w dół (próg + opór). W innym
+               wypadku NIE ruszamy szuflady → lista scrolluje się natywnie, a trzymanie
+               butelki (hold-to-pour) nie "ucieka spod palca". */
+            onTouchStart={(e) => {
+              const el = e.currentTarget as any;
+              el._sy = e.touches[0].clientY;
+              el._st0 = scrollRef.current ? scrollRef.current.scrollTop : 0;
+              el._mode = ""; el._pull = 0;
+            }}
             onTouchMove={(e) => {
               const el = e.currentTarget as any;
               const dy = e.touches[0].clientY - el._sy;
-              if (dy > 0) el.style.transform = `translateY(${dy}px)`;
+              const sc = scrollRef.current;
+              const atTop = !sc || sc.scrollTop <= 0;
+              if (el._mode === "") {
+                if (dy > 16 && atTop) el._mode = "pull";        // ciągnięcie w dół od góry → zamykanie
+                else if (Math.abs(dy) > 8) el._mode = "scroll";  // zwykły scroll listy / micro-ruch holdu
+              }
+              if (el._mode === "pull") {
+                const pull = Math.max(0, dy - 16) * 0.55;        // opór + offset progu (nie za szybko)
+                el._pull = pull;
+                el.style.transition = "none";
+                el.style.transform = `translateY(${pull}px)`;
+              }
             }}
             onTouchEnd={(e) => {
               const el = e.currentTarget as any;
-              const m = /translateY\(([0-9.]+)px\)/.exec(el.style.transform || "");
-              const dragged = m ? parseFloat(m[1]) : 0;
-              el.style.transform = "";
-              if (dragged > 90) closeCat();
+              el.style.transition = "transform .32s cubic-bezier(.2,.85,.2,1)";
+              if (el._mode === "pull" && el._pull > 110) { el.style.transform = "translateY(100%)"; setTimeout(closeCat, 220); }
+              else el.style.transform = "";
+              el._mode = "";
             }}>
             {/* Category tabs row at top of drawer (desktop pills) */}
             <div className="cx-drawer-tabs">
@@ -6523,8 +6558,9 @@ function CocktailStyles() {
         display:flex; flex-direction:column; align-items:center; gap:14px; text-align:center;
         transform:translate(-50%,-50%) scale(.86); transition:opacity .25s ease; will-change:transform,opacity; }
       .cx-scrollpop-label { font-family:var(--f-display,sans-serif); font-weight:800;
-        font-size:clamp(24px,6vw,78px); letter-spacing:.04em; text-transform:uppercase; line-height:1.05; color:#eafdff;
-        white-space:normal; overflow-wrap:break-word; word-break:break-word; max-width:90vw; box-sizing:border-box; text-align:center;
+        /* JEDNA LINIA: nie łamiemy na słowa; rozmiar skalowany wg szerokości ekranu by się zmieścił */
+        font-size:clamp(18px,6vw,72px); letter-spacing:.02em; text-transform:uppercase; line-height:1.05; color:#eafdff;
+        white-space:nowrap; max-width:96vw; box-sizing:border-box; text-align:center;
         text-shadow:0 0 6px #5BE1FF, 0 0 18px #5BE1FF, 0 0 42px rgba(91,225,255,.8);
         transition:filter .6s ease, transform .6s ease, opacity .4s ease; }
       .cx-scrollpop-label[data-morphing] { filter:blur(8px); transform:scale(0.92); opacity:0.4; }

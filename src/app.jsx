@@ -216,33 +216,10 @@ export default function App() {
     document.documentElement.lang = t.language;
   }
 
-  // Geo-location language
-  useEffectA(() => {
-    // Safari w trybie prywatnym rzuca wyjątek przy dostępie do localStorage — zabezpieczamy całość.
-    const lsGet = (k) => { try { return localStorage.getItem(k); } catch { return null; } };
-    const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } };
-    if (!lsGet("shistoria-lang-set")) {
-      fetch("https://ipapi.co/json/")
-        .then(res => res.json())
-        .then(data => {
-          const country = data.country_code;
-          let lang = "en";
-          if (country === "IT") lang = "it";
-          else if (country === "PL") lang = "pl";
-          else if (country === "DE" || country === "AT" || country === "CH") lang = "de";
-          else if (country === "FR") lang = "fr";
-          else if (country === "ES") lang = "es";
-          setTweak("language", lang);
-          lsSet("shistoria-lang-set", "true");
-        }).catch(e => {
-           const navLang = (navigator.language || "en").split("-")[0];
-           if (["it","pl","en","de","fr","es"].includes(navLang)) {
-             setTweak("language", navLang);
-           }
-           lsSet("shistoria-lang-set", "true");
-        });
-    }
-  }, []);
+  // (I3) Usunięto DRUGI, konkurujący efekt geolokalizacji — używał innego klucza
+  // (shistoria-lang-set), NIE sprawdzał ręcznego wyboru i nadpisywał pierwszy efekt
+  // wyścigiem fetchy, przez co przy wejściu pokazywał się zły język. Detekcja języka
+  // jest teraz wyłącznie w efekcie powyżej (z guardami sh-lang-manual / sh-lang-auto).
 
   // Section observer for nav highlight
   useEffectA(() => {
