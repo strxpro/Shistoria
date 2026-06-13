@@ -1764,6 +1764,79 @@ function AdminStyles() {
       .admin-templates { display:flex; gap:8px; flex-wrap:wrap; }
       .admin-tpl { padding:10px 16px; border-radius:10px; border:2px solid; font-size:13px; cursor:pointer; transition:all .2s; color:#fff; }
       .admin-tpl.active { transform:scale(1.05); box-shadow:0 4px 20px rgba(0,0,0,0.4); }
+
+      /* ═══════════════════════════════════════════════════════════════════
+       * 🎨 REDESIGN LAYER (Novara/Stellar) — czysto, miękko, smooth.
+       * Dodane na końcu → nadpisuje wygląd, zachowuje nazwy klas/struktury.
+       * ═══════════════════════════════════════════════════════════════════ */
+      .admin, .admin-login {
+        font-family:'Inter','SF Pro Display',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+        letter-spacing:-0.01em;
+      }
+      /* Tło — głębsze, z subtelnym blaskiem zamiast płaskiego koloru */
+      .admin-theme-dark.admin { background:radial-gradient(1200px 600px at 18% -10%, #15293a 0%, transparent 55%), radial-gradient(900px 500px at 100% 0%, #1a2030 0%, transparent 50%), #080c12 !important; }
+      .admin-theme-light.admin { background:radial-gradient(1000px 500px at 15% -10%, #ffffff 0%, transparent 60%), #eef1f6 !important; }
+
+      /* Sidebar — szklisty, czysty */
+      .admin-nav { backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); padding:28px 18px; gap:26px; }
+      .admin-theme-dark .admin-nav { background:rgba(255,255,255,0.035) !important; border-right:1px solid rgba(255,255,255,0.07) !important; }
+      .admin-theme-light .admin-nav { background:rgba(255,255,255,0.85) !important; border-right:1px solid rgba(0,0,0,0.06) !important; box-shadow:1px 0 30px rgba(0,0,0,0.04); }
+      .admin-logo h2 { font-weight:800; letter-spacing:-0.02em; }
+      .admin-logo span { opacity:0.5; }
+
+      /* Nawigacja — pełniejsze pigułki, miękkie aktywne */
+      .admin-nav nav button { border-radius:14px; padding:12px 15px; font-weight:600; border:1px solid transparent; transition:all .28s cubic-bezier(.2,.8,.2,1); }
+      .admin-theme-dark .admin-nav nav button { background:transparent; color:rgba(255,255,255,0.66); }
+      .admin-theme-dark .admin-nav nav button:hover { background:rgba(255,255,255,0.06); color:#fff; transform:none; }
+      .admin-theme-dark .admin-nav nav button.active { background:linear-gradient(135deg,rgba(232,146,124,0.9),rgba(232,146,124,0.65)) !important; color:#15202b !important; border-color:transparent !important; font-weight:800; box-shadow:0 10px 26px rgba(232,146,124,0.28); }
+      .admin-theme-light .admin-nav nav button { background:transparent !important; color:#5a6b7b !important; }
+      .admin-theme-light .admin-nav nav button:hover { background:rgba(0,0,0,0.04) !important; color:#15202b !important; transform:none; }
+      .admin-theme-light .admin-nav nav button.active { background:#15202b !important; color:#fff !important; font-weight:800; box-shadow:0 10px 26px rgba(21,32,43,0.18); }
+      .admin-nav-ico { font-size:17px; opacity:0.95; }
+
+      /* Nagłówki paneli — większe, ciaśniejsze */
+      .admin-panel-head { margin-bottom:28px; }
+      .admin-panel-head h1 { font-size:clamp(26px,3vw,38px); font-weight:800; letter-spacing:-0.03em; }
+      .admin-main { padding:38px 44px; }
+
+      /* Karty — większy promień, miękki cień, subtelny hover-lift */
+      .admin-table, .admin-order, .admin-event-card, .admin-drink-card, .stats-kpi, .amsg-list, .amsg-conv, .stats-country, .admin-login-card {
+        border-radius:20px !important;
+        transition:transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .25s, background .25s !important;
+      }
+      .admin-theme-dark .admin-table, .admin-theme-dark .admin-order, .admin-theme-dark .admin-event-card, .admin-theme-dark .admin-drink-card, .admin-theme-dark .stats-kpi, .admin-theme-dark .amsg-list, .admin-theme-dark .amsg-conv {
+        background:rgba(255,255,255,0.04) !important; border:1px solid rgba(255,255,255,0.08) !important; box-shadow:0 10px 30px rgba(0,0,0,0.25) !important;
+      }
+      .admin-theme-light .admin-table, .admin-theme-light .admin-order, .admin-theme-light .admin-event-card, .admin-theme-light .admin-drink-card, .admin-theme-light .stats-kpi, .admin-theme-light .amsg-list, .admin-theme-light .amsg-conv {
+        background:#ffffff !important; border:1px solid rgba(0,0,0,0.05) !important; box-shadow:0 8px 30px rgba(17,34,51,0.06) !important;
+      }
+      .admin-order:hover, .admin-event-card:hover, .admin-drink-card:hover, .stats-kpi:hover { transform:translateY(-3px); }
+      .admin-theme-dark .admin-order:hover, .admin-theme-dark .admin-event-card:hover, .admin-theme-dark .admin-drink-card:hover, .admin-theme-dark .stats-kpi:hover { box-shadow:0 18px 44px rgba(0,0,0,0.34) !important; }
+      .admin-theme-light .admin-order:hover, .admin-theme-light .admin-event-card:hover, .admin-theme-light .admin-drink-card:hover, .admin-theme-light .stats-kpi:hover { box-shadow:0 18px 44px rgba(17,34,51,0.1) !important; }
+
+      /* Przyciski — pigułki, smooth */
+      .admin-btn, .admin-btn-ghost { border-radius:999px !important; font-weight:700 !important; padding:11px 22px !important; transition:all .25s cubic-bezier(.2,.8,.2,1) !important; }
+      .admin-btn { background:linear-gradient(135deg,#E8927C,#e07a60) !important; box-shadow:0 8px 22px rgba(232,146,124,0.3) !important; }
+      .admin-btn:hover { transform:translateY(-2px) !important; box-shadow:0 12px 30px rgba(232,146,124,0.42) !important; }
+      .admin-btn-sm { border-radius:999px !important; transition:all .2s !important; }
+      .admin-subtabs button { border-radius:999px !important; }
+
+      /* Pola formularzy — czyste, z focus-ringiem */
+      .admin-form input, .admin-form textarea, .admin-form select, .admin-login-card input, .amsg-input textarea {
+        border-radius:14px !important; transition:border-color .2s, box-shadow .2s !important;
+      }
+      .admin-form input:focus, .admin-form textarea:focus, .admin-form select:focus, .amsg-input textarea:focus, .admin-login-card input:focus {
+        border-color:#E8927C !important; box-shadow:0 0 0 4px rgba(232,146,124,0.15) !important; outline:none !important;
+      }
+
+      /* KPI — wyrazistsze liczby */
+      .stats-kpi { padding:20px !important; }
+      .stats-kpi-val { letter-spacing:-0.02em; }
+
+      /* Login — bardziej premium */
+      .admin-theme-dark .admin-login { background:radial-gradient(900px 500px at 50% -10%, #15293a, #080c12) !important; }
+      .admin-login-card { border-radius:26px !important; box-shadow:0 30px 80px rgba(0,0,0,0.4) !important; }
     `}</style>
+
   );
 }
