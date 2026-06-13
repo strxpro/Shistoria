@@ -1017,9 +1017,19 @@ function MessagesPanel() {
       } catch { replyTranslated = replyIt; }
     }
     const subjMap: Record<string, string> = { it: "Risposta da S'Historia", pl: "Odpowiedź od S'Historia", en: "Reply from S'Historia", de: "Antwort von S'Historia", fr: "Réponse de S'Historia", es: "Respuesta de S'Historia" };
+    const noteMap: Record<string, string> = {
+      it: "Puoi rispondere direttamente a questa email — ti risponderemo presto.",
+      pl: "Możesz odpowiedzieć bezpośrednio na tego maila — wkrótce się odezwiemy.",
+      en: "You can reply directly to this email — we'll get back to you soon.",
+      de: "Du kannst direkt auf diese E-Mail antworten — wir melden uns bald.",
+      fr: "Tu peux répondre directement à cet e-mail — nous te répondrons bientôt.",
+      es: "Puedes responder directamente a este correo — te responderemos pronto.",
+    };
     const replySubject = subjMap[lang] || subjMap.it;
+    const replyNote = noteMap[lang] || noteMap.it;
     const replyHtml = `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#15202b;">
       <p style="font-size:15px;line-height:1.6;">${replyTranslated.replace(/\n/g, "<br>")}</p>
+      <p style="font-size:13px;color:#E8927C;margin-top:18px;">↩︎ ${replyNote}</p>
       <hr style="border:none;border-top:1px solid #eee;margin:20px 0;">
       <p style="font-size:12px;color:#888;">S'Historia · Rena Majore (OT), Sardegna · <a href="https://www.shistoria.it">www.shistoria.it</a></p>
     </div>`;
@@ -1029,7 +1039,7 @@ function MessagesPanel() {
       if (url) {
         await fetch(url, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type: "admin_reply", email: activeThread.email, name: target.name, lang, reply_it: replyIt, reply_text: replyTranslated, reply_subject: replySubject, reply_html: replyHtml }),
+          body: JSON.stringify({ type: "admin_reply", email: activeThread.email, name: target.name, lang, reply_it: replyIt, reply_text: replyTranslated, reply_subject: replySubject, reply_html: replyHtml, reply_to: "info@shistoria.it", from_name: "S'Historia" }),
         });
       }
     } catch (e) { console.error(e); }
