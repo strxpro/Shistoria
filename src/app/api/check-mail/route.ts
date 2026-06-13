@@ -179,6 +179,19 @@ function extractBody(raw: string): string {
   return body || "(messaggio vuoto)";
 }
 
+// Wykryj język tekstu (Google translate detect — darmowy endpoint). Zwraca kod 2-literowy.
+async function detectLang(text: string): Promise<string> {
+  const t = (text || "").trim().slice(0, 300);
+  if (!t) return "it";
+  try {
+    const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=${encodeURIComponent(t)}`);
+    const j = await r.json();
+    const detected = j?.[2];
+    if (detected && ["it", "pl", "en", "de", "fr", "es"].includes(detected)) return detected;
+  } catch { /* ignore */ }
+  return "it";
+}
+
 export async function GET(req: NextRequest) {
   const key = req.nextUrl.searchParams.get("key") || "";
   if (!CRON_SECRET || key !== CRON_SECRET) {
@@ -191,6 +204,8 @@ export async function GET(req: NextRequest) {
     const mails = await imapFetchUnseen();
     let saved = 0;
     for (const m of mails) {
+      // Wykryj język wiadomości klienta → zapisz, by odpowiedzi tłumaczyły się poprawnie
+      const detectedLang = await detectLang(`${m.subject} ${m.body}`);
       const res = await fetch(`${SUPABASE_URL}/rest/v1/contact_messages`, {
         method: "POST",
         headers: {
@@ -203,7 +218,7 @@ export async function GET(req: NextRequest) {
           name: m.fromName,
           email: m.from,
           message: m.subject ? `${m.subject}\n\n${m.body}` : m.body,
-          language: "it",
+          language: detectedLang,
           is_read: false,
         }),
       });
