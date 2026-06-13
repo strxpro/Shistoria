@@ -1003,15 +1003,33 @@ function MessagesPanel() {
     if (!draft.trim() || !activeThread) return;
     setSending(true);
     const target = activeThread.last;
+    const replyIt = draft.trim();
+    const lang = (target.language || "it").slice(0, 2);
     // Zapisz odpowiedź admina + oznacz przeczytane
-    await supabase.from("contact_messages").update({ admin_reply: draft.trim(), is_read: true }).eq("id", target.id);
-    // Webhook make.com → wyśle e-mail do klienta w jego języku (tłumaczenie po stronie make/template)
+    await supabase.from("contact_messages").update({ admin_reply: replyIt, is_read: true }).eq("id", target.id);
+    // Pre-tłumaczenie odpowiedzi na język klienta (make tylko wysyła gotowy tekst)
+    let replyTranslated = replyIt;
+    if (lang !== "it") {
+      try {
+        const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=it&tl=${lang}&dt=t&q=${encodeURIComponent(replyIt)}`);
+        const j = await r.json();
+        replyTranslated = (j?.[0] || []).map((s: any) => s[0]).join("") || replyIt;
+      } catch { replyTranslated = replyIt; }
+    }
+    const subjMap: Record<string, string> = { it: "Risposta da S'Historia", pl: "Odpowiedź od S'Historia", en: "Reply from S'Historia", de: "Antwort von S'Historia", fr: "Réponse de S'Historia", es: "Respuesta de S'Historia" };
+    const replySubject = subjMap[lang] || subjMap.it;
+    const replyHtml = `<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#15202b;">
+      <p style="font-size:15px;line-height:1.6;">${replyTranslated.replace(/\n/g, "<br>")}</p>
+      <hr style="border:none;border-top:1px solid #eee;margin:20px 0;">
+      <p style="font-size:12px;color:#888;">S'Historia · Rena Majore (OT), Sardegna · <a href="https://www.shistoria.it">www.shistoria.it</a></p>
+    </div>`;
+    // Webhook make.com → wyśle e-mail do klienta w jego języku (gotowy tekst + HTML)
     try {
       const url = process.env.NEXT_PUBLIC_MAKE_REPLY_WEBHOOK || process.env.NEXT_PUBLIC_MAKE_CONTACT_WEBHOOK;
       if (url) {
         await fetch(url, {
           method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type: "admin_reply", email: activeThread.email, name: target.name, lang: target.language || "it", reply_it: draft.trim() }),
+          body: JSON.stringify({ type: "admin_reply", email: activeThread.email, name: target.name, lang, reply_it: replyIt, reply_text: replyTranslated, reply_subject: replySubject, reply_html: replyHtml }),
         });
       }
     } catch (e) { console.error(e); }

@@ -115,3 +115,45 @@ W każdym mailu ustaw **Content type = HTML** (inaczej HTML pokaże się jako te
 ## 🔒 Bezpieczeństwo
 - URL-e webhooków trzymaj w env Vercel (są też tutaj dla wygody konfiguracji — to webhooki przychodzące, nie sekrety krytyczne, ale nie publikuj ich szerzej).
 - Hasło skrzynki SMTP wpisz tylko w make.com (połączenie), nigdy w kodzie repo.
+
+
+---
+
+## 💬 WIADOMOŚCI — odpowiedź z admina do klienta (admin_reply)
+
+Webhook: `NEXT_PUBLIC_MAKE_REPLY_WEBHOOK` (jeśli brak → użyje `NEXT_PUBLIC_MAKE_CONTACT_WEBHOOK`)
+
+Gdy w adminie odpisujesz na wiadomość, strona **sama tłumaczy** odpowiedź na język
+klienta i wysyła JSON z gotowymi polami:
+- `email` — adres klienta
+- `name` — imię klienta
+- `lang` — język klienta (it/pl/en/de/fr/es)
+- `reply_text` — przetłumaczona treść (czysty tekst)
+- `reply_subject` — gotowy temat w języku klienta
+- `reply_html` — gotowy HTML maila (do wysłania)
+- `reply_it` — oryginał po włosku (fallback)
+
+### Scenariusz (2 moduły — bardzo prosty)
+1. **Webhooks → Custom webhook** (reply webhook). *Redetermine data structure* i odpisz raz w adminie na testową wiadomość, żeby make złapał strukturę.
+2. **Email → Send an email**:
+   - To: `{{email}}`
+   - Subject: `{{reply_subject}}`
+   - Content type: **HTML**, Content: `{{reply_html}}`
+   - (połączenie SMTP OVH `info@shistoria.it`, jak wyżej)
+
+Gotowe — klient dostaje odpowiedź w swoim języku. Nic nie tłumaczysz w make.
+
+### Jak przetestować (PowerShell)
+```powershell
+$body = @{
+  type = "admin_reply"
+  email = "TWOJ@email.com"
+  name = "Mario"
+  lang = "it"
+  reply_subject = "Risposta da S'Historia"
+  reply_html = "<p>Ciao Mario, grazie per il tuo messaggio!</p>"
+  reply_text = "Ciao Mario, grazie per il tuo messaggio!"
+} | ConvertTo-Json
+Invoke-RestMethod -Method POST -Uri "PASTE_REPLY_WEBHOOK_URL" -ContentType "application/json" -Body $body
+```
+(Najpierw „Run once" w make, potem odpal komendę.)
