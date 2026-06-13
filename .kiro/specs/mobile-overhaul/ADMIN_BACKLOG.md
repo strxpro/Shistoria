@@ -37,9 +37,9 @@ Pełna, rozwinięta lista wszystkiego o co prosiłeś. `[x]` = zrobione, `[ ]` =
 - [x] Nazwa wątku z ostatniej wiadomości klienta (nie z odpowiedzi obsługi).
 
 ### Blok 3 — 📧 Newsletter w adminie (~1 tura)
-- [ ] **Flow zapisu:** klik „Newsletter" w footerze → pole na email → po wpisaniu emaila **rozwija się formularz** (imię itp.) → „Zapisz" → zapis do **make.com** (+ Supabase) → toast.
-- [ ] **Zakładka „Newsletter" w adminie** — lista subskrybentów, liczba, data zapisu.
-- [ ] **Grupowanie osób** — każda osoba pokazana z tym, z czym jest powiązana (newsletter / event / drink / rezerwacja).
+- [x] **Flow zapisu:** footer → pole email → po wpisaniu rozwija się imię → „Iscriviti" → zapis do **Supabase + make.com** → toast (6 jęz). (UI istniał, dodano make.com).
+- [x] **Zakładka „Newsletter" w adminie** — lista subskrybentów, liczba, data, szukajka, usuwanie.
+- [x] **Grupowanie osób** — każdy subskrybent z badge'ami powiązań: 🍸 drink, 📱 ordini, ⭐ recensione, 💬 messaggi, lub „Solo newsletter".
 
 ### Blok 4 — 📊 Statystyki Chart.js (~1–2 tury)
 - [ ] Wszystkie najważniejsze KPI (wizyty, zamówienia, drinki, wiadomości, kraje, konwersje).
