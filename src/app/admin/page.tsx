@@ -81,13 +81,11 @@ export default function AdminPage() {
         </div>
         <nav>
           {([
-            { id: "menu", label: "Menu", ico: "🍽" },
+            { id: "menu", label: "Menu & Orari", ico: "🍽" },
             { id: "events", label: "Eventi", ico: "🎭" },
-            { id: "drinks", label: "Drink Clienti", ico: "🍸" },
-            { id: "orders", label: "Ordini QR", ico: "📱" },
+            { id: "drinks", label: "Drink & Ordini", ico: "🍸" },
             { id: "messages", label: "Messaggi", ico: "💬" },
             { id: "reviews", label: "Recensioni", ico: "⭐" },
-            { id: "hours", label: "Orari & Date", ico: "🕐" },
             { id: "stats", label: "Statistiche", ico: "📊" },
           ] as { id: Tab; label: string; ico: string }[]).map((t) => (
             <button
@@ -107,16 +105,42 @@ export default function AdminPage() {
       </aside>
       <button className="admin-nav-toggle" onClick={() => setNavOpen((o) => !o)} aria-label="Menu">{navOpen ? "✕" : "☰"}</button>
       <main className="admin-main">
-        {tab === "menu" && <MenuPanel />}
+        {tab === "menu" && <MenuHoursPanel />}
         {tab === "events" && <EventsPanel />}
-        {tab === "drinks" && <DrinksPanel />}
-        {tab === "orders" && <OrdersPanel />}
+        {tab === "drinks" && <DrinksOrdersPanel />}
         {tab === "messages" && <MessagesPanel />}
         {tab === "reviews" && <ReviewsPanel />}
-        {tab === "hours" && <HoursPanel />}
         {tab === "stats" && <StatsPanel />}
       </main>
       <AdminStyles />
+    </div>
+  );
+}
+
+// ─── Menu + Orari (połączona zakładka z pod-zakładkami) ────────────────────────
+function MenuHoursPanel() {
+  const [sub, setSub] = useState<"menu" | "hours">("menu");
+  return (
+    <div className="admin-subtabs-wrap">
+      <div className="admin-subtabs">
+        <button className={sub === "menu" ? "active" : ""} onClick={() => setSub("menu")}>🍽 Menu</button>
+        <button className={sub === "hours" ? "active" : ""} onClick={() => setSub("hours")}>🕐 Orari & Date</button>
+      </div>
+      {sub === "menu" ? <MenuPanel /> : <HoursPanel />}
+    </div>
+  );
+}
+
+// ─── Drink & Ordini (połączona zakładka z pod-zakładkami) ──────────────────────
+function DrinksOrdersPanel() {
+  const [sub, setSub] = useState<"drinks" | "orders">("drinks");
+  return (
+    <div className="admin-subtabs-wrap">
+      <div className="admin-subtabs">
+        <button className={sub === "drinks" ? "active" : ""} onClick={() => setSub("drinks")}>🍸 Drink Clienti</button>
+        <button className={sub === "orders" ? "active" : ""} onClick={() => setSub("orders")}>📱 Ordini QR</button>
+      </div>
+      {sub === "drinks" ? <DrinksPanel /> : <OrdersPanel />}
     </div>
   );
 }
@@ -691,15 +715,15 @@ function DrinksPanel() {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<"week" | "month">("month");
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
     const { data } = await supabase.from("community_drinks").select("*").order("created_at", { ascending: false });
     setDrinks(data || []);
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
   useEffect(() => {
-    const ch = supabase.channel("drinks_rt").on("postgres_changes", { event: "*", schema: "public", table: "community_drinks" }, () => load()).subscribe();
+    const ch = supabase.channel("drinks_rt").on("postgres_changes", { event: "*", schema: "public", table: "community_drinks" }, () => load(true)).subscribe();
     return () => { supabase.removeChannel(ch); };
   }, []);
 
@@ -803,8 +827,8 @@ function OrdersPanel() {
   const [codeInput, setCodeInput] = useState("");
   const [scanMsg, setScanMsg] = useState("");
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
     const { data } = await supabase.from("drink_orders").select("*").order("created_at", { ascending: false });
     setOrders(data || []);
     setLoading(false);
@@ -812,7 +836,7 @@ function OrdersPanel() {
   useEffect(() => { load(); }, []);
   // Realtime — nowe zamówienia QR na żywo
   useEffect(() => {
-    const ch = supabase.channel("orders_rt").on("postgres_changes", { event: "*", schema: "public", table: "drink_orders" }, () => load()).subscribe();
+    const ch = supabase.channel("orders_rt").on("postgres_changes", { event: "*", schema: "public", table: "drink_orders" }, () => load(true)).subscribe();
     return () => { supabase.removeChannel(ch); };
   }, []);
 
@@ -926,8 +950,8 @@ function MessagesPanel() {
   const [sending, setSending] = useState(false);
   const [trMap, setTrMap] = useState<Record<string, string>>({});
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
     const { data } = await supabase.from("contact_messages").select("*").order("created_at", { ascending: true });
     setMessages(data || []);
     setLoading(false);
@@ -938,10 +962,10 @@ function MessagesPanel() {
   useEffect(() => {
     const ch = supabase
       .channel("contact_messages_rt")
-      .on("postgres_changes", { event: "*", schema: "public", table: "contact_messages" }, () => { load(); })
+      .on("postgres_changes", { event: "*", schema: "public", table: "contact_messages" }, () => { load(true); })
       .subscribe();
     // fallback polling co 15s (gdyby realtime nie był włączony w Supabase)
-    const poll = setInterval(load, 15000);
+    const poll = setInterval(() => load(true), 15000);
     return () => { supabase.removeChannel(ch); clearInterval(poll); };
   }, []);
 
@@ -972,7 +996,7 @@ function MessagesPanel() {
 
   const markThreadRead = async (email: string) => {
     await supabase.from("contact_messages").update({ is_read: true }).eq("email", email);
-    load();
+    load(true);
   };
 
   const sendReply = async () => {
@@ -993,7 +1017,7 @@ function MessagesPanel() {
     } catch (e) { console.error(e); }
     setDraft("");
     setSending(false);
-    load();
+    load(true);
   };
 
   const removeThread = async (email: string) => {
@@ -1407,6 +1431,17 @@ function StatsPanel() {
 function AdminStyles() {
   return (
     <style>{`
+      /* ── Pod-zakładki (Drink & Ordini) ── */
+      .admin-subtabs-wrap { display:flex; flex-direction:column; gap:0; }
+      .admin-subtabs { display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap; }
+      .admin-subtabs button { padding:10px 18px; border-radius:999px; border:1px solid rgba(255,255,255,0.12);
+        background:rgba(255,255,255,0.04); color:rgba(255,255,255,0.7); font-weight:700; font-size:14px; cursor:pointer;
+        transition:all .25s cubic-bezier(.2,.8,.2,1); }
+      .admin-subtabs button:hover { background:rgba(232,146,124,0.14); color:#fff; }
+      .admin-subtabs button.active { background:var(--cx-accent,#E8927C); color:#1a1a1a; border-color:transparent; box-shadow:0 6px 18px rgba(232,146,124,0.3); }
+      .admin-theme-light .admin-subtabs button { background:rgba(0,0,0,0.04); color:#445; border-color:rgba(0,0,0,0.1); }
+      .admin-theme-light .admin-subtabs button.active { background:#E8927C; color:#fff; }
+
       /* ── MOTYW: zmienne (ciemny domyślnie, jasny przez .admin-theme-light) ── */
       .admin-theme-dark, .admin-theme-light { --a-bg:#0a0e14; --a-text:#ffffff; }
       .admin-theme-light { --a-bg:#f4f6f9; --a-text:#15202b; }
