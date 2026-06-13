@@ -14,19 +14,20 @@
 
 type Json = Record<string, unknown>;
 
-function webhook(key: "contact" | "drink" | "winner" | "event"): string | null {
+function webhook(key: "contact" | "drink" | "winner" | "event" | "newsletter"): string | null {
   const map: Record<string, string | undefined> = {
     contact: process.env.NEXT_PUBLIC_MAKE_CONTACT_WEBHOOK,
     drink: process.env.NEXT_PUBLIC_MAKE_DRINK_WEBHOOK,
     winner: process.env.NEXT_PUBLIC_MAKE_WINNER_WEBHOOK,
     event: process.env.NEXT_PUBLIC_MAKE_EVENT_WEBHOOK,
+    newsletter: process.env.NEXT_PUBLIC_MAKE_NEWSLETTER_WEBHOOK,
   };
   // Fallback: pojedynczy webhook dla wszystkiego (window override do testów)
   const single = (typeof window !== "undefined" && (window as any).__MAKE_WEBHOOK) || process.env.NEXT_PUBLIC_MAKE_WEBHOOK;
   return map[key] || single || null;
 }
 
-async function send(key: "contact" | "drink" | "winner" | "event", payload: Json): Promise<boolean> {
+async function send(key: "contact" | "drink" | "winner" | "event" | "newsletter", payload: Json): Promise<boolean> {
   const url = webhook(key);
   if (!url) { console.info(`[make] webhook '${key}' nieskonfigurowany — pomijam`); return false; }
   try {
@@ -188,5 +189,20 @@ export async function subscribeEventReminder(data: {
     email_html_3d: mail3d.html,         // 3 dni przed: pełny HTML
     email_subject_5h: mail5h.subject,   // 5 godzin przed: temat
     email_html_5h: mail5h.html,         // 5 godzin przed: pełny HTML
+  });
+}
+
+
+/* ── 5. Newsletter — nowy zapis (footer) ───────────────────────────────────
+ * → make.com dodaje do listy mailingowej / Data Store; mail powitalny w języku.
+ */
+export async function subscribeNewsletter(data: {
+  email: string; name?: string; lang: string;
+}): Promise<boolean> {
+  return send("newsletter", {
+    type: "newsletter_signup",
+    email: data.email,
+    name: data.name || "",
+    lang: data.lang,
   });
 }

@@ -2,7 +2,7 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { SplitReveal, Placeholder, TextClipReveal } from "./shell";
 import AttrazioniMap from "./components/AttrazioniMap";
-import { sendReservation, subscribeEventReminder } from "./lib/make-webhooks";
+import { sendReservation, subscribeEventReminder, subscribeNewsletter } from "./lib/make-webhooks";
 
 // Eventi, SocialFeed, Attrazioni, Recensioni, Contatti, Footer
 const { useState: useStateE, useEffect: useEffectE, useRef: useRefE } = React;
@@ -1267,6 +1267,8 @@ function Footer({ t }) {
       const sb = createClient(url, key);
       await sb.from("newsletter").insert({ email: news.email, name: news.name || null, language: lang });
     } catch { /* tabela opcjonalna */ }
+    // make.com — dodaj do listy mailingowej + mail powitalny (w jego języku)
+    try { await subscribeNewsletter({ email: news.email, name: news.name, lang }); } catch { /* webhook opcjonalny */ }
     setNews((n) => ({ ...n, sent: true }));
     setTimeout(() => setNews({ email: "", name: "", open: false, sent: false }), 4000);
   };

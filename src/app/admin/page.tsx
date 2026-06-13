@@ -11,7 +11,7 @@ const StatsGlobe = dynamic(() => import("../../components/StatsGlobe"), {
   loading: () => <div className="stats-globe-loading">🌍</div>,
 });
 
-type Tab = "menu" | "events" | "drinks" | "orders" | "messages" | "reviews" | "stats" | "hours";
+type Tab = "menu" | "events" | "drinks" | "orders" | "messages" | "reviews" | "stats" | "hours" | "newsletter";
 
 // Skeleton loading — animowane „kości" zamiast napisu Caricamento
 function Skeleton({ rows = 5 }: { rows?: number }) {
@@ -85,6 +85,7 @@ export default function AdminPage() {
             { id: "events", label: "Eventi", ico: "🎭" },
             { id: "drinks", label: "Drink & Ordini", ico: "🍸" },
             { id: "messages", label: "Messaggi", ico: "💬" },
+            { id: "newsletter", label: "Newsletter", ico: "📧" },
             { id: "reviews", label: "Recensioni", ico: "⭐" },
             { id: "stats", label: "Statistiche", ico: "📊" },
           ] as { id: Tab; label: string; ico: string }[]).map((t) => (
@@ -109,6 +110,7 @@ export default function AdminPage() {
         {tab === "events" && <EventsPanel />}
         {tab === "drinks" && <DrinksOrdersPanel />}
         {tab === "messages" && <MessagesPanel />}
+        {tab === "newsletter" && <NewsletterPanel />}
         {tab === "reviews" && <ReviewsPanel />}
         {tab === "stats" && <StatsPanel />}
       </main>
@@ -1195,6 +1197,89 @@ function MessagesPanel() {
               </>
             ) : <p className="admin-empty">Seleziona una conversazione.</p>}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Newsletter Panel (subskrybenci + powiązania) ─────────────────────────────
+function NewsletterPanel() {
+  const [subs, setSubs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [assoc, setAssoc] = useState<{ drinks: Set<string>; orders: Set<string>; reviews: Set<string>; msgs: Set<string> }>({ drinks: new Set(), orders: new Set(), reviews: new Set(), msgs: new Set() });
+
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
+    const [s, drk, ord, rev, msg] = await Promise.all([
+      supabase.from("newsletter").select("*").order("created_at", { ascending: false }).limit(1000),
+      supabase.from("community_drinks").select("author_name").limit(1000),
+      supabase.from("drink_orders").select("author_name").limit(1000),
+      supabase.from("reviews").select("email").limit(1000),
+      supabase.from("contact_messages").select("email").limit(1000),
+    ]);
+    setSubs(s.data || []);
+    const lc = (v: any) => (v || "").toString().toLowerCase();
+    setAssoc({
+      drinks: new Set((drk.data || []).map((d: any) => lc(d.author_name))),
+      orders: new Set((ord.data || []).map((d: any) => lc(d.author_name))),
+      reviews: new Set((rev.data || []).map((d: any) => lc(d.email))),
+      msgs: new Set((msg.data || []).map((d: any) => lc(d.email))),
+    });
+    setLoading(false);
+  };
+  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    const ch = supabase.channel("newsletter_rt").on("postgres_changes", { event: "*", schema: "public", table: "newsletter" }, () => load(true)).subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, []);
+
+  const q = search.trim().toLowerCase();
+  const filtered = q ? subs.filter((s) => (s.email || "").toLowerCase().includes(q) || (s.name || "").toLowerCase().includes(q)) : subs;
+
+  const remove = async (id: string) => {
+    if (confirm("Rimuovere questo iscritto?")) { await supabase.from("newsletter").delete().eq("id", id); load(true); }
+  };
+
+  return (
+    <div className="admin-panel">
+      <header className="admin-panel-head">
+        <h1>Newsletter</h1>
+        <span className="admin-count">{subs.length} iscritti</span>
+      </header>
+      <div className="amsg-search" style={{ maxWidth: 360, marginBottom: 18 }}>
+        <span className="amsg-search-ico">🔍</span>
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cerca per nome o email…" />
+        {search && <button className="amsg-search-clear" onClick={() => setSearch("")}>✕</button>}
+      </div>
+      {loading ? <Skeleton /> : (
+        <div className="admin-orders">
+          {filtered.map((s) => {
+            const email = (s.email || "").toLowerCase();
+            const name = (s.name || "").toLowerCase();
+            const tags: { label: string; cls: string }[] = [];
+            if (assoc.drinks.has(name)) tags.push({ label: "🍸 Drink", cls: "amsg-badge-coral" });
+            if (assoc.orders.has(name)) tags.push({ label: "📱 Ordini", cls: "amsg-badge-sky" });
+            if (assoc.reviews.has(email)) tags.push({ label: "⭐ Recensione", cls: "amsg-badge-gold" });
+            if (assoc.msgs.has(email)) tags.push({ label: "💬 Messaggi", cls: "" });
+            return (
+              <div key={s.id} className="admin-order">
+                <div className="admin-order-info">
+                  <h4>{s.name || "—"} <span style={{ opacity: 0.5, fontWeight: 400, fontSize: 13 }}>🌐 {s.language || "it"}</span></h4>
+                  <p style={{ opacity: 0.7 }}>{s.email}</p>
+                  <div className="amsg-person" style={{ marginTop: 6 }}>
+                    {tags.length > 0 ? tags.map((t, i) => <span key={i} className={`amsg-badge ${t.cls}`}>{t.label}</span>) : <span className="amsg-badge">Solo newsletter</span>}
+                  </div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
+                  <span style={{ fontSize: 12, opacity: 0.5 }}>{s.created_at ? new Date(s.created_at).toLocaleDateString("it-IT") : ""}</span>
+                  <button className="admin-btn-sm admin-btn-danger" onClick={() => remove(s.id)}>🗑</button>
+                </div>
+              </div>
+            );
+          })}
+          {filtered.length === 0 && <p className="admin-empty">{search ? "Nessun risultato." : "Nessun iscritto alla newsletter."}</p>}
         </div>
       )}
     </div>

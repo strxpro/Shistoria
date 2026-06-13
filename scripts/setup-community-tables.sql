@@ -168,3 +168,21 @@ ALTER PUBLICATION supabase_realtime ADD TABLE drink_orders;
 -- Każda odpowiedź z admina to nowy wiersz z is_staff=true (nie nadpisuje starego).
 ALTER TABLE contact_messages ADD COLUMN IF NOT EXISTS is_staff boolean DEFAULT false;
 CREATE INDEX IF NOT EXISTS idx_contact_messages_email ON contact_messages(email);
+
+
+-- ─── Newsletter (zapisy z footera) ────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS newsletter (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  email text NOT NULL,
+  name text,
+  language text DEFAULT 'it',
+  created_at timestamptz DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_newsletter_email ON newsletter(lower(email));
+ALTER TABLE newsletter ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  CREATE POLICY "Public insert newsletter" ON newsletter FOR INSERT WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  CREATE POLICY "Public read newsletter" ON newsletter FOR SELECT USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
