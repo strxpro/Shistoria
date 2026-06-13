@@ -25,9 +25,10 @@ Pełna, rozwinięta lista wszystkiego o co prosiłeś. `[x]` = zrobione, `[ ]` =
 ## 🔜 DO ZROBIENIA (kolejność pracy)
 
 ### Blok 1 — 🎨 Redesign wyglądu admina (~2 tury)
-- [ ] Styl jak Novara/Stellar: czysty sidebar, dużo światła, miękkie karty, zaokrąglenia, smooth animacje.
-- [ ] Czytelna typografia, spójne odstępy, nie „klasyczny panel".
-- [ ] Działa w trybie jasnym i ciemnym + na telefonie.
+- [x] Styl jak Novara/Stellar: czysty sidebar (szklisty), miękkie karty (radius 20, soft shadow, hover-lift), przyciski-pigułki, smooth animacje.
+- [x] Czytelna typografia (Inter, ciaśniejsze nagłówki), spójne odstępy, focus-ring na polach.
+- [x] Działa w trybie jasnym i ciemnym + na telefonie.
+- [ ] (opcjonalnie) dalsze dopieszczenie po Twoim feedbacku ze zrzutu.
 
 ### Blok 2 — 💬 Czat wiadomości jak WhatsApp (~2 tury)
 - [ ] **Lupa/szukajka** — szukanie konwersacji po imieniu/mailu/treści.
