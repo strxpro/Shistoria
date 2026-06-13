@@ -258,3 +258,92 @@ export function winnerOthersEmailHTML(v: WinnerVars): { subject: string; html: s
   `;
   return { subject, html: shell(inner) };
 }
+
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * EVENTI — przypomnienia o wydarzeniu (3 dni przed / 5 godzin przed).
+ * Pre-renderowane w języku odbiorcy → make.com tylko mapuje gotowe pola.
+ * ──────────────────────────────────────────────────────────────────────── */
+export interface EventVars {
+  name: string;
+  eventTitle: string;
+  eventDate: string;          // gotowy do wyświetlenia tekst daty/godziny
+  eventDescription?: string;
+  lang: Lang;
+  link?: string;
+}
+
+const EVENT_T: Record<Lang, {
+  subj3d: (t: string) => string; subj5h: (t: string) => string;
+  hi: string;
+  lead3d: (t: string) => string; lead5h: (t: string) => string;
+  whenLabel: string; descLabel: string; cta: string; footer: string;
+}> = {
+  it: {
+    subj3d: (t) => `📅 Tra 3 giorni: ${t} — S'Historia`,
+    subj5h: (t) => `⏳ Tra poche ore: ${t}! — S'Historia`,
+    hi: "Ciao",
+    lead3d: (t) => `Manca poco! Tra 3 giorni ti aspettiamo per <strong>${t}</strong> da S'Historia.`,
+    lead5h: (t) => `Ci siamo quasi! <strong>${t}</strong> inizia tra poche ore. Ti aspettiamo!`,
+    whenLabel: "Quando", descLabel: "Dettagli", cta: "Vedi l'evento", footer: "A presto, il team di S'Historia",
+  },
+  pl: {
+    subj3d: (t) => `📅 Za 3 dni: ${t} — S'Historia`,
+    subj5h: (t) => `⏳ Już za kilka godzin: ${t}! — S'Historia`,
+    hi: "Cześć",
+    lead3d: (t) => `Już niedługo! Za 3 dni zapraszamy na <strong>${t}</strong> w S'Historia.`,
+    lead5h: (t) => `Prawie czas! <strong>${t}</strong> zaczyna się za kilka godzin. Czekamy na Ciebie!`,
+    whenLabel: "Kiedy", descLabel: "Szczegóły", cta: "Zobacz wydarzenie", footer: "Do zobaczenia, zespół S'Historia",
+  },
+  en: {
+    subj3d: (t) => `📅 In 3 days: ${t} — S'Historia`,
+    subj5h: (t) => `⏳ In a few hours: ${t}! — S'Historia`,
+    hi: "Hi",
+    lead3d: (t) => `Almost there! In 3 days we're waiting for you at <strong>${t}</strong> at S'Historia.`,
+    lead5h: (t) => `Almost time! <strong>${t}</strong> starts in a few hours. See you there!`,
+    whenLabel: "When", descLabel: "Details", cta: "View the event", footer: "See you soon, the S'Historia team",
+  },
+  de: {
+    subj3d: (t) => `📅 In 3 Tagen: ${t} — S'Historia`,
+    subj5h: (t) => `⏳ In wenigen Stunden: ${t}! — S'Historia`,
+    hi: "Hallo",
+    lead3d: (t) => `Bald ist es soweit! In 3 Tagen erwarten wir dich bei <strong>${t}</strong> im S'Historia.`,
+    lead5h: (t) => `Fast geschafft! <strong>${t}</strong> beginnt in wenigen Stunden. Wir freuen uns auf dich!`,
+    whenLabel: "Wann", descLabel: "Details", cta: "Event ansehen", footer: "Bis bald, dein S'Historia Team",
+  },
+  fr: {
+    subj3d: (t) => `📅 Dans 3 jours : ${t} — S'Historia`,
+    subj5h: (t) => `⏳ Dans quelques heures : ${t} ! — S'Historia`,
+    hi: "Bonjour",
+    lead3d: (t) => `C'est bientôt ! Dans 3 jours nous t'attendons pour <strong>${t}</strong> chez S'Historia.`,
+    lead5h: (t) => `Ça approche ! <strong>${t}</strong> commence dans quelques heures. À très vite !`,
+    whenLabel: "Quand", descLabel: "Détails", cta: "Voir l'événement", footer: "À bientôt, l'équipe S'Historia",
+  },
+  es: {
+    subj3d: (t) => `📅 En 3 días: ${t} — S'Historia`,
+    subj5h: (t) => `⏳ En pocas horas: ${t}! — S'Historia`,
+    hi: "Hola",
+    lead3d: (t) => `¡Ya casi! En 3 días te esperamos para <strong>${t}</strong> en S'Historia.`,
+    lead5h: (t) => `¡Casi es la hora! <strong>${t}</strong> empieza en pocas horas. ¡Te esperamos!`,
+    whenLabel: "Cuándo", descLabel: "Detalles", cta: "Ver el evento", footer: "Hasta pronto, el equipo de S'Historia",
+  },
+};
+
+/** E-mail przypomnienia o evencie — w języku odbiorcy. kind: "3d" | "5h". */
+export function eventReminderHTML(v: EventVars, kind: "3d" | "5h"): { subject: string; html: string } {
+  const tr = EVENT_T[v.lang] ?? EVENT_T.it;
+  const link = v.link || `${BRAND.site}/#eventi`;
+  const subject = kind === "3d" ? tr.subj3d(v.eventTitle) : tr.subj5h(v.eventTitle);
+  const lead = kind === "3d" ? tr.lead3d(v.eventTitle) : tr.lead5h(v.eventTitle);
+  const inner = `
+    <h1 style="margin:0 0 14px;font-size:24px;color:${BRAND.cream};font-weight:800;">${tr.hi} ${v.name || ""},</h1>
+    <p style="margin:0 0 18px;font-size:16px;line-height:1.6;color:${BRAND.cream};">${lead}</p>
+    <table style="width:100%;border-collapse:collapse;margin:8px 0 4px;">
+      ${row(tr.whenLabel, v.eventDate)}
+      ${v.eventDescription ? row(tr.descLabel, v.eventDescription) : ""}
+    </table>
+    ${ctaButton(tr.cta, link)}
+    <p style="margin:24px 0 0;font-size:14px;color:${BRAND.muted};">${tr.footer} 🍸</p>
+  `;
+  return { subject, html: shell(inner) };
+}

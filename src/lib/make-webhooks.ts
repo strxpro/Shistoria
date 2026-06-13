@@ -166,6 +166,13 @@ export async function subscribeEventReminder(data: {
   name: string; email: string; lang: string;
   event_title: string; event_date: string; event_description?: string;
 }): Promise<boolean> {
+  const { eventReminderHTML } = await import("./email-templates");
+  const lang = (["it","pl","en","de","fr","es"].includes(data.lang) ? data.lang : "it") as import("./email-templates").Lang;
+  const link = typeof window !== "undefined" ? `${window.location.origin}/#eventi` : "https://www.shistoria.it/#eventi";
+  const vars = { name: data.name, eventTitle: data.event_title, eventDate: data.event_date, eventDescription: data.event_description, lang, link };
+  // Pre-renderowane maile w języku odbiorcy — make.com wysyła je w odpowiednim momencie
+  const mail3d = eventReminderHTML(vars, "3d");
+  const mail5h = eventReminderHTML(vars, "5h");
   return send("event", {
     type: "event_reminder",
     name: data.name,
@@ -176,5 +183,10 @@ export async function subscribeEventReminder(data: {
     event_description: data.event_description || "",
     remind_days_before: 3,
     remind_hours_before: 5,
+    // ── GOTOWE treści (make.com mapuje tylko te pola w odpowiednim mailu) ──
+    email_subject_3d: mail3d.subject,   // 3 dni przed: temat
+    email_html_3d: mail3d.html,         // 3 dni przed: pełny HTML
+    email_subject_5h: mail5h.subject,   // 5 godzin przed: temat
+    email_html_5h: mail5h.html,         // 5 godzin przed: pełny HTML
   });
 }
