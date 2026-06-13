@@ -42,8 +42,8 @@ Pełna, rozwinięta lista wszystkiego o co prosiłeś. `[x]` = zrobione, `[ ]` =
 - [x] **Grupowanie osób** — każdy subskrybent z badge'ami powiązań: 🍸 drink, 📱 ordini, ⭐ recensione, 💬 messaggi, lub „Solo newsletter".
 
 ### Blok 4 — 📊 Statystyki Chart.js (~1–2 tury)
-- [ ] Wszystkie najważniejsze KPI (wizyty, zamówienia, drinki, wiadomości, kraje, konwersje).
-- [ ] Wykresy Chart.js (liniowy wizyt, słupkowy zamówień, pączek krajów itp.).
+- [x] KPI: wizyty, konwersje (%), z email, czas średni, ordini QR, messaggi, **drink creati, recensioni**.
+- [x] Wykresy Chart.js (z CDN, bez bundlowania): **liniowy wizyt w czasie** + **doughnut top paesi**. Globus/mapa krajów już interaktywne.
 
 ### Blok 5 — ⚡ Wydajność (~1 tura) — ROBIĘ TERAZ
 - [ ] Przyspieszenie ładowania zakładek (limity zapytań, mniej danych na raz, brak zbędnych pobrań).
