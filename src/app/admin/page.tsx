@@ -717,7 +717,7 @@ function DrinksPanel() {
 
   const load = async (silent = false) => {
     if (!silent) setLoading(true);
-    const { data } = await supabase.from("community_drinks").select("*").order("created_at", { ascending: false });
+    const { data } = await supabase.from("community_drinks").select("*").order("created_at", { ascending: false }).limit(200);
     setDrinks(data || []);
     setLoading(false);
   };
@@ -829,7 +829,7 @@ function OrdersPanel() {
 
   const load = async (silent = false) => {
     if (!silent) setLoading(true);
-    const { data } = await supabase.from("drink_orders").select("*").order("created_at", { ascending: false });
+    const { data } = await supabase.from("drink_orders").select("*").order("created_at", { ascending: false }).limit(200);
     setOrders(data || []);
     setLoading(false);
   };
@@ -952,7 +952,7 @@ function MessagesPanel() {
 
   const load = async (silent = false) => {
     if (!silent) setLoading(true);
-    const { data } = await supabase.from("contact_messages").select("*").order("created_at", { ascending: true });
+    const { data } = await supabase.from("contact_messages").select("*").order("created_at", { ascending: true }).limit(800);
     setMessages(data || []);
     setLoading(false);
   };
@@ -1136,7 +1136,7 @@ function ReviewsPanel() {
 
   const load = async () => {
     setLoading(true);
-    const { data } = await supabase.from("reviews").select("*").order("created_at", { ascending: false });
+    const { data } = await supabase.from("reviews").select("*").order("created_at", { ascending: false }).limit(200);
     setReviews(data || []);
     setLoading(false);
   };
