@@ -1836,7 +1836,66 @@ function AdminStyles() {
       /* Login — bardziej premium */
       .admin-theme-dark .admin-login { background:radial-gradient(900px 500px at 50% -10%, #15293a, #080c12) !important; }
       .admin-login-card { border-radius:26px !important; box-shadow:0 30px 80px rgba(0,0,0,0.4) !important; }
+
+      /* ═══════════════════════════════════════════════════════════════════
+       * ✨ POLISH + MOTION LAYER — płynne wejścia jak iPhone Weather, spring,
+       * wyrównanie, momentum scroll. Profesjonalnie i elastycznie.
+       * ═══════════════════════════════════════════════════════════════════ */
+      :root { --spring: cubic-bezier(.22,1,.36,1); }
+      .admin-main { scroll-behavior:smooth; -webkit-overflow-scrolling:touch; }
+
+      /* Wejście całego panelu po zmianie zakładki (remount → re-run) */
+      .admin-main > * { animation:adminPanelIn .55s var(--spring) both; }
+      @keyframes adminPanelIn { from { opacity:0; transform:translateY(18px) scale(.985); } to { opacity:1; transform:none; } }
+
+      /* Stagger kart/wierszy — kolejne wjeżdżają z lekkim opóźnieniem (jak Weather) */
+      .admin-grid > *, .admin-orders > *, .stats-kpis > *, .ev-tpl-grid > * { animation:adminCardIn .5s var(--spring) both; }
+      @keyframes adminCardIn { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:none; } }
+      .admin-grid > *:nth-child(1),.admin-orders > *:nth-child(1),.stats-kpis > *:nth-child(1){animation-delay:.03s}
+      .admin-grid > *:nth-child(2),.admin-orders > *:nth-child(2),.stats-kpis > *:nth-child(2){animation-delay:.07s}
+      .admin-grid > *:nth-child(3),.admin-orders > *:nth-child(3),.stats-kpis > *:nth-child(3){animation-delay:.11s}
+      .admin-grid > *:nth-child(4),.admin-orders > *:nth-child(4),.stats-kpis > *:nth-child(4){animation-delay:.15s}
+      .admin-grid > *:nth-child(5),.admin-orders > *:nth-child(5){animation-delay:.19s}
+      .admin-grid > *:nth-child(6),.admin-orders > *:nth-child(6){animation-delay:.23s}
+      .admin-grid > *:nth-child(7),.admin-orders > *:nth-child(7){animation-delay:.27s}
+      .admin-grid > *:nth-child(8),.admin-orders > *:nth-child(8){animation-delay:.31s}
+
+      /* Aktywne karty/przyciski reagują sprężyście */
+      .admin-nav nav button, .admin-subtabs button, .admin-btn, .admin-btn-sm, .admin-order, .admin-drink-card, .admin-event-card, .stats-kpi, .amsg-thread {
+        transition:transform .35s var(--spring), box-shadow .35s var(--spring), background .25s ease, color .25s ease, border-color .25s ease !important;
+      }
+      .admin-nav nav button:active, .admin-subtabs button:active, .admin-btn:active, .admin-btn-sm:active { transform:scale(.96) !important; }
+
+      /* WYRÓWNANIE — spójne nagłówki, odstępy, brak „rozjazdów" */
+      .admin-panel-head { gap:16px; flex-wrap:wrap; align-items:center; }
+      .admin-panel-head > div { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+      .admin-subtabs { align-items:center; }
+      .admin-grid { gap:18px; }
+      .admin-orders { display:flex; flex-direction:column; gap:14px; }
+      .admin-order { align-items:center; }
+
+      /* Pod-zakładki — przesuwalne poziomo na telefonie ze snap (jak swipe) */
+      .admin-subtabs { overflow-x:auto; scrollbar-width:none; scroll-snap-type:x proximity; -webkit-overflow-scrolling:touch; flex-wrap:nowrap; }
+      .admin-subtabs::-webkit-scrollbar { display:none; }
+      .admin-subtabs button { scroll-snap-align:start; flex:0 0 auto; }
+
+      /* Nawigacja boczna — momentum scroll i brak skoków */
+      .admin-nav nav { gap:6px; }
+
+      /* Szanuj „mniej ruchu" */
+      @media (prefers-reduced-motion: reduce) {
+        .admin-main > *, .admin-grid > *, .admin-orders > *, .stats-kpis > *, .ev-tpl-grid > * { animation:none !important; }
+      }
+
+      /* Telefon — pod-zakładki przewijane, panele pełna szerokość, smooth */
+      @media (max-width:768px) {
+        .admin-subtabs { margin-bottom:14px; padding-bottom:4px; }
+        .admin-subtabs button { flex:0 0 auto; padding:10px 16px; }
+        .admin-main { padding:64px 14px 24px; }
+        .admin-panel-head h1 { font-size:24px; }
+      }
     `}</style>
+
 
   );
 }
