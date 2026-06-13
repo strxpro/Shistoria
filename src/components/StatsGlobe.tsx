@@ -133,7 +133,7 @@ export default function StatsGlobe({ countries }: { countries: Country[] }) {
   const total = countries.reduce((s, c) => s + c.count, 0);
 
   return (
-    <div style={{ width: "100%", maxWidth: 420, margin: "0 auto" }}>
+    <div style={{ width: "100%", maxWidth: 480, margin: "0 auto" }}>
       {/* przełącznik globus / mapa */}
       <div style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 10 }}>
         <button onClick={() => setFlat(false)} style={btn(!flat)}>🌍 Globo</button>
@@ -163,15 +163,29 @@ export default function StatsGlobe({ countries }: { countries: Country[] }) {
         </Canvas>
       </div>
 
-      {/* info wybranego kraju */}
+      {/* info wybranego kraju — POPOUT (modal wyśrodkowany) */}
       {sel && (
-        <div style={{ marginTop: 12, padding: "14px 16px", borderRadius: 14, background: "rgba(232,146,124,0.12)", border: "1px solid rgba(232,146,124,0.4)", display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 30 }}>{flagEmoji(sel.code)}</span>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 16, fontWeight: 800 }}>{sel.name}</div>
-            <div style={{ fontSize: 13, opacity: 0.75 }}>{sel.count} visite · {total ? Math.round((sel.count / total) * 100) : 0}% del totale</div>
+        <div onClick={() => setSel(null)}
+          style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(4,12,18,0.7)", backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, animation: "sgFade .2s ease" }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ position: "relative", width: "100%", maxWidth: 360, borderRadius: 22, padding: "30px 24px 26px", textAlign: "center", background: "linear-gradient(160deg,#16384c,#0d2230)", border: "1px solid rgba(232,146,124,0.4)", boxShadow: "0 30px 90px rgba(0,0,0,0.55)", color: "#fff" }}>
+            <button onClick={() => setSel(null)} aria-label="Chiudi"
+              style={{ position: "absolute", top: 12, right: 12, width: 34, height: 34, borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.1)", color: "#fff", fontSize: 16, cursor: "pointer" }}>✕</button>
+            <div style={{ fontSize: 68, lineHeight: 1 }}>{flagEmoji(sel.code)}</div>
+            <h3 style={{ margin: "14px 0 2px", fontSize: 26, fontWeight: 800 }}>{sel.name}</h3>
+            <p style={{ margin: 0, fontSize: 12, letterSpacing: 3, textTransform: "uppercase", opacity: 0.55 }}>{sel.code}</p>
+            <div style={{ display: "flex", gap: 12, marginTop: 22 }}>
+              <div style={popStat}>
+                <div style={{ fontSize: 28, fontWeight: 800, color: "#E8927C" }}>{sel.count}</div>
+                <div style={{ fontSize: 12, opacity: 0.7, marginTop: 2 }}>visite</div>
+              </div>
+              <div style={popStat}>
+                <div style={{ fontSize: 28, fontWeight: 800, color: "#E8927C" }}>{total ? Math.round((sel.count / total) * 100) : 0}%</div>
+                <div style={{ fontSize: 12, opacity: 0.7, marginTop: 2 }}>del totale</div>
+              </div>
+            </div>
           </div>
-          <button onClick={() => setSel(null)} style={{ width: 30, height: 30, borderRadius: "50%", border: "none", background: "rgba(0,0,0,0.3)", color: "#fff", cursor: "pointer" }}>✕</button>
+          <style>{`@keyframes sgFade{from{opacity:0}to{opacity:1}}`}</style>
         </div>
       )}
       <p style={{ textAlign: "center", fontSize: 11, opacity: 0.45, marginTop: 8 }}>
@@ -180,6 +194,11 @@ export default function StatsGlobe({ countries }: { countries: Country[] }) {
     </div>
   );
 }
+
+const popStat: React.CSSProperties = {
+  flex: 1, padding: "14px 8px", borderRadius: 14,
+  background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)",
+};
 
 function btn(active: boolean): React.CSSProperties {
   return {

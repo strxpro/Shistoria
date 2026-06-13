@@ -1515,6 +1515,19 @@ function AdminStyles() {
         .ord-filter { flex-wrap:wrap; }
         .admin-main > section, .admin-main > div { max-width:100%; box-sizing:border-box; }
         .stats-pop-grid { grid-template-columns:1fr 1fr; }
+        /* Tabele: przewijanie poziome zamiast łamania layoutu */
+        .admin-table { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+        .admin-table table { min-width:480px; }
+        /* KPI 2 kolumny na telefonie */
+        .stats-kpis { grid-template-columns:repeat(2,1fr) !important; }
+        /* Pod-zakładki pełna szerokość */
+        .admin-subtabs { width:100%; }
+        .admin-subtabs button { flex:1; text-align:center; padding:10px 8px; font-size:13px; }
+        /* Pola formularzy pełna szerokość, brak poziomego przepełnienia */
+        .admin-main input, .admin-main textarea, .admin-main select { max-width:100%; box-sizing:border-box; }
+        .admin, .admin-main { overflow-x:hidden; }
+        /* Globus/mapa statystyk wyśrodkowane i mieszczące się */
+        .stats-geo { gap:16px; }
       }
       .admin-nav { padding:32px 20px; background:rgba(255,255,255,0.04); border-right:1px solid rgba(255,255,255,0.1); display:flex; flex-direction:column; gap:32px; }
       .admin-logo h2 { font-size:24px; margin:0; color:#fff; } .admin-logo span { font-size:11px; opacity:0.55; letter-spacing:0.15em; text-transform:uppercase; }
