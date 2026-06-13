@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "../../lib/supabase";
 import { translateToAll } from "../../lib/translate";
 import dynamic from "next/dynamic";
@@ -1451,6 +1451,62 @@ function HoursPanel() {
 
 // ─── Globo 3D (WebGL) — komponent w src/components/StatsGlobe.tsx ─────────────
 
+// ─── Wykresy statystyk (Chart.js z CDN — bez bundlowania) ─────────────────────
+function StatsCharts({ visits, byCountry }: { visits: any[]; byCountry: any[] }) {
+  const lineRef = useRef<HTMLCanvasElement>(null);
+  const doughRef = useRef<HTMLCanvasElement>(null);
+  const charts = useRef<any[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    const loadChart = (): Promise<any> => new Promise((res, rej) => {
+      const w = window as any;
+      if (w.Chart) return res(w.Chart);
+      const s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js";
+      s.onload = () => res((window as any).Chart);
+      s.onerror = () => rej(new Error("Chart.js load failed"));
+      document.head.appendChild(s);
+    });
+    (async () => {
+      try {
+        const Chart = await loadChart();
+        if (cancelled) return;
+        charts.current.forEach((c) => { try { c.destroy(); } catch {} });
+        charts.current = [];
+        const grid = "rgba(148,163,184,0.12)", tick = "#94a3b8";
+        // Wizyty wg dnia
+        const byDay: Record<string, number> = {};
+        visits.forEach((v) => { const d = (v.created_at || "").slice(0, 10); if (d) byDay[d] = (byDay[d] || 0) + 1; });
+        const days = Object.keys(byDay).sort();
+        if (lineRef.current) {
+          charts.current.push(new Chart(lineRef.current, {
+            type: "line",
+            data: { labels: days.map((d) => d.slice(5)), datasets: [{ label: "Visite", data: days.map((d) => byDay[d]), borderColor: "#E8927C", backgroundColor: "rgba(232,146,124,0.15)", fill: true, tension: 0.35, pointRadius: 2, borderWidth: 2 }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: tick, maxTicksLimit: 8 } }, y: { grid: { color: grid }, ticks: { color: tick, precision: 0 }, beginAtZero: true } } },
+          }));
+        }
+        // Top paesi (doughnut)
+        const top = byCountry.slice(0, 6);
+        if (doughRef.current && top.length) {
+          charts.current.push(new Chart(doughRef.current, {
+            type: "doughnut",
+            data: { labels: top.map((c) => c.name), datasets: [{ data: top.map((c) => c.count), backgroundColor: ["#E8927C", "#5BB8D4", "#F4D03F", "#9DC85A", "#C8102E", "#A78BFA"], borderWidth: 0 }] },
+            options: { responsive: true, maintainAspectRatio: false, cutout: "62%", plugins: { legend: { position: "bottom", labels: { color: tick, boxWidth: 12, padding: 10, font: { size: 11 } } } } },
+          }));
+        }
+      } catch { /* CDN offline — wykresy pomijamy, reszta statystyk działa */ }
+    })();
+    return () => { cancelled = true; charts.current.forEach((c) => { try { c.destroy(); } catch {} }); charts.current = []; };
+  }, [visits, byCountry]);
+
+  return (
+    <div className="stats-charts">
+      <div className="stats-chart-card"><h3>📈 Visite nel tempo</h3><div className="stats-chart-canvas"><canvas ref={lineRef} /></div></div>
+      <div className="stats-chart-card"><h3>🌍 Top paesi</h3><div className="stats-chart-canvas"><canvas ref={doughRef} /></div></div>
+    </div>
+  );
+}
+
 function StatsPanel() {
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<"today" | "week" | "month" | "prevmonth" | "all">("month");
@@ -1539,7 +1595,12 @@ function StatsPanel() {
             <div className="stats-kpi"><span className="stats-kpi-val">{fmtDur(avgDuration)}</span><span className="stats-kpi-lbl">Tempo medio</span></div>
             <div className="stats-kpi"><span className="stats-kpi-val">{counts.orders}</span><span className="stats-kpi-lbl">Ordini QR</span></div>
             <div className="stats-kpi"><span className="stats-kpi-val">{counts.messages}</span><span className="stats-kpi-lbl">Messaggi</span></div>
+            <div className="stats-kpi"><span className="stats-kpi-val">{counts.drinks}</span><span className="stats-kpi-lbl">Drink creati</span></div>
+            <div className="stats-kpi"><span className="stats-kpi-val">{counts.reviews}</span><span className="stats-kpi-lbl">Recensioni</span></div>
           </div>
+
+          {/* Wykresy Chart.js */}
+          <StatsCharts visits={visits} byCountry={byCountry} />
 
           {/* Kraje — interaktywne słupki z intensywnością */}
           <div className="stats-section">
@@ -2069,7 +2130,17 @@ function AdminStyles() {
       .amsg-badge-sky { background:rgba(91,184,212,0.18); border-color:rgba(91,184,212,0.4); color:#5BB8D4; }
       .amsg-badge-gold { background:rgba(241,196,15,0.18); border-color:rgba(241,196,15,0.4); color:#f1c40f; }
       .admin-theme-light .amsg-badge { background:rgba(0,0,0,0.05); border-color:rgba(0,0,0,0.1); }
+
+      /* ── Wykresy statystyk (Chart.js) ── */
+      .stats-charts { display:grid; grid-template-columns:1.6fr 1fr; gap:18px; margin-bottom:28px; }
+      .stats-chart-card { border-radius:20px; padding:20px; }
+      .admin-theme-dark .stats-chart-card { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); box-shadow:0 10px 30px rgba(0,0,0,0.25); }
+      .admin-theme-light .stats-chart-card { background:#fff; border:1px solid rgba(0,0,0,0.05); box-shadow:0 8px 30px rgba(17,34,51,0.06); }
+      .stats-chart-card h3 { margin:0 0 14px; font-size:15px; font-weight:700; }
+      .stats-chart-canvas { position:relative; height:240px; }
+      @media (max-width:768px) { .stats-charts { grid-template-columns:1fr; } .stats-chart-canvas { height:220px; } }
     `}</style>
+
 
 
 
