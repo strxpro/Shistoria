@@ -2150,6 +2150,16 @@ function CocktailExperience() {
     } catch {}
   }, [poured, drinkName, customerName, strength.label, mixedColor]);
 
+  // Blokada scrolla podczas wyboru szklanki i animacji nalewania (shake blokuje osobno w doShake).
+  // Tylko lenis.stop() — NIE overflow:hidden (czarny ekran na iOS).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const lock = stage === "shaking" || stage === "pickGlass" || (glassPourOpen && !glassFilled);
+    const lenis = (window as any).lenis;
+    if (lock) lenis?.stop(); else lenis?.start();
+    return () => { (window as any).lenis?.start(); };
+  }, [stage, glassPourOpen, glassFilled]);
+
   const reset = useCallback(() => {
     const api = sceneApiRef.current;
     setPoured([]); setChosenGlass(null); setDrinkName(""); setCustomerName(""); setStage("build");
