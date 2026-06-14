@@ -58,6 +58,7 @@ export async function publishDrink(drink: {
   strength_value: number;
   color: string;
   photo_url?: string;
+  lang?: string; // język autora — do maila Drinka Miesiąca w jego języku
 }) {
   const { data, error } = await supabase
     .from('community_drinks')

@@ -5474,6 +5474,7 @@ function ShareDrinkBtn() {
         strength_value: 0,
         color: myDrink.color || "#E8927C",
         photo_url: photo || undefined,
+        lang: (typeof window !== "undefined" && (window as any).currentLanguage) || "it",
       });
     } catch (e) { console.error("Publish error:", e); }
     // make.com — e-mail do twórcy (jeśli podał email przy drinku)
@@ -5737,6 +5738,7 @@ function CommunitySection({ sectionRef }: { sectionRef?: React.RefObject<HTMLEle
   // tytuł w języku strony (z window.currentLanguage); fallback do IT
   const [featured, setFeatured] = useState<any>(null);
   const [featuredPeriod, setFeaturedPeriod] = useState<"week" | "month">("week");
+  const [podium, setPodium] = useState<any[]>([]); // top 3 (likes + zamówienia×2)
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -5757,8 +5759,14 @@ function CommunitySection({ sectionRef }: { sectionRef?: React.RefObject<HTMLEle
         const freshWeek = data.filter((d) => now - new Date(d.created_at || now).getTime() < WEEK);
         const period: "week" | "month" = freshWeek.length >= 2 ? "week" : "month";
         const pool = period === "week" ? (freshWeek.length ? freshWeek : data) : data.filter((d) => now - new Date(d.created_at || now).getTime() < MONTH);
-        const best = (pool.length ? pool : data).slice().sort((a, b) => score(b, period) - score(a, period))[0];
-        if (alive && best) { setFeatured(best); setFeaturedPeriod(period); }
+        const ranked = (pool.length ? pool : data).slice().sort((a, b) => score(b, period) - score(a, period));
+        const best = ranked[0];
+        if (alive && best) {
+          setFeatured(best); setFeaturedPeriod(period);
+          // podium: top 3 wg polubienia + zamówienia×2 (bez bonusu świeżości — czyste standings)
+          const podScore = (d: any) => (d.likes || 0) + (d.claimed_count || d.claimed || 0) * 2;
+          setPodium(data.slice().sort((a, b) => podScore(b) - podScore(a)).filter((d) => podScore(d) > 0).slice(0, 3));
+        }
       } catch (e) { /* ignore */ }
     })();
     return () => { alive = false; };
@@ -5886,6 +5894,36 @@ function CommunitySection({ sectionRef }: { sectionRef?: React.RefObject<HTMLEle
                 <span className="cx-mini-kicker">{lbl}</span>
                 <h3>{name}</h3>
                 <p>by {by} · ♥ {likes}{claimed > 0 ? ` · 🍸 ${claimed}` : ""}</p>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* 🏆 Podium top 3 — polubienia + zamówienia×2 */}
+        {podium.length >= 2 && (() => {
+          const lang = ((typeof window !== "undefined" && (window as any).currentLanguage) || "it") as string;
+          const TT: Record<string, string> = { it: "Podio della community", pl: "Podium społeczności", en: "Community podium", de: "Community-Podium", fr: "Podium de la communauté", es: "Podio de la comunidad" };
+          const medals = ["🥇", "🥈", "🥉"];
+          const order = [1, 0, 2]; // 2. – 1. – 3. (klasyczny układ podium)
+          return (
+            <div className="cx-podium">
+              <span className="cx-mini-kicker cx-podium-title">🏆 {TT[lang] || TT.it}</span>
+              <div className="cx-podium-row">
+                {order.filter((i) => podium[i]).map((i) => {
+                  const d = podium[i];
+                  const sc = (d.likes || 0) + (d.claimed_count || d.claimed || 0) * 2;
+                  return (
+                    <div key={d.id} className={`cx-podium-spot cx-podium-${i + 1}`}>
+                      <span className="cx-podium-medal">{medals[i]}</span>
+                      {d.photo_url
+                        ? <img src={d.photo_url} alt={d.name} className="cx-podium-photo" />
+                        : <span className="cx-podium-dot" style={{ background: d.color || "#E8927C" }} />}
+                      <span className="cx-podium-name">{d.name}</span>
+                      <span className="cx-podium-by">by {d.author_name || "—"}</span>
+                      <span className="cx-podium-score">★ {sc}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );
@@ -6686,6 +6724,21 @@ function CocktailStyles() {
       .cx-featured-body p { font-size:12px; opacity:0.7; margin:0; }
       .cx-featured-glass { width:50px; height:75px; flex-shrink:0; opacity:0.8; }
       .cx-featured-photo { width:64px; height:64px; flex-shrink:0; border-radius:14px; object-fit:cover; border:2px solid rgba(241,196,15,0.5); box-shadow:0 6px 20px rgba(0,0,0,0.4); }
+      /* 🏆 Podium top 3 */
+      .cx-podium { margin:0 0 26px; }
+      .cx-podium-title { display:block; text-align:center; margin-bottom:14px; }
+      .cx-podium-row { display:flex; align-items:flex-end; justify-content:center; gap:12px; }
+      .cx-podium-spot { display:flex; flex-direction:column; align-items:center; gap:3px; flex:1; max-width:150px; min-width:0;
+        padding:14px 10px; border-radius:16px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); box-sizing:border-box; }
+      .cx-podium-1 { background:linear-gradient(180deg, rgba(244,208,63,0.18), rgba(255,255,255,0.04)); border-color:rgba(244,208,63,0.5); transform:translateY(-10px); padding-top:18px; }
+      .cx-podium-2 { border-color:rgba(200,210,220,0.4); }
+      .cx-podium-3 { border-color:rgba(205,127,50,0.4); }
+      .cx-podium-medal { font-size:26px; line-height:1; }
+      .cx-podium-photo { width:46px; height:46px; border-radius:12px; object-fit:cover; margin:2px 0; }
+      .cx-podium-dot { width:34px; height:34px; border-radius:50%; margin:4px 0; box-shadow:0 4px 12px rgba(0,0,0,0.4); }
+      .cx-podium-name { font-size:13px; font-weight:800; color:#fff; text-align:center; line-height:1.15; max-width:100%; overflow:hidden; text-overflow:ellipsis; }
+      .cx-podium-by { font-size:10px; color:rgba(255,255,255,0.55); }
+      .cx-podium-score { font-size:11px; font-weight:700; color:var(--cx-accent,#E8927C); }
       .cx-comm-head { display:flex; justify-content:center; align-items:center; text-align:center; gap:24px; padding-bottom:36px; border-bottom:1px solid rgba(255,255,255,0.16); margin-bottom:48px; flex-wrap:wrap; }
       .cx-comm-head .cx-mini-kicker { color:rgba(255,255,255,0.7); }
       .cx-comm-head h2 { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:clamp(40px,6vw,96px); line-height:0.95; letter-spacing:-0.03em; color:#fff; margin-top:14px; word-break:keep-all; overflow-wrap:normal; white-space:nowrap; }
