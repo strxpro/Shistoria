@@ -270,12 +270,12 @@ export type PourTune = {
   gStartY: number; gEndY: number; gCurve: number; gCurveZ: number; gThick: number;
 };
 const POUR_TUNE_DEFAULT: PourTune = {
-  bottleY_m: 1.7,  bottleY_d: 2.9,
-  bottleX_m: 0.7,  bottleX_d: 1.0,
+  bottleY_m: 1.3,  bottleY_d: 2.4,
+  bottleX_m: 0.55, bottleX_d: 0.9,
   bottleZ_m: 1.6,  bottleZ_d: 1.6,
   scale_m: 0.5,    scale_d: 0.6,
-  tilt_m: 145,     tilt_d: 140,
-  aimX: 0,         aimY: 0.4,  aimZ: 0,
+  tilt_m: 150,     tilt_d: 145,
+  aimX: 0,         aimY: 0.1,  aimZ: 0,
   gStartY: 1.55,   gEndY: 0.7,  gCurve: 0.12, gCurveZ: 0, gThick: 0.03,
 };
 function getPourTune(): PourTune {
