@@ -4028,6 +4028,22 @@ function strengthLabelTr(itLabel: string): string {
   return M[itLabel]?.[lang] ?? itLabel;
 }
 
+/* Tłumaczenie nazwy kategorii składników (tylko opisowe; nazwy własne jak Gin/Vodka/Rum/Tequila/Whisky zostają) */
+function cxCatLabel(group: string, lang: string): string {
+  if (lang === "it") return group;
+  const M: Record<string, Record<string, string>> = {
+    Bibite: { pl: "Napoje", en: "Soft drinks", de: "Getränke", fr: "Sodas", es: "Refrescos" },
+    Succhi: { pl: "Soki", en: "Juices", de: "Säfte", fr: "Jus", es: "Zumos" },
+    Sciroppi: { pl: "Syropy", en: "Syrups", de: "Sirupe", fr: "Sirops", es: "Siropes" },
+    Aromi: { pl: "Aromaty", en: "Aromas", de: "Aromen", fr: "Arômes", es: "Aromas" },
+    Liquori: { pl: "Likiery", en: "Liqueurs", de: "Liköre", fr: "Liqueurs", es: "Licores" },
+    Amari: { pl: "Amaro", en: "Bitters", de: "Amaro", fr: "Amers", es: "Amargos" },
+    Grappe: { pl: "Grappa", en: "Grappa", de: "Grappa", fr: "Grappa", es: "Grappa" },
+    Birre: { pl: "Piwa", en: "Beers", de: "Biere", fr: "Bières", es: "Cervezas" },
+  };
+  return M[group]?.[lang] ?? group;
+}
+
 /* E7: krótkie etykiety UI kreatora w języku strony (6 języków) */
 function cxLabel(key: "pourHint" | "inGlass" | "claimGift" | "confirmed"): string {
   const lang = (typeof window !== "undefined" && (window as unknown as { currentLanguage?: string }).currentLanguage) || "it";
@@ -4322,12 +4338,12 @@ function AccordionPanel({
   // E7/G10: etykiety panelu w języku strony
   const apLang = (typeof window !== "undefined" && (window as any).currentLanguage) || "it";
   const AL = ({
-    it: { searchPh: "Cerca ingrediente...", empty: "Niente in questa categoria", foundOther: "Trovato in", otherPanel: "cerca nell'altro pannello!", noResults: "Nessun risultato per", all: "Tutti", hint: "Tocca per una dose · tieni premuto per versare", items: "ingredienti", categories: "Categorie" },
-    pl: { searchPh: "Szukaj składnika...", empty: "Nic w tej kategorii", foundOther: "Znaleziono w", otherPanel: "sprawdź drugi panel!", noResults: "Brak wyników dla", all: "Wszystkie", hint: "Dotknij = jedna porcja · przytrzymaj = nalewanie", items: "pozycji", categories: "Kategorie" },
-    en: { searchPh: "Search ingredient...", empty: "Nothing in this category", foundOther: "Found in", otherPanel: "check the other panel!", noResults: "No results for", all: "All", hint: "Tap for one dose · hold to pour", items: "items", categories: "Categories" },
-    de: { searchPh: "Zutat suchen...", empty: "Nichts in dieser Kategorie", foundOther: "Gefunden in", otherPanel: "im anderen Panel suchen!", noResults: "Keine Ergebnisse für", all: "Alle", hint: "Tippen = eine Dosis · halten = gießen", items: "Positionen", categories: "Kategorien" },
-    fr: { searchPh: "Chercher un ingrédient...", empty: "Rien dans cette catégorie", foundOther: "Trouvé dans", otherPanel: "regarde l'autre panneau!", noResults: "Aucun résultat pour", all: "Tous", hint: "Touche = une dose · maintiens = verser", items: "éléments", categories: "Catégories" },
-    es: { searchPh: "Buscar ingrediente...", empty: "Nada en esta categoría", foundOther: "Encontrado en", otherPanel: "¡mira el otro panel!", noResults: "Sin resultados para", all: "Todos", hint: "Toca = una dosis · mantén = verter", items: "posiciones", categories: "Categorías" },
+    it: { searchPh: "Cerca ingrediente...", empty: "Niente in questa categoria", foundOther: "Trovato in", otherPanel: "cerca nell'altro pannello!", noResults: "Nessun risultato per", all: "Tutti", hint: "Tocca per una dose · tieni premuto per versare", items: "ingredienti", categories: "Categorie", options: "opzioni" },
+    pl: { searchPh: "Szukaj składnika...", empty: "Nic w tej kategorii", foundOther: "Znaleziono w", otherPanel: "sprawdź drugi panel!", noResults: "Brak wyników dla", all: "Wszystkie", hint: "Dotknij = jedna porcja · przytrzymaj = nalewanie", items: "pozycji", categories: "Kategorie", options: "opcji" },
+    en: { searchPh: "Search ingredient...", empty: "Nothing in this category", foundOther: "Found in", otherPanel: "check the other panel!", noResults: "No results for", all: "All", hint: "Tap for one dose · hold to pour", items: "items", categories: "Categories", options: "options" },
+    de: { searchPh: "Zutat suchen...", empty: "Nichts in dieser Kategorie", foundOther: "Gefunden in", otherPanel: "im anderen Panel suchen!", noResults: "Keine Ergebnisse für", all: "Alle", hint: "Tippen = eine Dosis · halten = gießen", items: "Positionen", categories: "Kategorien", options: "Optionen" },
+    fr: { searchPh: "Chercher un ingrédient...", empty: "Rien dans cette catégorie", foundOther: "Trouvé dans", otherPanel: "regarde l'autre panneau!", noResults: "Aucun résultat pour", all: "Tous", hint: "Touche = une dose · maintiens = verser", items: "éléments", categories: "Catégories", options: "options" },
+    es: { searchPh: "Buscar ingrediente...", empty: "Nada en esta categoría", foundOther: "Encontrado en", otherPanel: "¡mira el otro panel!", noResults: "Sin resultados para", all: "Todos", hint: "Toca = una dosis · mantén = verter", items: "posiciones", categories: "Categorías", options: "opciones" },
   } as Record<string, Record<string, string>>)[apLang] ?? ({} as Record<string, string>);
   const al = (k: string, it: string) => AL[k] ?? it;
 
@@ -4367,7 +4383,7 @@ function AccordionPanel({
     { id: "high", label: "🔥 Extreme 40%+", c: "#C8102E", test: (a: number) => a > 40 },
   ];
   const curStrength = STRENGTH_OPTS.find((o) => o.id === strengthFilter) ?? STRENGTH_OPTS[0];
-  const curCatLabel = isAll ? "Tutti" : (current?.group ?? "Tutti");
+  const curCatLabel = isAll ? al("all", "Tutti") : cxCatLabel(current?.group ?? "Tutti", apLang);
   const curCatEmoji = isAll ? "✦" : (current?.emoji ?? "✦");
 
   const updateArrows = useCallback(() => {
@@ -4516,8 +4532,8 @@ function AccordionPanel({
             <button key="__all__" className="cx-cat" onClick={() => openCat("__all__")} style={{ "--cat-c": "var(--cx-accent,#E8927C)" } as React.CSSProperties}>
               <span className="cx-cat-emoji">✦</span>
               <span className="cx-cat-txt">
-                <strong>Tutti</strong>
-                <em>{groups.reduce((s, g) => s + g.items.length, 0)} opzioni</em>
+                <strong>{al("all", "Tutti")}</strong>
+                <em>{groups.reduce((s, g) => s + g.items.length, 0)} {al("options", "opzioni")}</em>
               </span>
               <span className="cx-cat-arrow">→</span>
             </button>
@@ -4527,8 +4543,8 @@ function AccordionPanel({
                 <button key={g.group} className="cx-cat" onClick={() => openCat(g.group)} style={{ "--cat-c": g.items[0].color } as React.CSSProperties}>
                   <span className="cx-cat-emoji">{g.emoji}</span>
                   <span className="cx-cat-txt">
-                    <strong>{g.group}</strong>
-                    <em>{g.items.length} opzioni</em>
+                    <strong>{cxCatLabel(g.group, apLang)}</strong>
+                    <em>{g.items.length} {al("options", "opzioni")}</em>
                   </span>
                   {used > 0 && <span className="cx-cat-badge">{used}</span>}
                   <span className="cx-cat-arrow">→</span>
@@ -4542,7 +4558,7 @@ function AccordionPanel({
       {!collapsed && (current || isAll) && typeof document !== "undefined" && createPortal(
         <div className="cx-drawer-wrap" data-side={side} onClick={(e) => { if (e.target === e.currentTarget) closeCat(); }}>
           <div className="cx-drawer-backdrop" onClick={closeCat} aria-hidden="true" />
-          <div className="cx-drawer" role="dialog" aria-label={isAll ? al("all", "Tutti") : current!.group}
+          <div className="cx-drawer" role="dialog" aria-label={isAll ? al("all", "Tutti") : cxCatLabel(current!.group, apLang)}
             onClick={(e) => e.stopPropagation()}
             /* I5/I4: zamykanie swipe-em w dół jak TikTok — ALE tylko gdy lista jest już
                przewinięta na samą górę i ciągniemy wyraźnie w dół (próg + opór). W innym
@@ -4584,7 +4600,7 @@ function AccordionPanel({
               </button>
               {groups.map((g) => (
                 <button key={g.group} className={`cx-drawer-tab ${active === g.group ? "active" : ""} ${isAll && visibleGroup === g.group ? "active" : ""}`} onClick={() => { setActive(g.group); setStrengthFilter("all"); onOpenChange?.(true); }}>
-                  <span className="cx-drawer-tab-emoji">{g.emoji}</span> {g.group} <span className="cx-drawer-tab-count">{g.items.length}</span>
+                  <span className="cx-drawer-tab-emoji">{g.emoji}</span> {cxCatLabel(g.group, apLang)} <span className="cx-drawer-tab-count">{g.items.length}</span>
                 </button>
               ))}
             </div>
@@ -4624,7 +4640,7 @@ function AccordionPanel({
                   </button>
                   {groups.map((g) => (
                     <button key={g.group} className={`cx-drop-opt ${active === g.group ? "active" : ""}`} onClick={() => { setActive(g.group); setStrengthFilter("all"); onOpenChange?.(true); setCatDropOpen(false); }}>
-                      <span className="cx-drop-emoji">{g.emoji}</span> {g.group} <span className="cx-drop-cnt">{g.items.length}</span>
+                      <span className="cx-drop-emoji">{g.emoji}</span> {cxCatLabel(g.group, apLang)} <span className="cx-drop-cnt">{g.items.length}</span>
                     </button>
                   ))}
                 </div>
@@ -4701,7 +4717,7 @@ function AccordionPanel({
               <button className="cx-back" onClick={closeCat}>
                 <span className="cx-back-ico">←</span> {al("categories", "Categorie")}
               </button>
-              <span className="cx-drawer-title">{isAll ? al("all", "Tutti") : current!.group} <em>· {items.length}</em></span>
+              <span className="cx-drawer-title">{isAll ? al("all", "Tutti") : cxCatLabel(current!.group, apLang)} <em>· {items.length}</em></span>
               <div className="cx-drawer-arrows">
                 <button className="cx-car-nav" disabled={!canLeft} onClick={() => scrollBy(-1)} aria-label="Precedente">‹</button>
                 <button className="cx-car-nav" disabled={!canRight} onClick={() => scrollBy(1)} aria-label="Successivo">›</button>
@@ -4725,7 +4741,7 @@ function AccordionPanel({
                   <React.Fragment key={g.group}>
                     <div className="cx-car-group-sep" data-group={g.group}>
                       <span className="cx-car-group-emoji">{g.emoji}</span>
-                      <span className="cx-car-group-name">{g.group}</span>
+                      <span className="cx-car-group-name">{cxCatLabel(g.group, apLang)}</span>
                       <span className="cx-car-group-count">{groupItems.length}</span>
                     </div>
                     {groupItems.map((i) => (
@@ -7103,8 +7119,8 @@ function CocktailStyles() {
       .cx-cat-emoji { width:36px; height:36px; flex-shrink:0; display:grid; place-items:center; font-size:17px; border-radius:11px;
         background:radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--cat-c,#888) 40%, transparent), rgba(255,255,255,0.04));
         box-shadow:inset 0 1px 0 rgba(255,255,255,0.25), 0 6px 14px rgba(0,0,0,0.3); }
-      .cx-cat-txt { display:flex; flex-direction:column; gap:2px; flex:1; }
-      .cx-cat-txt strong { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:14px; letter-spacing:0.02em; }
+      .cx-cat-txt { display:flex; flex-direction:column; gap:2px; flex:1; min-width:0; }
+      .cx-cat-txt strong { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:14px; letter-spacing:0.02em; white-space:normal; word-break:break-word; line-height:1.15; }
       .cx-cat-txt em { font-family:var(--f-serif,"Instrument Serif",serif); font-style:italic; font-size:12px; color:rgba(255,255,255,0.55); }
       .cx-cat-badge { min-width:20px; height:20px; padding:0 6px; display:grid; place-items:center; border-radius:999px; background:var(--c-coral,#E8927C); color:#fff; font-weight:800; font-size:10px; }
       .cx-cat-arrow { color:var(--cx-accent,#E8927C); font-size:15px; opacity:0.7; transition:transform .3s; }
