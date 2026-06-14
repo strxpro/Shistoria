@@ -58,11 +58,11 @@ const TEMPLATES: { id: string; label: string; build: TplFn }[] = [
   },
   {
     id: "event-3d", label: "📅 Evento — 3 giorni prima",
-    build: (lang) => eventReminderHTML({ name: "Claudio", eventTitle: "Serata Jazz & Cocktail", eventDate: "Venerdì 20 giugno, ore 21:00", eventDescription: "Live jazz e drink d'autore.", lang }, "3d"),
+    build: (lang) => eventReminderHTML({ name: "Claudio", eventTitle: "Serata Jazz & Cocktail", eventDate: "Venerdì 20 giugno, ore 21:00", eventDescription: "Live jazz e drink d'autore.", bg: "#1a1040", accent: "#9b59b6", tag: "Jazz Night", lang }, "3d"),
   },
   {
     id: "event-5h", label: "⏳ Evento — 5 ore prima",
-    build: (lang) => eventReminderHTML({ name: "Claudio", eventTitle: "Serata Jazz & Cocktail", eventDate: "Oggi, ore 21:00", eventDescription: "Live jazz e drink d'autore.", lang }, "5h"),
+    build: (lang) => eventReminderHTML({ name: "Claudio", eventTitle: "Serata Jazz & Cocktail", eventDate: "Oggi, ore 21:00", eventDescription: "Live jazz e drink d'autore.", bg: "#2d1b0e", accent: "#c0392b", tag: "Degustazione", lang }, "5h"),
   },
   {
     id: "reservation-client", label: "🍽️ Prenotazione — al cliente",

@@ -184,11 +184,12 @@ export async function announceWinner(data: {
 export async function subscribeEventReminder(data: {
   name: string; email: string; lang: string;
   event_title: string; event_date: string; event_description?: string;
+  image_url?: string; bg?: string; accent?: string; tag?: string;
 }): Promise<boolean> {
   const { eventReminderHTML } = await import("./email-templates");
   const lang = (["it","pl","en","de","fr","es"].includes(data.lang) ? data.lang : "it") as import("./email-templates").Lang;
   const link = typeof window !== "undefined" ? `${window.location.origin}/#eventi` : "https://www.shistoria.it/#eventi";
-  const vars = { name: data.name, eventTitle: data.event_title, eventDate: data.event_date, eventDescription: data.event_description, lang, link };
+  const vars = { name: data.name, eventTitle: data.event_title, eventDate: data.event_date, eventDescription: data.event_description, imageUrl: data.image_url, bg: data.bg, accent: data.accent, tag: data.tag, lang, link };
   // Pre-renderowane maile w języku odbiorcy — make.com wysyła je w odpowiednim momencie
   const mail3d = eventReminderHTML(vars, "3d");
   const mail5h = eventReminderHTML(vars, "5h");

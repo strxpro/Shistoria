@@ -293,6 +293,9 @@ export interface EventVars {
   eventDate: string;          // gotowy do wyświetlenia tekst daty/godziny
   eventDescription?: string;
   imageUrl?: string;          // grafika eventu (jak karta na stronie)
+  bg?: string;                // kolor tła szablonu eventu (custom_colors.bg)
+  accent?: string;            // kolor akcentu szablonu eventu (custom_colors.accent)
+  tag?: string;               // etykieta eventu (np. "Jazz Night")
   lang: Lang;
   link?: string;
 }
@@ -359,16 +362,24 @@ export function eventReminderHTML(v: EventVars, kind: "3d" | "5h"): { subject: s
   const link = v.link || `${BRAND.site}/#eventi`;
   const subject = kind === "3d" ? tr.subj3d(v.eventTitle) : tr.subj5h(v.eventTitle);
   const lead = kind === "3d" ? tr.lead3d(v.eventTitle) : tr.lead5h(v.eventTitle);
-  // Karta eventu wyśrodkowana — jak na stronie (grafika + tytuł + data + opis)
+  // Karta eventu wyśrodkowana — odwzorowuje szablon eventu ze strony (kolory + grafika + tag)
+  const bg = v.bg || "#1a1040";
+  const accent = v.accent || "#9b59b6";
+  const tagPill = v.tag
+    ? `<div style="position:absolute;top:16px;left:16px;z-index:2;display:inline-block;padding:6px 14px;border-radius:999px;background:rgba(0,0,0,0.45);color:${accent};font-size:11px;font-weight:800;letter-spacing:2px;text-transform:uppercase;">${v.tag}</div>`
+    : "";
   const card = `
-    <div style="border-radius:20px;overflow:hidden;border:1px solid rgba(255,255,255,0.1);margin:22px 0 6px;box-shadow:0 16px 44px rgba(0,0,0,0.4);">
-      ${v.imageUrl
-        ? `<img src="${v.imageUrl}" alt="${v.eventTitle}" width="100%" style="display:block;width:100%;height:auto;" />`
-        : `<div style="height:150px;background:linear-gradient(135deg,#1a1040,#9b59b6 60%,#E8927C);"></div>`}
-      <div style="padding:24px 24px 26px;background:#0a1822;text-align:center;">
-        <h2 style="margin:0 0 14px;font-size:22px;color:${BRAND.cream};font-weight:800;letter-spacing:-0.01em;">${v.eventTitle}</h2>
-        <div style="display:inline-block;padding:8px 18px;border-radius:999px;background:rgba(232,146,124,0.15);border:1px solid rgba(232,146,124,0.4);color:${BRAND.coral};font-size:13px;font-weight:700;">📅 ${v.eventDate}</div>
-        ${v.eventDescription ? `<p style="margin:16px 0 0;font-size:14px;color:${BRAND.muted};line-height:1.7;">${v.eventDescription}</p>` : ""}
+    <div style="position:relative;border-radius:20px;overflow:hidden;border:1px solid rgba(255,255,255,0.12);margin:22px 0 6px;box-shadow:0 18px 50px rgba(0,0,0,0.45);">
+      <div style="position:relative;">
+        ${tagPill}
+        ${v.imageUrl
+          ? `<img src="${v.imageUrl}" alt="${v.eventTitle}" width="100%" style="display:block;width:100%;height:auto;" />`
+          : `<div style="height:170px;background:linear-gradient(135deg,${bg},${accent});"></div>`}
+      </div>
+      <div style="padding:24px 24px 26px;background:linear-gradient(180deg,${bg},#0a1822);text-align:center;">
+        <h2 style="margin:0 0 14px;font-size:22px;color:#fff;font-weight:800;letter-spacing:-0.01em;">${v.eventTitle}</h2>
+        <div style="display:inline-block;padding:8px 18px;border-radius:999px;background:rgba(255,255,255,0.12);border:1px solid ${accent};color:${accent};font-size:13px;font-weight:700;">📅 ${v.eventDate}</div>
+        ${v.eventDescription ? `<p style="margin:16px 0 0;font-size:14px;color:rgba(255,255,255,0.8);line-height:1.7;">${v.eventDescription}</p>` : ""}
       </div>
     </div>`;
   const inner = `

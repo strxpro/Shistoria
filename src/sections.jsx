@@ -238,6 +238,10 @@ function Eventi({ t }) {
                       event_title: reminderEvent.title,
                       event_date: reminderEvent.event_date || reminderEvent.date || "",
                       event_description: reminderEvent.description || "",
+                      image_url: reminderEvent.image_url || "",
+                      bg: reminderEvent.custom_colors?.bg || "",
+                      accent: reminderEvent.custom_colors?.accent || "",
+                      tag: reminderEvent.tag || "",
                     });
                     setRemSent(true);
                   }}>
