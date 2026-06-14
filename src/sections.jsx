@@ -385,6 +385,35 @@ function EventCard({ item, index }) {
 
 // ─── Social Feed ──────────────────────────────────────────────────────────────
 function SocialFeed({ t }) {
+  const STORIES = [
+    { l: "Aperitivo", c: "#E8927C", t: "food" },
+    { l: "Tramonto", c: "#5BB8D4", t: "sea" },
+    { l: "Eventi", c: "#9b59b6", t: "rock" },
+    { l: "Menu", c: "#F4D03F", t: "food" },
+    { l: "Cocktail", c: "#C8102E", t: "food" },
+    { l: "Mare", c: "#3FB68B", t: "sea" },
+  ];
+  const [storyIdx, setStoryIdx] = useStateE(-1); // -1 = zamknięte
+  const storyOpen = storyIdx >= 0;
+  const storyTimer = useRefE(null);
+
+  // Auto-przejście co 4s + zamknięcie po ostatniej
+  useEffectE(() => {
+    if (!storyOpen) return;
+    if (typeof document !== "undefined") document.body.style.overflow = "hidden";
+    storyTimer.current = setTimeout(() => {
+      setStoryIdx((i) => (i + 1 < STORIES.length ? i + 1 : -1));
+    }, 4000);
+    return () => {
+      if (storyTimer.current) clearTimeout(storyTimer.current);
+      if (typeof document !== "undefined") document.body.style.overflow = "";
+    };
+  }, [storyIdx, storyOpen]);
+
+  const closeStory = () => setStoryIdx(-1);
+  const nextStory = () => setStoryIdx((i) => (i + 1 < STORIES.length ? i + 1 : -1));
+  const prevStory = () => setStoryIdx((i) => (i > 0 ? i - 1 : 0));
+
   return (
     <section className="social" id="social">
       <div className="container">
@@ -401,7 +430,18 @@ function SocialFeed({ t }) {
                 <h4 className="social-handle">@shistoria.renamajore</h4>
                 <span className="kicker">{t("social.instagram")}</span>
               </div>
-              <a href="#" className="social-link">→</a>
+              <a href="https://www.instagram.com/shistoria.renamajore" target="_blank" rel="noopener" className="social-link">→</a>
+            </div>
+            {/* Relacje (stories) — kółka jak na Instagramie → otwierają podgląd */}
+            <div className="social-stories">
+              {STORIES.map((s, i) => (
+                <button key={i} type="button" className="social-story" onClick={() => setStoryIdx(i)}>
+                  <span className="social-story-ring" style={{ background: `conic-gradient(from 140deg, ${s.c}, #E8927C, #5BB8D4, ${s.c})` }}>
+                    <span className="social-story-inner"><Placeholder type={s.t} label="" style={{ width: "100%", height: "100%" }} /></span>
+                  </span>
+                  <span className="social-story-label">{s.l}</span>
+                </button>
+              ))}
             </div>
             <div className="social-ig-grid">
               {[
@@ -457,6 +497,34 @@ function SocialFeed({ t }) {
           </div>
         </div>
       </div>
+
+      {/* Podgląd relacji — fullscreen jak na Instagramie (paski postępu, tap lewo/prawo) */}
+      {storyOpen && typeof document !== "undefined" && createPortal(
+        <div className="story-overlay" onClick={closeStory}>
+          <div className="story-view" onClick={(e) => e.stopPropagation()}>
+            <div className="story-bars">
+              {STORIES.map((_, i) => (
+                <div key={i} className="story-bar">
+                  <div className="story-bar-fill" style={{ width: i < storyIdx ? "100%" : i > storyIdx ? "0%" : undefined, animation: i === storyIdx ? "storyFill 4s linear forwards" : "none" }} />
+                </div>
+              ))}
+            </div>
+            <div className="story-head">
+              <span className="story-avatar">S'H</span>
+              <strong>shistoria.renamajore</strong>
+              <button className="story-close" onClick={closeStory} aria-label="Chiudi">×</button>
+            </div>
+            <div className="story-img">
+              <Placeholder type={STORIES[storyIdx].t} label="" style={{ width: "100%", height: "100%" }} />
+              <span className="story-caption">{STORIES[storyIdx].l}</span>
+            </div>
+            <a href="https://www.instagram.com/shistoria.renamajore" target="_blank" rel="noopener" className="story-ig-link">Vedi su Instagram →</a>
+            <button className="story-nav story-nav-l" onClick={prevStory} aria-label="Precedente" />
+            <button className="story-nav story-nav-r" onClick={nextStory} aria-label="Successivo" />
+          </div>
+        </div>,
+        document.body,
+      )}
       <style>{`
         .social { background: linear-gradient(180deg, #FFFFFF 0%, #EBF6FA 100%); padding: 120px 0; }
         .social-head { max-width: 720px; margin-bottom: 64px; }
@@ -469,6 +537,14 @@ function SocialFeed({ t }) {
         .social-link { margin-left: auto; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--c-line); display: flex; align-items: center; justify-content: center; transition: all 0.3s; }
         .social-link:hover { background: var(--c-deep); color: #fff; border-color: var(--c-deep); }
         .social-ig-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+        /* Relacje (stories) — kółka jak na Instagramie */
+        .social-stories { display: flex; gap: 16px; overflow-x: auto; padding: 0 2px 18px; margin-bottom: 6px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+        .social-stories::-webkit-scrollbar { display: none; }
+        .social-story { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 6px; text-decoration: none; width: 70px; }
+        .social-story-ring { display: block; width: 64px; height: 64px; border-radius: 50%; padding: 3px; transition: transform .25s var(--ease-out, ease); }
+        .social-story:hover .social-story-ring { transform: scale(1.06); }
+        .social-story-inner { display: block; width: 100%; height: 100%; border-radius: 50%; overflow: hidden; border: 2px solid var(--c-bg, #fff); background: #ccc; }
+        .social-story-label { font-size: 11px; font-weight: 600; color: var(--c-deep); opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70px; }
         .social-ig-cell { position: relative; aspect-ratio: 1; border-radius: 6px; overflow: hidden; cursor: pointer; }
         .social-ig-overlay { position: absolute; inset: 0; background: rgba(26,61,82,0.6); color: #fff; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; font-family: var(--f-display); font-weight: 700; }
         .social-ig-cell:hover .social-ig-overlay { opacity: 1; }
@@ -479,6 +555,23 @@ function SocialFeed({ t }) {
         .social-fb-title { font-family: var(--f-display); font-weight: 700; font-size: 17px; letter-spacing: -0.01em; }
         .social-fb-body { font-size: 14px; color: var(--c-mute); margin-top: 8px; line-height: 1.5; }
         .social-fb-cta { display: inline-block; margin-top: 12px; font-size: 12px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--c-sky); font-weight: 500; }
+        /* Podgląd relacji (story viewer) */
+        .story-overlay { position: fixed; inset: 0; z-index: 6000; background: rgba(6,8,12,0.92); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; padding: 16px; animation: storyFade .2s ease; }
+        .story-view { position: relative; width: min(420px, 96vw); height: min(80vh, 760px); background: #0f1620; border-radius: 18px; overflow: hidden; box-shadow: 0 30px 90px rgba(0,0,0,0.6); }
+        .story-bars { position: absolute; top: 10px; left: 12px; right: 12px; z-index: 5; display: flex; gap: 4px; }
+        .story-bar { flex: 1; height: 3px; border-radius: 2px; background: rgba(255,255,255,0.3); overflow: hidden; }
+        .story-bar-fill { height: 100%; background: #fff; border-radius: 2px; }
+        @keyframes storyFill { from { width: 0%; } to { width: 100%; } }
+        @keyframes storyFade { from { opacity: 0; } to { opacity: 1; } }
+        .story-head { position: absolute; top: 22px; left: 14px; right: 14px; z-index: 5; display: flex; align-items: center; gap: 10px; color: #fff; }
+        .story-head strong { font-size: 14px; font-weight: 700; }
+        .story-avatar { width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg,#E8927C,#9b59b6); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; }
+        .story-close { margin-left: auto; width: 34px; height: 34px; border-radius: 50%; border: none; background: rgba(0,0,0,0.4); color: #fff; font-size: 22px; cursor: pointer; line-height: 1; }
+        .story-img { position: absolute; inset: 0; }
+        .story-caption { position: absolute; left: 0; right: 0; bottom: 70px; text-align: center; color: #fff; font-family: var(--f-display); font-weight: 800; font-size: 28px; text-shadow: 0 2px 20px rgba(0,0,0,0.6); }
+        .story-ig-link { position: absolute; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 5; color: #fff; background: rgba(255,255,255,0.16); border: 1px solid rgba(255,255,255,0.3); padding: 10px 22px; border-radius: 999px; font-size: 13px; font-weight: 600; text-decoration: none; backdrop-filter: blur(6px); }
+        .story-nav { position: absolute; top: 60px; bottom: 60px; width: 40%; background: transparent; border: none; cursor: pointer; z-index: 4; }
+        .story-nav-l { left: 0; } .story-nav-r { right: 0; }
       `}</style>
     </section>
   );
