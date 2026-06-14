@@ -1821,7 +1821,7 @@ function CocktailExperience() {
     if (active) document.body.dataset.cxPouring = "1";
     else delete document.body.dataset.cxPouring;
   }, [pouring, stage]);
-  useEffect(() => () => { if (typeof document !== "undefined") { delete document.body.dataset.cxPouring; delete document.body.dataset.cxScrolling; } }, []);
+  useEffect(() => () => { if (typeof document !== "undefined") { delete document.body.dataset.cxPouring; delete document.body.dataset.cxScrolling; delete document.body.dataset.cxPop; } }, []);
 
   // Blokada zaznaczania tekstu / menu kontekstowego podczas lania (long-press) w kreatorze
   useEffect(() => {
@@ -2358,6 +2358,10 @@ function CocktailExperience() {
             const e = phase === "exit" ? (p - CONFIG.exitStart) / (1 - CONFIG.exitStart) : 0;
             const o = smooth(clamp01((e - 0.04) / 0.18));
             pop.style.opacity = String(o);
+            // Gdy neonowy napis się pojawia → twardo chowamy FAB/SHAKE (nie migają)
+            if (typeof document !== "undefined") {
+              if (o > 0.02) document.body.dataset.cxPop = "1"; else delete document.body.dataset.cxPop;
+            }
             pop.style.transform = `translate(-50%, -50%) scale(${0.86 + o * 0.14})`;
             if (popArrowRef.current) popArrowRef.current.style.transform = `rotate(${self.direction < 0 ? 180 : 0}deg)`;
             if (popLabelRef.current) {
@@ -7361,17 +7365,23 @@ function CocktailStyles() {
         body:not([data-cx-section="creator"]) .cx-col-right .cx-fab { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
         /* podczas lania/animacji szklanki FAB też znikają (nawet jeśli is-pouring nie złapie) */
         body[data-cx-pouring] .cx-col-left .cx-fab,
-        body[data-cx-pouring] .cx-col-right .cx-fab { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
-        /* podczas wjazdu/wyjazdu sekcji (scroll) FAB znikają */
+        body[data-cx-pouring] .cx-col-right .cx-fab { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; transition:none !important; }
+        /* podczas wjazdu/wyjazdu sekcji (scroll) FAB znikają — NATYCHMIAST (bez fade, by nie wisiały) */
         body[data-cx-scrolling] .cx-col-left .cx-fab,
-        body[data-cx-scrolling] .cx-col-right .cx-fab { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
+        body[data-cx-scrolling] .cx-col-right .cx-fab { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; transition:none !important; }
+        body[data-cx-pop] .cx-col-left .cx-fab,
+        body[data-cx-pop] .cx-col-right .cx-fab,
+        body[data-cx-pop] .cx-slide-wrap,
+        body[data-cx-pop] .cx-shake-desktop,
+        body[data-cx-pop] .cx-minfo,
+        body[data-cx-pop] .cx-layerbar { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; transition:none !important; }
         /* slide-to-shake widoczny tylko w sekcji kreatora */
         .cx-slide-wrap { opacity:0; visibility:hidden; transition:opacity .3s, visibility .3s; }
         body[data-cx-section="creator"] .cx-slide-wrap { opacity:1; visibility:visible; }
         /* podczas lania / animacji szklanki — suwak shake znika razem z FAB */
         .cx-col-right.is-pouring .cx-slide-wrap { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
         body[data-cx-pouring] .cx-slide-wrap { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
-        body[data-cx-scrolling] .cx-slide-wrap { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
+        body[data-cx-scrolling] .cx-slide-wrap { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; transition:none !important; }
         body:not([data-cx-section="creator"]) .cx-slide-wrap { opacity:0 !important; visibility:hidden !important; pointer-events:none !important; }
         /* info button tylko w sekcji kreatora */
         .cx-minfo { opacity:0; visibility:hidden; transition:opacity .3s, visibility .3s; }

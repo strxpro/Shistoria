@@ -898,6 +898,13 @@ function DrinksPanel() {
                   <h4>#{i+1} {d.name}{d.is_drink_of_month && <span className="admin-badge">👑</span>}</h4>
                   <span>di {d.author_name} · {d.total_ml}ml · {d.strength_label}</span>
                   <span>👁 {d.views||0} · ♥ {d.likes||0} · 💬 {d.comments||0} · 🍸 {d.claimed_count||0} ritiri</span>
+                  {Array.isArray(d.ingredients) && d.ingredients.length > 0 && (
+                    <div className="admin-drink-ingr">
+                      {d.ingredients.slice(0, 10).map((ing: any, ii: number) => (
+                        <span key={ii} className="admin-drink-ingr-pill"><span style={{ background: ing.color || "#888" }} />{ing.name}</span>
+                      ))}
+                    </div>
+                  )}
                   {d.author_email && <span className="drk-email">✉️ {d.author_email}</span>}
                 </div>
                 <div className="admin-drink-actions">
@@ -2165,6 +2172,10 @@ function AdminStyles() {
       .admin-drink-swipe { position:relative; border-radius:16px; overflow:hidden; }
       .admin-drink-swipe .admin-drink-card { position:relative; z-index:2; }
       .admin-drink-trash { position:absolute; top:0; right:0; bottom:0; width:84px; border:none; background:linear-gradient(90deg,#b91c1c,#dc2626); color:#fff; font-size:26px; cursor:pointer; z-index:1; display:flex; align-items:center; justify-content:center; }
+      .admin-drink-ingr { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
+      .admin-drink-ingr-pill { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:999px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.16); font-size:11px; font-weight:600; color:#fff; }
+      .admin-drink-ingr-pill > span { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+      .admin-theme-light .admin-drink-ingr-pill { background:rgba(0,0,0,0.06); border-color:rgba(0,0,0,0.12); color:#15202b; }
       .admin-drink-card.is-month { border-color:rgba(241,196,15,0.6); background:rgba(241,196,15,0.12); }
       .admin-drink-photo { width:100%; height:120px; object-fit:cover; border-radius:10px; }
       .admin-drink-info h4 { margin:0; font-size:16px; } .admin-drink-info span { font-size:12px; opacity:0.6; display:block; }
