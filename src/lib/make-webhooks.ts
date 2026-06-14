@@ -136,10 +136,20 @@ export async function announceWinner(data: {
 }): Promise<boolean> {
   const { winnerEmailHTML, winnerOthersEmailHTML } = await import("./email-templates");
   const norm = (l?: string) => (["it","pl","en","de","fr","es"].includes(l || "") ? l : "it") as import("./email-templates").Lang;
-  const link = typeof window !== "undefined" ? `${window.location.origin}/#ready-drinks` : "https://www.shistoria.it/#ready-drinks";
-  // E-mail zwycięzcy — w JEGO języku
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://www.shistoria.it";
+  const link = `${origin}/#ready-drinks`;
+  // Kod nagrody (darmowy drink) + QR dla zwycięzcy — barman odbiera na /reward/[code]
+  const code = "SH-" + Math.random().toString(36).slice(2, 7).toUpperCase();
+  const rewardUrl = `${origin}/reward/${code}`;
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=0&data=${encodeURIComponent(rewardUrl)}`;
+  // Zapisz nagrodę w bazie (best-effort, nieblokujące)
+  try {
+    const { supabase } = await import("./supabase");
+    await supabase.from("rewards").insert({ code, winner_name: data.winner_author, winner_email: data.winner_email || null, drink_name: data.winner_drink, period: data.period });
+  } catch { /* ignore */ }
+  // E-mail zwycięzcy — w JEGO języku, z kodem + QR
   const winLang = norm(data.winner_lang);
-  const winnerMail = winnerEmailHTML({ winnerDrink: data.winner_drink, winnerAuthor: data.winner_author, period: data.period, lang: winLang, link });
+  const winnerMail = winnerEmailHTML({ winnerDrink: data.winner_drink, winnerAuthor: data.winner_author, period: data.period, lang: winLang, link, code, qrUrl });
   // E-maile pozostałych — każdy z gotowym HTML w SWOIM języku (make.com tylko iteruje i wysyła)
   const recipients = data.recipients.map((r) => {
     const lang = norm(r.lang);
@@ -153,6 +163,8 @@ export async function announceWinner(data: {
     winner_author: data.winner_author,
     winner_email: data.winner_email || "",
     winner_lang: winLang,
+    winner_code: code,
+    reward_url: rewardUrl,
     // ── GOTOWE treści zwycięzcy (make.com mapuje tylko te pola) ──
     winner_email_subject: winnerMail.subject,
     winner_email_html: winnerMail.html,

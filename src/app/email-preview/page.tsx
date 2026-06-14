@@ -50,7 +50,7 @@ const TEMPLATES: { id: string; label: string; build: TplFn }[] = [
   },
   {
     id: "winner", label: "🏆 Winner — vincitore (mese)",
-    build: (lang) => winnerEmailHTML({ winnerDrink: "Tramonto Sardo", winnerAuthor: "Claudio", recipientName: "Claudio", period: "month", lang }),
+    build: (lang) => winnerEmailHTML({ winnerDrink: "Tramonto Sardo", winnerAuthor: "Claudio", recipientName: "Claudio", period: "month", lang, code: "SH-A7K2Q", qrUrl: "https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=0&data=https://www.shistoria.it/reward/SH-A7K2Q" }),
   },
   {
     id: "winner-others", label: "🍸 Winner — agli altri",

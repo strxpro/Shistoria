@@ -59,24 +59,26 @@ function row(label: string, value?: string | number): string {
 }
 
 function shell(innerHtml: string): string {
-  return `<!doctype html><html><body style="margin:0;padding:0;background:#0a1822;">
-  <div style="max-width:580px;margin:0 auto;padding:0;font-family:'Helvetica Neue',Arial,sans-serif;">
+  return `<!doctype html><html><body style="margin:0;padding:0;background:#081019;">
+  <div style="background:#081019;padding:30px 14px;font-family:'Helvetica Neue',Arial,sans-serif;">
+  <div style="max-width:600px;margin:0 auto;border-radius:24px;overflow:hidden;background:${BRAND.card};box-shadow:0 28px 70px rgba(0,0,0,0.5);">
     <!-- Header z logo -->
-    <div style="text-align:center;padding:36px 24px 20px;background:linear-gradient(180deg,#0E222F,#0a1822);">
-      <img src="${BRAND.site}/logo.png" alt="S'Historia" width="120" style="display:inline-block;max-width:120px;height:auto;filter:brightness(0) invert(1);" />
-      <div style="font-size:11px;letter-spacing:4px;text-transform:uppercase;color:${BRAND.coral};margin-top:14px;">${BRAND.tagline}</div>
+    <div style="text-align:center;padding:50px 28px 32px;background:linear-gradient(180deg,#0E222F,#0c2433);">
+      <img src="${BRAND.site}/logo.png" alt="S'Historia" width="132" style="display:inline-block;max-width:132px;height:auto;filter:brightness(0) invert(1);" />
+      <div style="font-size:11px;letter-spacing:5px;text-transform:uppercase;color:${BRAND.coral};margin-top:18px;">${BRAND.tagline}</div>
     </div>
     <div style="height:3px;background:linear-gradient(90deg,transparent,${BRAND.coral},${BRAND.sky},transparent);"></div>
     <!-- Body -->
-    <div style="background:${BRAND.card};padding:34px 30px;">
+    <div style="background:${BRAND.card};padding:46px 42px;">
       ${innerHtml}
     </div>
     <!-- Footer -->
-    <div style="text-align:center;padding:24px;background:#0a1822;color:${BRAND.muted};font-size:12px;line-height:1.7;">
-      <a href="${BRAND.site}" style="color:${BRAND.sky};text-decoration:none;font-weight:600;">www.shistoria.it</a><br>
+    <div style="text-align:center;padding:32px 28px;background:#0a1822;color:${BRAND.muted};font-size:12px;line-height:2;border-top:1px solid rgba(255,255,255,0.06);">
+      <a href="${BRAND.site}" style="color:${BRAND.sky};text-decoration:none;font-weight:600;letter-spacing:1px;">www.shistoria.it</a><br>
       Via Delfino · 07020 Rena Majore (OT), Sardegna<br>
       <span style="opacity:0.6;">info@shistoria.it · +39 0789 000 000</span>
     </div>
+  </div>
   </div></body></html>`;
 }
 
@@ -159,7 +161,18 @@ export interface WinnerVars {
   period: "month" | "week";
   lang: Lang;
   link?: string;
+  code?: string;      // kod nagrody (darmowy drink) — tylko dla zwycięzcy
+  qrUrl?: string;     // URL obrazka QR (do pokazania barmanowi)
 }
+
+const CODE_T: Record<Lang, { label: string; note: string; free: string }> = {
+  it: { label: "Codice premio", note: "Mostra questo codice o QR al barista — valido una sola volta.", free: "1 DRINK GRATUITO A SCELTA" },
+  pl: { label: "Kod nagrody", note: "Pokaż ten kod lub QR barmanowi — ważny tylko raz.", free: "1 DARMOWY DRINK DO WYBORU" },
+  en: { label: "Reward code", note: "Show this code or QR to the bartender — valid only once.", free: "1 FREE DRINK OF YOUR CHOICE" },
+  de: { label: "Prämiencode", note: "Zeig diesen Code oder QR dem Barkeeper — nur einmal gültig.", free: "1 GRATIS-DRINK NACH WAHL" },
+  fr: { label: "Code cadeau", note: "Montre ce code ou QR au barman — valable une seule fois.", free: "1 COCKTAIL GRATUIT AU CHOIX" },
+  es: { label: "Código premio", note: "Muestra este código o QR al barman — válido una sola vez.", free: "1 TRAGO GRATIS A ELEGIR" },
+};
 
 const WINNER_T: Record<Lang, {
   // dla zwycięzcy
@@ -225,21 +238,31 @@ const WINNER_T: Record<Lang, {
 };
 
 function ctaButton(label: string, link: string): string {
-  return `<div style="text-align:center;margin:26px 0 8px;">
-    <a href="${link}" style="display:inline-block;background:${BRAND.coral};color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:14px 28px;border-radius:999px;">${label} →</a>
+  return `<div style="text-align:center;margin:30px 0 8px;">
+    <a href="${link}" style="display:inline-block;background:${BRAND.coral};color:#1a1014;text-decoration:none;font-weight:700;font-size:14px;letter-spacing:0.5px;padding:15px 34px;border-radius:999px;box-shadow:0 8px 24px rgba(232,146,124,0.35);">${label} →</a>
   </div>`;
 }
 
 /** E-mail do ZWYCIĘZCY drinka — w jego języku. */
 export function winnerEmailHTML(v: WinnerVars): { subject: string; html: string } {
   const tr = WINNER_T[v.lang] ?? WINNER_T.it;
+  const ct = CODE_T[v.lang] ?? CODE_T.it;
   const link = v.link || `${BRAND.site}/#ready-drinks`;
   const subject = v.period === "week" ? tr.winSubjWeek : tr.winSubjMonth;
+  const codeBlock = v.code ? `
+    <div style="margin:26px 0 8px;padding:26px 22px;background:#0a1822;border:1.5px dashed ${BRAND.coral};border-radius:18px;text-align:center;">
+      <div style="font-size:12px;letter-spacing:2px;text-transform:uppercase;color:${BRAND.coral};font-weight:700;margin-bottom:6px;">🍸 ${ct.free}</div>
+      <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;color:${BRAND.muted};margin:14px 0 8px;">${ct.label}</div>
+      <div style="font-size:30px;font-weight:800;letter-spacing:7px;color:${BRAND.cream};font-family:'Courier New',monospace;">${v.code}</div>
+      ${v.qrUrl ? `<img src="${v.qrUrl}" alt="QR" width="170" style="display:block;margin:18px auto 6px;width:170px;height:170px;border-radius:14px;background:#fff;padding:10px;" />` : ""}
+      <div style="font-size:12px;color:${BRAND.muted};margin-top:8px;line-height:1.5;">${ct.note}</div>
+    </div>` : "";
   const inner = `
-    <div style="text-align:center;font-size:46px;margin-bottom:6px;">👑</div>
-    <h1 style="margin:0 0 6px;font-size:24px;color:${BRAND.cream};text-align:center;">${tr.winHi}${v.recipientName ? `, ${v.recipientName}` : ""}!</h1>
-    <p style="margin:14px 0;font-size:16px;color:${BRAND.cream};line-height:1.6;text-align:center;">${tr.winCongrats(v.winnerDrink)}</p>
-    <div style="background:rgba(241,196,15,0.12);border:1px solid rgba(241,196,15,0.4);border-radius:14px;padding:18px;margin:18px 0;text-align:center;color:${BRAND.cream};font-size:15px;line-height:1.6;">${tr.winGift}</div>
+    <div style="text-align:center;font-size:48px;margin-bottom:8px;">👑</div>
+    <h1 style="margin:0 0 8px;font-size:25px;color:${BRAND.cream};text-align:center;font-weight:800;">${tr.winHi}${v.recipientName ? `, ${v.recipientName}` : ""}!</h1>
+    <p style="margin:16px 0;font-size:16px;color:${BRAND.cream};line-height:1.7;text-align:center;">${tr.winCongrats(v.winnerDrink)}</p>
+    <div style="background:rgba(241,196,15,0.12);border:1px solid rgba(241,196,15,0.4);border-radius:16px;padding:20px;margin:20px 0;text-align:center;color:${BRAND.cream};font-size:15px;line-height:1.7;">${tr.winGift}</div>
+    ${codeBlock}
     ${ctaButton(tr.winCta, link)}
   `;
   return { subject, html: shell(inner) };
@@ -269,6 +292,7 @@ export interface EventVars {
   eventTitle: string;
   eventDate: string;          // gotowy do wyświetlenia tekst daty/godziny
   eventDescription?: string;
+  imageUrl?: string;          // grafika eventu (jak karta na stronie)
   lang: Lang;
   link?: string;
 }
@@ -335,15 +359,24 @@ export function eventReminderHTML(v: EventVars, kind: "3d" | "5h"): { subject: s
   const link = v.link || `${BRAND.site}/#eventi`;
   const subject = kind === "3d" ? tr.subj3d(v.eventTitle) : tr.subj5h(v.eventTitle);
   const lead = kind === "3d" ? tr.lead3d(v.eventTitle) : tr.lead5h(v.eventTitle);
+  // Karta eventu wyśrodkowana — jak na stronie (grafika + tytuł + data + opis)
+  const card = `
+    <div style="border-radius:20px;overflow:hidden;border:1px solid rgba(255,255,255,0.1);margin:22px 0 6px;box-shadow:0 16px 44px rgba(0,0,0,0.4);">
+      ${v.imageUrl
+        ? `<img src="${v.imageUrl}" alt="${v.eventTitle}" width="100%" style="display:block;width:100%;height:auto;" />`
+        : `<div style="height:150px;background:linear-gradient(135deg,#1a1040,#9b59b6 60%,#E8927C);"></div>`}
+      <div style="padding:24px 24px 26px;background:#0a1822;text-align:center;">
+        <h2 style="margin:0 0 14px;font-size:22px;color:${BRAND.cream};font-weight:800;letter-spacing:-0.01em;">${v.eventTitle}</h2>
+        <div style="display:inline-block;padding:8px 18px;border-radius:999px;background:rgba(232,146,124,0.15);border:1px solid rgba(232,146,124,0.4);color:${BRAND.coral};font-size:13px;font-weight:700;">📅 ${v.eventDate}</div>
+        ${v.eventDescription ? `<p style="margin:16px 0 0;font-size:14px;color:${BRAND.muted};line-height:1.7;">${v.eventDescription}</p>` : ""}
+      </div>
+    </div>`;
   const inner = `
     <h1 style="margin:0 0 14px;font-size:24px;color:${BRAND.cream};font-weight:800;">${tr.hi} ${v.name || ""},</h1>
-    <p style="margin:0 0 18px;font-size:16px;line-height:1.6;color:${BRAND.cream};">${lead}</p>
-    <table style="width:100%;border-collapse:collapse;margin:8px 0 4px;">
-      ${row(tr.whenLabel, v.eventDate)}
-      ${v.eventDescription ? row(tr.descLabel, v.eventDescription) : ""}
-    </table>
+    <p style="margin:0 0 8px;font-size:16px;line-height:1.7;color:${BRAND.cream};">${lead}</p>
+    ${card}
     ${ctaButton(tr.cta, link)}
-    <p style="margin:24px 0 0;font-size:14px;color:${BRAND.muted};">${tr.footer} 🍸</p>
+    <p style="margin:26px 0 0;font-size:14px;color:${BRAND.muted};text-align:center;">${tr.footer} 🍸</p>
   `;
   return { subject, html: shell(inner) };
 }

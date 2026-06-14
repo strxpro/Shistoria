@@ -227,3 +227,26 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN
   CREATE POLICY "Public read newsletter" ON newsletter FOR SELECT USING (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+
+-- ─── Rewards (darmowy drink dla zwycięzcy Drink del Mese/Settimana) ───────────
+-- Kod + QR w mailu zwycięzcy; barman odbiera na /reward/[code] (jednorazowo).
+CREATE TABLE IF NOT EXISTS rewards (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  code text UNIQUE NOT NULL,
+  winner_name text,
+  winner_email text,
+  drink_name text,
+  period text DEFAULT 'month',          -- 'month' | 'week'
+  redeemed boolean DEFAULT false,        -- czy już odebrany
+  redeemed_at timestamptz,
+  chosen_drink text,                     -- co barman wydał (opcjonalnie)
+  created_at timestamptz DEFAULT now()
+);
+ALTER TABLE rewards ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public read rewards" ON rewards;
+DROP POLICY IF EXISTS "Public insert rewards" ON rewards;
+DROP POLICY IF EXISTS "Public update rewards" ON rewards;
+CREATE POLICY "Public read rewards" ON rewards FOR SELECT USING (true);
+CREATE POLICY "Public insert rewards" ON rewards FOR INSERT WITH CHECK (true);
+CREATE POLICY "Public update rewards" ON rewards FOR UPDATE USING (true);
