@@ -74,8 +74,9 @@ function hasWebGL(): boolean {
   if (typeof window === "undefined") return true;
   try {
     const c = document.createElement("canvas");
-    return !!((window as any).WebGLRenderingContext && (c.getContext("webgl") || c.getContext("experimental-webgl")));
-  } catch { return false; }
+    // three.js/R3F używa WebGL2 (z fallbackiem na WebGL1). Akceptuj którykolwiek.
+    return !!(c.getContext("webgl2") || c.getContext("webgl") || (c as any).getContext("experimental-webgl"));
+  } catch { return true; } // w razie wątpliwości NIE blokuj — niech Canvas spróbuje (ErrorBoundary złapie realny błąd)
 }
 
 import { supabase, getSessionId, createOrder, newOrderId, publishDrink, likeDrink, addComment, getComments, getCommentsFull, toggleCommentLike, getMyCommentLikes, incrementDrinkView, claimDrink as claimDrinkApi, getDrinkStats, deleteMyDrink } from "./lib/supabase";
