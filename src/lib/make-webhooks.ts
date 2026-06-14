@@ -189,7 +189,17 @@ export async function subscribeEventReminder(data: {
   const { eventReminderHTML } = await import("./email-templates");
   const lang = (["it","pl","en","de","fr","es"].includes(data.lang) ? data.lang : "it") as import("./email-templates").Lang;
   const link = typeof window !== "undefined" ? `${window.location.origin}/#eventi` : "https://www.shistoria.it/#eventi";
-  const vars = { name: data.name, eventTitle: data.event_title, eventDate: data.event_date, eventDescription: data.event_description, imageUrl: data.image_url, bg: data.bg, accent: data.accent, tag: data.tag, lang, link };
+  // Przetłumacz treść eventu (tytuł/opis/tag) na język odbiorcy, żeby cała karta była w jego języku
+  const tr = async (txt?: string) => {
+    if (!txt || lang === "it") return txt || "";
+    try {
+      const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${lang}&dt=t&q=${encodeURIComponent(txt)}`);
+      const j = await r.json();
+      return (j?.[0] || []).map((s: any) => s[0]).join("") || txt;
+    } catch { return txt; }
+  };
+  const [titleTr, descTr, tagTr] = await Promise.all([tr(data.event_title), tr(data.event_description), tr(data.tag)]);
+  const vars = { name: data.name, eventTitle: titleTr || data.event_title, eventDate: data.event_date, eventDescription: descTr, imageUrl: data.image_url, bg: data.bg, accent: data.accent, tag: tagTr, lang, link };
   // Pre-renderowane maile w języku odbiorcy — make.com wysyła je w odpowiednim momencie
   const mail3d = eventReminderHTML(vars, "3d");
   const mail5h = eventReminderHTML(vars, "5h");

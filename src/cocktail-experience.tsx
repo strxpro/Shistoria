@@ -68,7 +68,7 @@ if (typeof window !== "undefined") {
   try { ScrollTrigger.config({ ignoreMobileResize: true }); } catch { /* ignore */ }
 }
 
-import { supabase, getSessionId, createOrder, newOrderId, publishDrink, likeDrink, addComment, getComments, getCommentsFull, toggleCommentLike, getMyCommentLikes, claimDrink as claimDrinkApi } from "./lib/supabase";
+import { supabase, getSessionId, createOrder, newOrderId, publishDrink, likeDrink, addComment, getComments, getCommentsFull, toggleCommentLike, getMyCommentLikes, incrementDrinkView, claimDrink as claimDrinkApi } from "./lib/supabase";
 import { findCocktailByIngredients } from "./lib/cocktail-db";
 import { PersonalizedQR } from "./components/PersonalizedQR";
 
@@ -5418,6 +5418,7 @@ function DbDrinkCard({ d }: { d: any }) {
   // Po otwarciu popoutu — załaduj pełną listę (top-level + odpowiedzi) i moje lajki
   useEffect(() => {
     if (!popout || !d.id) return;
+    try { incrementDrinkView(d.id); } catch {} // statystyka: liczba otwarć popoutu
     getCommentsFull(d.id).then(async ({ top, repliesByParent }) => {
       setComments(top);
       setReplies(repliesByParent);

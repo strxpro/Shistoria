@@ -198,6 +198,19 @@ export async function getMyCommentLikes(commentIds: string[]): Promise<Set<strin
   return new Set((data || []).map((r: any) => r.comment_id));
 }
 
+// Statystyka: zwiększ licznik wyświetleń drinka (otwarcie popoutu). Jednorazowo na sesję/drink.
+export async function incrementDrinkView(drinkId: string) {
+  if (!drinkId || drinkId.startsWith('tmp-')) return;
+  try {
+    const key = 'sh-viewed-drinks';
+    const seen: string[] = JSON.parse(sessionStorage.getItem(key) || '[]');
+    if (seen.includes(drinkId)) return;
+    seen.push(drinkId);
+    sessionStorage.setItem(key, JSON.stringify(seen));
+  } catch { /* brak sessionStorage */ }
+  try { await supabase.rpc('increment_drink_views', { drink_uuid: drinkId }); } catch { /* RPC może nie istnieć */ }
+}
+
 // ─── Orders (QR barman) ───────────────────────────────────────────────────────
 
 export function newOrderId(): string {

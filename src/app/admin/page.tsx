@@ -885,7 +885,7 @@ function DrinksPanel() {
                 <div className="admin-drink-info">
                   <h4>#{i+1} {d.name}{d.is_drink_of_month && <span className="admin-badge">👑</span>}</h4>
                   <span>di {d.author_name} · {d.total_ml}ml · {d.strength_label}</span>
-                  <span>♥ {d.likes||0} · 💬 {d.comments||0} · 🍸 {d.claimed_count||0} ritiri</span>
+                  <span>👁 {d.views||0} · ♥ {d.likes||0} · 💬 {d.comments||0} · 🍸 {d.claimed_count||0} ritiri</span>
                   {d.author_email && <span className="drk-email">✉️ {d.author_email}</span>}
                 </div>
                 <div className="admin-drink-actions">

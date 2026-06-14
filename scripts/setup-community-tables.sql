@@ -250,3 +250,13 @@ DROP POLICY IF EXISTS "Public update rewards" ON rewards;
 CREATE POLICY "Public read rewards" ON rewards FOR SELECT USING (true);
 CREATE POLICY "Public insert rewards" ON rewards FOR INSERT WITH CHECK (true);
 CREATE POLICY "Public update rewards" ON rewards FOR UPDATE USING (true);
+
+
+-- ─── Statystyki drinków: licznik wyświetleń (otwarć popoutu) ──────────────────
+ALTER TABLE community_drinks ADD COLUMN IF NOT EXISTS views integer DEFAULT 0;
+CREATE OR REPLACE FUNCTION increment_drink_views(drink_uuid uuid)
+RETURNS void AS $$
+BEGIN
+  UPDATE community_drinks SET views = COALESCE(views, 0) + 1 WHERE id = drink_uuid;
+END;
+$$ LANGUAGE plpgsql;
