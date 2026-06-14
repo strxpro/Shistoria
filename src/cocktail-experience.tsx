@@ -5742,6 +5742,11 @@ function DbDrinkCard({ d }: { d: any }) {
               {d.photo_url && <span className="cx-cc-swipe-hint" aria-hidden="true">{(({it:"Scorri per i dettagli",pl:"Przesuń po szczegóły",en:"Swipe for details",de:"Wischen für Details",fr:"Glisse pour les détails",es:"Desliza para detalles"} as Record<string,string>)[lang] || "Scorri →")} →</span>}
             </div>
             <div className="cx-cc-popout-right">
+              {d.photo_url && (
+                <button className="cx-cc-right-thumb" onClick={() => { const el = document.querySelector(".cx-cc-popout"); el?.scrollTo({ left: 0, behavior: "smooth" }); }} aria-label="Foto">
+                  <img src={d.photo_url} alt={d.name} />
+                </button>
+              )}
               <div className="cx-cc-popout-header">
                 <span className="cx-cc-popout-by">{tt("by", "by")} {d.author_name}</span>
                 <h3 className="cx-cc-popout-name">{d.name}</h3>
@@ -8064,6 +8069,7 @@ function CocktailStyles() {
       .cx-cc-popout-left { display:flex; align-items:center; justify-content:center; padding:40px; background:rgba(0,0,0,0.3); }
       .cx-cc-popout-glass { width:80%; max-width:200px; filter:drop-shadow(0 20px 40px rgba(0,0,0,0.5)); }
       .cx-cc-popout-right { padding:32px; display:flex; flex-direction:column; gap:20px; overflow-y:auto; scrollbar-width:none; -ms-overflow-style:none; }
+      .cx-cc-right-thumb { display:none; }
       .cx-cc-popout-right::-webkit-scrollbar { display:none; }
       .cx-cc-popout::-webkit-scrollbar { display:none; }
       .cx-cc-popout-by { font-size:11px; letter-spacing:0.2em; text-transform:uppercase; color:rgba(255,255,255,0.5); }
@@ -8166,6 +8172,8 @@ function CocktailStyles() {
         .cx-cc-popout > .cx-cc-popout-left, .cx-cc-popout > .cx-cc-popout-right { flex:0 0 100%; width:100%; box-sizing:border-box; scroll-snap-align:start; }
         .cx-cc-popout-left.has-photo { min-height:62vh; }
         .cx-cc-popout-right { max-height:92vh; overflow-y:auto; touch-action:pan-y; }
+        .cx-cc-right-thumb { display:block; width:100%; border:none; padding:0; background:none; cursor:pointer; }
+        .cx-cc-right-thumb img { width:100%; height:130px; object-fit:cover; border-radius:14px; display:block; }
         .cx-cc-popout-close { position:fixed; top:max(14px, env(safe-area-inset-top)); right:14px; }
       }
 
