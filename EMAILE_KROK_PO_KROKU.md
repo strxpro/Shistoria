@@ -18,6 +18,8 @@
 > | **Odpowiedzi klientów wracają do panelu** (IMAP) | **SEKCJA C** | 🟡 |
 > | **Drink del Mese — mail do wszystkich** | **SEKCJA D** | 🟡 |
 > | **Przypomnienia o wydarzeniach** | **SEKCJA E** | 🟡 |
+> | **Newsletter „wyślij do wszystkich" + problem `recipients`** | **SEKCJA F** | 🟢 |
+> | **Testy maili na żywo (bez czekania 3 dni)** | **SEKCJA G** | 🟢 |
 > | **Co przygotować ZANIM zaczniesz** | **SEKCJA 0** | 🔴 |
 >
 > ⏱ Razem ~40-60 minut. Sekcje A i B są najważniejsze — zrób je pierwsze.
@@ -285,3 +287,139 @@ Gdy make.com pyta o połączenie do **wysyłania** maili (Send an email), użyj 
 | (share drinka) | `NEXT_PUBLIC_MAKE_DRINK_WEBHOOK` |
 
 Po dodaniu KAŻDEJ zmiennej → **Redeploy**.
+
+---
+
+<div align="center">
+
+# 🟢 SEKCJA F — NEWSLETTER „WYŚLIJ DO WSZYSTKICH" (broadcast)
+
+**Efekt: w adminie klikasz „📣 Invia a tutti", wpisujesz tytuł/opis → KAŻDY subskrybent dostaje mail w SWOIM języku.**
+
+</div>
+
+> [!IMPORTANT]
+> ## ❓ „W Iteratorze nie mam pola `recipients` / `1.recipients`"
+> To NAJCZĘSTSZY problem. Powód: make.com pokazuje tylko te pola, które **już
+> kiedyś złapał** z prawdziwego webhooka. Ten sam adres webhooka obsługuje DWA
+> różne payloady:
+> - **zapis do newslettera** (`type = newsletter_signup`) — ma pole `email_html`, **NIE ma** `recipients`
+> - **broadcast** (`type = newsletter_broadcast`) — **ma listę `recipients`**
+>
+> Jeśli make „nauczył się" tylko z zapisu, to `recipients` nie istnieje w pickerze.
+> **ROZWIĄZANIE = wyślij raz prawdziwy broadcast podczas „Run once"** (KROK F3 niżej).
+> Po tym `recipients` pojawi się na liście pól.
+
+### KROK F1 — webhook (jeśli jeszcze nie masz)
+1. To **ten sam** webhook co zapis do newslettera: `NEXT_PUBLIC_MAKE_NEWSLETTER_WEBHOOK`.
+2. Jeśli go nie masz: nowy scenariusz → **Webhooks → Custom webhook** → nazwij `shistoria-newsletter` → skopiuj URL → Vercel: `NEXT_PUBLIC_MAKE_NEWSLETTER_WEBHOOK` → **Redeploy**.
+
+### KROK F2 — struktura modułów (3 moduły)
+```
+[1] Webhooks: Custom webhook
+        │
+[2] Flow control: Iterator      ← Array = recipients (patrz F4)
+        │
+[3] Email: Send an email        ← To/Subject/Content z Iteratora
+```
+
+### KROK F3 — „nakarm" webhook broadcastem (KLUCZOWE dla problemu z recipients)
+1. Kliknij na module **[1] webhook → „Run once"** (make czeka na dane).
+2. Wejdź w **admin → zakładka Newsletter → „📣 Invia a tutti"**, wpisz np. tytuł „Test", krótki opis, kliknij wyślij.
+   - (Musisz mieć min. 1 subskrybenta w bazie — zapisz swój email przez formularz newslettera na stronie, jeśli lista pusta.)
+3. make pokaże „successfully determined" i **teraz zna pole `recipients`** (lista) z podpolami `email`, `name`, `lang`, `email_subject`, `email_html`.
+
+> Jeśli nadal nie widzisz `recipients`: w polu Array Iteratora **wpisz ręcznie**
+> `{{1.recipients}}` (kliknij w pole, przełącz na tryb tekstowy „map" i wpisz),
+> gdzie `1` to numer modułu webhooka (widoczny na kafelku jako mała cyfra).
+
+### KROK F4 — Iterator [2]
+1. Dodaj **Flow control → Iterator** zaraz po webhooku.
+2. Pole **Array**: wybierz `recipients` z pickera (albo wpisz `{{1.recipients}}`).
+
+### KROK F5 — Send an email [3]
+Dodaj **Email → Send an email** po Iteratorze. Ustaw (numer modułu Iteratora to zwykle `2`):
+- **To:** `{{2.email}}`
+- **Subject:** `{{2.email_subject}}`
+- **Content type:** **HTML** ← bez tego HTML pokaże się jako tekst
+- **Content:** `{{2.email_html}}`
+- **From:** `info@shistoria.it` (połączenie SMTP OVH — patrz sekcja USTAWIENIA SMTP)
+
+### KROK F6 — włącz i testuj
+1. Przełącznik scenariusza na **ON** (lewy dół).
+2. Admin → Newsletter → „📣 Invia a tutti" → po chwili maile lecą do wszystkich.
+
+> [!NOTE]
+> ### Rozdzielić zapis i broadcast (opcjonalnie, czyściej)
+> Jeśli ten sam webhook obsługuje też zapis do newslettera, dodaj po module [1]
+> **Router** z dwoma filtrami po polu `type`:
+> - `type` = `newsletter_signup` → Send email (To `{{1.email}}`, Content `{{1.email_html}}`)
+> - `type` = `newsletter_broadcast` → Iterator (`{{1.recipients}}`) → Send email (`{{2.email}}` itd.)
+>
+> Wtedy jeden scenariusz robi obie rzeczy bez mieszania.
+
+✅ **GOTOWE — sekcja F skończona.**
+
+---
+
+<div align="center">
+
+# 🧪 SEKCJA G — TESTY MAILI NA ŻYWO (ze mną, bez czekania 3 dni)
+
+</div>
+
+## G1. Najszybszy test markowego maila (1 komenda)
+W terminalu (folder projektu):
+```powershell
+node scripts/test-pretty-email.cjs TWOJ@email.com
+```
+Wysyła testowy, ładny mail przez webhook newslettera. Sprawdź skrzynkę (i SPAM).
+> Wymaga: scenariusz z SEKCJI F włączony (ON) i `NEXT_PUBLIC_MAKE_NEWSLETTER_WEBHOOK` ustawiony.
+
+## G2. Test każdego typu maila „na żywo" — co kliknąć w adminie
+| Mail | Gdzie w adminie | Co sprawdzić |
+|---|---|---|
+| **Rezerwacja** (do Ciebie + klienta) | wyślij formularz na stronie | 2 maile: włoski do Ciebie, w języku klienta do niego |
+| **Odpowiedź na wiadomość** | Messaggi → otwórz wątek → napisz odpowiedź → wyślij | klient dostaje mail przetłumaczony na jego język |
+| **Drink del Mese/Settimana** | Drink Clienti → wybierz okres → „👑 Ogłoś" | zwycięzca: mail z kodem + QR; reszta: „sprawdź drink" |
+| **Newsletter broadcast** | Newsletter → „📣 Invia a tutti" | każdy subskrybent w swoim języku |
+| **Event — przypomnienie** | patrz G3 (trzeba oszukać czas) | mail „za 3 dni" / „za kilka godzin" |
+| **Podziękowanie za opinię** | zostaw opinię na stronie z podanym emailem | mail „grazie" w języku gościa |
+
+> Podgląd WSZYSTKICH maili bez wysyłania: wejdź na **`/email-preview`** (lokalnie
+> `http://localhost:3000/email-preview`, na produkcji `www.shistoria.it/email-preview`)
+> i przełączaj język u góry.
+
+## G3. Eventy — jak NIE czekać 3 dni
+Przypomnienia eventowe wysyłają się, gdy `event_date - teraz` wpada w okno
+(≈71–73h przed = „3 dni", ≈4.5–5.5h przed = „5 godzin"). Żeby przetestować od razu,
+masz 2 sposoby:
+
+**Sposób A — ustaw datę eventu tak, by wpadła w okno (najprościej):**
+1. W make → Data Store `event_subs` znajdź swój rekord (albo dodaj nowy ręcznie).
+2. Ustaw `event_date` na **teraz + 72h** (dla maila „3 dni") albo **teraz + 5h** (dla „5 godzin").
+3. Ustaw `sent_3d = false` (lub `sent_5h = false`).
+4. W scenariuszu B (cykliczny) kliknij **„Run once"** — mail poleci natychmiast.
+
+**Sposób B — tymczasowo poszerz filtr czasu (na 1 test):**
+1. W scenariuszu B, w filtrze gałęzi „3 dni", zmień warunek na bardzo szeroki
+   (np. „różnica < 100000 godzin” I `sent_3d = false`).
+2. **Run once** → mail leci. Potem **przywróć** wąski filtr (71–73h), żeby nie spamować.
+
+**Sposób C — wstrzyknij testowy rekord eventu webhookiem (PowerShell):**
+```powershell
+$body = @{
+  type = "event_reminder"
+  name = "Mario"
+  email = "TWOJ@email.com"
+  lang = "it"
+  event_title = "Serata Test"
+  event_date = (Get-Date).AddHours(72).ToString("yyyy-MM-ddTHH:mm:ss")
+  remind_days_before = 3
+  remind_hours_before = 5
+} | ConvertTo-Json
+Invoke-RestMethod -Method POST -Uri "https://hook.eu1.make.com/4swpubn6ixliy7w2j77kxhyc9e6s1lfz" -ContentType "application/json" -Body $body
+```
+(Najpierw „Run once" na scenariuszu A — ZAPIS — żeby rekord wpadł do Data Store, potem „Run once" na scenariuszu B — WYSYŁKA.)
+
+✅ **GOTOWE — testy maili skończone.**
