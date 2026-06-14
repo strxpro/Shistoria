@@ -5927,18 +5927,34 @@ function MyDrinksList({ drinks, lang, confirmDel, onEdit, onStats, onAskDelete, 
   onConfirmDelete: (i: number) => void; onCancelDelete: () => void; onNew: () => void;
 }) {
   const T = mdT(lang);
+  const [showAll, setShowAll] = useState(false);
+  const sharedCount = drinks.filter((d) => d.photo_url).length;
+  const hist = ({ it: "Mostra tutte le creazioni", pl: "Pokaż wszystkie kreacje", en: "Show all creations", de: "Alle Kreationen zeigen", fr: "Voir toutes les créations", es: "Ver todas las creaciones" } as Record<string, string>)[lang] || "Tutte";
+  const onlyShared = ({ it: "Solo pubblicate", pl: "Tylko opublikowane", en: "Only published", de: "Nur veröffentlichte", fr: "Seulement publiées", es: "Solo publicadas" } as Record<string, string>)[lang] || "Solo pubblicate";
+  const emptyShared = ({ it: "Nessun drink pubblicato con foto. Tocca l'icona 🕘 per vedere tutte le tue creazioni.", pl: "Brak opublikowanych drinków ze zdjęciem. Dotknij 🕘 aby zobaczyć wszystkie swoje kreacje.", en: "No published drinks with photo. Tap 🕘 to see all your creations.", de: "Keine veröffentlichten Drinks mit Foto. Tippe 🕘 für alle Kreationen.", fr: "Aucun cocktail publié avec photo. Touche 🕘 pour voir toutes tes créations.", es: "Ningún trago publicado con foto. Toca 🕘 para ver todas tus creaciones." } as Record<string, string>)[lang] || "Nessun drink pubblicato.";
+  const showHistBtn = drinks.length > sharedCount; // są też nieudostępnione
   return (
     <div className="cx-mydrinks">
       <div className="cx-mydrinks-head">
-        <span className="cx-mini-kicker">{T.title}</span>
-        <p className="cx-mydrinks-hint">{T.hint}</p>
+        <div className="cx-mydrinks-titlerow">
+          <span className="cx-mini-kicker">{T.title}</span>
+          {showHistBtn && (
+            <button className={`cx-mydrinks-hist ${showAll ? "on" : ""}`} onClick={() => setShowAll((v) => !v)}
+              title={showAll ? onlyShared : hist} aria-label={showAll ? onlyShared : hist}>🕘</button>
+          )}
+        </div>
+        <p className="cx-mydrinks-hint">{showAll ? hist : (sharedCount > 0 ? onlyShared : "")} · {T.hint}</p>
       </div>
       <div className="cx-mydrinks-list">
-        {drinks.map((d, i) => (
-          <MyDrinkRow key={d.saved_at || i} d={d} lang={lang} confirm={confirmDel === i}
-            onEdit={() => onEdit(d)} onStats={() => onStats(d)} onAskDelete={() => onAskDelete(i)}
-            onConfirmDelete={() => onConfirmDelete(i)} onCancelDelete={onCancelDelete} />
-        ))}
+        {drinks.map((d, i) => {
+          if (!showAll && !d.photo_url) return null;
+          return (
+            <MyDrinkRow key={d.saved_at || i} d={d} lang={lang} confirm={confirmDel === i}
+              onEdit={() => onEdit(d)} onStats={() => onStats(d)} onAskDelete={() => onAskDelete(i)}
+              onConfirmDelete={() => onConfirmDelete(i)} onCancelDelete={onCancelDelete} />
+          );
+        })}
+        {!showAll && sharedCount === 0 && <p className="cx-mydrinks-empty">{emptyShared}</p>}
       </div>
       <button className="cx-btn cx-mydrinks-new" onClick={onNew}>{T.new}</button>
     </div>
@@ -6253,13 +6269,15 @@ function ShareDrinkBtn() {
       <button className="cx-comm-share-btn" onClick={() => setOpen(true)}>{(() => { const L: Record<string,string> = {it:"Invia →",pl:"Wyślij →",en:"Submit →",de:"Senden →",fr:"Envoyer →",es:"Enviar →"}; return L[((typeof window!=="undefined"&&(window as any).currentLanguage)||"it") as keyof typeof L]??L.it; })()}</button>
       {open && typeof document !== "undefined" && createPortal(
         <div className="cx-share-overlay" onClick={() => setOpen(false)}>
-          <button className="cx-cc-popout-close cx-cc-popout-close-fixed" onClick={() => setOpen(false)} aria-label="Chiudi">×</button>
           <div className="cx-share-popout" onClick={(e) => e.stopPropagation()}>
+            <div className="cx-share-topbar">
+              {!sent && ((view === "edit" && allDrinks.length > 0) || view === "stats") ? (
+                <button className="cx-share-tb-btn" onClick={() => setView("list")} aria-label="Indietro">←</button>
+              ) : <span className="cx-share-tb-spacer" />}
+              <button className="cx-share-tb-btn" onClick={() => setOpen(false)} aria-label="Chiudi">×</button>
+            </div>
             {publishProgress > 0 && (
               <div className="cx-share-progress"><div className="cx-share-progress-fill" style={{ width: `${Math.round(publishProgress * 100)}%` }} /></div>
-            )}
-            {!sent && ((view === "edit" && allDrinks.length > 1) || view === "stats") && (
-              <button className="cx-share-back" onClick={() => setView("list")} aria-label="Indietro">←</button>
             )}
             {sent ? (
               <div className="cx-share-success">
@@ -8069,11 +8087,14 @@ function CocktailStyles() {
       .cx-share-submit { margin-top:auto; width:100%; box-sizing:border-box; white-space:normal; text-align:center; line-height:1.25; padding:14px 18px; font-size:clamp(13px,3.6vw,15px); }
       .cx-share-submit:disabled { opacity:0.4; cursor:not-allowed; }
 
-      /* Przycisk "wstecz" w popoucie udostępniania */
-      .cx-share-back { position:absolute; top:14px; left:14px; z-index:6; width:38px; height:38px; border-radius:50%;
-        background:rgba(0,0,0,0.5); border:1px solid rgba(255,255,255,0.25); color:#fff; font-size:20px; cursor:pointer;
-        display:grid; place-items:center; backdrop-filter:blur(6px); transition:background .2s; }
-      .cx-share-back:hover { background:rgba(255,255,255,0.15); }
+      /* Sticky topbar popoutu udostępniania — strzałka powrotu (lewo) + krzyżyk (prawo) na równi */
+      .cx-share-topbar { position:sticky; top:0; z-index:7; display:flex; align-items:center; justify-content:space-between;
+        padding:12px 14px; background:linear-gradient(180deg,rgba(18,23,30,0.96),rgba(18,23,30,0.0)); }
+      .cx-share-tb-btn { width:38px; height:38px; border-radius:50%; border:1px solid rgba(255,255,255,0.22);
+        background:rgba(0,0,0,0.45); color:#fff; font-size:20px; line-height:1; cursor:pointer; display:grid; place-items:center;
+        backdrop-filter:blur(6px); transition:background .2s; }
+      .cx-share-tb-btn:hover { background:rgba(255,255,255,0.15); }
+      .cx-share-tb-spacer { width:38px; height:38px; }
       /* Przycisk usuwania w panelu edycji */
       .cx-share-del-btn { margin-top:10px; width:100%; box-sizing:border-box; padding:11px 14px; border-radius:12px;
         background:rgba(220,38,38,0.12); border:1px solid rgba(220,38,38,0.4); color:#ff8a8a; font-weight:700; font-size:13px; cursor:pointer; transition:all .2s; }
@@ -8082,6 +8103,11 @@ function CocktailStyles() {
       /* ── Lista "Le mie creazioni" (Vedi/Modifica) ── */
       .cx-mydrinks { padding:26px 22px 22px; display:flex; flex-direction:column; gap:14px; }
       .cx-mydrinks-head { display:flex; flex-direction:column; gap:4px; }
+      .cx-mydrinks-titlerow { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+      .cx-mydrinks-hist { width:36px; height:36px; border-radius:50%; flex-shrink:0; border:1px solid rgba(255,255,255,0.2);
+        background:rgba(255,255,255,0.06); color:#fff; font-size:17px; cursor:pointer; display:grid; place-items:center; transition:all .2s; }
+      .cx-mydrinks-hist.on { background:var(--cx-accent,#E8927C); border-color:transparent; }
+      .cx-mydrinks-empty { color:rgba(255,255,255,0.5); font-size:13px; line-height:1.5; text-align:center; padding:18px 8px; }
       .cx-mydrinks-hint { margin:0; font-size:12px; color:rgba(255,255,255,0.5); line-height:1.4; }
       .cx-mydrinks-list { display:flex; flex-direction:column; gap:10px; }
       .cx-mydrink-swipe { position:relative; border-radius:14px; overflow:hidden; touch-action:pan-y; }
