@@ -26,6 +26,36 @@ function detectReferrer(): { referrer: string; utm: string } {
   return { referrer: source, utm };
 }
 
+function detectDevice(): { device: string; os: string } {
+  if (typeof navigator === "undefined") return { device: "desktop", os: "Desktop" };
+  const ua = navigator.userAgent || "";
+  const isTablet = /iPad|Tablet/i.test(ua) || (/Macintosh/i.test(ua) && (navigator as any).maxTouchPoints > 1);
+  const isMobile = /Mobi|Android|iPhone|iPod/i.test(ua) && !isTablet;
+  let os = "Desktop";
+  if (/Android/i.test(ua)) os = "Android";
+  else if (/iPhone|iPad|iPod/i.test(ua) || (/Macintosh/i.test(ua) && (navigator as any).maxTouchPoints > 1)) os = "iOS";
+  else if (/Windows/i.test(ua)) os = "Windows";
+  else if (/Mac/i.test(ua)) os = "macOS";
+  else if (/Linux/i.test(ua)) os = "Linux";
+  const device = isTablet ? "tablet" : isMobile ? "mobile" : "desktop";
+  return { device, os };
+}
+
+function storedIdentity(): { email: string; name: string } | null {
+  try { const raw = localStorage.getItem("sh-identity"); return raw ? JSON.parse(raw) : null; } catch { return null; }
+}
+
+/** Zapisz tożsamość (email) — wywoływane gdy gość poda email (newsletter, drink, event, recenzja).
+ * Przeglądarka pamięta to i podpina analitykę tej sesji (i kolejnych) do emaila. */
+export async function setIdentity(email?: string, name?: string) {
+  if (typeof window === "undefined" || !email || !email.includes("@")) return;
+  const e = email.trim().toLowerCase();
+  try { localStorage.setItem("sh-identity", JSON.stringify({ email: e, name: name || storedIdentity()?.name || "" })); } catch { /* ignore */ }
+  if (_visitId) {
+    try { await supabase.from("analytics_visits").update({ email: e, visitor_name: name || null }).eq("id", _visitId); } catch { /* kolumny mogą nie istnieć */ }
+  }
+}
+
 /** Start śledzenia wizyty — wywołaj raz przy starcie aplikacji. */
 export async function startTracking() {
   if (typeof window === "undefined" || _visitId) return;
@@ -43,10 +73,16 @@ export async function startTracking() {
   } catch { /* ignore */ }
 
   try {
-    const { data } = await supabase.from("analytics_visits").insert({
-      session_id: sid, country, country_name, city, referrer, utm_source: utm, language: lang,
-    }).select().single();
-    _visitId = data?.id || null;
+    const { device, os } = detectDevice();
+    const ident = storedIdentity();
+    const base: Record<string, any> = { session_id: sid, country, country_name, city, referrer, utm_source: utm, language: lang };
+    const full = { ...base, device, os, email: ident?.email || null, visitor_name: ident?.name || null };
+    let res = await supabase.from("analytics_visits").insert(full).select().single();
+    if (res.error) {
+      // Kolumny device/os/email mogą nie istnieć w bazie — wstaw bez nich (analityka nadal działa)
+      res = await supabase.from("analytics_visits").insert(base).select().single();
+    }
+    _visitId = res.data?.id || null;
   } catch { /* ignore */ }
 
   // Zapisz czas trwania + sekcje przy wyjściu

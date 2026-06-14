@@ -14,6 +14,8 @@
 
 type Json = Record<string, unknown>;
 
+import { setIdentity } from "./analytics";
+
 type WebhookKey = "contact" | "drink" | "winner" | "event" | "newsletter" | "comment" | "review";
 
 function webhook(key: WebhookKey): string | null {
@@ -58,6 +60,7 @@ export async function sendReservation(data: {
   name: string; firstName?: string; lastName?: string; email: string; phone?: string; date?: string; time?: string; people?: number; message?: string; lang: string;
 }): Promise<boolean> {
   const { clientEmailHTML, ownerEmailHTML, ownerWhatsAppText } = await import("./email-templates");
+  setIdentity(data.email, data.firstName || data.name);
   const lang = (["it","pl","en","de","fr","es"].includes(data.lang) ? data.lang : "it") as import("./email-templates").Lang;
   // Przetłumacz wiadomość klienta na włoski (dla właściciela) — auto-detect języka
   let messageIt = data.message || "";
@@ -114,6 +117,7 @@ export async function sendDrinkShared(data: {
   ingredients: { name: string }[]; lang: string; photo_url?: string;
 }): Promise<boolean> {
   if (!data.author_email) return false;
+  setIdentity(data.author_email, data.author_name);
   return send("drink", {
     type: "drink_shared",
     drink_name: data.drink_name,
@@ -187,6 +191,7 @@ export async function subscribeEventReminder(data: {
   image_url?: string; bg?: string; accent?: string; tag?: string;
 }): Promise<boolean> {
   const { eventReminderHTML } = await import("./email-templates");
+  setIdentity(data.email, data.name);
   const lang = (["it","pl","en","de","fr","es"].includes(data.lang) ? data.lang : "it") as import("./email-templates").Lang;
   const link = typeof window !== "undefined" ? `${window.location.origin}/#eventi` : "https://www.shistoria.it/#eventi";
   // Przetłumacz treść eventu (tytuł/opis/tag) na język odbiorcy, żeby cała karta była w jego języku
@@ -229,6 +234,7 @@ export async function subscribeNewsletter(data: {
   email: string; name?: string; lang: string;
 }): Promise<boolean> {
   const { newsletterWelcomeHTML } = await import("./email-templates");
+  setIdentity(data.email, data.name);
   const lang = (["it","pl","en","de","fr","es"].includes(data.lang) ? data.lang : "it") as import("./email-templates").Lang;
   const mail = newsletterWelcomeHTML({ name: data.name, lang });
   return send("newsletter", {
@@ -269,6 +275,7 @@ export async function notifyReview(data: {
   name: string; email?: string; content: string; stars: number; lang: string;
 }): Promise<boolean> {
   if (!data.email) return false; // bez maila nie ma do kogo wysłać podziękowania
+  setIdentity(data.email, data.name);
   const { reviewThankYouHTML } = await import("./email-templates");
   const lang = (["it","pl","en","de","fr","es"].includes(data.lang) ? data.lang : "it") as import("./email-templates").Lang;
   const mail = reviewThankYouHTML({ name: data.name, stars: data.stars, lang });

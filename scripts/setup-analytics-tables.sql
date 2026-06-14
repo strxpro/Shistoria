@@ -22,6 +22,15 @@ CREATE INDEX IF NOT EXISTS idx_visits_country ON analytics_visits(country);
 CREATE INDEX IF NOT EXISTS idx_visits_created ON analytics_visits(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_visits_session ON analytics_visits(session_id);
 
+-- ─── Identyfikacja po emailu + urządzenie (CRM Ospiti) ──────────────────────
+-- Gdy gość poda email (newsletter/drink/event/recenzja), przeglądarka podpina
+-- jego wizyty do emaila → w panelu Ospiti widać pełną aktywność danej osoby.
+ALTER TABLE analytics_visits ADD COLUMN IF NOT EXISTS email text;
+ALTER TABLE analytics_visits ADD COLUMN IF NOT EXISTS visitor_name text;
+ALTER TABLE analytics_visits ADD COLUMN IF NOT EXISTS device text;  -- desktop | mobile | tablet
+ALTER TABLE analytics_visits ADD COLUMN IF NOT EXISTS os text;      -- Android | iOS | Windows | macOS | Linux
+CREATE INDEX IF NOT EXISTS idx_visits_email ON analytics_visits(email);
+
 -- ─── Odsłony sekcji (gdzie się zatrzymują) ──────────────────────────────────
 CREATE TABLE IF NOT EXISTS analytics_sections (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,

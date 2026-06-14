@@ -1527,22 +1527,44 @@ function MessagesPanel({ compose, onComposeUsed }: { compose?: { email: string; 
 
 // ─── Ospiti Panel (CRM — wszyscy ludzie z mailami + powiązania) ───────────────
 function GuestDetailModal({ guest, onClose, onWrite }: { guest: any; onClose: () => void; onWrite: (g: any) => void }) {
-  const [data, setData] = useState<{ drinks: any[]; orders: number; reviews: any[]; comments: any[] } | null>(null);
+  const [data, setData] = useState<{ drinks: any[]; orders: number; reviews: any[]; comments: any[]; visits: any[] } | null>(null);
   const flag = (c: string) => ({ it: "🇮🇹", pl: "🇵🇱", en: "🇬🇧", de: "🇩🇪", fr: "🇫🇷", es: "🇪🇸" } as Record<string, string>)[c] || "🌐";
   useEffect(() => {
     (async () => {
       try {
-        const [drk, ord, rev, cmt] = await Promise.all([
+        const [drk, ord, rev, cmt, vis] = await Promise.all([
           supabase.from("community_drinks").select("id,name,likes,claimed_count,created_at").or(`author_email.eq.${guest.email},author_name.eq.${guest.name}`),
           supabase.from("drink_orders").select("id", { count: "exact", head: true }).eq("author_name", guest.name),
           supabase.from("reviews").select("content,stars,created_at").eq("email", guest.email).order("created_at", { ascending: false }),
           supabase.from("drink_comments").select("content,created_at,drink_id").eq("author", guest.name).order("created_at", { ascending: false }).limit(20),
+          supabase.from("analytics_visits").select("duration_seconds,top_section,device,os,is_conversion,referrer,created_at").eq("email", guest.email).order("created_at", { ascending: false }).limit(500),
         ]);
-        setData({ drinks: drk.data || [], orders: ord.count || 0, reviews: rev.data || [], comments: cmt.data || [] });
-      } catch { setData({ drinks: [], orders: 0, reviews: [], comments: [] }); }
+        setData({ drinks: drk.data || [], orders: ord.count || 0, reviews: rev.data || [], comments: cmt.data || [], visits: vis.data || [] });
+      } catch { setData({ drinks: [], orders: 0, reviews: [], comments: [], visits: [] }); }
     })();
   }, [guest.email, guest.name]);
   const tags: string[] = [...(guest.tags || [])];
+  // Agregacje analityki
+  const visits = data?.visits || [];
+  const totalVisits = visits.length;
+  const avgDur = totalVisits ? Math.round(visits.reduce((s, v) => s + (v.duration_seconds || 0), 0) / totalVisits) : 0;
+  const fmtDur = (s: number) => s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`;
+  const tally = (key: string) => { const m: Record<string, number> = {}; visits.forEach((v: any) => { const k = v[key]; if (k) m[k] = (m[k] || 0) + 1; }); return Object.entries(m).sort((a, b) => b[1] - a[1]); };
+  const devices = tally("device"); const oses = tally("os"); const sections = tally("top_section"); const refs = tally("referrer");
+  const devIco: Record<string, string> = { desktop: "🖥️", mobile: "📱", tablet: "📲" };
+  const osIco: Record<string, string> = { Android: "🤖", iOS: "🍏", Windows: "🪟", macOS: "🍎", Linux: "🐧" };
+  const maxOf = (arr: [string, number][]) => arr[0]?.[1] || 1;
+  const Bars = ({ arr, color, ico }: { arr: [string, number][]; color: string; ico?: Record<string, string> }) => (
+    <div className="stats-countries">
+      {arr.map(([k, n]) => (
+        <div key={k} className="stats-country" style={{ cursor: "default" }}>
+          <span className="stats-country-name" style={{ minWidth: 100 }}>{ico?.[k] || ""} {k}</span>
+          <span className="stats-country-bar-wrap"><span className="stats-country-bar" style={{ width: `${(n / maxOf(arr)) * 100}%`, background: color }} /></span>
+          <span className="stats-country-count">{n}</span>
+        </div>
+      ))}
+    </div>
+  );
   return (
     <div className="admin-modal-overlay" onClick={onClose}>
       <div className="admin-modal admin-modal-wide" onClick={(e) => e.stopPropagation()}>
@@ -1579,7 +1601,25 @@ function GuestDetailModal({ guest, onClose, onWrite }: { guest: any; onClose: ()
                 {data.reviews.map((r, i) => <div key={i} className="drk-cmt-row"><span>{"★".repeat(r.stars || 0)} {r.content}</span></div>)}
               </div>
             )}
-            <p style={{ fontSize: 11, opacity: 0.4, marginTop: 12 }}>ℹ️ Tempo sul sito / sezioni preferite sono anonimi (per sessione) e non collegati all'email.</p>
+            {/* Analityka powiązana z emailem (wizyty / czas / urządzenie / sezioni) */}
+            <div style={{ marginTop: 16 }}>
+              <span className="admin-field-lbl">Comportamento sul sito</span>
+              {totalVisits === 0 ? (
+                <p style={{ fontSize: 12, opacity: 0.55, marginTop: 6 }}>Nessun dato ancora — i dati di navigazione si collegano quando l'utente apre il sito dallo stesso browser dopo aver lasciato l'email.</p>
+              ) : (
+                <>
+                  <div className="drk-stats-grid" style={{ gridTemplateColumns: "repeat(3,1fr)", marginTop: 8 }}>
+                    <div className="drk-stat"><span className="drk-stat-ico">👁</span><strong>{totalVisits}</strong><span>Visite</span></div>
+                    <div className="drk-stat"><span className="drk-stat-ico">⏱</span><strong>{fmtDur(avgDur)}</strong><span>Tempo medio</span></div>
+                    <div className="drk-stat"><span className="drk-stat-ico">🎯</span><strong>{visits.filter((v: any) => v.is_conversion).length}</strong><span>Conversioni</span></div>
+                  </div>
+                  {devices.length > 0 && (<><span className="admin-field-lbl" style={{ display: "block", marginTop: 12 }}>Dispositivo</span><Bars arr={devices} color="rgba(232,146,124,0.7)" ico={devIco} /></>)}
+                  {oses.length > 0 && (<><span className="admin-field-lbl" style={{ display: "block", marginTop: 10 }}>Sistema (Android / iPhone / PC)</span><Bars arr={oses} color="rgba(91,184,212,0.7)" ico={osIco} /></>)}
+                  {sections.length > 0 && (<><span className="admin-field-lbl" style={{ display: "block", marginTop: 10 }}>Sezioni preferite</span><Bars arr={sections} color="rgba(241,196,15,0.7)" /></>)}
+                  {refs.length > 0 && (<><span className="admin-field-lbl" style={{ display: "block", marginTop: 10 }}>Come è arrivato</span><Bars arr={refs} color="rgba(155,213,236,0.6)" /></>)}
+                </>
+              )}
+            </div>
           </>
         )}
         <div className="admin-modal-actions">
@@ -1640,19 +1680,24 @@ function OspitiPanel({ onWrite }: { onWrite: (g: { email: string; name?: string;
         {search && <button className="amsg-search-clear" onClick={() => setSearch("")}>✕</button>}
       </div>
       {loading ? <Skeleton /> : (
-        <div className="admin-orders">
+        <div className="ospiti-grid">
           {detail && <GuestDetailModal guest={detail} onClose={() => setDetail(null)} onWrite={onWrite} />}
           {filtered.map((g) => (
-            <div key={g.email} className="admin-order" style={{ cursor: "pointer" }} onClick={(e) => { if ((e.target as HTMLElement).closest("button")) return; setDetail(g); }}>
-              <span className="amsg-avatar">{(g.name || "?").charAt(0).toUpperCase()}</span>
-              <div className="admin-order-info" style={{ flex: 1 }}>
-                <h4>{g.name} <span style={{ opacity: 0.5, fontWeight: 400, fontSize: 13 }}>{flag(g.lang)}</span></h4>
-                <p style={{ opacity: 0.7 }}>{g.email}</p>
-                <div className="amsg-person" style={{ marginTop: 6 }}>
-                  {[...g.tags].map((tg: string) => <span key={tg} className={`amsg-badge ${tagCls[tg] || ""}`}>{tg === "newsletter" ? "📧 Newsletter" : tg === "messaggi" ? "💬 Messaggi" : "⭐ Recensione"}</span>)}
+            <div key={g.email} className="ospiti-card" onClick={(e) => { if ((e.target as HTMLElement).closest("button")) return; setDetail(g); }}>
+              <div className="ospiti-card-top">
+                <span className="amsg-avatar">{(g.name || "?").charAt(0).toUpperCase()}</span>
+                <div className="ospiti-card-id">
+                  <h4>{g.name} <span style={{ opacity: 0.5, fontWeight: 400, fontSize: 12 }}>{flag(g.lang)}</span></h4>
+                  <p>{g.email}</p>
                 </div>
               </div>
-              <button className="admin-btn" style={{ flexShrink: 0 }} onClick={() => onWrite({ email: g.email, name: g.name, lang: g.lang })}>✉️ Scrivi</button>
+              <div className="amsg-person">
+                {[...g.tags].map((tg: string) => <span key={tg} className={`amsg-badge ${tagCls[tg] || ""}`}>{tg === "newsletter" ? "📧" : tg === "messaggi" ? "💬" : "⭐"} {tg}</span>)}
+              </div>
+              <div className="ospiti-card-actions">
+                <button className="admin-btn-sm" onClick={() => setDetail(g)}>📊 Dettagli</button>
+                <button className="admin-btn-sm" onClick={() => onWrite({ email: g.email, name: g.name, lang: g.lang })}>✉️ Scrivi</button>
+              </div>
             </div>
           ))}
           {filtered.length === 0 && <p className="admin-empty">{search ? "Nessun risultato." : "Nessun contatto ancora."}</p>}
@@ -2359,6 +2404,15 @@ function AdminStyles() {
       .amsg-trash.arm { background:#dc2626; color:#fff; border-color:#dc2626; animation:bellPulse 1s ease-in-out infinite; }
       .amsg-img { max-width:200px; max-height:220px; border-radius:12px; display:block; }
       .amsg-loc { display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:12px; background:rgba(91,184,212,0.15); border:1px solid rgba(91,184,212,0.5); color:#9bd6ec; font-weight:700; text-decoration:none; font-size:13px; }
+      /* ── Ospiti: węższe karty w siatce ── */
+      .ospiti-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px; }
+      .ospiti-card { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:16px; padding:14px; cursor:pointer; display:flex; flex-direction:column; gap:10px; transition:transform .2s, border-color .2s; }
+      .ospiti-card:hover { transform:translateY(-2px); border-color:rgba(232,146,124,0.4); }
+      .ospiti-card-top { display:flex; align-items:center; gap:10px; }
+      .ospiti-card-id { min-width:0; } .ospiti-card-id h4 { margin:0; font-size:15px; } .ospiti-card-id p { margin:0; font-size:12px; opacity:0.6; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .ospiti-card-actions { display:flex; gap:8px; margin-top:auto; }
+      .ospiti-card-actions .admin-btn-sm { flex:1; }
+      .admin-theme-light .ospiti-card { background:#fff; border-color:rgba(0,0,0,0.08); }
       @media (max-width:768px) {
         .amsg-chat { grid-template-columns:1fr; height:auto; }
         .amsg-list { flex-direction:column; overflow-x:visible; border-right:none; border-bottom:none; padding-bottom:0; }
