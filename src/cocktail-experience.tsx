@@ -270,16 +270,21 @@ export type PourTune = {
   gStartY: number; gEndY: number; gCurve: number; gCurveZ: number; gThick: number;
 };
 const POUR_TUNE_DEFAULT: PourTune = {
-  bottleY_m: 1.3,  bottleY_d: 2.4,
-  bottleX_m: 0.55, bottleX_d: 0.9,
+  bottleY_m: 0.45, bottleY_d: 0.9,
+  bottleX_m: 0.4,  bottleX_d: 0.75,
   bottleZ_m: 1.6,  bottleZ_d: 1.6,
-  scale_m: 0.5,    scale_d: 0.6,
-  tilt_m: 150,     tilt_d: 145,
-  aimX: 0,         aimY: 0.1,  aimZ: 0,
+  scale_m: 0.52,   scale_d: 0.6,
+  tilt_m: 156,     tilt_d: 150,
+  aimX: 0,         aimY: -0.15, aimZ: 0,
   gStartY: 1.55,   gEndY: 0.7,  gCurve: 0.12, gCurveZ: 0, gThick: 0.03,
 };
 function getPourTune(): PourTune {
   if (typeof window === "undefined") return POUR_TUNE_DEFAULT;
+  // Produkcja: ZAWSZE wartości z kodu (ignoruj zapisane strojenie).
+  // Tylko gdy panel włączony (?tune=1) używamy zapisanych/żywych wartości.
+  let tuneOn = false;
+  try { tuneOn = new URLSearchParams(window.location.search).has("tune") || localStorage.getItem("sh-pour-tune-on") === "1"; } catch { /* ignore */ }
+  if (!tuneOn) return POUR_TUNE_DEFAULT;
   const w = window as any;
   if (w.__POUR_TUNE) return { ...POUR_TUNE_DEFAULT, ...w.__POUR_TUNE };
   try {
