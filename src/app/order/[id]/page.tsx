@@ -81,7 +81,10 @@ export default function OrderPage({ params }: { params: { id: string } }) {
           </div>
           <input
             type="password"
-            inputMode="numeric"
+            inputMode="text"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             placeholder="PIN"
             value={pin}
             onChange={(e) => { setPin(e.target.value); setPinErr(false); }}
