@@ -391,3 +391,177 @@ export function newsletterWelcomeHTML(v: { name?: string; lang: Lang }): { subje
   `;
   return { subject: tr.subject, html: shell(inner) };
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * RECENSIONE — podziękowanie za opinię, w języku klienta.
+ * Wywoływane po dodaniu recenzji (jeśli klient podał email).
+ * ──────────────────────────────────────────────────────────────────────── */
+const REVIEW_T: Record<Lang, {
+  subject: string; hi: string; thanks: string; body: string; pending: string; cta: string;
+}> = {
+  it: {
+    subject: "Grazie per la tua recensione 🌟 — S'Historia",
+    hi: "Ciao", thanks: "Grazie di cuore per la tua recensione!",
+    body: "Le tue parole ci aiutano a crescere e a migliorare ogni giorno. Significa molto per tutto il team.",
+    pending: "La tua recensione sarà visibile sul sito dopo una rapida approvazione.",
+    cta: "Visita il sito",
+  },
+  pl: {
+    subject: "Dziękujemy za opinię 🌟 — S'Historia",
+    hi: "Cześć", thanks: "Z całego serca dziękujemy za Twoją opinię!",
+    body: "Twoje słowa pomagają nam się rozwijać i być coraz lepszymi każdego dnia. To wiele znaczy dla całego zespołu.",
+    pending: "Twoja opinia pojawi się na stronie po krótkiej akceptacji.",
+    cta: "Odwiedź stronę",
+  },
+  en: {
+    subject: "Thank you for your review 🌟 — S'Historia",
+    hi: "Hi", thanks: "Thank you so much for your review!",
+    body: "Your words help us grow and get better every day. It means a lot to the whole team.",
+    pending: "Your review will appear on the site after a quick approval.",
+    cta: "Visit the website",
+  },
+  de: {
+    subject: "Danke für deine Bewertung 🌟 — S'Historia",
+    hi: "Hallo", thanks: "Vielen Dank für deine Bewertung!",
+    body: "Deine Worte helfen uns, jeden Tag besser zu werden. Das bedeutet dem ganzen Team viel.",
+    pending: "Deine Bewertung erscheint nach einer kurzen Freigabe auf der Website.",
+    cta: "Website besuchen",
+  },
+  fr: {
+    subject: "Merci pour ton avis 🌟 — S'Historia",
+    hi: "Bonjour", thanks: "Merci beaucoup pour ton avis !",
+    body: "Tes mots nous aident à grandir et à nous améliorer chaque jour. Cela compte beaucoup pour toute l'équipe.",
+    pending: "Ton avis sera visible sur le site après une rapide validation.",
+    cta: "Visiter le site",
+  },
+  es: {
+    subject: "Gracias por tu reseña 🌟 — S'Historia",
+    hi: "Hola", thanks: "¡Muchas gracias por tu reseña!",
+    body: "Tus palabras nos ayudan a crecer y a mejorar cada día. Significa mucho para todo el equipo.",
+    pending: "Tu reseña aparecerá en el sitio tras una rápida aprobación.",
+    cta: "Visitar el sitio",
+  },
+};
+
+export function reviewThankYouHTML(v: { name?: string; stars?: number; lang: Lang }): { subject: string; html: string } {
+  const tr = REVIEW_T[v.lang] ?? REVIEW_T.it;
+  const stars = Math.max(1, Math.min(5, v.stars || 5));
+  const starsHtml = `<div style="text-align:center;font-size:30px;letter-spacing:6px;color:#F1C40F;margin:6px 0 16px;">${"★".repeat(stars)}<span style="color:rgba(255,255,255,0.18);">${"★".repeat(5 - stars)}</span></div>`;
+  const inner = `
+    <div style="text-align:center;font-size:42px;margin-bottom:4px;">🌟</div>
+    <h1 style="margin:0 0 6px;font-size:24px;color:${BRAND.cream};text-align:center;font-weight:800;">${tr.hi}${v.name ? ` ${v.name}` : ""}!</h1>
+    ${starsHtml}
+    <p style="margin:0 0 6px;font-size:16px;line-height:1.6;color:${BRAND.cream};text-align:center;">${tr.thanks}</p>
+    <p style="margin:0 0 6px;font-size:15px;line-height:1.6;color:${BRAND.muted};text-align:center;">${tr.body}</p>
+    <p style="margin:0 0 6px;font-size:13px;line-height:1.6;color:${BRAND.muted};text-align:center;font-style:italic;">${tr.pending}</p>
+    ${ctaButton(tr.cta, BRAND.site)}
+  `;
+  return { subject: tr.subject, html: shell(inner) };
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * NEWSLETTER BROADCAST — powiadomienia do subskrybentów o nowym drinku/evencie.
+ * Pre-renderowane w języku odbiorcy → make.com iteruje listę i wysyła.
+ * ──────────────────────────────────────────────────────────────────────── */
+export interface BroadcastVars {
+  name?: string;
+  kind: "drink" | "event";
+  title: string;
+  description?: string;
+  imageUrl?: string;
+  whenText?: string;   // tylko event: data/godzina
+  lang: Lang;
+  link?: string;
+}
+
+const BROADCAST_T: Record<Lang, {
+  drinkSubj: (t: string) => string; eventSubj: (t: string) => string;
+  hi: string;
+  drinkLead: string; eventLead: string;
+  whenLabel: string; drinkCta: string; eventCta: string; footer: string; unsub: string;
+}> = {
+  it: {
+    drinkSubj: (t) => `🍸 Nuovo cocktail da provare: ${t}`,
+    eventSubj: (t) => `🎉 Nuovo evento da S'Historia: ${t}`,
+    hi: "Ciao",
+    drinkLead: "C'è una novità che dovresti assolutamente assaggiare da S'Historia:",
+    eventLead: "Abbiamo un nuovo evento in arrivo — non perdertelo:",
+    whenLabel: "Quando", drinkCta: "Scopri il drink", eventCta: "Vedi l'evento",
+    footer: "A presto, il team di S'Historia",
+    unsub: "Ricevi questa email perché sei iscritto alla newsletter S'Historia.",
+  },
+  pl: {
+    drinkSubj: (t) => `🍸 Nowy drink do spróbowania: ${t}`,
+    eventSubj: (t) => `🎉 Nowe wydarzenie w S'Historia: ${t}`,
+    hi: "Cześć",
+    drinkLead: "Mamy nowość, której koniecznie musisz spróbować w S'Historia:",
+    eventLead: "Szykuje się nowe wydarzenie — nie przegap go:",
+    whenLabel: "Kiedy", drinkCta: "Zobacz drink", eventCta: "Zobacz wydarzenie",
+    footer: "Do zobaczenia, zespół S'Historia",
+    unsub: "Otrzymujesz tę wiadomość, bo zapisałeś się do newslettera S'Historia.",
+  },
+  en: {
+    drinkSubj: (t) => `🍸 A new cocktail to try: ${t}`,
+    eventSubj: (t) => `🎉 A new event at S'Historia: ${t}`,
+    hi: "Hi",
+    drinkLead: "There's something new you absolutely have to taste at S'Historia:",
+    eventLead: "We have a new event coming up — don't miss it:",
+    whenLabel: "When", drinkCta: "Discover the drink", eventCta: "View the event",
+    footer: "See you soon, the S'Historia team",
+    unsub: "You're receiving this because you subscribed to the S'Historia newsletter.",
+  },
+  de: {
+    drinkSubj: (t) => `🍸 Ein neuer Cocktail zum Probieren: ${t}`,
+    eventSubj: (t) => `🎉 Ein neues Event im S'Historia: ${t}`,
+    hi: "Hallo",
+    drinkLead: "Es gibt etwas Neues, das du unbedingt im S'Historia probieren musst:",
+    eventLead: "Wir haben ein neues Event — verpass es nicht:",
+    whenLabel: "Wann", drinkCta: "Drink entdecken", eventCta: "Event ansehen",
+    footer: "Bis bald, dein S'Historia Team",
+    unsub: "Du erhältst diese E-Mail, weil du den S'Historia Newsletter abonniert hast.",
+  },
+  fr: {
+    drinkSubj: (t) => `🍸 Un nouveau cocktail à goûter : ${t}`,
+    eventSubj: (t) => `🎉 Un nouvel événement chez S'Historia : ${t}`,
+    hi: "Bonjour",
+    drinkLead: "Il y a une nouveauté que tu dois absolument goûter chez S'Historia :",
+    eventLead: "Un nouvel événement arrive — ne le manque pas :",
+    whenLabel: "Quand", drinkCta: "Découvrir le cocktail", eventCta: "Voir l'événement",
+    footer: "À bientôt, l'équipe S'Historia",
+    unsub: "Tu reçois cet e-mail car tu es inscrit à la newsletter S'Historia.",
+  },
+  es: {
+    drinkSubj: (t) => `🍸 Un nuevo cóctel para probar: ${t}`,
+    eventSubj: (t) => `🎉 Un nuevo evento en S'Historia: ${t}`,
+    hi: "Hola",
+    drinkLead: "Hay una novedad que tienes que probar sí o sí en S'Historia:",
+    eventLead: "Tenemos un nuevo evento — no te lo pierdas:",
+    whenLabel: "Cuándo", drinkCta: "Descubre el drink", eventCta: "Ver el evento",
+    footer: "Hasta pronto, el equipo de S'Historia",
+    unsub: "Recibes este correo porque te suscribiste a la newsletter de S'Historia.",
+  },
+};
+
+export function newsletterBroadcastHTML(v: BroadcastVars): { subject: string; html: string } {
+  const tr = BROADCAST_T[v.lang] ?? BROADCAST_T.it;
+  const isDrink = v.kind === "drink";
+  const link = v.link || `${BRAND.site}/${isDrink ? "#ready-drinks" : "#eventi"}`;
+  const subject = isDrink ? tr.drinkSubj(v.title) : tr.eventSubj(v.title);
+  const lead = isDrink ? tr.drinkLead : tr.eventLead;
+  const cta = isDrink ? tr.drinkCta : tr.eventCta;
+  const img = v.imageUrl
+    ? `<img src="${v.imageUrl}" alt="${v.title}" width="100%" style="display:block;width:100%;max-width:520px;height:auto;border-radius:14px;margin:0 0 18px;" />`
+    : `<div style="text-align:center;font-size:54px;margin:6px 0 14px;">${isDrink ? "🍸" : "🎉"}</div>`;
+  const inner = `
+    <h1 style="margin:0 0 12px;font-size:23px;color:${BRAND.cream};font-weight:800;">${tr.hi}${v.name ? ` ${v.name}` : ""},</h1>
+    <p style="margin:0 0 16px;font-size:16px;line-height:1.6;color:${BRAND.cream};">${lead}</p>
+    ${img}
+    <h2 style="margin:0 0 8px;font-size:20px;color:${BRAND.coral};font-weight:800;">${v.title}</h2>
+    ${v.whenText ? `<table style="width:100%;border-collapse:collapse;margin:0 0 6px;">${row(tr.whenLabel, v.whenText)}</table>` : ""}
+    ${v.description ? `<p style="margin:6px 0 0;font-size:15px;line-height:1.6;color:${BRAND.muted};">${v.description}</p>` : ""}
+    ${ctaButton(cta, link)}
+    <p style="margin:22px 0 0;font-size:14px;color:${BRAND.muted};">${tr.footer} 🍸</p>
+    <p style="margin:14px 0 0;font-size:11px;color:${BRAND.muted};opacity:0.7;">${tr.unsub}</p>
+  `;
+  return { subject, html: shell(inner) };
+}

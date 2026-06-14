@@ -1405,12 +1405,80 @@ function NewsletterPanel() {
     if (confirm("Rimuovere questo iscritto?")) { await supabase.from("newsletter").delete().eq("id", id); load(true); }
   };
 
+  // ── Broadcast: powiadom wszystkich subskrybentów o nowym drinku/evencie ──
+  const [bcOpen, setBcOpen] = useState(false);
+  const [bc, setBc] = useState<{ kind: "drink" | "event"; title: string; description: string; image_url: string; when_text: string }>({ kind: "drink", title: "", description: "", image_url: "", when_text: "" });
+  const [bcBusy, setBcBusy] = useState(false);
+  const [bcMsg, setBcMsg] = useState("");
+  const sendBroadcast = async () => {
+    if (!bc.title.trim()) { setBcMsg("Inserisci un titolo."); return; }
+    if (!confirm(`Inviare questa email a tutti i ${subs.length} iscritti?`)) return;
+    setBcBusy(true); setBcMsg("Invio in corso…");
+    try {
+      const res = await fetch("/api/notify-subscribers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...bc, admin_pin: "shistoria2026" }),
+      });
+      const j = await res.json();
+      if (j.ok) {
+        setBcMsg(`✓ Inviato a ${j.recipients} iscritti.`);
+        setTimeout(() => { setBcOpen(false); setBcMsg(""); setBc({ kind: "drink", title: "", description: "", image_url: "", when_text: "" }); }, 2200);
+      } else {
+        setBcMsg(`Errore: ${j.error || "invio non riuscito"}`);
+      }
+    } catch (e: any) {
+      setBcMsg(`Errore: ${e?.message || "rete"}`);
+    }
+    setBcBusy(false);
+  };
+
   return (
     <div className="admin-panel">
       <header className="admin-panel-head">
         <h1>Newsletter</h1>
         <span className="admin-count">{subs.length} iscritti</span>
+        <button className="admin-btn" style={{ marginLeft: "auto" }} onClick={() => setBcOpen(true)}>📣 Invia a tutti</button>
       </header>
+
+      {bcOpen && (
+        <div className="admin-modal-overlay" onClick={() => !bcBusy && setBcOpen(false)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>📣 Notifica agli iscritti</h3>
+            <p style={{ opacity: 0.65, fontSize: 13, marginTop: -10 }}>
+              L'email viene tradotta automaticamente nella lingua di ogni iscritto ({subs.length} destinatari).
+            </p>
+            <div className="bc-kind-switch" style={{ display: "flex", gap: 8, margin: "4px 0 14px" }}>
+              <button className={`admin-btn-sm ${bc.kind === "drink" ? "" : "admin-btn-ghost"}`} onClick={() => setBc((b) => ({ ...b, kind: "drink" }))}>🍸 Nuovo drink</button>
+              <button className={`admin-btn-sm ${bc.kind === "event" ? "" : "admin-btn-ghost"}`} onClick={() => setBc((b) => ({ ...b, kind: "event" }))}>🎉 Nuovo evento</button>
+            </div>
+            <label className="admin-field">
+              <span>Titolo *</span>
+              <input value={bc.title} onChange={(e) => setBc((b) => ({ ...b, title: e.target.value }))} placeholder={bc.kind === "drink" ? "Es. Negroni d'Autunno" : "Es. Serata Jazz & Cocktail"} />
+            </label>
+            {bc.kind === "event" && (
+              <label className="admin-field">
+                <span>Quando</span>
+                <input value={bc.when_text} onChange={(e) => setBc((b) => ({ ...b, when_text: e.target.value }))} placeholder="Es. Venerdì 20 giugno, ore 21:00" />
+              </label>
+            )}
+            <label className="admin-field">
+              <span>Descrizione</span>
+              <textarea rows={3} value={bc.description} onChange={(e) => setBc((b) => ({ ...b, description: e.target.value }))} placeholder="Breve descrizione…" />
+            </label>
+            <label className="admin-field">
+              <span>URL immagine (facoltativo)</span>
+              <input value={bc.image_url} onChange={(e) => setBc((b) => ({ ...b, image_url: e.target.value }))} placeholder="https://…" />
+            </label>
+            {bcMsg && <p style={{ fontWeight: 600, fontSize: 13, margin: "4px 0 0" }}>{bcMsg}</p>}
+            <div className="admin-modal-actions">
+              <button className="admin-btn" onClick={sendBroadcast} disabled={bcBusy}>{bcBusy ? "Invio…" : `📣 Invia a ${subs.length} iscritti`}</button>
+              <button className="admin-btn-ghost" onClick={() => setBcOpen(false)} disabled={bcBusy}>Annulla</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="amsg-search" style={{ maxWidth: 360, marginBottom: 18 }}>
         <span className="amsg-search-ico">🔍</span>
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cerca per nome o email…" />
@@ -2142,6 +2210,11 @@ function AdminStyles() {
       .admin-form-row { display:flex; align-items:center; gap:8px; }
       .admin-modal-actions { display:flex; gap:12px; margin-top:24px; position:sticky; bottom:-32px; background:linear-gradient(to top, #14181e 70%, rgba(20,24,30,0)); padding:16px 0 4px; margin-bottom:-8px; z-index:5; }
       .admin-modal-actions .admin-btn { flex:1; }
+      .admin-field { display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
+      .admin-field > span { font-size:12px; letter-spacing:0.08em; text-transform:uppercase; color:rgba(255,255,255,0.5); }
+      .admin-field input, .admin-field textarea { width:100%; padding:12px 16px; border-radius:10px; border:1px solid rgba(255,255,255,0.12); background:rgba(255,255,255,0.04); color:#fff; font-size:14px; font-family:inherit; resize:vertical; }
+      .admin-theme-light .admin-field > span { color:rgba(0,0,0,0.55); }
+      .admin-theme-light .admin-field input, .admin-theme-light .admin-field textarea { background:#f4f6f9; color:#15202b; border-color:rgba(0,0,0,0.15); }
       .admin-templates { display:flex; gap:8px; flex-wrap:wrap; }
       .admin-tpl { padding:10px 16px; border-radius:10px; border:2px solid; font-size:13px; cursor:pointer; transition:all .2s; color:#fff; }
       .admin-tpl.active { transform:scale(1.05); box-shadow:0 4px 20px rgba(0,0,0,0.4); }

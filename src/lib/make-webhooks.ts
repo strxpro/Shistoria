@@ -14,7 +14,9 @@
 
 type Json = Record<string, unknown>;
 
-function webhook(key: "contact" | "drink" | "winner" | "event" | "newsletter" | "comment"): string | null {
+type WebhookKey = "contact" | "drink" | "winner" | "event" | "newsletter" | "comment" | "review";
+
+function webhook(key: WebhookKey): string | null {
   const map: Record<string, string | undefined> = {
     contact: process.env.NEXT_PUBLIC_MAKE_CONTACT_WEBHOOK,
     drink: process.env.NEXT_PUBLIC_MAKE_DRINK_WEBHOOK,
@@ -22,13 +24,16 @@ function webhook(key: "contact" | "drink" | "winner" | "event" | "newsletter" | 
     event: process.env.NEXT_PUBLIC_MAKE_EVENT_WEBHOOK,
     newsletter: process.env.NEXT_PUBLIC_MAKE_NEWSLETTER_WEBHOOK,
     comment: process.env.NEXT_PUBLIC_MAKE_COMMENT_WEBHOOK,
+    // Recenzje korzystają z webhooka newslettera (ten sam kanał mailowy),
+    // chyba że ustawisz dedykowany NEXT_PUBLIC_MAKE_REVIEW_WEBHOOK.
+    review: process.env.NEXT_PUBLIC_MAKE_REVIEW_WEBHOOK || process.env.NEXT_PUBLIC_MAKE_NEWSLETTER_WEBHOOK,
   };
   // Fallback: pojedynczy webhook dla wszystkiego (window override do testów)
   const single = (typeof window !== "undefined" && (window as any).__MAKE_WEBHOOK) || process.env.NEXT_PUBLIC_MAKE_WEBHOOK;
   return map[key] || single || null;
 }
 
-async function send(key: "contact" | "drink" | "winner" | "event" | "newsletter" | "comment", payload: Json): Promise<boolean> {
+async function send(key: WebhookKey, payload: Json): Promise<boolean> {
   const url = webhook(key);
   if (!url) { console.info(`[make] webhook '${key}' nieskonfigurowany — pomijam`); return false; }
   try {
@@ -229,5 +234,30 @@ export async function notifyComment(data: {
     author: data.author,
     content: data.content,
     lang: data.lang || "it",
+  });
+}
+
+/* ── 7. Recenzja / opinia (community) ──────────────────────────────────────
+ * Klient zostawia opinię (imię + email + treść + gwiazdki).
+ * → mail "dziękujemy za opinię" w języku klienta (jeśli podał email).
+ * Pre-renderowany HTML → make.com mapuje tylko email_subject + email_html.
+ */
+export async function notifyReview(data: {
+  name: string; email?: string; content: string; stars: number; lang: string;
+}): Promise<boolean> {
+  if (!data.email) return false; // bez maila nie ma do kogo wysłać podziękowania
+  const { reviewThankYouHTML } = await import("./email-templates");
+  const lang = (["it","pl","en","de","fr","es"].includes(data.lang) ? data.lang : "it") as import("./email-templates").Lang;
+  const mail = reviewThankYouHTML({ name: data.name, stars: data.stars, lang });
+  return send("review", {
+    type: "review_thankyou",
+    name: data.name,
+    email: data.email,
+    content: data.content,
+    stars: data.stars,
+    lang: data.lang,
+    // GOTOWY, markowy mail z podziękowaniem (make mapuje tylko te pola)
+    email_subject: mail.subject,
+    email_html: mail.html,
   });
 }

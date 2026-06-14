@@ -2,7 +2,7 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { SplitReveal, Placeholder, TextClipReveal } from "./shell";
 import AttrazioniMap from "./components/AttrazioniMap";
-import { sendReservation, subscribeEventReminder, subscribeNewsletter } from "./lib/make-webhooks";
+import { sendReservation, subscribeEventReminder, subscribeNewsletter, notifyReview } from "./lib/make-webhooks";
 
 // Eventi, SocialFeed, Attrazioni, Recensioni, Contatti, Footer
 const { useState: useStateE, useEffect: useEffectE, useRef: useRefE } = React;
@@ -635,8 +635,9 @@ function Recensioni({ t }) {
   const [filter, setFilter] = useStateE("all");
   const [writeOpen, setWriteOpen] = useStateE(false);
   const [writeTab, setWriteTab] = useStateE("local"); // "local" | "google"
-  const [reviewForm, setReviewForm] = useStateE({ name: "", email: "", text: "" });
+  const [reviewForm, setReviewForm] = useStateE({ name: "", email: "", text: "", stars: 5 });
   const [reviewSent, setReviewSent] = useStateE(false);
+  const [hoverStar, setHoverStar] = useStateE(0);
   const sources = ["all", "Google", "TripAdvisor", "Locale"];
 
   // Wczytaj zatwierdzone recenzje z DB (dodane przez gości, zatwierdzone w adminie) + realtime
@@ -666,6 +667,8 @@ function Recensioni({ t }) {
   const submitReview = async (e) => {
     e.preventDefault();
     if (!reviewForm.name || !reviewForm.text) return;
+    const lang = (typeof window !== "undefined" && window.currentLanguage) || "it";
+    const stars = Math.max(1, Math.min(5, reviewForm.stars || 5));
     try {
       const { createClient } = await import("@supabase/supabase-js");
       const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://slatelpipxtqveydgslc.supabase.co';
@@ -676,10 +679,14 @@ function Recensioni({ t }) {
         email: reviewForm.email || null,
         content: reviewForm.text,
         source: "Locale",
-        stars: 5,
-        language: (typeof window !== "undefined" && window.currentLanguage) || "it",
+        stars,
+        language: lang,
       });
     } catch (err) { console.error("Review submit error:", err); }
+    // Mail z podziękowaniem w języku klienta (best-effort, nieblokujące)
+    if (reviewForm.email) {
+      try { notifyReview({ name: reviewForm.name, email: reviewForm.email, content: reviewForm.text, stars, lang }); } catch {}
+    }
     setReviewSent(true);
   };
 
@@ -748,7 +755,21 @@ function Recensioni({ t }) {
             ) : (
               <form className="rec-write-form" onSubmit={submitReview}>
                 <input placeholder="Il tuo nome *" value={reviewForm.name} onChange={(e) => setReviewForm(f => ({...f, name: e.target.value}))} required />
-                <input type="email" placeholder="Email (facoltativa)" value={reviewForm.email} onChange={(e) => setReviewForm(f => ({...f, email: e.target.value}))} />
+                <input type="email" placeholder="Email (per ricevere il nostro grazie)" value={reviewForm.email} onChange={(e) => setReviewForm(f => ({...f, email: e.target.value}))} />
+                <div className="rec-star-pick" role="radiogroup" aria-label="Valutazione">
+                  {[1,2,3,4,5].map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      className={`rec-star-btn ${n <= (hoverStar || reviewForm.stars) ? "on" : ""}`}
+                      onMouseEnter={() => setHoverStar(n)}
+                      onMouseLeave={() => setHoverStar(0)}
+                      onClick={() => setReviewForm(f => ({...f, stars: n}))}
+                      aria-label={`${n} ★`}
+                    >★</button>
+                  ))}
+                  <span className="rec-star-val">{reviewForm.stars}/5</span>
+                </div>
                 <textarea placeholder="La tua esperienza..." rows={4} value={reviewForm.text} onChange={(e) => setReviewForm(f => ({...f, text: e.target.value}))} required />
                 <button type="submit" className="btn rec-submit-btn">Invia →</button>
               </form>
@@ -791,6 +812,11 @@ function Recensioni({ t }) {
         .rec-write-form { display:flex; flex-direction:column; gap:14px; }
         .rec-write-form input, .rec-write-form textarea { padding:12px 16px; border-radius:12px; border:1px solid var(--c-line); font-size:14px; font-family:inherit; resize:vertical; }
         .rec-submit-btn { background:var(--c-coral); color:#fff; align-self:flex-start; }
+        .rec-star-pick { display:flex; align-items:center; gap:6px; padding:2px 2px 0; }
+        .rec-star-btn { background:none; border:none; cursor:pointer; font-size:28px; line-height:1; color:var(--c-line); padding:0; transition:transform .15s cubic-bezier(.2,.8,.2,1), color .15s; -webkit-tap-highlight-color:transparent; }
+        .rec-star-btn:hover { transform:scale(1.18); }
+        .rec-star-btn.on { color:#F1C40F; }
+        .rec-star-val { margin-left:8px; font-size:13px; font-weight:700; opacity:.6; }
         .rec-write-google { text-align:center; padding:32px 0; }
         .rec-write-google p { margin-bottom:20px; opacity:0.7; font-size:15px; }
         .rec-google-btn { background:var(--c-deep); color:#fff; }

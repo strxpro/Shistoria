@@ -180,3 +180,73 @@ Bez webhooka komentarz i tak zapisuje się w Supabase (`drink_comments`) i pokaz
 
 ### Env w Vercel (opcjonalnie)
 `NEXT_PUBLIC_MAKE_COMMENT_WEBHOOK` → Redeploy. Jeśli pominiesz, użyje webhooka CONTACT.
+
+
+---
+
+## 🌟 RECENSIONI — podziękowanie za opinię (NOWE)
+
+Webhook: `NEXT_PUBLIC_MAKE_REVIEW_WEBHOOK` (jeśli nie ustawisz, używa
+`NEXT_PUBLIC_MAKE_NEWSLETTER_WEBHOOK` — ten sam kanał mailowy).
+
+Gdy gość zostawia opinię na stronie (imię + email + treść + gwiazdki) i poda email,
+strona wysyła JSON z **gotowym** mailem podziękowania w języku gościa:
+- `email` — adres gościa
+- `email_subject` — temat (już w jego języku)
+- `email_html` — pełny HTML maila (już w jego języku)
+- `name`, `stars`, `content`, `lang` — dane pomocnicze (opcjonalne do logów)
+
+### Scenariusz (2 moduły)
+1. **Webhooks → Custom webhook** (ten URL). Kliknij *Redetermine data structure*,
+   potem wyślij testową opinię z podanym emailem.
+2. **Email → Send an email**:
+   - To: `{{email}}`
+   - Subject: `{{email_subject}}`
+   - Content type: **HTML** ← WAŻNE
+   - Content: `{{email_html}}`
+   - From: `info@shistoria.it`
+
+Włącz scenariusz (ON). Gotowe — gość dostaje ładny, przetłumaczony „grazie".
+
+---
+
+## 📣 NEWSLETTER BROADCAST — powiadom wszystkich o drinku/evencie (NOWE)
+
+Webhook: `NEXT_PUBLIC_MAKE_NEWSLETTER_WEBHOOK` (ten sam co zapis do newslettera).
+
+W adminie → zakładka **Newsletter** → przycisk **„📣 Invia a tutti"**. Wpisujesz
+tytuł/opis (i ewentualnie obrazek/datę), klikasz wyślij. Strona pobiera wszystkich
+subskrybentów i tworzy dla **każdego** gotowy mail w **jego** języku. Następnie
+wysyła do make.com jeden JSON:
+- `type` = `"newsletter_broadcast"`
+- `kind` = `"drink"` lub `"event"`
+- `recipients[]` — lista, każdy ma: `email`, `name`, `lang`, `email_subject`, `email_html`
+
+### Scenariusz (3 moduły)
+1. **Webhooks → Custom webhook** (URL newslettera). *Redetermine data structure*,
+   wyślij testowy broadcast z panelu.
+2. **Flow control → Iterator**: Array = `{{recipients}}`.
+3. **Email → Send an email**:
+   - To: `{{2.email}}` (numer modułu Iteratora)
+   - Subject: `{{2.email_subject}}`
+   - Content type: **HTML**
+   - Content: `{{2.email_html}}`
+   - From: `info@shistoria.it`
+
+> UWAGA: ten sam webhook obsługuje teraz DWA typy: zapis do newslettera
+> (`type=newsletter_signup`, pole `email_html`) ORAZ broadcast
+> (`type=newsletter_broadcast`, lista `recipients`). Jeśli chcesz je rozdzielić,
+> dodaj po webhooku **Router** z filtrem po `{{type}}`:
+> - gałąź `newsletter_signup` → Send email (To `{{email}}`, `{{email_html}}`)
+> - gałąź `newsletter_broadcast` → Iterator → Send email
+>
+> Alternatywnie ustaw osobny `NEXT_PUBLIC_MAKE_REVIEW_WEBHOOK` dla opinii.
+
+### Automatyzacja (opcjonalnie, bez admina)
+Możesz wołać endpoint cyklicznie / z innego systemu:
+```
+POST https://www.shistoria.it/api/notify-subscribers?key=CRON_SECRET
+Content-Type: application/json
+{ "kind": "event", "title": "Serata Jazz", "when_text": "Ven 20/06 21:00", "description": "..." }
+```
+Autoryzacja: `?key=CRON_SECRET` (env) albo w body `admin_pin` = PIN admina.

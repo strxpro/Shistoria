@@ -18,7 +18,9 @@ Pełna, rozwinięta lista wszystkiego o co prosiłeś. `[x]` = zrobione, `[ ]` =
 - [x] **QR natychmiastowy** — kod pokazuje się od razu (ID lokalne, zapis w tle), koniec „klepsydry".
 - [x] **Maile odpowiedzi (admin → klient)** — pre-tłumaczone na 6 języków, linia „możesz odpisać", Reply-To info@shistoria.it (odpowiedzi wracają do skrzynki).
 - [x] **Pre-renderowane maile eventów** (3 dni / 5 godzin) w 6 językach — make tylko wysyła.
-- [x] **Instrukcje make.com** — `MAKE_SETUP.md` (drinki, eventy, wiadomości).
+- [x] **Recensioni z gwiazdkami + mail „grazie"** — formularz opinii ma wybór 1–5 gwiazdek; po wysłaniu (gdy podano email) gość dostaje pre-renderowany, przetłumaczony mail z podziękowaniem (`reviewThankYouHTML` + `notifyReview`).
+- [x] **Newsletter broadcast** — w adminie „📣 Invia a tutti": powiadomienie o nowym drinku/evencie do WSZYSTKICH subskrybentów, każdy mail spersonalizowany i przetłumaczony (endpoint `/api/notify-subscribers` + `newsletterBroadcastHTML`).
+- [x] **Instrukcje make.com** — `MAKE_SETUP.md` (drinki, eventy, wiadomości, recensioni, broadcast).
 
 ---
 
