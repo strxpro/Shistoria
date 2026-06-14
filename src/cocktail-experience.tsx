@@ -255,6 +255,36 @@ const CONFIG = {
 const GLASS_POUR_Y = -1.6;
 
 /* ──────────────────────────────────────────────────────────────────────────
+ * STROJENIE NALEWANIA (live) — suwaki dostępne tylko z ?tune=1 w URL.
+ * Domyślne wartości = obecne zachowanie. Panel zapisuje do localStorage +
+ * window.__POUR_TUNE; PourBottle czyta te wartości przy każdym nalaniu.
+ * ──────────────────────────────────────────────────────────────────────── */
+export type PourTune = {
+  bottleY_m: number; bottleY_d: number;   // wysokość butelki/puszki nad szejkerem (telefon / komputer)
+  bottleX_m: number; bottleX_d: number;   // przesunięcie w bok
+  scale_m: number; scale_d: number;       // skala modelu podczas lania
+  tilt_m: number; tilt_d: number;         // przechył butelki przy laniu (stopnie)
+  aimX: number; aimY: number;             // korekta celu strumienia (gdzie wpada względem otworu)
+};
+const POUR_TUNE_DEFAULT: PourTune = {
+  bottleY_m: 2.55, bottleY_d: 2.9,
+  bottleX_m: 0.7,  bottleX_d: 1.0,
+  scale_m: 0.5,    scale_d: 0.6,
+  tilt_m: 145,     tilt_d: 140,
+  aimX: 0,         aimY: 0.4,
+};
+function getPourTune(): PourTune {
+  if (typeof window === "undefined") return POUR_TUNE_DEFAULT;
+  const w = window as any;
+  if (w.__POUR_TUNE) return { ...POUR_TUNE_DEFAULT, ...w.__POUR_TUNE };
+  try {
+    const raw = localStorage.getItem("sh-pour-tune");
+    if (raw) { const v = { ...POUR_TUNE_DEFAULT, ...JSON.parse(raw) }; w.__POUR_TUNE = v; return v; }
+  } catch { /* ignore */ }
+  return POUR_TUNE_DEFAULT;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
  * Dane składników (lewo = mixery/napoje, prawo = alkohole).
  * isReal → używa prawdziwej butelki GLB (wina i likiery).
  * ──────────────────────────────────────────────────────────────────────── */
@@ -2553,6 +2583,9 @@ function CocktailExperience() {
       {/* kinowa animacja nalewania — fullscreen overlay z blur tłem */}
       <PourOverlay req={pourReq} onDone={onPourDone} />
 
+      {/* panel strojenia nalewania — tylko z ?tune=1 w URL */}
+      <PourTunePanel />
+
       {/* miarka napełnienia szejkera (obok) — segmenty w kolorach trunków, tylko podczas lania */}
       <PourGauge onReady={(api) => { gaugeApiRef.current = api; }} cap={SHAKER_CAP}
         segments={poured.map((p) => ({ color: p.ing.color, ml: p.ml }))}
@@ -2949,6 +2982,10 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
       const t = (CONFIG.shakerRest.z - camera.position.z) / dz;
       target.copy(camera.position).addScaledVector(_aim, t);
     }
+    // korekta strojenia (live) — gdzie dokładnie wpada strumień
+    const T = getPourTune();
+    target.x += T.aimX;
+    target.y += T.aimY - 0.4; // 0.4 było stałą bazową; aimY=0.4 = bez zmian
   }, [tx, ty, camera, _aim, target]);
 
   // G4/H: wyrównanie kamery overlay z kamerą głównej sceny (ta patrzy na camTargetRest),
@@ -3060,12 +3097,13 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
     const isMob = typeof window !== "undefined" && window.innerWidth < 768;
 
     // pozycja "obok szejkera": butelka WYŻEJ — dłuższy, bardziej widoczny strumień
-    const offX = isMob ? 0.7 : 1.0;
+    const T = getPourTune();
+    const offX = isMob ? T.bottleX_m : T.bottleX_d;
     const bodyX = side === "right" ? offX : -offX;
-    const bodyY = isMob ? 2.55 : 2.9;      // wyżej nad wlotem → dłuższy łuk strumienia
+    const bodyY = isMob ? T.bottleY_m : T.bottleY_d;      // wyżej nad wlotem → dłuższy łuk strumienia
     const bodyZ = CONFIG.shakerRest.z;      // ta sama głębia co szejker → strumień trafia do otworu
-    const tilt = side === "right" ? deg(isMob ? 145 : 140) : deg(isMob ? -145 : -140);
-    const sPour = isMob ? 0.5 : 0.6;
+    const tilt = side === "right" ? deg(isMob ? T.tilt_m : T.tilt_d) : deg(isMob ? -T.tilt_m : -T.tilt_d);
+    const sPour = isMob ? T.scale_m : T.scale_d;
 
     gsap.set(o.position, { x: startX, y: startY, z: 0 });
     gsap.set(o.scale, { x: 0.01, y: 0.01, z: 0.01 });
@@ -3269,6 +3307,107 @@ function PourOverlay({ req, onDone }: { req: PourReq | null; onDone: () => void 
           <Environment preset="city" />
         </Suspense>
       </Canvas>
+    </div>,
+    document.body,
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * PourTunePanel — suwaki do strojenia nalewania (butelki/puszki + strumień).
+ * Pokazuje się TYLKO gdy w URL jest ?tune=1 (zwykli goście go nie widzą).
+ * Zmiany są na żywo (aim) lub od następnego nalania (pozycja/skala/przechył).
+ * „Copia valori" kopiuje wartości — wyślij mi je, a wpiszę je na stałe.
+ * ──────────────────────────────────────────────────────────────────────── */
+function PourTunePanel() {
+  const [on, setOn] = useState(false);
+  const [open, setOpen] = useState(true);
+  const [t, setT] = useState<PourTune>(POUR_TUNE_DEFAULT);
+  const [copied, setCopied] = useState(false);
+  const [isMob, setIsMob] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const enabled = new URLSearchParams(window.location.search).has("tune") || localStorage.getItem("sh-pour-tune-on") === "1";
+    setOn(enabled);
+    setIsMob(window.innerWidth < 768);
+    if (enabled) {
+      const cur = getPourTune();
+      setT(cur);
+      (window as any).__POUR_TUNE = cur;
+    }
+  }, []);
+
+  const update = (patch: Partial<PourTune>) => {
+    setT((prev) => {
+      const next = { ...prev, ...patch };
+      (window as any).__POUR_TUNE = next;
+      try { localStorage.setItem("sh-pour-tune", JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  };
+
+  const copy = () => {
+    const txt = JSON.stringify(t, null, 2);
+    try { navigator.clipboard?.writeText(txt); } catch { /* ignore */ }
+    setCopied(true); setTimeout(() => setCopied(false), 1500);
+  };
+  const reset = () => update(POUR_TUNE_DEFAULT);
+
+  if (!on || typeof document === "undefined") return null;
+
+  // Na telefonie edytujemy pola *_m, na komputerze *_d (plus wspólne).
+  const yKey = isMob ? "bottleY_m" : "bottleY_d";
+  const xKey = isMob ? "bottleX_m" : "bottleX_d";
+  const sKey = isMob ? "scale_m" : "scale_d";
+  const tiltKey = isMob ? "tilt_m" : "tilt_d";
+
+  const Row = (label: string, k: keyof PourTune, min: number, max: number, step: number) => (
+    <label className="cx-tune-row" key={k}>
+      <span>{label}</span>
+      <input type="range" min={min} max={max} step={step} value={t[k]} onChange={(e) => update({ [k]: parseFloat(e.target.value) } as Partial<PourTune>)} />
+      <b>{Number(t[k]).toFixed(2)}</b>
+    </label>
+  );
+
+  return createPortal(
+    <div className={`cx-tune ${open ? "" : "is-min"}`}>
+      <div className="cx-tune-head">
+        <strong>🎚️ Strojenie nalewania ({isMob ? "📱 telefon" : "💻 PC"})</strong>
+        <button onClick={() => setOpen((v) => !v)}>{open ? "—" : "+"}</button>
+      </div>
+      {open && (
+        <div className="cx-tune-body">
+          {Row("Wysokość (Y)", yKey as keyof PourTune, 0, 4, 0.05)}
+          {Row("W bok (X)", xKey as keyof PourTune, 0, 3, 0.05)}
+          {Row("Skala", sKey as keyof PourTune, 0.2, 1.2, 0.02)}
+          {Row("Przechył °", tiltKey as keyof PourTune, 90, 180, 1)}
+          <div className="cx-tune-sep">Strumień — gdzie wpada (na żywo)</div>
+          {Row("Cel X", "aimX", -2, 2, 0.02)}
+          {Row("Cel Y", "aimY", -1.5, 2, 0.02)}
+          <div className="cx-tune-actions">
+            <button className="cx-tune-copy" onClick={copy}>{copied ? "✓ Skopiowano" : "📋 Copia valori"}</button>
+            <button className="cx-tune-reset" onClick={reset}>↺ Reset</button>
+          </div>
+          <p className="cx-tune-hint">Zmień suwaki, potem dotknij składnika i nalej ponownie, by zobaczyć efekt. „Cel X/Y" działa od razu. Skopiuj wartości i wyślij mi je.</p>
+        </div>
+      )}
+      <style>{`
+        .cx-tune { position:fixed; left:10px; bottom:10px; z-index:99999; width:min(330px,calc(100vw - 20px));
+          background:rgba(12,20,28,0.94); color:#eaf2f7; border:1px solid rgba(255,255,255,0.14); border-radius:14px;
+          backdrop-filter:blur(10px); font-family:system-ui,sans-serif; box-shadow:0 16px 50px rgba(0,0,0,0.5); }
+        .cx-tune-head { display:flex; align-items:center; justify-content:space-between; padding:10px 12px; font-size:12px; }
+        .cx-tune-head button { width:28px; height:28px; border-radius:8px; border:1px solid rgba(255,255,255,0.2); background:transparent; color:#fff; font-size:16px; cursor:pointer; }
+        .cx-tune-body { padding:4px 12px 12px; }
+        .cx-tune-row { display:grid; grid-template-columns:84px 1fr 44px; align-items:center; gap:8px; margin:7px 0; font-size:11px; }
+        .cx-tune-row input[type=range] { width:100%; accent-color:#E8927C; }
+        .cx-tune-row b { text-align:right; font-variant-numeric:tabular-nums; color:#E8927C; font-size:11px; }
+        .cx-tune-sep { margin:12px 0 4px; font-size:10px; letter-spacing:0.06em; text-transform:uppercase; opacity:0.6; border-top:1px solid rgba(255,255,255,0.1); padding-top:8px; }
+        .cx-tune-actions { display:flex; gap:8px; margin-top:12px; }
+        .cx-tune-actions button { flex:1; padding:10px; border-radius:10px; border:none; font-weight:700; font-size:12px; cursor:pointer; }
+        .cx-tune-copy { background:#E8927C; color:#1a1014; }
+        .cx-tune-reset { background:rgba(255,255,255,0.1); color:#fff; }
+        .cx-tune-hint { margin:10px 0 0; font-size:10px; line-height:1.4; opacity:0.6; }
+      `}</style>
     </div>,
     document.body,
   );
