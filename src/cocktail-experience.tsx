@@ -6294,9 +6294,16 @@ function CommunitySection({ sectionRef }: { sectionRef?: React.RefObject<HTMLEle
           <div>
             <span className="cx-mini-kicker">{kicker}</span>
             <h2 ref={headRef} className="cx-comm-title">
-              {heading.split("").map((ch, i) => (
-                <span key={i} className="cx-char" style={{ display: "inline-block" }}>{ch === " " ? "\u00A0" : ch}</span>
-              ))}
+              {(() => {
+                const words = heading.split(" ");
+                const last = words.length > 1 ? words[words.length - 1] : "";
+                const first = words.length > 1 ? words.slice(0, -1).join(" ") : heading;
+                let idx = 0;
+                const renderChars = (txt: string) => txt.split("").map((ch) => (
+                  <span key={idx++} className="cx-char" style={{ display: "inline-block" }}>{ch === " " ? "\u00A0" : ch}</span>
+                ));
+                return (<>{renderChars(first)}{last && <br />}{last && renderChars(last)}</>);
+              })()}
             </h2>
           </div>
           <span className="cx-comm-count">{dbDrinks.length}</span>
