@@ -82,7 +82,10 @@ function RiseCard({ children, z = 2, distance = 240, peek = null, peekBg = "line
         </motion.div>
       )}
       {isMobile ? (
-        <motion.div style={{ transform, position: "relative", zIndex: 1 }}>{children}</motion.div>
+        // MOBILE: brak scroll-linked translateY na karcie. Pasek adresu Chrome
+        // zmienia wysokosc okna → framer-motion przeliczalby postep i karta
+        // „teleportowala sie". Statyczna karta = zero przeskokow przy scrollu.
+        <div style={{ position: "relative", zIndex: 1 }}>{children}</div>
       ) : (
         <motion.div style={{ transform }}>
           {children}
