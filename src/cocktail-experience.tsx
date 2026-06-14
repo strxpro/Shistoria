@@ -6444,6 +6444,39 @@ function CommunityFilters({ filter, setFilter, gridMode, setGridMode }: { filter
   );
 }
 
+/* Odliczanie do automatycznego wyboru Drinka Tygodnia/Miesiąca (koniec okresu) */
+function FeaturedCountdown({ period, lang }: { period: "week" | "month"; lang: string }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
+  const d = new Date(now);
+  let endMs: number;
+  if (period === "week") {
+    const day = d.getDay(); // 0=nd … 1=pn
+    const daysToMon = ((8 - day) % 7) || 7;
+    const e = new Date(d); e.setHours(0, 0, 0, 0); e.setDate(d.getDate() + daysToMon); endMs = e.getTime();
+  } else {
+    endMs = new Date(d.getFullYear(), d.getMonth() + 1, 1, 0, 0, 0, 0).getTime();
+  }
+  const left = Math.max(0, endMs - now);
+  const days = Math.floor(left / 86400000);
+  const hrs = Math.floor((left % 86400000) / 3600000);
+  const min = Math.floor((left % 3600000) / 60000);
+  const sec = Math.floor((left % 60000) / 1000);
+  const lbl = ({ it: "Si rinnova tra", pl: "Nowy wybór za", en: "Renews in", de: "Erneuert in", fr: "Renouvelé dans", es: "Se renueva en" } as Record<string, string>)[lang] || "Si rinnova tra";
+  const U = ({ it: ["g", "h", "m", "s"], pl: ["d", "h", "m", "s"], en: ["d", "h", "m", "s"], de: ["T", "h", "m", "s"], fr: ["j", "h", "m", "s"], es: ["d", "h", "m", "s"] } as Record<string, string[]>)[lang] || ["d", "h", "m", "s"];
+  return (
+    <div className="cx-featured-timer">
+      <span className="cx-featured-timer-lbl">⏳ {lbl}</span>
+      <div className="cx-featured-timer-units">
+        {days > 0 && <span><strong>{days}</strong>{U[0]}</span>}
+        <span><strong>{String(hrs).padStart(2, "0")}</strong>{U[1]}</span>
+        <span><strong>{String(min).padStart(2, "0")}</strong>{U[2]}</span>
+        <span><strong>{String(sec).padStart(2, "0")}</strong>{U[3]}</span>
+      </div>
+    </div>
+  );
+}
+
 function CommunitySection({ sectionRef }: { sectionRef?: React.RefObject<HTMLElement> }) {
   const headRef = useRef<HTMLHeadingElement>(null!);
   const [dbDrinks, setDbDrinks] = useState<any[]>([]);
@@ -6452,6 +6485,8 @@ function CommunitySection({ sectionRef }: { sectionRef?: React.RefObject<HTMLEle
   const [loadOffset, setLoadOffset] = useState(0);
   const [noMore, setNoMore] = useState(false);
   const [gridMode, setGridMode] = useState<"single" | "grid">(() => {
+    // Desktop: domyślnie siatka (3 kolumny); telefon: pojedyncza kolumna.
+    if (typeof window !== "undefined" && window.innerWidth >= 768) return "grid";
     return "single";
   });
 
@@ -6459,20 +6494,20 @@ function CommunitySection({ sectionRef }: { sectionRef?: React.RefObject<HTMLEle
     if (loadingMore || noMore) return;
     setLoadingMore(true);
     try {
-      // Doładowuj po 4 (range offset..offset+3), dopisując do istniejących
+      // Doładowuj po 6 (range offset..offset+5), dopisując do istniejących
       const { data } = await supabase
         .from("community_drinks")
         .select("*")
         .eq("is_published", true)
         .order("likes", { ascending: false })
-        .range(loadOffset, loadOffset + 3);
+        .range(loadOffset, loadOffset + 5);
       if (data && data.length > 0) {
         setDbDrinks((prev) => {
           const seen = new Set(prev.map((d) => d.id));
           return [...prev, ...data.filter((d) => !seen.has(d.id))];
         });
-        setLoadOffset((o) => o + 4);
-        if (data.length < 4) setNoMore(true);
+        setLoadOffset((o) => o + 6);
+        if (data.length < 6) setNoMore(true);
       } else {
         setNoMore(true);
       }
@@ -6665,6 +6700,7 @@ function CommunitySection({ sectionRef }: { sectionRef?: React.RefObject<HTMLEle
                 <span className="cx-mini-kicker">{lbl}</span>
                 <h3>{name}</h3>
                 <p>by {by} · ♥ {likes}{claimed > 0 ? ` · 🍸 ${claimed}` : ""}</p>
+                <FeaturedCountdown period={featuredPeriod} lang={lang} />
               </div>
             </div>
           );
@@ -7490,14 +7526,21 @@ function CocktailStyles() {
       .cx-community::after { content:""; position:absolute; left:0; right:0; top:0; height:60vh; pointer-events:none; border-radius:2.4rem 2.4rem 0 0;
         background:linear-gradient(180deg, var(--cx-flood,#E85C3A), transparent); opacity:calc(var(--cx-spill) * 0.65); mix-blend-mode:screen; transition:opacity .2s linear; }
       .cx-comm-inner { max-width:1240px; margin:0 auto; padding:0 clamp(20px,5vw,72px); }
-      .cx-featured-drink { display:flex; align-items:center; gap:20px; padding:20px 24px; margin-bottom:24px; border-radius:20px;
-        background:linear-gradient(135deg, rgba(241,196,15,0.08), rgba(232,146,124,0.06)); border:1px solid rgba(241,196,15,0.3);
-        box-shadow:0 8px 32px rgba(241,196,15,0.1); position:relative; overflow:hidden; }
-      .cx-featured-crown { font-size:28px; flex-shrink:0; }
-      .cx-featured-body { flex:1; } .cx-featured-body h3 { margin:4px 0 2px; font-size:18px; font-weight:800; color:#fff; }
-      .cx-featured-body p { font-size:12px; opacity:0.7; margin:0; }
-      .cx-featured-glass { width:50px; height:75px; flex-shrink:0; opacity:0.8; }
-      .cx-featured-photo { width:64px; height:64px; flex-shrink:0; border-radius:14px; object-fit:cover; border:2px solid rgba(241,196,15,0.5); box-shadow:0 6px 20px rgba(0,0,0,0.4); }
+      .cx-featured-drink { display:flex; align-items:center; gap:22px; padding:26px 30px; margin-bottom:28px; border-radius:24px;
+        background:linear-gradient(135deg, rgba(241,196,15,0.14), rgba(232,146,124,0.08)); border:1.5px solid rgba(241,196,15,0.45);
+        box-shadow:0 14px 50px rgba(241,196,15,0.18); position:relative; overflow:hidden; }
+      .cx-featured-crown { font-size:36px; flex-shrink:0; }
+      .cx-featured-body { flex:1; } .cx-featured-body h3 { margin:4px 0 2px; font-size:clamp(22px,4vw,30px); font-weight:800; color:#fff; }
+      .cx-featured-body p { font-size:13px; opacity:0.75; margin:0; }
+      .cx-featured-glass { width:64px; height:96px; flex-shrink:0; opacity:0.85; }
+      .cx-featured-photo { width:96px; height:96px; flex-shrink:0; border-radius:18px; object-fit:cover; border:2px solid rgba(241,196,15,0.6); box-shadow:0 8px 28px rgba(0,0,0,0.45); }
+      /* Timer odliczania (Drink Tygodnia/Miesiąca) */
+      .cx-featured-timer { margin-top:10px; display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; }
+      .cx-featured-timer-lbl { font-size:11px; letter-spacing:0.05em; text-transform:uppercase; color:rgba(241,196,15,0.9); font-weight:700; }
+      .cx-featured-timer-units { display:flex; gap:7px; }
+      .cx-featured-timer-units span { background:rgba(0,0,0,0.35); border:1px solid rgba(255,255,255,0.12); border-radius:9px; padding:4px 8px; font-size:11px; color:rgba(255,255,255,0.65); font-variant-numeric:tabular-nums; }
+      .cx-featured-timer-units strong { color:#fff; font-size:15px; margin-right:2px; }
+      @media (max-width:600px) { .cx-featured-drink { gap:16px; padding:18px; } .cx-featured-photo { width:72px; height:72px; } .cx-featured-crown { font-size:28px; } }
       /* 🏆 Podium top 3 */
       .cx-podium { margin:0 0 26px; }
       .cx-podium-title { display:block; text-align:center; margin-bottom:14px; }
@@ -7606,7 +7649,7 @@ function CocktailStyles() {
       .cx-comm-grid .cx-cc { transition:transform .4s cubic-bezier(.2,.8,.2,1), opacity .3s ease, box-shadow .4s; }
       .cx-comm-grid-2col { max-width:none !important; grid-template-columns:repeat(2,1fr) !important; gap:16px !important; }
       @media (min-width:900px) { .cx-comm-grid-2col { grid-template-columns:repeat(3,1fr) !important; } }
-      @media (min-width:1200px) { .cx-comm-grid-2col { grid-template-columns:repeat(4,1fr) !important; } }
+      @media (min-width:1200px) { .cx-comm-grid-2col { grid-template-columns:repeat(3,1fr) !important; max-width:1180px; } }
       @media (max-width:768px) { .cx-comm-grid { grid-template-columns:1fr; gap:14px; }
         .cx-comm-grid-2col { grid-template-columns:repeat(2,1fr) !important; gap:12px !important; }
         .cx-comm-filter-desktop { display:none !important; }
