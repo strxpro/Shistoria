@@ -68,6 +68,16 @@ if (typeof window !== "undefined") {
   try { ScrollTrigger.config({ ignoreMobileResize: true }); } catch { /* ignore */ }
 }
 
+/* Czy przeglądarka obsługuje WebGL? (najczęstsza przyczyna „3D non disponibile"
+ * na desktopie = wyłączona akceleracja sprzętowa / brak WebGL). Na serwerze → true. */
+function hasWebGL(): boolean {
+  if (typeof window === "undefined") return true;
+  try {
+    const c = document.createElement("canvas");
+    return !!((window as any).WebGLRenderingContext && (c.getContext("webgl") || c.getContext("experimental-webgl")));
+  } catch { return false; }
+}
+
 import { supabase, getSessionId, createOrder, newOrderId, publishDrink, likeDrink, addComment, getComments, getCommentsFull, toggleCommentLike, getMyCommentLikes, incrementDrinkView, claimDrink as claimDrinkApi, getDrinkStats, deleteMyDrink } from "./lib/supabase";
 import { findCocktailByIngredients } from "./lib/cocktail-db";
 import { PersonalizedQR } from "./components/PersonalizedQR";
@@ -1777,6 +1787,8 @@ function CocktailExperience() {
   const inSceneGlassRef = useRef<THREE.Group | null>(null); // root modelu szklanki (in-scene) — do wyjścia scrollem
   const [sceneReady, setSceneReady] = useState(false);
   const [inView, setInView] = useState(false); // mount Canvas tylko gdy sekcja blisko viewportu
+  const [webglOk, setWebglOk] = useState(true); // false → przeglądarka bez WebGL/akceleracji
+  useEffect(() => { setWebglOk(hasWebGL()); }, []);
   // Telefon: lżejsze ustawienia WebGL (bez cieni, niższy DPR) — iOS pada przy ciężkim kontekście.
   const [isMobileDevice] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
 
@@ -2572,7 +2584,7 @@ function CocktailExperience() {
 
         {/* Canvas */}
         <div className="cx-canvas">
-          {inView && (
+          {inView && webglOk && (
             <Canvas frameloop={isMobileDevice ? "always" : "demand"} shadows={!isMobileDevice} dpr={isMobileDevice ? [1, 1.5] : [1, 2]}
               gl={{ antialias: true, alpha: true, powerPreference: "high-performance", failIfMajorPerformanceCaveat: false }}
               camera={{ position: [CONFIG.camPos.x, CONFIG.camPos.y, CONFIG.camPos.z], fov: 36 }}>
@@ -2583,6 +2595,21 @@ function CocktailExperience() {
                   onModelReady: (g) => { inSceneGlassRef.current = g; },
                 } : null} />
             </Canvas>
+          )}
+          {/* Brak WebGL (akceleracja sprzętowa wyłączona / stary GPU) — jasny komunikat zamiast crashu */}
+          {inView && !webglOk && (
+            <div className="cx-webgl-msg">
+              <span className="cx-webgl-ico">🧊</span>
+              <p>{(({
+                it: "Per usare il Cocktail Maker 3D attiva l'accelerazione hardware del browser (Impostazioni → Sistema) e ricarica la pagina.",
+                pl: "Aby użyć kreatora 3D, włącz akcelerację sprzętową w przeglądarce (Ustawienia → System) i odśwież stronę.",
+                en: "To use the 3D Cocktail Maker, enable hardware acceleration in your browser (Settings → System) and reload.",
+                de: "Aktiviere die Hardwarebeschleunigung deines Browsers (Einstellungen → System) und lade neu, um den 3D-Cocktail-Maker zu nutzen.",
+                fr: "Pour utiliser le Cocktail Maker 3D, active l'accélération matérielle du navigateur (Paramètres → Système) et recharge.",
+                es: "Para usar el Cocktail Maker 3D activa la aceleración por hardware del navegador (Ajustes → Sistema) y recarga.",
+              } as Record<string, string>)[(typeof window !== "undefined" && (window as any).currentLanguage) || "it"] || "Abilita l'accelerazione hardware del browser e ricarica.")}</p>
+              <button className="cx-btn" onClick={() => window.location.reload()}>↻ {(({ it: "Ricarica", pl: "Odśwież", en: "Reload", de: "Neu laden", fr: "Recharger", es: "Recargar" } as Record<string, string>)[(typeof window !== "undefined" && (window as any).currentLanguage) || "it"] || "Ricarica")}</button>
+            </div>
           )}
           {/* Loader — widoczny dopóki scena 3D się nie załaduje (feedback gdy modele wolno wchodzą) */}
           {!sceneReady && (
@@ -6011,16 +6038,14 @@ function ShareDrinkBtn() {
     if (next.length === 0) setOpen(false);
   };
 
-  // Odświeżaj dane przy każdym otwarciu. Z "Vedi/Modifica" (alreadySent) → lista; inaczej edycja ostatniego.
+  // Odświeżaj dane przy każdym otwarciu. Jeśli masz drinki → pokaż LISTĘ (Le mie creazioni).
+  // Pojedynczy drink → też lista (tap otwiera edycję). Brak drinków → formularz/„crea il tuo drink".
   useEffect(() => {
     if (!open) return;
     const list = loadDrinks();
     setAllDrinks(list);
-    const wasSent = typeof localStorage !== "undefined" && localStorage.getItem("sh-drink-shared") === "true";
-    if (wasSent && list.length > 0) {
+    if (list.length > 0) {
       setView("list");
-    } else if (list.length > 0) {
-      openEdit(list[0]);
     } else {
       setMyDrink(null);
       setView("edit");
@@ -7327,6 +7352,9 @@ function CocktailStyles() {
       /* Canvas */
       .cx-canvas { position:absolute; inset:0; z-index:5; touch-action:pan-y; }
       .cx-canvas-loader { position:absolute; inset:0; display:grid; place-items:center; pointer-events:none; z-index:4; }
+      .cx-webgl-msg { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:32px; text-align:center; z-index:6; }
+      .cx-webgl-ico { font-size:48px; }
+      .cx-webgl-msg p { max-width:420px; color:rgba(255,255,255,0.8); font-size:14px; line-height:1.6; margin:0; }
       .cx-canvas-spin { width:46px; height:46px; border-radius:50%; border:3px solid rgba(255,255,255,0.18);
         border-top-color:var(--cx-accent,#E8927C); animation:cxSpin .9s linear infinite; }
 
