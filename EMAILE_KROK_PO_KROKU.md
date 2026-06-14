@@ -423,3 +423,60 @@ Invoke-RestMethod -Method POST -Uri "https://hook.eu1.make.com/4swpubn6ixliy7w2j
 (Najpierw „Run once" na scenariuszu A — ZAPIS — żeby rekord wpadł do Data Store, potem „Run once" na scenariuszu B — WYSYŁKA.)
 
 ✅ **GOTOWE — testy maili skończone.**
+
+---
+
+<div align="center">
+
+# 🧾 SEKCJA H — PEŁNY TEST CAŁEJ STRONY KROK PO KROKU
+
+**Sprawdzasz: czy wszystkie maile i powiadomienia działają, bez czekania kilku dni.**
+
+</div>
+
+## H0. Przygotowanie (1 min)
+1. Otwórz `scripts/test-emails.ps1`, zmień `$EMAIL` na swój adres, zapisz.
+2. Upewnij się, że KAŻDY scenariusz w make.com jest **ON** (przełącznik lewy dół).
+3. Miej otwarty admin: `www.shistoria.it/admin` (PIN: `shistoria2026`).
+
+## H1. Maile transakcyjne przez skrypt (najszybsze — 2 min)
+W terminalu (folder projektu):
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\test-emails.ps1
+```
+Wybierz `9` (wszystko po kolei). Po chwili na Twój `$EMAIL` powinny przyjść:
+- ✅ „Hai vinto il Drink del Mese" (zwycięzca + QR) + „Scopri il Drink del Mese" (odbiorca)
+- ✅ Event 3 dni / 5 godzin (po „Run once" w scenariuszu B — patrz niżej)
+- ✅ Odpowiedź z admina
+- ✅ Newsletter powitalny + broadcast
+- ✅ Podziękowanie za recenzję
+
+> Nic nie przyszło? Zajrzyj do make.com → zakładka **History** danego scenariusza:
+> jeśli widać zielony przebieg, ale maila brak → sprawdź SPAM albo połączenie SMTP.
+> Jeśli czerwony błąd → najczęściej Content type ≠ HTML albo niezmapowane pole.
+
+## H2. Test „na żywo" z poziomu strony i admina (realny scenariusz)
+Tak sprawdzasz, że dane z przeglądarki (z gotowym HTML) lecą poprawnie:
+
+| # | Co kliknąć | Gdzie | Oczekiwany mail / efekt |
+|---|---|---|---|
+| 1 | Wyślij **formularz rezerwacji** | strona, sekcja kontakt | mail do Ciebie (IT) + mail do klienta (jego język) + WhatsApp |
+| 2 | W **adminie → Messaggi** otwórz wątek, napisz odpowiedź, wyślij | admin | klient dostaje mail przetłumaczony |
+| 3 | Stwórz drink w **kreatorze**, dodaj zdjęcie, „Wyślij" | strona | drink pojawia się w „Drink Clienti" w adminie |
+| 4 | Admin → **Drink Clienti** → wybierz tydzień/miesiąc → **„👑 Ogłoś"** | admin | zwycięzca: mail z kodem+QR; reszta: „sprawdź drink" |
+| 5 | Na stronie kliknij **„Ricordamelo"** na evencie (imię+email) | strona | rekord w Data Store `event_subs` (mail po oknie czasu) |
+| 6 | Zostaw **opinię** z podanym emailem | strona | mail „grazie" w języku gościa |
+| 7 | Zapisz się do **newslettera** (stopka) | strona | mail powitalny |
+| 8 | Admin → **Newsletter → „📣 Invia a tutti"** | admin | każdy subskrybent dostaje mail |
+
+## H3. Powiadomienia — czy przychodzą
+- **WhatsApp** (rezerwacja): sprawdź telefon po teście #1. Brak → patrz SEKCJA B (callmebot apikey aktywny?).
+- **E-mail do właściciela** (`info@shistoria.it`): rezerwacja #1 i komentarze (jeśli włączony webhook comment).
+- **Admin panel**: wiadomości z IMAP (SEKCJA C) wpadają do „Messaggi"; nowe drinki do „Drink Clienti”; recenzje do „Recensioni”.
+
+## H4. Eventy — wysłać przypomnienie OD RAZU (bez czekania 3 dni)
+1. Uruchom skrypt → wybierz `2` (Event). To wrzuca rekord do Data Store przez webhook.
+2. W make → scenariusz **B (cykliczny)** kliknij **„Run once"**.
+3. **Albo** w Data Store ręcznie ustaw `event_date` = teraz+72h (mail „3 dni") lub teraz+5h (mail „5 godzin”) i `sent_3d`/`sent_5h` = false → „Run once".
+
+✅ **Po H1–H4 masz przetestowane WSZYSTKIE maile i powiadomienia.**
