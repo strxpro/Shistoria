@@ -267,7 +267,7 @@ export type PourTune = {
   tilt_m: number; tilt_d: number;         // przechył butelki przy laniu (stopnie)
   aimX: number; aimY: number; aimZ: number; // korekta celu strumienia (gdzie wpada)
   // Szklanka (scena nalewania do szklanki) — strumień szejker→szklanka
-  gStartY: number; gEndY: number; gCurve: number; gThick: number;
+  gStartY: number; gEndY: number; gCurve: number; gCurveZ: number; gThick: number;
 };
 const POUR_TUNE_DEFAULT: PourTune = {
   bottleY_m: 1.7,  bottleY_d: 2.9,
@@ -276,7 +276,7 @@ const POUR_TUNE_DEFAULT: PourTune = {
   scale_m: 0.5,    scale_d: 0.6,
   tilt_m: 145,     tilt_d: 140,
   aimX: 0,         aimY: 0.4,  aimZ: 0,
-  gStartY: 1.55,   gEndY: 0.7,  gCurve: 0.12, gThick: 0.03,
+  gStartY: 1.55,   gEndY: 0.7,  gCurve: 0.12, gCurveZ: 0, gThick: 0.03,
 };
 function getPourTune(): PourTune {
   if (typeof window === "undefined") return POUR_TUNE_DEFAULT;
@@ -1231,10 +1231,13 @@ function InSceneGlassPour({ url, withIce, color, onReveal, onDone, onModelReady 
   const { invalidate } = useThree();
   const cloned = useMemo(() => scene.clone(true), [scene]);
   const { actions, mixer } = useAnimations(animations, rootRef);
-  const liquidMesh = useMemo((): THREE.Mesh | null => {
-    let found: THREE.Mesh | null = null;
-    cloned.traverse((o) => { if (!found && (o as THREE.Mesh).isMesh && /^li[gq]uid/i.test(o.name)) found = o as THREE.Mesh; });
-    return found;
+  const liquidMeshes = useMemo((): THREE.Mesh[] => {
+    const out: THREE.Mesh[] = [];
+    cloned.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh && /li[gq]uid|juice|drink|fill|cocktail|bevera/i.test(o.name)) out.push(m);
+    });
+    return out;
   }, [cloned]);
   const onModelReadyRef = useRef(onModelReady);
   onModelReadyRef.current = onModelReady; // stabilne — bez re-runów efektu
@@ -1260,14 +1263,17 @@ function InSceneGlassPour({ url, withIce, color, onReveal, onDone, onModelReady 
         if (mesh.name === "szklanka") { mat.transparent = true; mat.depthWrite = false; mat.opacity = Math.min(mat.opacity ?? 1, 0.4); }
       }
     });
-    if (liquidMesh && liquidMesh.material) {
-      const lm = (liquidMesh.material as THREE.MeshStandardMaterial).clone();
-      lm.transparent = false; lm.side = THREE.DoubleSide;
-      // G6: tekstura (map) nadpisywała kolor → ciecz nie miała koloru mieszanki.
-      lm.map = null; lm.roughness = 0.12; lm.metalness = 0;
-      lm.color.set(colorRefLocal.current); lm.emissive = new THREE.Color(colorRefLocal.current); lm.emissiveIntensity = 0.3;
-      lm.needsUpdate = true;
-      liquidMesh.material = lm;
+    if (liquidMeshes.length) {
+      liquidMeshes.forEach((lmesh) => {
+        if (!lmesh.material) return;
+        const lm = (lmesh.material as THREE.MeshStandardMaterial).clone();
+        lm.transparent = false; lm.side = THREE.DoubleSide;
+        // G6: tekstura (map) nadpisywała kolor → ciecz nie miała koloru mieszanki.
+        lm.map = null; lm.roughness = 0.12; lm.metalness = 0;
+        lm.color.set(colorRefLocal.current); lm.emissive = new THREE.Color(colorRefLocal.current); lm.emissiveIntensity = 0.3;
+        lm.needsUpdate = true;
+        lmesh.material = lm;
+      });
     }
     cloned.updateMatrixWorld(true);
     const glassObj0 = cloned.getObjectByName("szklanka") ?? cloned;
@@ -1310,7 +1316,7 @@ function InSceneGlassPour({ url, withIce, color, onReveal, onDone, onModelReady 
     const c = gStreamCurve;
     c.v0.set(0, T.gStartY, 0);
     c.v2.set(0, T.gEndY, 0);
-    c.v1.set(T.gCurve, (T.gStartY + T.gEndY) / 2, 0);
+    c.v1.set(T.gCurve, (T.gStartY + T.gEndY) / 2, T.gCurveZ);
     const tube = new THREE.TubeGeometry(c, 20, Math.max(0.006, T.gThick * w), 8, false);
     s.geometry.dispose();
     s.geometry = tube;
@@ -1328,12 +1334,14 @@ function InSceneGlassPour({ url, withIce, color, onReveal, onDone, onModelReady 
   }, [buildStream, invalidate]);
 
   useEffect(() => {
-    if (!liquidMesh) return;
-    const lm = liquidMesh.material as THREE.MeshStandardMaterial;
-    lm.color.set(color); lm.emissive.set(color); lm.needsUpdate = true;
+    if (!liquidMeshes.length) return;
+    liquidMeshes.forEach((lmesh) => {
+      const lm = lmesh.material as THREE.MeshStandardMaterial;
+      if (lm) { lm.color.set(color); if (lm.emissive) lm.emissive.set(color); lm.needsUpdate = true; }
+    });
     pourStreamMat.color.set(color); pourStreamMat.emissive.set(color);
     invalidate();
-  }, [liquidMesh, color, invalidate, pourStreamMat]);
+  }, [liquidMeshes, color, invalidate, pourStreamMat]);
 
   // „Bez lodu" → schowaj kostki lodu i łopatkę (Ice Cube*, Ice Scoop). Dzięki temu
   // wysoka szklanka, która ma jedną wspólną animację cieczy, wygląda poprawnie w
@@ -1356,13 +1364,12 @@ function InSceneGlassPour({ url, withIce, color, onReveal, onDone, onModelReady 
     list.forEach((a) => { a.time = t; });
     mixer.update(0);
     // Re-apply liquid color — animation keyframes may override material color
-    if (liquidMesh && liquidMesh.material) {
-      const lm = liquidMesh.material as THREE.MeshStandardMaterial;
-      lm.color.set(colorRefLocal.current);
-      if (lm.emissive) lm.emissive.set(colorRefLocal.current);
-    }
+    liquidMeshes.forEach((lmesh) => {
+      const lm = lmesh.material as THREE.MeshStandardMaterial;
+      if (lm) { lm.color.set(colorRefLocal.current); if (lm.emissive) lm.emissive.set(colorRefLocal.current); }
+    });
     invalidate();
-  }, [actions, mixer, invalidate, liquidMesh]);
+  }, [actions, mixer, invalidate, liquidMeshes]);
 
   useEffect(() => {
     const { start, end } = withIce ? rangeFor(url).withIce : rangeFor(url).noIce;
@@ -3471,6 +3478,7 @@ function PourTunePanel() {
           {Row("Start (góra)", "gStartY", 0, 3, 0.02)}
           {Row("Koniec (dół)", "gEndY", -0.5, 2, 0.02)}
           {Row("Zakrzywienie", "gCurve", -1, 1, 0.02)}
+          {Row("Zakrzyw. Z (3D przód/tył)", "gCurveZ", -1, 1, 0.02)}
           {Row("Grubość", "gThick", 0.005, 0.12, 0.005)}
           <div className="cx-tune-actions">
             <button className="cx-tune-copy" onClick={copy}>{copied ? "✓ Skopiowano" : "📋 Copia valori"}</button>
