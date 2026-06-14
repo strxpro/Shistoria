@@ -7,6 +7,73 @@ import { sendReservation, subscribeEventReminder, subscribeNewsletter, notifyRev
 // Eventi, SocialFeed, Attrazioni, Recensioni, Contatti, Footer
 const { useState: useStateE, useEffect: useEffectE, useRef: useRefE } = React;
 
+// ─── Instagram Stories (relacje) — kółka + podgląd fullscreen ───────────────────
+function IgStories() {
+  const STORIES = [
+    { l: "Aperitivo", c: "#E8927C", t: "food" },
+    { l: "Tramonto", c: "#5BB8D4", t: "sea" },
+    { l: "Eventi", c: "#9b59b6", t: "rock" },
+    { l: "Menu", c: "#F4D03F", t: "food" },
+    { l: "Cocktail", c: "#C8102E", t: "food" },
+    { l: "Mare", c: "#3FB68B", t: "sea" },
+  ];
+  const [storyIdx, setStoryIdx] = useStateE(-1);
+  const storyOpen = storyIdx >= 0;
+  const storyTimer = useRefE(null);
+  useEffectE(() => {
+    if (!storyOpen) return;
+    if (typeof document !== "undefined") document.body.style.overflow = "hidden";
+    storyTimer.current = setTimeout(() => { setStoryIdx((i) => (i + 1 < STORIES.length ? i + 1 : -1)); }, 4000);
+    return () => { if (storyTimer.current) clearTimeout(storyTimer.current); if (typeof document !== "undefined") document.body.style.overflow = ""; };
+  }, [storyIdx, storyOpen]);
+  const closeStory = () => setStoryIdx(-1);
+  const nextStory = () => setStoryIdx((i) => (i + 1 < STORIES.length ? i + 1 : -1));
+  const prevStory = () => setStoryIdx((i) => (i > 0 ? i - 1 : 0));
+  return (
+    <>
+      <div className="ig-stories-row">
+        {STORIES.map((s, i) => (
+          <button key={i} type="button" className="social-story" onClick={() => setStoryIdx(i)}>
+            <span className="social-story-ring" style={{ background: `conic-gradient(from 140deg, ${s.c}, #E8927C, #5BB8D4, ${s.c})` }}>
+              <span className="social-story-inner"><Placeholder type={s.t} label="" style={{ width: "100%", height: "100%" }} /></span>
+            </span>
+            <span className="social-story-label">{s.l}</span>
+          </button>
+        ))}
+      </div>
+      {storyOpen && typeof document !== "undefined" && createPortal(
+        <div className="story-overlay" onClick={closeStory}>
+          <div className="story-view" onClick={(e) => e.stopPropagation()}>
+            <div className="story-bars">
+              {STORIES.map((_, i) => (
+                <div key={i} className="story-bar"><div className="story-bar-fill" style={{ width: i < storyIdx ? "100%" : i > storyIdx ? "0%" : undefined, animation: i === storyIdx ? "storyFill 4s linear forwards" : "none" }} /></div>
+              ))}
+            </div>
+            <div className="story-head">
+              <span className="story-avatar">S'H</span>
+              <strong>shistoria.renamajore</strong>
+              <button className="story-close" onClick={closeStory} aria-label="Chiudi">×</button>
+            </div>
+            <div className="story-img">
+              <Placeholder type={STORIES[storyIdx].t} label="" style={{ width: "100%", height: "100%" }} />
+              <span className="story-caption">{STORIES[storyIdx].l}</span>
+            </div>
+            <a href="https://www.instagram.com/shistoria.renamajore" target="_blank" rel="noopener" className="story-ig-link">Vedi su Instagram →</a>
+            <button className="story-nav story-nav-l" onClick={prevStory} aria-label="Precedente" />
+            <button className="story-nav story-nav-r" onClick={nextStory} aria-label="Successivo" />
+          </div>
+        </div>,
+        document.body,
+      )}
+      <style>{`
+        .ig-stories-row { display:flex; gap:16px; overflow-x:auto; padding:4px 2px 22px; margin-bottom:8px; scrollbar-width:none; -webkit-overflow-scrolling:touch; justify-content:center; }
+        .ig-stories-row::-webkit-scrollbar { display:none; }
+        @media (max-width:768px){ .ig-stories-row { justify-content:flex-start; } }
+      `}</style>
+    </>
+  );
+}
+
 // ─── Eventi ───────────────────────────────────────────────────────────────────
 function Eventi({ t }) {
   const [events, setEvents] = useStateE([]);
@@ -115,6 +182,9 @@ function Eventi({ t }) {
           <SplitReveal as="h2" className="h2">{t("eventi.heading")}</SplitReveal>
           <TextClipReveal text={t("eventi.intro")} className="ev-intro" />
         </div>
+
+        {/* Relacje z Instagrama (stories) — pod nagłówkiem, nad eventami */}
+        <IgStories />
 
         {/* Piramidowa karuzela — klik lewa/prawa = nawigacja */}
         <div className="ev-carousel" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} onClick={onCarouselClick}>
@@ -431,17 +501,6 @@ function SocialFeed({ t }) {
                 <span className="kicker">{t("social.instagram")}</span>
               </div>
               <a href="https://www.instagram.com/shistoria.renamajore" target="_blank" rel="noopener" className="social-link">→</a>
-            </div>
-            {/* Relacje (stories) — kółka jak na Instagramie → otwierają podgląd */}
-            <div className="social-stories">
-              {STORIES.map((s, i) => (
-                <button key={i} type="button" className="social-story" onClick={() => setStoryIdx(i)}>
-                  <span className="social-story-ring" style={{ background: `conic-gradient(from 140deg, ${s.c}, #E8927C, #5BB8D4, ${s.c})` }}>
-                    <span className="social-story-inner"><Placeholder type={s.t} label="" style={{ width: "100%", height: "100%" }} /></span>
-                  </span>
-                  <span className="social-story-label">{s.l}</span>
-                </button>
-              ))}
             </div>
             <div className="social-ig-grid">
               {[

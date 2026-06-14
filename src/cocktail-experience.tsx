@@ -5573,6 +5573,7 @@ function DbDrinkCard({ d }: { d: any }) {
                   <span>👁 {d.views || 0}</span>
                 </div>
               )}
+              {d.photo_url && <span className="cx-cc-swipe-hint" aria-hidden="true">{(({it:"Scorri per i dettagli",pl:"Przesuń po szczegóły",en:"Swipe for details",de:"Wischen für Details",fr:"Glisse pour les détails",es:"Desliza para detalles"} as Record<string,string>)[lang] || "Scorri →")} →</span>}
             </div>
             <div className="cx-cc-popout-right">
               <div className="cx-cc-popout-header">
@@ -7656,6 +7657,13 @@ function CocktailStyles() {
       .cx-tt-heart { position:absolute; width:64px; height:64px; transform:translate(-50%,-50%); pointer-events:none; color:#FE2C55; z-index:6; filter:drop-shadow(0 4px 12px rgba(0,0,0,0.4)); animation:ttHeart 1s ease-out forwards; }
       @keyframes ttHeart { 0%{opacity:0;transform:translate(-50%,-50%) scale(.3) rotate(-15deg);} 15%{opacity:1;transform:translate(-50%,-50%) scale(1.25) rotate(8deg);} 100%{opacity:0;transform:translate(-50%,-140px) scale(1) rotate(-8deg);} }
       .cx-cc-popout-counts { position:absolute; left:0; right:0; bottom:0; z-index:5; display:flex; gap:16px; justify-content:center; padding:14px; font-size:13px; font-weight:700; color:#fff; pointer-events:none; }
+      .cx-cc-swipe-hint { display:none; }
+      @media (max-width:768px) {
+        .cx-cc-swipe-hint { display:flex; align-items:center; gap:6px; position:absolute; right:12px; top:50%; transform:translateY(-50%); z-index:6;
+          background:rgba(0,0,0,0.55); color:#fff; font-size:12px; font-weight:700; padding:8px 12px; border-radius:999px; pointer-events:none;
+          animation:ccSwipeHint 1.6s ease-in-out infinite; }
+        @keyframes ccSwipeHint { 0%,100%{ transform:translateY(-50%) translateX(0); opacity:0.85; } 50%{ transform:translateY(-50%) translateX(6px); opacity:1; } }
+      }
 
       /* D3: komentarze jak na Instagramie */
       .cx-cc-cmt-ig { font-style:normal; color:rgba(255,255,255,0.78); font-size:13px; line-height:1.45; }
