@@ -797,18 +797,19 @@ function EventsPanel() {
 }
 
 // ─── Drinks Panel ─────────────────────────────────────────────────────────────
-// Odliczanie do końca tygodnia/miesiąca (auto-ogłoszenie) — admin
+// Odliczanie do końca tygodnia/miesiąca (auto-ogłoszenie) — schemat jak endpoint:
+// miesiąc → 1. dnia następnego miesiąca; tydzień → najbliższy z dni 8/15/22/29 (po 29 → 8. nast. miesiąca)
 function adminCountdown(period: "week" | "month"): string {
-  const now = Date.now();
-  const d = new Date(now);
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth(), day = now.getDate();
   let end: number;
-  if (period === "week") {
-    const day = d.getDay(); const toMon = ((8 - day) % 7) || 7;
-    const e = new Date(d); e.setHours(0, 0, 0, 0); e.setDate(d.getDate() + toMon); end = e.getTime();
+  if (period === "month") {
+    end = new Date(y, m + 1, 1, 0, 0, 0, 0).getTime();
   } else {
-    end = new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime();
+    const next = [8, 15, 22, 29].find((d) => d > day);
+    end = next ? new Date(y, m, next, 0, 0, 0, 0).getTime() : new Date(y, m + 1, 8, 0, 0, 0, 0).getTime();
   }
-  const left = Math.max(0, end - now);
+  const left = Math.max(0, end - now.getTime());
   const days = Math.floor(left / 86400000), hrs = Math.floor((left % 86400000) / 3600000), min = Math.floor((left % 3600000) / 60000);
   return `${days}g ${String(hrs).padStart(2, "0")}h ${String(min).padStart(2, "0")}m`;
 }

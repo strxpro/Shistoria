@@ -231,6 +231,17 @@ export default function App() {
   // wyścigiem fetchy, przez co przy wejściu pokazywał się zły język. Detekcja języka
   // jest teraz wyłącznie w efekcie powyżej (z guardami sh-lang-manual / sh-lang-auto).
 
+  // Auto-ogłaszanie Drinka Tygodnia/Miesiąca BEZ crona — wołamy endpoint przy wejściu
+  // (raz na sesję). Endpoint jest idempotentny i ogłasza tylko w dni graniczne
+  // (miesiąc 1., tydzień 8/15/22/29), więc bezpiecznie odpalać z frontu.
+  useEffectA(() => {
+    try {
+      if (sessionStorage.getItem("sh-announce-tick") === "1") return;
+      sessionStorage.setItem("sh-announce-tick", "1");
+      fetch("/api/announce-winner").catch(() => {});
+    } catch { /* ignore */ }
+  }, []);
+
   // Section observer for nav highlight
   useEffectA(() => {
     if (!preloadDone) return;

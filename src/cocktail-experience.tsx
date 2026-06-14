@@ -6554,13 +6554,14 @@ function FeaturedCountdown({ period, lang }: { period: "week" | "month"; lang: s
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t); }, []);
   const d = new Date(now);
+  const y = d.getFullYear(), mo = d.getMonth(), day = d.getDate();
   let endMs: number;
   if (period === "week") {
-    const day = d.getDay(); // 0=nd … 1=pn
-    const daysToMon = ((8 - day) % 7) || 7;
-    const e = new Date(d); e.setHours(0, 0, 0, 0); e.setDate(d.getDate() + daysToMon); endMs = e.getTime();
+    // tydzień liczony od 1. dnia miesiąca: granice 8/15/22/29 (po 29 → 8. nast. miesiąca)
+    const next = [8, 15, 22, 29].find((dd) => dd > day);
+    endMs = next ? new Date(y, mo, next, 0, 0, 0, 0).getTime() : new Date(y, mo + 1, 8, 0, 0, 0, 0).getTime();
   } else {
-    endMs = new Date(d.getFullYear(), d.getMonth() + 1, 1, 0, 0, 0, 0).getTime();
+    endMs = new Date(y, mo + 1, 1, 0, 0, 0, 0).getTime();
   }
   const left = Math.max(0, endMs - now);
   const days = Math.floor(left / 86400000);

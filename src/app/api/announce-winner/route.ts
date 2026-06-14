@@ -162,10 +162,14 @@ async function announce(p: Period, force: boolean) {
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  if (searchParams.get("secret") !== SECRET) {
+  const force = searchParams.get("force");
+  // FORCE (test, pomija bramkę idempotencji) wymaga sekretu. Tryb AUTO jest publiczny:
+  // jest bezpieczny, bo ogłasza TYLKO w dni graniczne (1/8/15/22/29) i jest idempotentny
+  // (tabela winner_announcements z unikalnym period_key blokuje duplikaty). Dzięki temu
+  // można go wołać z frontu przy każdym wejściu na stronę — bez crona.
+  if (force && searchParams.get("secret") !== SECRET) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  const force = searchParams.get("force");
   const periods = duePeriods(new Date(), force);
   if (periods.length === 0) {
     return NextResponse.json({ ok: true, message: "nothing due today", utc: new Date().toISOString() });
