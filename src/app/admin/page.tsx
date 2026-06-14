@@ -2376,7 +2376,59 @@ function AdminStyles() {
         /* Hamburger chowamy gdy menu otwarte (jest close w środku) */
         .admin-nav.is-open ~ .admin-nav-toggle { opacity:0; pointer-events:none; }
       }
+
+      /* ═══ FINISHING POLISH — modale, suwaki, tabele, scrollbary, inputy ═══ */
+      /* Scrollbary premium */
+      .admin-main::-webkit-scrollbar, .amsg-list::-webkit-scrollbar, .amsg-bubbles::-webkit-scrollbar, .admin-modal::-webkit-scrollbar { width:8px; height:8px; }
+      .admin-main::-webkit-scrollbar-thumb, .amsg-list::-webkit-scrollbar-thumb, .amsg-bubbles::-webkit-scrollbar-thumb, .admin-modal::-webkit-scrollbar-thumb { background:rgba(232,146,124,0.35); border-radius:99px; }
+      .admin-main::-webkit-scrollbar-thumb:hover { background:rgba(232,146,124,0.6); }
+      .admin-main { scrollbar-width:thin; scrollbar-color:rgba(232,146,124,0.4) transparent; }
+
+      /* Modale — szklane, większy promień, miękkie wejście */
+      .admin-modal-overlay { backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); background:rgba(4,8,14,0.5) !important; }
+      .admin-modal { border-radius:24px !important; animation:adminPanelIn .4s var(--spring,cubic-bezier(.22,1,.36,1)) both; }
+      .admin-theme-dark .admin-modal { background:linear-gradient(180deg,#16222e,#0f1b26) !important; border:1px solid rgba(255,255,255,0.1) !important; box-shadow:0 40px 100px rgba(0,0,0,0.55) !important; }
+      .admin-theme-light .admin-modal { box-shadow:0 40px 100px rgba(17,34,51,0.18) !important; }
+      .admin-modal h3 { font-weight:800; letter-spacing:-0.02em; }
+
+      /* Suwaki zakresu statystyk — pigułki */
+      .stats-range button { border-radius:999px !important; transition:all .25s var(--spring,ease) !important; }
+      .stats-range button:active { transform:scale(.95); }
+
+      /* Tabele — czytelniejsze nagłówki, miększe wiersze */
+      .admin-table table { border-collapse:separate; border-spacing:0; }
+      .admin-table th { font-size:11px; letter-spacing:0.08em; text-transform:uppercase; font-weight:700; }
+      .admin-table tbody tr { transition:background .2s; }
+      .admin-theme-dark .admin-table tbody tr:hover { background:rgba(255,255,255,0.04); }
+      .admin-theme-light .admin-table tbody tr:hover { background:rgba(232,146,124,0.06); }
+      .menu-thumb { border-radius:12px !important; }
+
+      /* Inputy/selecty/textarea — spójne, zaokrąglone */
+      .admin-form input, .admin-form textarea, .admin-form select, .menu-sel, .amsg-input textarea, .admin-login-card input {
+        border-radius:14px !important;
+      }
+      .admin-form input, .admin-form textarea, .admin-form select { padding:12px 14px !important; }
+
+      /* Awatar czatu/Ospiti — delikatny cień */
+      .amsg-avatar { box-shadow:0 4px 14px rgba(232,146,124,0.3); }
+
+      /* Pigułki składników/badge — spójne */
+      .cx-cc-pill, .amsg-badge { border-radius:999px; }
+
+      /* Empty state — ładniejszy */
+      .admin-empty { opacity:0.5; font-size:15px; }
+
+      /* Skeleton — delikatniejszy promień */
+      .admin-skel-box { border-radius:12px; }
+
+      /* Karty drink/event — obrazek zaokrąglony */
+      .admin-drink-photo { border-radius:14px !important; }
+
+      /* Bell badge puls przy nowych */
+      @keyframes bellPulse { 0%,100%{ transform:scale(1);} 50%{ transform:scale(1.15);} }
+      .admin-bell-badge { animation:bellPulse 2s ease-in-out infinite; }
     `}</style>
+
 
 
 
