@@ -308,7 +308,14 @@ export default function App() {
             <div style={{minHeight:"60vh",display:"flex",alignItems:"center",justifyContent:"center",background:"var(--c-deep)",color:"#fff",textAlign:"center",padding:"32px"}}>
               <div style={{maxWidth:"600px"}}>
                 <p style={{fontFamily:"var(--f-display)",fontWeight:800,fontSize:"24px",marginBottom:"12px"}}>Cocktail Maker</p>
-                <p style={{opacity:0.7,fontSize:"14px"}}>Esperienza 3D temporaneamente non disponibile.</p>
+                <p style={{opacity:0.7,fontSize:"14px",marginBottom:"16px"}}>Esperienza 3D temporaneamente non disponibile.</p>
+                <button onClick={() => window.location.reload()} style={{padding:"10px 22px",borderRadius:"999px",border:"1px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.08)",color:"#fff",cursor:"pointer",fontWeight:700,marginBottom:"18px"}}>↻ Riprova</button>
+                {msg && (
+                  <details style={{textAlign:"left",fontSize:"11px",opacity:0.5,marginTop:"8px"}}>
+                    <summary style={{cursor:"pointer",opacity:0.7}}>Dettagli tecnici</summary>
+                    <pre style={{whiteSpace:"pre-wrap",wordBreak:"break-word",marginTop:"6px"}}>{msg}{stack ? "\n"+stack : ""}</pre>
+                  </details>
+                )}
               </div>
             </div>
           )}>
