@@ -5470,7 +5470,7 @@ function GifPicker({ onPick, onClose, lang }: { onPick: (url: string) => void; o
   const [q, setQ] = useState("");
   const [gifs, setGifs] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const KEY = process.env.NEXT_PUBLIC_GIPHY_KEY || "";
+  const KEY = process.env.NEXT_PUBLIC_GIPHY_KEY || "fw5kGIoQ1ihfBa6G7s0YcTWvT0NMO5dQ";
   useEffect(() => {
     if (!KEY) return;
     let cancelled = false;

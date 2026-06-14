@@ -183,8 +183,8 @@ function Eventi({ t }) {
           <TextClipReveal text={t("eventi.intro")} className="ev-intro" />
         </div>
 
-        {/* Relacje z Instagrama (stories) — pod nagłówkiem, nad eventami */}
-        <IgStories />
+        {/* Relacje z Instagrama (stories) — pod nagłówkiem, nad eventami. TYMCZASOWO WYŁĄCZONE. */}
+        {/* <IgStories /> */}
 
         {/* Piramidowa karuzela — klik lewa/prawa = nawigacja */}
         <div className="ev-carousel" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} onClick={onCarouselClick}>
