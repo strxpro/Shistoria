@@ -68,16 +68,7 @@ if (typeof window !== "undefined") {
   try { ScrollTrigger.config({ ignoreMobileResize: true }); } catch { /* ignore */ }
 }
 
-/* Czy przeglądarka obsługuje WebGL? (najczęstsza przyczyna „3D non disponibile"
- * na desktopie = wyłączona akceleracja sprzętowa / brak WebGL). Na serwerze → true. */
-function hasWebGL(): boolean {
-  if (typeof window === "undefined") return true;
-  try {
-    const c = document.createElement("canvas");
-    // three.js/R3F używa WebGL2 (z fallbackiem na WebGL1). Akceptuj którykolwiek.
-    return !!(c.getContext("webgl2") || c.getContext("webgl") || (c as any).getContext("experimental-webgl"));
-  } catch { return true; } // w razie wątpliwości NIE blokuj — niech Canvas spróbuje (ErrorBoundary złapie realny błąd)
-}
+/* Czy przeglądarka obsługuje WebGL? (nieużywane — usunięto pre-gate, polegamy na ErrorBoundary) */
 
 import { supabase, getSessionId, createOrder, newOrderId, publishDrink, likeDrink, addComment, getComments, getCommentsFull, toggleCommentLike, getMyCommentLikes, incrementDrinkView, claimDrink as claimDrinkApi, getDrinkStats, deleteMyDrink } from "./lib/supabase";
 import { findCocktailByIngredients } from "./lib/cocktail-db";
@@ -1788,8 +1779,6 @@ function CocktailExperience() {
   const inSceneGlassRef = useRef<THREE.Group | null>(null); // root modelu szklanki (in-scene) — do wyjścia scrollem
   const [sceneReady, setSceneReady] = useState(false);
   const [inView, setInView] = useState(false); // mount Canvas tylko gdy sekcja blisko viewportu
-  const [webglOk, setWebglOk] = useState(true); // false → przeglądarka bez WebGL/akceleracji
-  useEffect(() => { setWebglOk(hasWebGL()); }, []);
   // Telefon: lżejsze ustawienia WebGL (bez cieni, niższy DPR) — iOS pada przy ciężkim kontekście.
   const [isMobileDevice] = useState(() => typeof window !== "undefined" && window.innerWidth < 768);
 
@@ -2595,7 +2584,7 @@ function CocktailExperience() {
 
         {/* Canvas */}
         <div className="cx-canvas">
-          {inView && webglOk && (
+          {inView && (
             <Canvas frameloop={isMobileDevice ? "always" : "demand"} shadows={!isMobileDevice} dpr={isMobileDevice ? [1, 1.5] : [1, 2]}
               gl={{ antialias: true, alpha: true, powerPreference: "high-performance", failIfMajorPerformanceCaveat: false }}
               camera={{ position: [CONFIG.camPos.x, CONFIG.camPos.y, CONFIG.camPos.z], fov: 36 }}>
@@ -2606,21 +2595,6 @@ function CocktailExperience() {
                   onModelReady: (g) => { inSceneGlassRef.current = g; },
                 } : null} />
             </Canvas>
-          )}
-          {/* Brak WebGL (akceleracja sprzętowa wyłączona / stary GPU) — jasny komunikat zamiast crashu */}
-          {inView && !webglOk && (
-            <div className="cx-webgl-msg">
-              <span className="cx-webgl-ico">🧊</span>
-              <p>{(({
-                it: "Per usare il Cocktail Maker 3D attiva l'accelerazione hardware del browser (Impostazioni → Sistema) e ricarica la pagina.",
-                pl: "Aby użyć kreatora 3D, włącz akcelerację sprzętową w przeglądarce (Ustawienia → System) i odśwież stronę.",
-                en: "To use the 3D Cocktail Maker, enable hardware acceleration in your browser (Settings → System) and reload.",
-                de: "Aktiviere die Hardwarebeschleunigung deines Browsers (Einstellungen → System) und lade neu, um den 3D-Cocktail-Maker zu nutzen.",
-                fr: "Pour utiliser le Cocktail Maker 3D, active l'accélération matérielle du navigateur (Paramètres → Système) et recharge.",
-                es: "Para usar el Cocktail Maker 3D activa la aceleración por hardware del navegador (Ajustes → Sistema) y recarga.",
-              } as Record<string, string>)[(typeof window !== "undefined" && (window as any).currentLanguage) || "it"] || "Abilita l'accelerazione hardware del browser e ricarica.")}</p>
-              <button className="cx-btn" onClick={() => window.location.reload()}>↻ {(({ it: "Ricarica", pl: "Odśwież", en: "Reload", de: "Neu laden", fr: "Recharger", es: "Recargar" } as Record<string, string>)[(typeof window !== "undefined" && (window as any).currentLanguage) || "it"] || "Ricarica")}</button>
-            </div>
           )}
           {/* Loader — widoczny dopóki scena 3D się nie załaduje (feedback gdy modele wolno wchodzą) */}
           {!sceneReady && (
