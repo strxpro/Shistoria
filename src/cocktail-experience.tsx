@@ -2445,16 +2445,16 @@ function CocktailExperience() {
 
         {/* Wyśrodkowany tytuł + miernik mocy (moc pojawia się dopiero po wlaniu) */}
         <div ref={titleRef} className="cx-title">
-          <span className="cx-mini-kicker">Laboratorio · 05</span>
-          <h2>Crea il tuo <em>cocktail</em></h2>
+          <span className="cx-mini-kicker">{cxCreatorHead().kicker} · 05</span>
+          <h2>{cxCreatorHead().titlePre} <em>{cxCreatorHead().titleEm}</em></h2>
           
           {poured.length > 0 && (
-            <div className={`cx-strength ${strength.extreme ? "is-extreme" : ""}`} aria-label={`Forza: ${strength.label}`}>
+            <div className={`cx-strength ${strength.extreme ? "is-extreme" : ""}`} aria-label={`${cxStrengthWord()}: ${strengthLabelTr(strength.label)}`}>
               <span className="cx-strength-dot" style={{ background: strength.extreme ? "#ff2d2d" : mixedColor }} />
-              <span className="cx-strength-label">{strength.extreme ? "⚠ EXTREME" : `Forza · ${strength.label}`}</span>
+              <span className="cx-strength-label">{strength.extreme ? "⚠ EXTREME" : `${cxStrengthWord()} · ${strengthLabelTr(strength.label)}`}</span>
               <span className="cx-drops">
                 {strength.drops === 0
-                  ? <span className="cx-drop-zero">analcolico</span>
+                  ? <span className="cx-drop-zero">{strengthLabelTr("Analcolico").toLowerCase()}</span>
                   : Array.from({ length: 5 }).map((_, i) => (
                       <span key={i} className={`cx-drop ${i < strength.drops ? "on" : ""}`} />
                     ))}
@@ -3961,6 +3961,44 @@ function LazyBottle3D({ id, name, color, shape, ml, real }: { id: string; name: 
  * When user holds for 2s, triggers pouring. Shows thick ring timer.
  * ──────────────────────────────────────────────────────────────────────── */
 const HOLD_DURATION = 1500; // ms — przytrzymaj 1.5s żeby zaczęło lać
+
+/* Nagłówek sekcji kreatora (kicker + tytuł) w języku strony (6 języków) */
+function cxCreatorHead(): { kicker: string; titlePre: string; titleEm: string } {
+  const lang = (typeof window !== "undefined" && (window as unknown as { currentLanguage?: string }).currentLanguage) || "it";
+  const L: Record<string, { kicker: string; titlePre: string; titleEm: string }> = {
+    it: { kicker: "Laboratorio", titlePre: "Crea il tuo", titleEm: "cocktail" },
+    pl: { kicker: "Laboratorium", titlePre: "Stwórz swój", titleEm: "koktajl" },
+    en: { kicker: "Laboratory", titlePre: "Create your", titleEm: "cocktail" },
+    de: { kicker: "Labor", titlePre: "Misch deinen", titleEm: "Cocktail" },
+    fr: { kicker: "Laboratoire", titlePre: "Crée ton", titleEm: "cocktail" },
+    es: { kicker: "Laboratorio", titlePre: "Crea tu", titleEm: "cóctel" },
+  };
+  return L[lang] ?? L.it;
+}
+
+/* "Forza" (etykieta miernika mocy) w języku strony */
+function cxStrengthWord(): string {
+  const lang = (typeof window !== "undefined" && (window as unknown as { currentLanguage?: string }).currentLanguage) || "it";
+  const L: Record<string, string> = { it: "Forza", pl: "Moc", en: "Strength", de: "Stärke", fr: "Force", es: "Fuerza" };
+  return L[lang] ?? L.it;
+}
+
+/* Tłumaczenie etykiety mocy (przechowywanej po włosku) tylko do WYŚWIETLENIA.
+ * Wartość w bazie pozostaje włoska — tu mapujemy ją na język strony. */
+function strengthLabelTr(itLabel: string): string {
+  const lang = (typeof window !== "undefined" && (window as unknown as { currentLanguage?: string }).currentLanguage) || "it";
+  if (lang === "it") return itLabel;
+  const M: Record<string, Record<string, string>> = {
+    Analcolico: { pl: "Bezalkoholowy", en: "Non-alcoholic", de: "Alkoholfrei", fr: "Sans alcool", es: "Sin alcohol" },
+    Leggero: { pl: "Lekki", en: "Light", de: "Leicht", fr: "Léger", es: "Ligero" },
+    Morbido: { pl: "Łagodny", en: "Smooth", de: "Mild", fr: "Doux", es: "Suave" },
+    Bilanciato: { pl: "Zbalansowany", en: "Balanced", de: "Ausgewogen", fr: "Équilibré", es: "Equilibrado" },
+    Medio: { pl: "Średni", en: "Medium", de: "Mittel", fr: "Moyen", es: "Medio" },
+    Forte: { pl: "Mocny", en: "Strong", de: "Stark", fr: "Fort", es: "Fuerte" },
+    Tosto: { pl: "Bardzo mocny", en: "Very strong", de: "Sehr stark", fr: "Très fort", es: "Muy fuerte" },
+  };
+  return M[itLabel]?.[lang] ?? itLabel;
+}
 
 /* E7: krótkie etykiety UI kreatora w języku strony (6 języków) */
 function cxLabel(key: "pourHint" | "inGlass" | "claimGift" | "confirmed"): string {
@@ -5583,7 +5621,7 @@ function DbDrinkCard({ d }: { d: any }) {
               <div className="cx-cc-popout-header">
                 <span className="cx-cc-popout-by">{tt("by", "by")} {d.author_name}</span>
                 <h3 className="cx-cc-popout-name">{d.name}</h3>
-                <div className="cx-cc-popout-strength" style={{ color: strengthColor }}><span className="cx-cc-popout-dot" style={{ background: strengthColor }} />{d.strength_label}</div>
+                <div className="cx-cc-popout-strength" style={{ color: strengthColor }}><span className="cx-cc-popout-dot" style={{ background: strengthColor }} />{strengthLabelTr(d.strength_label)}</div>
               </div>
               <button className="cx-cc-claim-btn cx-cc-claim-top" onClick={handleOrder}>{tt("order", "🍸 Ordina questo drink")}</button>
               <div className="cx-cc-claimed-count">🍸 {d.claimed_count || 0} {tt("retired", "volte ritirato")}</div>
@@ -6541,7 +6579,7 @@ function CommunityCard({ c }: { c: (typeof COMMUNITY)[number] }) {
                 <h3 className="cx-cc-popout-name">{c.name}</h3>
                 <div className="cx-cc-popout-strength" style={{ color: strengthColor }}>
                   <span className="cx-cc-popout-dot" style={{ background: strengthColor }} />
-                  {alcCount === 0 ? "Analcolico" : alcCount <= 1 ? "Leggero" : alcCount <= 2 ? "Medio" : "Forte"}
+                  {strengthLabelTr(alcCount === 0 ? "Analcolico" : alcCount <= 1 ? "Leggero" : alcCount <= 2 ? "Medio" : "Forte")}
                 </div>
               </div>
               {/* Przycisk Ordina/Ritira — NA GÓRZE + licznik odebrań */}
