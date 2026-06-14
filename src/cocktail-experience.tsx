@@ -5211,6 +5211,24 @@ function DirectOrderQR({ name, orderId, color, onReset, onClose }: { name: strin
  * ──────────────────────────────────────────────────────────────────────── */
 function StickyQR({ color, drinkName, onNeedForm }: { color: string; drinkName: string; onNeedForm: () => void }) {
   const [open, setOpen] = useState(false);
+  const [offRange, setOffRange] = useState(false); // poza strefą kreator→community → schowaj w prawo
+  useEffect(() => {
+    const check = () => {
+      if (typeof document === "undefined") return;
+      const creator = document.getElementById("cocktail-rise");
+      const comm = document.getElementById("ready-drinks");
+      if (!creator) return;
+      const cTop = creator.getBoundingClientRect().top;
+      const aboveCreator = cTop > window.innerHeight * 0.4; // kreator jeszcze daleko w dole → jesteśmy w barze/wyżej
+      const commRect = comm?.getBoundingClientRect();
+      const belowComm = commRect ? commRect.bottom < window.innerHeight * 0.3 : false; // community przewinięte w górę
+      setOffRange(aboveCreator || belowComm);
+    };
+    window.addEventListener("scroll", check, { passive: true });
+    window.addEventListener("resize", check);
+    check();
+    return () => { window.removeEventListener("scroll", check); window.removeEventListener("resize", check); };
+  }, []);
   const lang = (typeof window !== "undefined" && (window as any).currentLanguage) || "it";
   const tr = ({
     it: { show: "Mostralo al barman" }, pl: { show: "Pokaż barmanowi" }, en: { show: "Show it to the barman" },
@@ -5225,7 +5243,7 @@ function StickyQR({ color, drinkName, onNeedForm }: { color: string; drinkName: 
   const orderUrl = orderId ? `${window.location.origin}/order/${orderId}` : "";
   return (
     <>
-      <button className="cx-qr-sticky" onClick={handleClick} aria-label="QR">
+      <button className={`cx-qr-sticky ${offRange ? "cx-qr-sticky-off" : ""}`} onClick={handleClick} aria-label="QR">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="3" height="3"/><rect x="18" y="18" width="3" height="3"/></svg>
       </button>
       {open && typeof document !== "undefined" && createPortal(
@@ -5489,6 +5507,13 @@ function DbDrinkCard({ d }: { d: any }) {
       setCmtTr((m) => ({ ...m, [c.id]: txt }));
     } catch { /* ignore */ }
   };
+  // Blokada scrolla strony gdy popout drinka otwarty (strona pod spodem nie skroluje)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (popout) { (window as any).lenis?.stop(); document.body.style.overflow = "hidden"; }
+    else { (window as any).lenis?.start(); document.body.style.overflow = ""; }
+    return () => { (window as any).lenis?.start(); document.body.style.overflow = ""; };
+  }, [popout]);
   // Ładuj 3 najnowsze komentarze OD RAZU (podgląd na karcie + popout)
   useEffect(() => {
     if (!d.id) return;
@@ -5903,6 +5928,8 @@ function MyDrinkRow({ d, lang, confirm, onEdit, onStats, onAskDelete, onConfirmD
   const [dx, setDx] = useState(0);
   const drag = useRef<{ on: boolean; sx: number; moved: boolean }>({ on: false, sx: 0, moved: false });
   const T = mdT(lang);
+  const published = !!d.published_id;
+  const pubLbl = ({ it: "Pubblicato", pl: "Opublikowany", en: "Published", de: "Veröffentlicht", fr: "Publié", es: "Publicado" } as Record<string, string>)[lang] || "Pubblicato";
   const TH = 70;
   const down = (e: React.PointerEvent) => { drag.current = { on: true, sx: e.clientX, moved: false }; try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* */ } };
   const move = (e: React.PointerEvent) => { if (!drag.current.on) return; const delta = e.clientX - drag.current.sx; if (Math.abs(delta) > 6) drag.current.moved = true; setDx(Math.max(-130, Math.min(130, delta))); };
@@ -5923,6 +5950,9 @@ function MyDrinkRow({ d, lang, confirm, onEdit, onStats, onAskDelete, onConfirmD
         <div className="cx-mydrink-info">
           <strong>{d.name || "—"}</strong>
           <span>{[d.ml ? `${d.ml} ${T.ml}` : "", d.author].filter(Boolean).join(" · ")}</span>
+          {published
+            ? <span className="cx-mydrink-pill cx-mydrink-pill-pub">✓ {pubLbl}</span>
+            : <span className="cx-mydrink-pill cx-mydrink-pill-draft">● {({ it: "Da pubblicare", pl: "Do opublikowania", en: "To publish", de: "Zu veröffentlichen", fr: "À publier", es: "Por publicar" } as Record<string, string>)[lang] || "Da pubblicare"}</span>}
         </div>
         <span className="cx-mydrink-chev">›</span>
       </div>
@@ -5945,34 +5975,18 @@ function MyDrinksList({ drinks, lang, confirmDel, onEdit, onStats, onAskDelete, 
   onConfirmDelete: (i: number) => void; onCancelDelete: () => void; onNew: () => void;
 }) {
   const T = mdT(lang);
-  const [showAll, setShowAll] = useState(false);
-  const sharedCount = drinks.filter((d) => d.photo_url).length;
-  const hist = ({ it: "Mostra tutte le creazioni", pl: "Pokaż wszystkie kreacje", en: "Show all creations", de: "Alle Kreationen zeigen", fr: "Voir toutes les créations", es: "Ver todas las creaciones" } as Record<string, string>)[lang] || "Tutte";
-  const onlyShared = ({ it: "Solo pubblicate", pl: "Tylko opublikowane", en: "Only published", de: "Nur veröffentlichte", fr: "Seulement publiées", es: "Solo publicadas" } as Record<string, string>)[lang] || "Solo pubblicate";
-  const emptyShared = ({ it: "Nessun drink pubblicato con foto. Tocca l'icona 🕘 per vedere tutte le tue creazioni.", pl: "Brak opublikowanych drinków ze zdjęciem. Dotknij 🕘 aby zobaczyć wszystkie swoje kreacje.", en: "No published drinks with photo. Tap 🕘 to see all your creations.", de: "Keine veröffentlichten Drinks mit Foto. Tippe 🕘 für alle Kreationen.", fr: "Aucun cocktail publié avec photo. Touche 🕘 pour voir toutes tes créations.", es: "Ningún trago publicado con foto. Toca 🕘 para ver todas tus creaciones." } as Record<string, string>)[lang] || "Nessun drink pubblicato.";
-  const showHistBtn = drinks.length > sharedCount; // są też nieudostępnione
   return (
     <div className="cx-mydrinks">
       <div className="cx-mydrinks-head">
-        <div className="cx-mydrinks-titlerow">
-          <span className="cx-mini-kicker">{T.title}</span>
-          {showHistBtn && (
-            <button className={`cx-mydrinks-hist ${showAll ? "on" : ""}`} onClick={() => setShowAll((v) => !v)}
-              title={showAll ? onlyShared : hist} aria-label={showAll ? onlyShared : hist}>🕘</button>
-          )}
-        </div>
-        <p className="cx-mydrinks-hint">{showAll ? hist : (sharedCount > 0 ? onlyShared : "")} · {T.hint}</p>
+        <span className="cx-mini-kicker">{T.title}</span>
+        <p className="cx-mydrinks-hint">{T.hint}</p>
       </div>
       <div className="cx-mydrinks-list">
-        {drinks.map((d, i) => {
-          if (!showAll && !d.photo_url) return null;
-          return (
-            <MyDrinkRow key={d.saved_at || i} d={d} lang={lang} confirm={confirmDel === i}
-              onEdit={() => onEdit(d)} onStats={() => onStats(d)} onAskDelete={() => onAskDelete(i)}
-              onConfirmDelete={() => onConfirmDelete(i)} onCancelDelete={onCancelDelete} />
-          );
-        })}
-        {!showAll && sharedCount === 0 && <p className="cx-mydrinks-empty">{emptyShared}</p>}
+        {drinks.map((d, i) => (
+          <MyDrinkRow key={d.saved_at || i} d={d} lang={lang} confirm={confirmDel === i}
+            onEdit={() => onEdit(d)} onStats={() => onStats(d)} onAskDelete={() => onAskDelete(i)}
+            onConfirmDelete={() => onConfirmDelete(i)} onCancelDelete={onCancelDelete} />
+        ))}
       </div>
       <button className="cx-btn cx-mydrinks-new" onClick={onNew}>{T.new}</button>
     </div>
@@ -6073,19 +6087,30 @@ function ShareDrinkBtn() {
     if (next.length === 0) setOpen(false);
   };
 
-  // Odświeżaj dane przy każdym otwarciu. Jeśli masz drinki → pokaż LISTĘ (Le mie creazioni).
-  // Pojedynczy drink → też lista (tap otwiera edycję). Brak drinków → formularz/„crea il tuo drink".
+  // Otwarcie: dopóki nie opublikowano → edycja ostatniego drinka (pamięta wpisane).
+  // Po publikacji (alreadySent) → lista wszystkich kreacji (publikowane + do opublikowania).
   useEffect(() => {
     if (!open) return;
     const list = loadDrinks();
     setAllDrinks(list);
-    if (list.length > 0) {
+    const wasSent = typeof localStorage !== "undefined" && localStorage.getItem("sh-drink-shared") === "true";
+    if (wasSent && list.length > 0) {
       setView("list");
+    } else if (list.length > 0) {
+      openEdit(list[0]);
     } else {
       setMyDrink(null);
       setView("edit");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  // Blokada scrolla strony gdy popout „Invia/Vedi" otwarty
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (open) { (window as any).lenis?.stop(); document.body.style.overflow = "hidden"; }
+    else { (window as any).lenis?.start(); document.body.style.overflow = ""; }
+    return () => { (window as any).lenis?.start(); document.body.style.overflow = ""; };
   }, [open]);
 
   // Sprawdź czy użytkownik już wysłał
@@ -7388,12 +7413,13 @@ function CocktailStyles() {
         width:54px; height:54px; border-radius:50%; border:1.5px solid rgba(255,255,255,0.25);
         background:rgba(20,16,14,0.82); color:var(--cx-accent,#E8927C); cursor:pointer;
         display:grid; place-items:center; backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
-        box-shadow:0 8px 28px rgba(0,0,0,0.45); transition:transform 0.25s ease, box-shadow 0.25s ease;
+        box-shadow:0 8px 28px rgba(0,0,0,0.45); transition:transform 0.45s cubic-bezier(0.22,1,0.36,1), opacity 0.35s ease, box-shadow 0.25s ease;
         animation:cxQrStickyIn 0.5s cubic-bezier(0.22,1,0.36,1) both; }
       .cx-qr-sticky svg { width:26px; height:26px; }
       .cx-qr-sticky:hover { transform:translateY(-50%) scale(1.08); box-shadow:0 12px 32px rgba(232,146,124,0.4); }
       @keyframes cxQrStickyIn { from { opacity:0; transform:translateY(-50%) translateX(20px); } to { opacity:1; transform:translateY(-50%) translateX(0); } }
-      body:not([data-cx-section="creator"]) .cx-qr-sticky { display:none; }
+      /* Poza strefą kreator→community: wsuwa się w prawo poza ekran (płynnie) */
+      .cx-qr-sticky-off { transform:translateY(-50%) translateX(140%) !important; opacity:0 !important; pointer-events:none !important; animation:none !important; }
       .cx-qr-mini { width:56px; height:56px; border-radius:50%; background:var(--cx-accent,#E8927C); border:none; color:#fff; cursor:pointer;
         display:grid; place-items:center; box-shadow:0 8px 24px rgba(232,146,124,0.4); transition:transform .3s, box-shadow .3s; }
       .cx-qr-mini:hover { transform:scale(1.1); box-shadow:0 12px 32px rgba(232,146,124,0.6); }
@@ -7966,7 +7992,8 @@ function CocktailStyles() {
       .cx-cc-popout-overlay { position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.75); backdrop-filter:blur(8px);
         display:flex; align-items:center; justify-content:center; padding:24px; animation:cxFade .3s ease; }
       .cx-cc-popout { position:relative; display:grid; grid-template-columns:1fr 1fr; width:min(900px,92vw); max-height:85vh; border-radius:24px; overflow:hidden;
-        background:#12171e; border:1px solid rgba(255,255,255,0.1); box-shadow:0 40px 100px rgba(0,0,0,0.6); animation:cxFadeUp .4s ease; }
+        background:#12171e; border:1px solid rgba(255,255,255,0.1); box-shadow:0 40px 100px rgba(0,0,0,0.6); animation:cxPopIn .6s cubic-bezier(.16,1.02,.3,1) both; }
+      @keyframes cxPopIn { 0% { opacity:0; transform:translateY(34px) scale(.9); } 55% { opacity:1; transform:translateY(-5px) scale(1.012); } 100% { opacity:1; transform:translateY(0) scale(1); } }
       @media (max-width:768px) { .cx-cc-popout { grid-template-columns:1fr; max-height:92vh; overflow-y:auto; } }
       .cx-cc-popout-close { position:absolute; top:16px; right:16px; z-index:5; width:40px; height:40px; border-radius:50%;
         background:rgba(0,0,0,0.55); border:1px solid rgba(255,255,255,0.3); color:#fff; font-size:22px;
@@ -8111,7 +8138,7 @@ function CocktailStyles() {
       .cx-share-overlay { position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.75); backdrop-filter:blur(8px);
         display:flex; align-items:center; justify-content:center; padding:24px; animation:cxFade .3s ease; }
       .cx-share-popout { width:min(700px,92vw); max-height:88vh; border-radius:24px; overflow-y:auto; overflow-x:hidden; position:relative;
-        background:#12171e; border:1px solid rgba(255,255,255,0.1); box-shadow:0 40px 100px rgba(0,0,0,0.6); animation:cxFadeUp .4s ease;
+        background:#12171e; border:1px solid rgba(255,255,255,0.1); box-shadow:0 40px 100px rgba(0,0,0,0.6); animation:cxPopIn .6s cubic-bezier(.16,1.02,.3,1) both;
         -webkit-overflow-scrolling:touch; }
       .cx-share-form { display:grid; grid-template-columns:1fr 1fr; min-height:360px; }
       @media (max-width:600px) { .cx-share-form { grid-template-columns:1fr; min-height:0; } .cx-share-preview { min-height:200px; } .cx-share-info { padding:20px; } .cx-share-info h3 { font-size:20px; } }
@@ -8183,6 +8210,9 @@ function CocktailStyles() {
       .cx-mydrink-info { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
       .cx-mydrink-info strong { color:#fff; font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
       .cx-mydrink-info span { color:rgba(255,255,255,0.55); font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .cx-mydrink-pill { display:inline-block; margin-top:4px; padding:2px 9px; border-radius:999px; font-size:10px; font-weight:700; letter-spacing:0.02em; }
+      .cx-mydrink-pill-pub { background:rgba(34,197,94,0.16); border:1px solid rgba(34,197,94,0.5); color:#4ade80; }
+      .cx-mydrink-pill-draft { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.18); color:rgba(255,255,255,0.6); }
       .cx-mydrink-chev { color:rgba(255,255,255,0.35); font-size:24px; flex-shrink:0; }
       .cx-mydrink-confirm { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:6px;
         padding:10px 12px; background:rgba(220,38,38,0.1); border:1px solid rgba(220,38,38,0.35); border-radius:12px; flex-wrap:wrap; }
