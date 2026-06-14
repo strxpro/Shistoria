@@ -800,6 +800,8 @@ function DrinksPanel() {
   const [drinks, setDrinks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<"week" | "month">("month");
+  const [swipe, setSwipe] = useState<{ id: string; x: number }>({ id: "", x: 0 });
+  const swipeStart = useRef<{ x: number; id: string } | null>(null);
 
   const load = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -879,8 +881,18 @@ function DrinksPanel() {
             </div>
           )}
           <div className="admin-grid">
-            {ranked.map((d, i) => (
-              <div key={d.id} className={`admin-drink-card ${d.is_drink_of_month ? "is-month" : ""}`}>
+            {ranked.map((d, i) => {
+              const sx = swipe.id === d.id ? swipe.x : 0;
+              return (
+              <div key={d.id} className="admin-drink-swipe">
+                <button className="admin-drink-trash" onClick={() => remove(d.id)} aria-label="Elimina">🗑</button>
+                <div
+                  className={`admin-drink-card ${d.is_drink_of_month ? "is-month" : ""}`}
+                  style={{ transform: `translateX(${sx}px)`, transition: swipeStart.current ? "none" : "transform .25s ease" }}
+                  onTouchStart={(e) => { swipeStart.current = { x: e.touches[0].clientX, id: d.id }; }}
+                  onTouchMove={(e) => { if (!swipeStart.current || swipeStart.current.id !== d.id) return; const dx = e.touches[0].clientX - swipeStart.current.x; setSwipe({ id: d.id, x: Math.max(-92, Math.min(0, dx)) }); }}
+                  onTouchEnd={() => { setSwipe((s) => ({ id: d.id, x: s.id === d.id && s.x < -50 ? -84 : 0 })); swipeStart.current = null; }}
+                >
                 {d.photo_url && <img src={d.photo_url} alt={d.name} className="admin-drink-photo" />}
                 <div className="admin-drink-info">
                   <h4>#{i+1} {d.name}{d.is_drink_of_month && <span className="admin-badge">👑</span>}</h4>
@@ -894,8 +906,10 @@ function DrinksPanel() {
                   </button>
                   <button className="admin-btn-sm admin-btn-danger" onClick={() => remove(d.id)}>✕</button>
                 </div>
+                </div>
               </div>
-            ))}
+              );
+            })}
             {drinks.length === 0 && <p className="admin-empty">Nessun drink pubblicato ancora.</p>}
           </div>
         </>
@@ -2147,6 +2161,10 @@ function AdminStyles() {
       .admin-event-actions { display:flex; gap:8px; margin-top:8px; }
 
       .admin-drink-card { padding:16px; border-radius:16px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.16); display:flex; flex-direction:column; gap:10px; }
+      /* Swipe-to-delete (telefon): przesuń kartę w lewo → odsłania kosz */
+      .admin-drink-swipe { position:relative; border-radius:16px; overflow:hidden; }
+      .admin-drink-swipe .admin-drink-card { position:relative; z-index:2; }
+      .admin-drink-trash { position:absolute; top:0; right:0; bottom:0; width:84px; border:none; background:linear-gradient(90deg,#b91c1c,#dc2626); color:#fff; font-size:26px; cursor:pointer; z-index:1; display:flex; align-items:center; justify-content:center; }
       .admin-drink-card.is-month { border-color:rgba(241,196,15,0.6); background:rgba(241,196,15,0.12); }
       .admin-drink-photo { width:100%; height:120px; object-fit:cover; border-radius:10px; }
       .admin-drink-info h4 { margin:0; font-size:16px; } .admin-drink-info span { font-size:12px; opacity:0.6; display:block; }
