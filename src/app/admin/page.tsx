@@ -797,12 +797,73 @@ function EventsPanel() {
 }
 
 // ─── Drinks Panel ─────────────────────────────────────────────────────────────
+// Odliczanie do końca tygodnia/miesiąca (auto-ogłoszenie) — admin
+function adminCountdown(period: "week" | "month"): string {
+  const now = Date.now();
+  const d = new Date(now);
+  let end: number;
+  if (period === "week") {
+    const day = d.getDay(); const toMon = ((8 - day) % 7) || 7;
+    const e = new Date(d); e.setHours(0, 0, 0, 0); e.setDate(d.getDate() + toMon); end = e.getTime();
+  } else {
+    end = new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime();
+  }
+  const left = Math.max(0, end - now);
+  const days = Math.floor(left / 86400000), hrs = Math.floor((left % 86400000) / 3600000), min = Math.floor((left % 3600000) / 60000);
+  return `${days}g ${String(hrs).padStart(2, "0")}h ${String(min).padStart(2, "0")}m`;
+}
+
+// Popout pełnych statystyk drinka (komentarze + liczby)
+function DrinkStatsModal({ drink, onClose }: { drink: any; onClose: () => void }) {
+  const [comments, setComments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await supabase.from("drink_comments").select("*").eq("drink_id", drink.id).order("created_at", { ascending: false });
+        setComments(data || []);
+      } catch { setComments([]); }
+      setLoading(false);
+    })();
+  }, [drink.id]);
+  return (
+    <div className="admin-modal-overlay" onClick={onClose}>
+      <div className="admin-modal admin-modal-wide" onClick={(e) => e.stopPropagation()}>
+        <h3>{drink.name} <span style={{ opacity: 0.5, fontWeight: 400, fontSize: 14 }}>di {drink.author_name}</span></h3>
+        <div className="drk-stats-grid">
+          <div className="drk-stat"><span className="drk-stat-ico">👁</span><strong>{drink.views || 0}</strong><span>Visualizzazioni</span></div>
+          <div className="drk-stat"><span className="drk-stat-ico">♥</span><strong>{drink.likes || 0}</strong><span>Mi piace</span></div>
+          <div className="drk-stat"><span className="drk-stat-ico">💬</span><strong>{drink.comments || comments.length}</strong><span>Commenti</span></div>
+          <div className="drk-stat"><span className="drk-stat-ico">🍸</span><strong>{drink.claimed_count || 0}</strong><span>Ordini/Ritiri</span></div>
+        </div>
+        <div className="drk-stats-cmts">
+          <span className="admin-field-lbl">Commenti</span>
+          {loading ? <p className="admin-empty">…</p> : comments.length === 0 ? <p className="admin-empty">Nessun commento.</p> : comments.map((c) => (
+            <div key={c.id} className="drk-cmt-row">
+              <span className="amsg-avatar" style={{ width: 28, height: 28, fontSize: 12 }}>{(c.author || "?").charAt(0).toUpperCase()}</span>
+              <div><strong>{c.author}</strong> <span style={{ opacity: 0.8 }}>{/^https?:\/\/\S+\.(gif|webp|png|jpe?g)/i.test(c.content) ? "🖼 GIF/foto" : c.content}</span>
+                <div style={{ fontSize: 11, opacity: 0.4 }}>{new Date(c.created_at).toLocaleString("it-IT")}</div></div>
+            </div>
+          ))}
+        </div>
+        <div className="admin-modal-actions">
+          <button className="admin-btn-ghost" onClick={onClose}>Chiudi</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DrinksPanel() {
   const [drinks, setDrinks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<"week" | "month">("month");
   const [swipe, setSwipe] = useState<{ id: string; x: number }>({ id: "", x: 0 });
   const swipeStart = useRef<{ x: number; id: string } | null>(null);
+  const movedRef = useRef(false);
+  const [statsDrink, setStatsDrink] = useState<any>(null);
+  const [, forceTick] = useState(0);
+  useEffect(() => { const t = setInterval(() => forceTick((n) => n + 1), 30000); return () => clearInterval(t); }, []);
 
   const load = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -865,6 +926,9 @@ function DrinksPanel() {
           <button className="admin-btn" onClick={announceWinner_}>👑 Ogłoś {period === "week" ? "Drink Settimana" : "Drink Mese"}</button>
         </div>
       </header>
+      <p className="drk-auto-note">⏳ Prossima proclamazione automatica {period === "week" ? "settimanale" : "mensile"} tra <strong>{adminCountdown(period)}</strong> · puoi anche proclamare ora con 👑</p>
+
+      {statsDrink && <DrinkStatsModal drink={statsDrink} onClose={() => setStatsDrink(null)} />}
 
       {loading ? <Skeleton /> : (
         <>
@@ -890,10 +954,13 @@ function DrinksPanel() {
                 <div
                   className={`admin-drink-card ${d.is_drink_of_month ? "is-month" : ""}`}
                   style={{ transform: `translateX(${sx}px)`, transition: swipeStart.current ? "none" : "transform .25s ease" }}
-                  onTouchStart={(e) => { swipeStart.current = { x: e.touches[0].clientX, id: d.id }; }}
-                  onTouchMove={(e) => { if (!swipeStart.current || swipeStart.current.id !== d.id) return; const dx = e.touches[0].clientX - swipeStart.current.x; setSwipe({ id: d.id, x: Math.max(-92, Math.min(0, dx)) }); }}
+                  onTouchStart={(e) => { swipeStart.current = { x: e.touches[0].clientX, id: d.id }; movedRef.current = false; }}
+                  onTouchMove={(e) => { if (!swipeStart.current || swipeStart.current.id !== d.id) return; const dx = e.touches[0].clientX - swipeStart.current.x; if (Math.abs(dx) > 6) movedRef.current = true; setSwipe({ id: d.id, x: Math.max(-92, Math.min(0, dx)) }); }}
                   onTouchEnd={() => { setSwipe((s) => ({ id: d.id, x: s.id === d.id && s.x < -50 ? -84 : 0 })); swipeStart.current = null; }}
+                  onClick={(e) => { if (movedRef.current) { movedRef.current = false; return; } if ((e.target as HTMLElement).closest("button")) return; setStatsDrink(d); }}
+                  role="button"
                 >
+                <button className="admin-drink-x" onClick={(e) => { e.stopPropagation(); remove(d.id); }} aria-label="Elimina">×</button>
                 {d.photo_url && <img src={d.photo_url} alt={d.name} className="admin-drink-photo" />}
                 <div className="admin-drink-info">
                   <h4>#{i+1} {d.name}{d.is_drink_of_month && <span className="admin-badge">👑</span>}</h4>
@@ -2641,6 +2708,23 @@ function AdminStyles() {
         background:linear-gradient(90deg,#dc2626,#b91c1c); color:#fff; font-weight:800; letter-spacing:0.02em; }
       .admin-swipe-fg { position:relative; z-index:2; touch-action:pan-y; }
 
+      /* ── Drink Clienti: notka auto-ogłoszenia, guzik usuwania w rogu, popout statystyk ── */
+      .drk-auto-note { margin:-6px 0 18px; font-size:12.5px; color:rgba(255,255,255,0.6); }
+      .admin-theme-light .drk-auto-note { color:rgba(0,0,0,0.55); }
+      .admin-drink-card { position:relative; cursor:pointer; }
+      .admin-drink-x { position:absolute; top:8px; right:8px; z-index:4; width:26px; height:26px; border-radius:50%;
+        border:1px solid rgba(255,255,255,0.25); background:rgba(0,0,0,0.45); color:#fff; font-size:16px; line-height:1; cursor:pointer;
+        display:grid; place-items:center; opacity:0.85; transition:all .2s; }
+      .admin-drink-x:hover { background:#dc2626; opacity:1; }
+      .drk-stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:14px 0 18px; }
+      .drk-stat { display:flex; flex-direction:column; align-items:center; gap:2px; padding:14px 8px; border-radius:14px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); }
+      .admin-theme-light .drk-stat { background:rgba(0,0,0,0.04); border-color:rgba(0,0,0,0.08); }
+      .drk-stat-ico { font-size:20px; } .drk-stat strong { font-size:22px; font-weight:800; } .drk-stat span:last-child { font-size:11px; opacity:0.6; }
+      .drk-stats-cmts { display:flex; flex-direction:column; gap:10px; max-height:40vh; overflow-y:auto; }
+      .admin-field-lbl { font-size:12px; letter-spacing:0.06em; text-transform:uppercase; opacity:0.55; }
+      .drk-cmt-row { display:flex; gap:10px; align-items:flex-start; font-size:13px; }
+      @media (max-width:600px) { .drk-stats-grid { grid-template-columns:repeat(2,1fr); } }
+
       /* ── DEFINITYWNA reguła mobilna popoutów admina (menu/eventy/skaner) — bottom-sheet ── */
       @media (max-width:768px) {
         .admin-modal-overlay { align-items:flex-end !important; justify-content:center !important; padding:0 !important; z-index:2000 !important; }
@@ -2649,6 +2733,8 @@ function AdminStyles() {
         .admin-modal-actions { position:sticky !important; bottom:0 !important; }
       }
     `}</style>
+
+
 
 
 
