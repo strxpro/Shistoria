@@ -262,18 +262,20 @@ const GLASS_POUR_Y = -1.6;
 export type PourTune = {
   bottleY_m: number; bottleY_d: number;   // wysokość butelki/puszki nad szejkerem (telefon / komputer)
   bottleX_m: number; bottleX_d: number;   // przesunięcie w bok
+  bottleZ_m: number; bottleZ_d: number;   // głębokość (przed / w szejkerze)
   scale_m: number; scale_d: number;       // skala modelu podczas lania
   tilt_m: number; tilt_d: number;         // przechył butelki przy laniu (stopnie)
-  aimX: number; aimY: number;             // korekta celu strumienia (gdzie wpada względem otworu)
+  aimX: number; aimY: number; aimZ: number; // korekta celu strumienia (gdzie wpada)
   // Szklanka (scena nalewania do szklanki) — strumień szejker→szklanka
   gStartY: number; gEndY: number; gCurve: number; gThick: number;
 };
 const POUR_TUNE_DEFAULT: PourTune = {
-  bottleY_m: 2.55, bottleY_d: 2.9,
+  bottleY_m: 1.7,  bottleY_d: 2.9,
   bottleX_m: 0.7,  bottleX_d: 1.0,
+  bottleZ_m: 1.6,  bottleZ_d: 1.6,
   scale_m: 0.5,    scale_d: 0.6,
   tilt_m: 145,     tilt_d: 140,
-  aimX: 0,         aimY: 0.4,
+  aimX: 0,         aimY: 0.4,  aimZ: 0,
   gStartY: 1.55,   gEndY: 0.7,  gCurve: 0.12, gThick: 0.03,
 };
 function getPourTune(): PourTune {
@@ -3022,6 +3024,7 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
     const T = getPourTune();
     target.x += T.aimX;
     target.y += T.aimY - 0.4; // 0.4 było stałą bazową; aimY=0.4 = bez zmian
+    target.z += T.aimZ;       // głębokość: + = bliżej kamery, - = w głąb szejkera
   }, [tx, ty, camera, _aim, target]);
 
   // G4/H: wyrównanie kamery overlay z kamerą głównej sceny (ta patrzy na camTargetRest),
@@ -3273,35 +3276,25 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
     // Ruch butelki — NA MOBILE wyłączony (strumień musi być stabilny i przyklejony do szyjki)
     const isMob2 = typeof window !== "undefined" && window.innerWidth < 768;
     const frozen = typeof window !== "undefined" && (window as any).__POUR_FREEZE;
-    // STROJENIE NA ŻYWO: gdy zatrzymane, przesuwaj butelkę/puszkę wg suwaków od razu
-    if (frozen && outer.current && !model.noStream) {
+    // STROJENIE NA ŻYWO: w fazie lania (lub gdy zatrzymane) ustawiaj butelkę/puszkę
+    // dokładnie wg suwaków — każda zmiana widoczna od razu, też na telefonie.
+    if ((pouringRef.current || frozen) && outer.current) {
       const T = getPourTune();
       const offX = isMob2 ? T.bottleX_m : T.bottleX_d;
       const bx = side === "right" ? offX : -offX;
       const by = isMob2 ? T.bottleY_m : T.bottleY_d;
+      const bz = isMob2 ? T.bottleZ_m : T.bottleZ_d;
       const sc = isMob2 ? T.scale_m : T.scale_d;
-      const ti = (side === "right" ? 1 : -1) * deg(isMob2 ? T.tilt_m : T.tilt_d);
-      outer.current.position.set(bx, by, CONFIG.shakerRest.z);
+      outer.current.position.set(bx, by, bz);
       outer.current.scale.setScalar(sc);
-      outer.current.rotation.set(0, 0, ti);
-      pouringRef.current = true; // utrzymaj widoczny strumień podczas strojenia
-    } else if (frozen && outer.current && model.noStream) {
-      const T = getPourTune();
-      const offX = isMob2 ? T.bottleX_m : T.bottleX_d;
-      const bx = side === "right" ? offX : -offX;
-      const by = isMob2 ? T.bottleY_m : T.bottleY_d;
-      const sc = isMob2 ? T.scale_m : T.scale_d;
-      const canTilt = (side === "right" ? 1 : -1) * deg(70);
-      outer.current.position.set(bx, by, CONFIG.shakerRest.z);
-      outer.current.scale.setScalar(sc);
-      outer.current.rotation.set(deg(20), 0, canTilt);
-      pouringRef.current = true;
-    }
-    if (pouringRef.current && outer.current && !isMob2 && !frozen) {
-      const offX = 1.2;
-      let targetPosX = target.x - pointer.x * 1.5;
-      targetPosX = THREE.MathUtils.clamp(targetPosX, target.x - offX, target.x + offX);
-      outer.current.position.x = THREE.MathUtils.lerp(outer.current.position.x, targetPosX, 0.08);
+      if (model.noStream) {
+        const canTilt = (side === "right" ? 1 : -1) * deg(70);
+        outer.current.rotation.set(deg(20), 0, canTilt);
+      } else {
+        const ti = (side === "right" ? 1 : -1) * deg(isMob2 ? T.tilt_m : T.tilt_d);
+        outer.current.rotation.set(0, 0, ti);
+      }
+      if (frozen) pouringRef.current = true; // utrzymaj strumień widoczny przy strojeniu
     }
     // Gdy wraca na miejsce po puszczeniu (pouringRef = false), GSAP z powrotem zajmie się osią X i Y,
     // ale my też możemy płynnie wracać do oryginału:
@@ -3443,6 +3436,7 @@ function PourTunePanel() {
   // Na telefonie edytujemy pola *_m, na komputerze *_d (plus wspólne).
   const yKey = isMob ? "bottleY_m" : "bottleY_d";
   const xKey = isMob ? "bottleX_m" : "bottleX_d";
+  const zKey = isMob ? "bottleZ_m" : "bottleZ_d";
   const sKey = isMob ? "scale_m" : "scale_d";
   const tiltKey = isMob ? "tilt_m" : "tilt_d";
 
@@ -3465,12 +3459,14 @@ function PourTunePanel() {
           <button className={`cx-tune-freeze ${frozen ? "on" : ""}`} onClick={toggleFreeze}>{frozen ? "▶ Wznów animację" : "⏸ Zatrzymaj (do strojenia)"}</button>
           <div className="cx-tune-sep">Butelka / puszka → szejker</div>
           {Row("Wysokość (Y)", yKey as keyof PourTune, 0, 4, 0.05)}
-          {Row("W bok (X)", xKey as keyof PourTune, 0, 3, 0.05)}
+          {Row("W bok (X)", xKey as keyof PourTune, -3, 3, 0.05)}
+          {Row("Głębokość (Z)", zKey as keyof PourTune, -1, 4, 0.05)}
           {Row("Skala", sKey as keyof PourTune, 0.2, 1.2, 0.02)}
           {Row("Przechył °", tiltKey as keyof PourTune, 90, 180, 1)}
           <div className="cx-tune-sep">Strumień → szejker (na żywo)</div>
           {Row("Cel X", "aimX", -2, 2, 0.02)}
           {Row("Cel Y", "aimY", -1.5, 2, 0.02)}
+          {Row("Cel Z (przód/w środku)", "aimZ", -1.5, 1.5, 0.02)}
           <div className="cx-tune-sep">Szklanka — strumień szejker→szklanka</div>
           {Row("Start (góra)", "gStartY", 0, 3, 0.02)}
           {Row("Koniec (dół)", "gEndY", -0.5, 2, 0.02)}
