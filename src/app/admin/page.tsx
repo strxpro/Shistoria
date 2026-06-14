@@ -927,18 +927,89 @@ function DrinksPanel() {
 }
 
 // ─── Orders Panel ─────────────────────────────────────────────────────────────
+function SwipeDeleteRow({ children, onDelete }: { children: React.ReactNode; onDelete: () => void }) {
+  const [dx, setDx] = useState(0);
+  const [removing, setRemoving] = useState(false);
+  const drag = useRef({ on: false, sx: 0, moved: false });
+  const TH = 90;
+  const down = (e: React.PointerEvent) => { drag.current = { on: true, sx: e.clientX, moved: false }; };
+  const move = (e: React.PointerEvent) => { if (!drag.current.on) return; const d = e.clientX - drag.current.sx; if (Math.abs(d) > 6) drag.current.moved = true; setDx(Math.max(0, Math.min(170, d))); };
+  const up = () => {
+    if (!drag.current.on) return; drag.current.on = false;
+    if (dx >= TH) { setRemoving(true); setTimeout(onDelete, 300); } else setDx(0);
+  };
+  return (
+    <div className={`admin-swipe ${removing ? "removing" : ""}`}>
+      <div className="admin-swipe-trash"><span>🗑 Elimina</span></div>
+      <div className="admin-swipe-fg" style={{ transform: `translateX(${removing ? 480 : dx}px)`, transition: drag.current.on ? "none" : "transform .3s cubic-bezier(.2,.8,.2,1)" }}
+        onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function QrScanner({ onDetected }: { onDetected: (text: string) => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [err, setErr] = useState("");
+  const [supported, setSupported] = useState(true);
+  useEffect(() => {
+    let stream: MediaStream | null = null;
+    let raf = 0;
+    let stopped = false;
+    const Detector = (typeof window !== "undefined") ? (window as any).BarcodeDetector : null;
+    if (!Detector) { setSupported(false); return; }
+    const detector = new Detector({ formats: ["qr_code"] });
+    (async () => {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        if (videoRef.current) { videoRef.current.srcObject = stream; await videoRef.current.play(); }
+        const tick = async () => {
+          if (stopped) return;
+          try {
+            if (videoRef.current && videoRef.current.readyState >= 2) {
+              const codes = await detector.detect(videoRef.current);
+              if (codes && codes[0]?.rawValue) { onDetected(codes[0].rawValue); return; }
+            }
+          } catch { /* ignore frame */ }
+          raf = requestAnimationFrame(tick);
+        };
+        raf = requestAnimationFrame(tick);
+      } catch { setErr("Impossibile accedere alla fotocamera. Concedi il permesso o usa il codice."); }
+    })();
+    return () => { stopped = true; cancelAnimationFrame(raf); stream?.getTracks().forEach((t) => t.stop()); };
+  }, [onDetected]);
+  if (!supported) return <p style={{ fontSize: 13, opacity: 0.7, textAlign: "center", margin: "8px 0 14px" }}>📷 Scanner automatico non supportato qui — inserisci il codice di 4 caratteri qui sotto.</p>;
+  return (
+    <div className="admin-qrcam">
+      <video ref={videoRef} playsInline muted />
+      <div className="admin-qrcam-frame" />
+      {err && <p style={{ color: "#ff8a8a", fontSize: 13, marginTop: 8 }}>{err}</p>}
+    </div>
+  );
+}
+
 function OrdersPanel() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "pending" | "completed">("all");
   const [scanOpen, setScanOpen] = useState(false);
+  const [camOn, setCamOn] = useState(false);
   const [codeInput, setCodeInput] = useState("");
   const [scanMsg, setScanMsg] = useState("");
 
   const load = async (silent = false) => {
     if (!silent) setLoading(true);
     const { data } = await supabase.from("drink_orders").select("*").order("created_at", { ascending: false }).limit(200);
-    setOrders(data || []);
+    const rows = data || [];
+    // Auto-„Fatto": zamówienia starsze niż 15 min wciąż „in attesa" → automatycznie completate (sprzątanie)
+    const stale = rows.filter((o: any) => o.status !== "completed" && (Date.now() - new Date(o.created_at).getTime()) / 60000 > 15);
+    if (stale.length) {
+      const ids = stale.map((o: any) => o.id);
+      supabase.from("drink_orders").update({ status: "completed", auto_completed: true }).in("id", ids).then(() => { /* best-effort */ });
+      stale.forEach((o: any) => { o.status = "completed"; });
+    }
+    setOrders(rows);
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
@@ -952,10 +1023,14 @@ function OrdersPanel() {
     await supabase.from("drink_orders").update({ status: "completed", scanned_at: new Date().toISOString() }).eq("id", id);
     load();
   };
+  const deleteOrder = async (id: string) => {
+    await supabase.from("drink_orders").delete().eq("id", id);
+    setOrders((prev) => prev.filter((o) => o.id !== id));
+  };
 
-  // Odbiór przez 4-znakowy kod (ważny 15 min — sprawdzane po created_at)
-  const redeemByCode = async () => {
-    const code = codeInput.trim().toUpperCase();
+  // Odbiór przez kod (ważny 15 min)
+  const redeemByCode = async (raw?: string) => {
+    const code = (typeof raw === "string" ? raw : codeInput).trim().toUpperCase();
     if (code.length < 4) { setScanMsg("Codice troppo corto"); return; }
     const { data } = await supabase.from("drink_orders").select("*").eq("pickup_code", code).order("created_at", { ascending: false }).limit(1);
     const order = data?.[0];
@@ -966,7 +1041,24 @@ function OrdersPanel() {
     await markDone(order.id);
     setScanMsg(`✓ ${order.drink_name} — consegnato!`);
     setCodeInput("");
-    setTimeout(() => { setScanOpen(false); setScanMsg(""); }, 1800);
+    setTimeout(() => { setScanOpen(false); setCamOn(false); setScanMsg(""); }, 1800);
+  };
+
+  // Odczyt z aparatu (QR zawiera URL /order/<id> albo sam kod)
+  const onScanDetected = async (text: string) => {
+    setCamOn(false);
+    const m = text.match(/\/order\/([^/?#\s]+)/);
+    if (m) {
+      const id = m[1];
+      const order = orders.find((o) => o.id === id);
+      if (order?.status === "completed") { setScanMsg("⚠ Già ritirato"); return; }
+      await markDone(id);
+      setScanMsg(`✓ ${order?.drink_name || "Drink"} — consegnato!`);
+      setTimeout(() => { setScanOpen(false); setScanMsg(""); }, 1800);
+    } else {
+      // może to sam kod
+      redeemByCode(text.replace(/[^A-Za-z0-9]/g, "").slice(0, 6));
+    }
   };
 
   const filtered = orders.filter((o) => filter === "all" ? true : o.status === (filter === "completed" ? "completed" : "pending") || (filter === "pending" && !o.status));
@@ -981,24 +1073,26 @@ function OrdersPanel() {
               <button key={id} className={filter === id ? "active" : ""} onClick={() => setFilter(id)}>{lbl}</button>
             ))}
           </div>
-          <button className="admin-btn" onClick={() => { setScanOpen(true); setScanMsg(""); }}>📷 Scansiona / Codice</button>
+          <button className="admin-btn" onClick={() => { setScanOpen(true); setScanMsg(""); setCamOn(true); }}>📷 Scansiona / Codice</button>
         </div>
       </header>
 
       {scanOpen && (
-        <div className="admin-modal-overlay" onClick={() => setScanOpen(false)}>
+        <div className="admin-modal-overlay" onClick={() => { setScanOpen(false); setCamOn(false); }}>
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
             <h3>Ritira drink</h3>
-            <p style={{ opacity: 0.6, fontSize: 13, marginBottom: 16 }}>Scansiona il QR del cliente con la fotocamera, oppure inserisci il codice di 4 caratteri (valido 15 min).</p>
-            <a className="admin-btn" href="https://www.google.com/search?q=scanner+qr+online" target="_blank" rel="noopener" style={{ display: "block", textAlign: "center", marginBottom: 14 }}>📷 Apri fotocamera per QR</a>
+            <p style={{ opacity: 0.6, fontSize: 13, marginBottom: 14 }}>Inquadra il QR del cliente con la fotocamera, oppure inserisci il codice di 4 caratteri (valido 15 min).</p>
+            {camOn ? <QrScanner onDetected={onScanDetected} /> : (
+              <button className="admin-btn" onClick={() => setCamOn(true)} style={{ display: "block", width: "100%", marginBottom: 14 }}>📷 Apri fotocamera</button>
+            )}
             <div className="admin-form">
               <label>Codice ritiro (4 caratteri)</label>
               <input value={codeInput} maxLength={6} onChange={(e) => { setCodeInput(e.target.value.toUpperCase()); setScanMsg(""); }} placeholder="es. A7K2" style={{ textTransform: "uppercase", letterSpacing: "0.3em", fontSize: 22, textAlign: "center" }} onKeyDown={(e) => e.key === "Enter" && redeemByCode()} />
             </div>
             {scanMsg && <p style={{ textAlign: "center", fontWeight: 700, margin: "12px 0" }}>{scanMsg}</p>}
             <div className="admin-modal-actions">
-              <button className="admin-btn" onClick={redeemByCode}>Conferma ritiro</button>
-              <button className="admin-btn-ghost" onClick={() => setScanOpen(false)}>Chiudi</button>
+              <button className="admin-btn" onClick={() => redeemByCode()}>Conferma ritiro</button>
+              <button className="admin-btn-ghost" onClick={() => { setScanOpen(false); setCamOn(false); }}>Chiudi</button>
             </div>
           </div>
         </div>
@@ -1007,22 +1101,24 @@ function OrdersPanel() {
       {loading ? <Skeleton /> : (
         <div className="admin-orders">
           {filtered.map((o) => (
-            <div key={o.id} className={`admin-order ${o.status === "completed" ? "done" : ""}`}>
-              <div className="admin-order-info">
-                <h4>{o.drink_name}</h4>
-                <span>di {o.author_name} · {o.total_ml}ml · {o.strength_label}</span>
-                <span className="admin-order-time">{new Date(o.created_at).toLocaleString("it-IT")}</span>
-                {o.pickup_code && <span className="ord-code">Codice: <strong>{o.pickup_code}</strong></span>}
+            <SwipeDeleteRow key={o.id} onDelete={() => deleteOrder(o.id)}>
+              <div className={`admin-order ${o.status === "completed" ? "done" : ""}`}>
+                <div className="admin-order-info">
+                  <h4>{o.drink_name}</h4>
+                  <span>di {o.author_name} · {o.total_ml}ml · {o.strength_label}</span>
+                  <span className="admin-order-time">{new Date(o.created_at).toLocaleString("it-IT")}</span>
+                  {o.pickup_code && <span className="ord-code">Codice: <strong>{o.pickup_code}</strong></span>}
+                </div>
+                <div className="admin-order-ingr">
+                  {(o.ingredients || []).slice(0, 5).map((ing: any, i: number) => (
+                    <span key={i} className="admin-pill" style={{ background: (ing.color || "#888") + "33", color: ing.color || "#fff" }}>{ing.name}</span>
+                  ))}
+                </div>
+                {o.status !== "completed" ? (
+                  <button className="admin-btn" onClick={() => markDone(o.id)}>✓ Fatto</button>
+                ) : <span className="admin-done-badge">✓ Completato</span>}
               </div>
-              <div className="admin-order-ingr">
-                {(o.ingredients || []).slice(0, 5).map((ing: any, i: number) => (
-                  <span key={i} className="admin-pill" style={{ background: (ing.color || "#888") + "33", color: ing.color || "#fff" }}>{ing.name}</span>
-                ))}
-              </div>
-              {o.status !== "completed" ? (
-                <button className="admin-btn" onClick={() => markDone(o.id)}>✓ Fatto</button>
-              ) : <span className="admin-done-badge">✓ Completato</span>}
-            </div>
+            </SwipeDeleteRow>
           ))}
           {filtered.length === 0 && <p className="admin-empty">Nessun ordine in questa categoria.</p>}
         </div>
@@ -2533,8 +2629,19 @@ function AdminStyles() {
       @keyframes bellPulse { 0%,100%{ transform:scale(1);} 50%{ transform:scale(1.15);} }
       .admin-bell-badge { animation:bellPulse 2s ease-in-out infinite; }
 
-      /* ── DEFINITYWNA reguła mobilna dla WSZYSTKICH popoutów admina (menu-edycja, eventy, skaner) ──
-         Bottom-sheet, zawsze widoczny, przewijalny. !important bo wcześniejsze reguły bazowe nadpisywały. */
+      /* ── Skaner QR (kamera) ── */
+      .admin-qrcam { position:relative; width:100%; aspect-ratio:1; max-height:300px; border-radius:16px; overflow:hidden; background:#000; margin-bottom:14px; }
+      .admin-qrcam video { width:100%; height:100%; object-fit:cover; display:block; }
+      .admin-qrcam-frame { position:absolute; inset:18%; border:3px solid rgba(255,255,255,0.85); border-radius:18px; box-shadow:0 0 0 100vmax rgba(0,0,0,0.35); }
+
+      /* ── Swipe-w-prawo → usuń (listy admina) ── */
+      .admin-swipe { position:relative; border-radius:14px; overflow:hidden; }
+      .admin-swipe.removing { transition:opacity .3s ease, transform .3s ease; opacity:0; transform:scale(0.96); }
+      .admin-swipe-trash { position:absolute; inset:0; display:flex; align-items:center; padding-left:22px; border-radius:14px;
+        background:linear-gradient(90deg,#dc2626,#b91c1c); color:#fff; font-weight:800; letter-spacing:0.02em; }
+      .admin-swipe-fg { position:relative; z-index:2; touch-action:pan-y; }
+
+      /* ── DEFINITYWNA reguła mobilna popoutów admina (menu/eventy/skaner) — bottom-sheet ── */
       @media (max-width:768px) {
         .admin-modal-overlay { align-items:flex-end !important; justify-content:center !important; padding:0 !important; z-index:2000 !important; }
         .admin-modal, .admin-modal-wide { width:100vw !important; max-width:100vw !important; max-height:90vh !important;
@@ -2542,6 +2649,7 @@ function AdminStyles() {
         .admin-modal-actions { position:sticky !important; bottom:0 !important; }
       }
     `}</style>
+
 
 
 
