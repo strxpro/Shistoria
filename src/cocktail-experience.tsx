@@ -7608,7 +7608,7 @@ function CocktailStyles() {
       .cx-share-pills { display:flex; flex-wrap:wrap; gap:6px; min-width:0; }
       .cx-share-pills .cx-cc-pill { max-width:100%; overflow:hidden; text-overflow:ellipsis; }
       .cx-share-hint { font-size:13px; color:rgba(255,255,255,0.6); line-height:1.5; }
-      .cx-share-submit { margin-top:auto; }
+      .cx-share-submit { margin-top:auto; width:100%; box-sizing:border-box; white-space:normal; text-align:center; line-height:1.25; padding:14px 18px; font-size:clamp(13px,3.6vw,15px); }
       .cx-share-submit:disabled { opacity:0.4; cursor:not-allowed; }
       .cx-share-success { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:60px 32px; text-align:center; }
       .cx-share-success-ico { font-size:56px; }
