@@ -5545,8 +5545,8 @@ function DbDrinkCard({ d }: { d: any }) {
 
       {popout && typeof document !== "undefined" && createPortal(
         <div className="cx-cc-popout-overlay" onClick={() => setPopout(false)}>
+          <button className="cx-cc-popout-close cx-cc-popout-close-fixed" onClick={() => setPopout(false)} aria-label="Chiudi">×</button>
           <div className="cx-cc-popout" onClick={(e) => e.stopPropagation()}>
-            <button className="cx-cc-popout-close" onClick={() => setPopout(false)}>×</button>
             <div className={`cx-cc-popout-left ${d.photo_url ? "has-photo" : ""}`}>
               {d.photo_url ? <img src={d.photo_url} alt={d.name} /> : <div style={{ fontSize: 60 }}>🍸</div>}
             </div>
@@ -7591,6 +7591,8 @@ function CocktailStyles() {
         background:rgba(0,0,0,0.55); border:1px solid rgba(255,255,255,0.3); color:#fff; font-size:22px;
         display:grid; place-items:center; cursor:pointer; transition:all .25s; backdrop-filter:blur(6px); }
       .cx-cc-popout-close:hover { background:#fff; color:#000; }
+      /* Close X zawsze w rogu ekranu (poza scrollowanym popoutem, nie ucięty) */
+      .cx-cc-popout-close-fixed { position:fixed; top:max(16px, env(safe-area-inset-top)); right:16px; z-index:10001; }
       .cx-cc-burst { position:absolute; inset:0; display:grid; place-items:center; z-index:4; pointer-events:none; font-size:80px;
         animation:ccBurst .65s cubic-bezier(.17,.89,.32,1.28); filter:drop-shadow(0 4px 14px rgba(0,0,0,0.5)); }
       @keyframes ccBurst { 0%{transform:scale(0) rotate(-15deg);opacity:0;} 35%{transform:scale(1.2) rotate(6deg);opacity:1;} 70%{transform:scale(0.95);} 100%{transform:scale(1.05);opacity:0;} }
