@@ -5745,6 +5745,8 @@ function ShareDrinkBtn() {
   const [myDrink, setMyDrink] = useState<any>(null);
   const [editName, setEditName] = useState("");
   const [editAuthor, setEditAuthor] = useState("");
+  const [sharing, setSharing] = useState(false); // generowanie obrazka story
+  const [publishProgress, setPublishProgress] = useState(0); // pasek postępu publikacji (0..1)
 
   // Odświeżaj dane drinka z localStorage przy każdym otwarciu + auto-wypełnij pola edycji
   useEffect(() => {
@@ -5789,6 +5791,9 @@ function ShareDrinkBtn() {
     if (!myDrink) return;
     const finalName = editName.trim() || myDrink.name || "Senza nome";
     const finalAuthor = editAuthor.trim() || myDrink.author || "Anonimo";
+    // pasek postępu publikacji (od góry) — wizualny feedback, bez przeskoku strony
+    setPublishProgress(0.15);
+    const tick = setInterval(() => setPublishProgress((p) => Math.min(0.9, p + 0.12)), 200);
     try {
       // Publikuj do Supabase
       await publishDrink({
@@ -5818,6 +5823,9 @@ function ShareDrinkBtn() {
       } catch (e) { console.error("Make drink webhook error:", e); }
     }
     if (typeof localStorage !== "undefined") localStorage.setItem("sh-drink-shared", "true");
+    clearInterval(tick);
+    setPublishProgress(1);
+    setTimeout(() => setPublishProgress(0), 1200);
     setSentName(finalName);
     setSent(true);
   };
@@ -5845,10 +5853,88 @@ function ShareDrinkBtn() {
     }
     copyShare();
   };
-  const shareIG = async () => {
-    // IG nie pozwala na pre-fill z webu — kopiujemy szablon i otwieramy Instagram
-    await copyShare();
-    window.open("https://www.instagram.com/", "_blank");
+
+  // Wczytaj obraz (Promise) — do rysowania na canvasie
+  const loadImg = (src: string): Promise<HTMLImageElement> => new Promise((res, rej) => {
+    const im = new Image(); im.crossOrigin = "anonymous";
+    im.onload = () => res(im); im.onerror = rej; im.src = src;
+  });
+
+  // Generuj obrazek STORY 1080×1920 z szablonem S'Historia (zdjęcie + nazwa + autor + logo + link)
+  const genStoryImage = async (): Promise<Blob | null> => {
+    try {
+      const W = 1080, H = 1920;
+      const c = document.createElement("canvas"); c.width = W; c.height = H;
+      const ctx = c.getContext("2d"); if (!ctx) return null;
+      const col = myDrink?.color || "#E8927C";
+      // tło — granat + poświata w kolorze drinka
+      const g = ctx.createLinearGradient(0, 0, 0, H);
+      g.addColorStop(0, "#0E222F"); g.addColorStop(1, "#081019");
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      const glow = ctx.createRadialGradient(W / 2, 760, 80, W / 2, 760, 760);
+      glow.addColorStop(0, col + "55"); glow.addColorStop(1, "transparent");
+      ctx.fillStyle = glow; ctx.fillRect(0, 0, W, H);
+      // zdjęcie drinka — duży zaokrąglony kwadrat, wyśrodkowany
+      if (photo) {
+        const img = await loadImg(photo);
+        const S = 760, x = (W - S) / 2, y = 430, r = 48;
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(x + r, y); ctx.arcTo(x + S, y, x + S, y + S, r); ctx.arcTo(x + S, y + S, x, y + S, r);
+        ctx.arcTo(x, y + S, x, y, r); ctx.arcTo(x, y, x + S, y, r); ctx.closePath(); ctx.clip();
+        // cover
+        const ar = img.width / img.height; let dw = S, dh = S, dx = x, dy = y;
+        if (ar > 1) { dh = S; dw = S * ar; dx = x - (dw - S) / 2; } else { dw = S; dh = S / ar; dy = y - (dh - S) / 2; }
+        ctx.drawImage(img, dx, dy, dw, dh);
+        ctx.restore();
+        ctx.strokeStyle = "rgba(255,255,255,0.18)"; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + S, y, x + S, y + S, r); ctx.arcTo(x + S, y + S, x, y + S, r); ctx.arcTo(x, y + S, x, y, r); ctx.arcTo(x, y, x + S, y, r); ctx.closePath(); ctx.stroke();
+      }
+      // logo (białe) na górze
+      try { const logo = await loadImg("/logo.png"); const lw = 280, lh = lw * (logo.height / logo.width || 0.4); ctx.drawImage(logo, (W - lw) / 2, 150, lw, lh); } catch { /* brak logo */ }
+      ctx.textAlign = "center";
+      // tagline
+      ctx.fillStyle = col; ctx.font = "700 30px Arial"; ctx.fillText("RISTORANTE · BAR · COCKTAIL", W / 2, 360);
+      // nazwa drinka
+      ctx.fillStyle = "#F5EDE0"; ctx.font = "800 84px Georgia";
+      const name = (editName || myDrink?.name || "Drink").slice(0, 24);
+      ctx.fillText(name, W / 2, 1320);
+      // autor
+      ctx.fillStyle = "rgba(255,255,255,0.75)"; ctx.font = "400 40px Arial";
+      ctx.fillText(`by ${(editAuthor || myDrink?.author || "Anonimo").slice(0, 24)}`, W / 2, 1390);
+      // hasło (przetłumaczone)
+      const slogan: Record<string, string> = {
+        it: "Crea il tuo drink da S'Historia 🍸", pl: "Stwórz swój drink w S'Historia 🍸",
+        en: "Create your drink at S'Historia 🍸", de: "Misch deinen Drink im S'Historia 🍸",
+        fr: "Crée ton cocktail chez S'Historia 🍸", es: "Crea tu trago en S'Historia 🍸",
+      };
+      ctx.fillStyle = "#5BB8D4"; ctx.font = "600 36px Arial";
+      ctx.fillText(slogan[sLang] || slogan.it, W / 2, 1560);
+      // link
+      ctx.fillStyle = "rgba(255,255,255,0.9)"; ctx.font = "700 40px Arial";
+      ctx.fillText("www.shistoria.it", W / 2, 1680);
+      return await new Promise<Blob | null>((res) => c.toBlob((b) => res(b), "image/png", 0.92));
+    } catch (e) { console.error("story image error", e); return null; }
+  };
+
+  // Udostępnij STORY: generuje obrazek i otwiera systemowe udostępnianie (telefon → IG/WhatsApp/FB),
+  // albo (desktop) pobiera obrazek + otwiera platformę.
+  const shareStory = async (platform: "instagram" | "facebook" | "whatsapp") => {
+    setSharing(true);
+    const blob = await genStoryImage();
+    setSharing(false);
+    if (!blob) { copyShare(); return; }
+    const file = new File([blob], "shistoria-drink.png", { type: "image/png" });
+    const navAny = navigator as any;
+    // Telefon: natywne udostępnianie z plikiem → user wybiera IG/WhatsApp/FB i wrzuca na story
+    if (navAny.canShare && navAny.canShare({ files: [file] })) {
+      try { await navAny.share({ files: [file], text: `${shareText} ${siteUrl}` }); return; } catch { /* anulowano → fallback */ }
+    }
+    // Desktop / brak Web Share: pobierz obrazek + otwórz platformę
+    try { const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "shistoria-drink.png"; a.click(); setTimeout(() => URL.revokeObjectURL(url), 4000); } catch {}
+    if (platform === "facebook") window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(siteUrl)}`, "_blank");
+    else if (platform === "whatsapp") window.open(`https://wa.me/?text=${encodeURIComponent(`${shareText} ${siteUrl}`)}`, "_blank");
+    else window.open("https://www.instagram.com/", "_blank");
   };
 
   if (alreadySent && !open) {
@@ -5863,6 +5949,9 @@ function ShareDrinkBtn() {
         <div className="cx-share-overlay" onClick={() => setOpen(false)}>
           <div className="cx-share-popout" onClick={(e) => e.stopPropagation()}>
             <button className="cx-cc-popout-close" onClick={() => setOpen(false)}>×</button>
+            {publishProgress > 0 && (
+              <div className="cx-share-progress"><div className="cx-share-progress-fill" style={{ width: `${Math.round(publishProgress * 100)}%` }} /></div>
+            )}
             {sent ? (
               <div className="cx-share-success">
                 <span className="cx-share-success-ico">🎉</span>
@@ -5871,18 +5960,18 @@ function ShareDrinkBtn() {
                 {/* D5: udostępnij w social = większa szansa na Drink Miesiąca */}
                 <p className="cx-share-social-hint">{(() => { const L: Record<string, string> = { it: "Condividi sui social → più voti → più chance di vincere il Drink del Mese! 📣", pl: "Udostępnij w social mediach → więcej głosów → większa szansa na Drink Miesiąca! 📣", en: "Share on socials → more votes → better chance to win Drink of the Month! 📣", de: "Teile es in Social Media → mehr Stimmen → bessere Chance auf den Drink des Monats! 📣", fr: "Partage sur les réseaux → plus de votes → plus de chances de gagner le Cocktail du Mois! 📣", es: "Comparte en redes → más votos → ¡más chances de ganar el Drink del Mes! 📣" }; return L[sLang] ?? L.it; })()}</p>
                 <div className="cx-cc-sharebar cx-share-socialbar">
-                  <button className="cx-cc-share-ico" onClick={shareNative} aria-label="Share" title="Share">📤</button>
-                  <button className="cx-cc-share-ico" onClick={shareIG} aria-label="Instagram" title="Instagram">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg>
+                  <button className="cx-cc-share-ico cx-share-ig" onClick={() => shareStory("instagram")} aria-label="Instagram Story" title="Instagram Story">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg>
                   </button>
-                  <a className="cx-cc-share-ico" href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(siteUrl)}&quote=${encodeURIComponent(shareText)}`} target="_blank" rel="noreferrer" aria-label="Facebook" title="Facebook">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M13.5 21v-7h2.4l.4-3h-2.8V9.1c0-.9.3-1.5 1.6-1.5h1.3V4.9c-.2 0-1-.1-1.9-.1-1.9 0-3.2 1.2-3.2 3.3V11H9v3h2.3v7h2.2z"/></svg>
-                  </a>
-                  <a className="cx-cc-share-ico" href={`https://wa.me/?text=${encodeURIComponent(`${shareText} ${siteUrl}`)}`} target="_blank" rel="noreferrer" aria-label="WhatsApp" title="WhatsApp">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm5 14.2c-.2.6-1.2 1.2-1.7 1.2-.4.1-1 .1-1.6-.1-.4-.1-.9-.3-1.5-.6-2.6-1.1-4.3-3.8-4.4-4-.1-.2-1.1-1.4-1.1-2.7 0-1.3.7-1.9.9-2.2.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.4.2.5.7 1.8.8 1.9.1.1.1.3 0 .5-.1.2-.1.3-.3.5l-.4.5c-.1.1-.3.3-.1.6.2.3.7 1.2 1.6 1.9 1.1 1 2 1.3 2.3 1.4.3.1.5.1.6-.1.2-.2.7-.8.9-1.1.2-.3.4-.2.6-.1.3.1 1.7.8 2 .9.3.2.5.2.5.4.1.1.1.7-.1 1.3z"/></svg>
-                  </a>
+                  <button className="cx-cc-share-ico cx-share-fb" onClick={() => shareStory("facebook")} aria-label="Facebook" title="Facebook">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M13.5 21v-7h2.4l.4-3h-2.8V9.1c0-.9.3-1.5 1.6-1.5h1.3V4.9c-.2 0-1-.1-1.9-.1-1.9 0-3.2 1.2-3.2 3.3V11H9v3h2.3v7h2.2z"/></svg>
+                  </button>
+                  <button className="cx-cc-share-ico cx-share-wa" onClick={() => shareStory("whatsapp")} aria-label="WhatsApp" title="WhatsApp">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm5 14.2c-.2.6-1.2 1.2-1.7 1.2-.4.1-1 .1-1.6-.1-.4-.1-.9-.3-1.5-.6-2.6-1.1-4.3-3.8-4.4-4-.1-.2-1.1-1.4-1.1-2.7 0-1.3.7-1.9.9-2.2.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.4.2.5.7 1.8.8 1.9.1.1.1.3 0 .5-.1.2-.1.3-.3.5l-.4.5c-.1.1-.3.3-.1.6.2.3.7 1.2 1.6 1.9 1.1 1 2 1.3 2.3 1.4.3.1.5.1.6-.1.2-.2.7-.8.9-1.1.2-.3.4-.2.6-.1.3.1 1.7.8 2 .9.3.2.5.2.5.4.1.1.1.7-.1 1.3z"/></svg>
+                  </button>
                   <button className="cx-cc-share-ico" onClick={copyShare} aria-label="Copia link" title="Copia link">{linkCopied ? "✓" : "🔗"}</button>
                 </div>
+                {sharing && <p className="cx-share-gen">{(() => { const L: Record<string,string> = {it:"Genero la storia…",pl:"Tworzę relację…",en:"Creating story…",de:"Erstelle Story…",fr:"Création de la story…",es:"Creando la historia…"}; return L[sLang] ?? L.it; })()}</p>}
               </div>
             ) : (
               <div className="cx-share-form">
@@ -7603,6 +7692,14 @@ function CocktailStyles() {
         border-radius:12px; padding:8px 12px; margin:2px 0; }
       .cx-share-edit-ico { font-size:13px; opacity:0.7; flex-shrink:0; }
       .cx-share-flabel { display:block; font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--cx-accent,#E8927C); font-weight:800; margin:8px 2px 2px; }
+      /* Story share — ikony marek + pasek postępu publikacji */
+      .cx-share-progress { position:absolute; top:0; left:0; right:0; height:4px; background:rgba(255,255,255,0.1); border-radius:4px 4px 0 0; overflow:hidden; z-index:10; }
+      .cx-share-progress-fill { height:100%; background:linear-gradient(90deg,#E8927C,#5BB8D4); transition:width .25s ease; }
+      .cx-share-gen { font-size:12px; color:rgba(255,255,255,0.6); margin-top:8px; }
+      .cx-share-ig { background:linear-gradient(45deg,#feda75,#fa7e1e,#d62976,#962fbf,#4f5bd5) !important; color:#fff !important; border:none !important; }
+      .cx-share-fb { background:#1877F2 !important; color:#fff !important; border:none !important; }
+      .cx-share-wa { background:#25D366 !important; color:#fff !important; border:none !important; }
+      .cx-share-ig:hover, .cx-share-fb:hover, .cx-share-wa:hover { transform:scale(1.1); }
       .cx-share-edit input { flex:1; min-width:0; background:none; border:none; outline:none; color:#fff; font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:20px; }
       .cx-share-edit-author input { font-family:var(--f-body); font-weight:600; font-size:14px; }
       .cx-share-edit input::placeholder { color:rgba(255,255,255,0.4); }
