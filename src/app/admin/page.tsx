@@ -1526,10 +1526,76 @@ function MessagesPanel({ compose, onComposeUsed }: { compose?: { email: string; 
 }
 
 // ─── Ospiti Panel (CRM — wszyscy ludzie z mailami + powiązania) ───────────────
+function GuestDetailModal({ guest, onClose, onWrite }: { guest: any; onClose: () => void; onWrite: (g: any) => void }) {
+  const [data, setData] = useState<{ drinks: any[]; orders: number; reviews: any[]; comments: any[] } | null>(null);
+  const flag = (c: string) => ({ it: "🇮🇹", pl: "🇵🇱", en: "🇬🇧", de: "🇩🇪", fr: "🇫🇷", es: "🇪🇸" } as Record<string, string>)[c] || "🌐";
+  useEffect(() => {
+    (async () => {
+      try {
+        const [drk, ord, rev, cmt] = await Promise.all([
+          supabase.from("community_drinks").select("id,name,likes,claimed_count,created_at").or(`author_email.eq.${guest.email},author_name.eq.${guest.name}`),
+          supabase.from("drink_orders").select("id", { count: "exact", head: true }).eq("author_name", guest.name),
+          supabase.from("reviews").select("content,stars,created_at").eq("email", guest.email).order("created_at", { ascending: false }),
+          supabase.from("drink_comments").select("content,created_at,drink_id").eq("author", guest.name).order("created_at", { ascending: false }).limit(20),
+        ]);
+        setData({ drinks: drk.data || [], orders: ord.count || 0, reviews: rev.data || [], comments: cmt.data || [] });
+      } catch { setData({ drinks: [], orders: 0, reviews: [], comments: [] }); }
+    })();
+  }, [guest.email, guest.name]);
+  const tags: string[] = [...(guest.tags || [])];
+  return (
+    <div className="admin-modal-overlay" onClick={onClose}>
+      <div className="admin-modal admin-modal-wide" onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <span className="amsg-avatar" style={{ width: 48, height: 48, fontSize: 20 }}>{(guest.name || "?").charAt(0).toUpperCase()}</span>
+          <div><h3 style={{ margin: 0 }}>{guest.name} {flag(guest.lang)}</h3><p style={{ margin: 0, opacity: 0.6, fontSize: 13 }}>{guest.email}</p></div>
+        </div>
+        <div className="amsg-person" style={{ margin: "12px 0 4px" }}>
+          {tags.map((tg) => <span key={tg} className="amsg-badge">{tg === "newsletter" ? "📧 Newsletter" : tg === "messaggi" ? "💬 Messaggi" : "⭐ Recensione"}</span>)}
+        </div>
+        {!data ? <p className="admin-empty">…</p> : (
+          <>
+            <div className="drk-stats-grid" style={{ gridTemplateColumns: "repeat(4,1fr)" }}>
+              <div className="drk-stat"><span className="drk-stat-ico">🍸</span><strong>{data.drinks.length}</strong><span>Drink creati</span></div>
+              <div className="drk-stat"><span className="drk-stat-ico">📱</span><strong>{data.orders}</strong><span>Ordini</span></div>
+              <div className="drk-stat"><span className="drk-stat-ico">💬</span><strong>{data.comments.length}</strong><span>Commenti</span></div>
+              <div className="drk-stat"><span className="drk-stat-ico">⭐</span><strong>{data.reviews.length}</strong><span>Recensioni</span></div>
+            </div>
+            {data.drinks.length > 0 && (
+              <div className="drk-stats-cmts" style={{ marginTop: 14 }}>
+                <span className="admin-field-lbl">Drink creati</span>
+                {data.drinks.map((d, i) => <div key={i} className="drk-cmt-row"><span>🍸 <strong>{d.name}</strong> · ♥{d.likes || 0} · 🍸{d.claimed_count || 0}</span></div>)}
+              </div>
+            )}
+            {data.comments.length > 0 && (
+              <div className="drk-stats-cmts" style={{ marginTop: 10 }}>
+                <span className="admin-field-lbl">Commenti lasciati</span>
+                {data.comments.slice(0, 8).map((c, i) => <div key={i} className="drk-cmt-row"><span style={{ opacity: 0.85 }}>{/^https?:\/\//.test(c.content) ? "🖼 GIF/foto" : c.content}</span></div>)}
+              </div>
+            )}
+            {data.reviews.length > 0 && (
+              <div className="drk-stats-cmts" style={{ marginTop: 10 }}>
+                <span className="admin-field-lbl">Recensioni</span>
+                {data.reviews.map((r, i) => <div key={i} className="drk-cmt-row"><span>{"★".repeat(r.stars || 0)} {r.content}</span></div>)}
+              </div>
+            )}
+            <p style={{ fontSize: 11, opacity: 0.4, marginTop: 12 }}>ℹ️ Tempo sul sito / sezioni preferite sono anonimi (per sessione) e non collegati all'email.</p>
+          </>
+        )}
+        <div className="admin-modal-actions">
+          <button className="admin-btn" onClick={() => { onWrite({ email: guest.email, name: guest.name, lang: guest.lang }); onClose(); }}>✉️ Scrivi (in italiano → tradotto)</button>
+          <button className="admin-btn-ghost" onClick={onClose}>Chiudi</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function OspitiPanel({ onWrite }: { onWrite: (g: { email: string; name?: string; lang?: string }) => void }) {
   const [guests, setGuests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [detail, setDetail] = useState<any>(null);
 
   const load = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -1575,8 +1641,9 @@ function OspitiPanel({ onWrite }: { onWrite: (g: { email: string; name?: string;
       </div>
       {loading ? <Skeleton /> : (
         <div className="admin-orders">
+          {detail && <GuestDetailModal guest={detail} onClose={() => setDetail(null)} onWrite={onWrite} />}
           {filtered.map((g) => (
-            <div key={g.email} className="admin-order">
+            <div key={g.email} className="admin-order" style={{ cursor: "pointer" }} onClick={(e) => { if ((e.target as HTMLElement).closest("button")) return; setDetail(g); }}>
               <span className="amsg-avatar">{(g.name || "?").charAt(0).toUpperCase()}</span>
               <div className="admin-order-info" style={{ flex: 1 }}>
                 <h4>{g.name} <span style={{ opacity: 0.5, fontWeight: 400, fontSize: 13 }}>{flag(g.lang)}</span></h4>
