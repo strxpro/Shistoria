@@ -5476,6 +5476,59 @@ function OrganicFlood({ floodRef, grainRef }: { floodRef: React.RefObject<HTMLDi
  * CommunitySection — "I cocktail dei clienti" (awwwards-style karty).
  * ──────────────────────────────────────────────────────────────────────── */
 
+/* Czy treść komentarza to obrazek/GIF (URL) — wtedy renderujemy <img>, nie tekst */
+function isMediaUrl(s: string): boolean {
+  return /^https?:\/\/\S+\.(gif|webp|png|jpe?g)(\?\S*)?$/i.test((s || "").trim()) || /giphy\.com\/media\//i.test(s || "");
+}
+
+/* Wyszukiwarka GIF / memów (GIPHY) — pigułka pod polem komentarza. Klucz: NEXT_PUBLIC_GIPHY_KEY */
+function GifPicker({ onPick, onClose, lang }: { onPick: (url: string) => void; onClose: () => void; lang: string }) {
+  const [q, setQ] = useState("");
+  const [gifs, setGifs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const KEY = process.env.NEXT_PUBLIC_GIPHY_KEY || "";
+  useEffect(() => {
+    if (!KEY) return;
+    let cancelled = false;
+    const run = async () => {
+      setLoading(true);
+      try {
+        const url = q.trim()
+          ? `https://api.giphy.com/v1/gifs/search?api_key=${KEY}&q=${encodeURIComponent(q)}&limit=18&rating=pg-13&lang=${lang}`
+          : `https://api.giphy.com/v1/gifs/trending?api_key=${KEY}&limit=18&rating=pg-13`;
+        const r = await fetch(url); const j = await r.json();
+        if (!cancelled) setGifs(j?.data || []);
+      } catch { if (!cancelled) setGifs([]); }
+      if (!cancelled) setLoading(false);
+    };
+    const t = setTimeout(run, 300);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [q, KEY, lang]);
+  const ph = ({ it: "Cerca GIF / meme…", pl: "Szukaj GIF / mem…", en: "Search GIF / meme…", de: "GIF / Meme suchen…", fr: "Chercher GIF / mème…", es: "Buscar GIF / meme…" } as Record<string, string>)[lang] || "Cerca GIF…";
+  return (
+    <div className="cx-gifpick" onClick={(e) => e.stopPropagation()}>
+      <div className="cx-gifpick-bar">
+        <input autoFocus className="cx-gifpick-input" value={q} onChange={(e) => setQ(e.target.value)} placeholder={ph} />
+        <button className="cx-gifpick-x" onClick={onClose} aria-label="Chiudi">×</button>
+      </div>
+      {!KEY ? (
+        <p className="cx-gifpick-msg">GIPHY non configurato (NEXT_PUBLIC_GIPHY_KEY)</p>
+      ) : loading && gifs.length === 0 ? (
+        <p className="cx-gifpick-msg">…</p>
+      ) : (
+        <div className="cx-gifpick-grid">
+          {gifs.map((g) => (
+            <button key={g.id} className="cx-gifpick-item" onClick={() => onPick(g.images?.fixed_height_small?.url || g.images?.original?.url || "")}>
+              <img src={g.images?.fixed_height_small?.url} alt="" loading="lazy" />
+            </button>
+          ))}
+        </div>
+      )}
+      <span className="cx-gifpick-credit">Powered by GIPHY</span>
+    </div>
+  );
+}
+
 /* ──────────────────────────────────────────────────────────────────────────
  * DbDrinkCard — karta drinka z bazy (Supabase) z pełnymi funkcjami:
  * zdjęcie, double-tap serce, lajki, komentarze, zamów (QR).
@@ -5512,8 +5565,10 @@ function DbDrinkCard({ d }: { d: any }) {
   const [replyTo, setReplyTo] = useState<{ id: string; author: string } | null>(null);
   const cmtInputRef = useRef<HTMLInputElement>(null);
   const [cmtTr, setCmtTr] = useState<Record<string, string>>({}); // przetłumaczone komentarze (id → tekst)
+  const [gifOpen, setGifOpen] = useState(false); // wyszukiwarka GIF/memów
   const focusComment = () => { setPopout(true); setTimeout(() => cmtInputRef.current?.focus(), 80); };
   const translateComment = async (c: any) => {
+    if (isMediaUrl(c.content)) return; // GIF/obrazek — nie tłumaczymy
     if (cmtTr[c.id]) { setCmtTr((m) => { const n = { ...m }; delete n[c.id]; return n; }); return; }
     const tlang = (typeof window !== "undefined" && (window as any).currentLanguage) || "it";
     try {
@@ -5577,11 +5632,11 @@ function DbDrinkCard({ d }: { d: any }) {
     setCmtText(`@${c.author} `);
     setTimeout(() => cmtInputRef.current?.focus(), 60);
   };
-  const submitComment = async () => {
-    const t = cmtText.trim();
+  const submitComment = async (override?: string) => {
+    const t = (typeof override === "string" ? override : cmtText).trim();
     if (!t) return;
     const parent = replyTo;
-    setCmtText("");
+    if (typeof override !== "string") setCmtText("");
     setReplyTo(null);
     let author = "Guest";
     try {
@@ -5730,10 +5785,10 @@ function DbDrinkCard({ d }: { d: any }) {
                     <div className="cx-cc-cmt-ig-row">
                       <span className="cx-cc-ava" style={{ background: avaColor(c.author) }}>{avaInit(c.author)}</span>
                       <div className="cx-cc-cmt-ig-body">
-                        <p className="cx-cc-cmt-ig-txt"><strong>{c.author}</strong> {cmtTr[c.id] || c.content}</p>
+                        <p className="cx-cc-cmt-ig-txt"><strong>{c.author}</strong> {isMediaUrl(c.content) ? <img className="cx-cc-cmt-gif" src={c.content} alt="GIF" /> : (cmtTr[c.id] || c.content)}</p>
                         <div className="cx-cc-cmt-ig-actions">
                           <button onClick={() => replyToComment(c)}>{replyLbl}</button>
-                          <button onClick={() => translateComment(c)}>{cmtTr[c.id] ? trLbl.orig : trLbl.tr}</button>
+                          {!isMediaUrl(c.content) && <button onClick={() => translateComment(c)}>{cmtTr[c.id] ? trLbl.orig : trLbl.tr}</button>}
                           {(cmtLikes[c.id] || 0) > 0 && <span className="cx-cc-cmt-ig-cnt">{cmtLikes[c.id]} ♥</span>}
                         </div>
                       </div>
@@ -5743,10 +5798,10 @@ function DbDrinkCard({ d }: { d: any }) {
                       <div key={r.id} className="cx-cc-cmt-ig-row cx-cc-cmt-ig-reply">
                         <span className="cx-cc-ava cx-cc-ava-sm" style={{ background: avaColor(r.author) }}>{avaInit(r.author)}</span>
                         <div className="cx-cc-cmt-ig-body">
-                          <p className="cx-cc-cmt-ig-txt"><strong>{r.author}</strong> {cmtTr[r.id] || r.content}</p>
+                          <p className="cx-cc-cmt-ig-txt"><strong>{r.author}</strong> {isMediaUrl(r.content) ? <img className="cx-cc-cmt-gif" src={r.content} alt="GIF" /> : (cmtTr[r.id] || r.content)}</p>
                           <div className="cx-cc-cmt-ig-actions">
                             <button onClick={() => replyToComment(c)}>{replyLbl}</button>
-                            <button onClick={() => translateComment(r)}>{cmtTr[r.id] ? trLbl.orig : trLbl.tr}</button>
+                            {!isMediaUrl(r.content) && <button onClick={() => translateComment(r)}>{cmtTr[r.id] ? trLbl.orig : trLbl.tr}</button>}
                             {(cmtLikes[r.id] || 0) > 0 && <span className="cx-cc-cmt-ig-cnt">{cmtLikes[r.id]} ♥</span>}
                           </div>
                         </div>
@@ -5761,11 +5816,13 @@ function DbDrinkCard({ d }: { d: any }) {
                     <button onClick={() => { setReplyTo(null); setCmtText(""); }} aria-label="Annulla">×</button>
                   </div>
                 )}
+                {gifOpen && <GifPicker lang={lang} onClose={() => setGifOpen(false)} onPick={(url) => { if (url) submitComment(url); setGifOpen(false); }} />}
                 <div className="cx-cc-cmt-row">
+                  <button className="cx-cc-cmt-gifbtn" onClick={() => setGifOpen((v) => !v)} aria-label="GIF">GIF</button>
                   <input ref={cmtInputRef} className="cx-cc-cmt-input" value={cmtText} onChange={(e) => setCmtText(e.target.value)}
                     placeholder={tt("addComment", "Aggiungi un commento…")} maxLength={180}
                     onKeyDown={(e) => { if (e.key === "Enter") submitComment(); }} />
-                  <button className={`cx-cc-cmt-send ${cmtText.trim() ? "on" : ""}`} onClick={submitComment}>{tt("publishCmt", "Pubblica")}</button>
+                  <button className={`cx-cc-cmt-send ${cmtText.trim() ? "on" : ""}`} onClick={() => submitComment()}>{tt("publishCmt", "Pubblica")}</button>
                 </div>
               </div>
             </div>
@@ -8073,6 +8130,19 @@ function CocktailStyles() {
       .cx-cc-cmt-input::placeholder { color:rgba(255,255,255,0.38); }
       .cx-cc-cmt-send { background:none; border:none; color:rgba(232,146,124,0.45); font-weight:700; font-size:13px; cursor:pointer; padding:6px 4px; transition:color .2s; }
       .cx-cc-cmt-send.on { color:var(--cx-accent,#E8927C); }
+      .cx-cc-cmt-gifbtn { flex-shrink:0; padding:5px 9px; border-radius:8px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.06); color:#fff; font-size:11px; font-weight:800; letter-spacing:0.04em; cursor:pointer; transition:background .2s; }
+      .cx-cc-cmt-gifbtn:hover { background:rgba(255,255,255,0.14); }
+      .cx-cc-cmt-gif { display:block; margin-top:5px; max-width:170px; max-height:170px; border-radius:12px; }
+      /* Wyszukiwarka GIF (GIPHY) */
+      .cx-gifpick { background:#0d1116; border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:10px; margin-bottom:8px; }
+      .cx-gifpick-bar { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+      .cx-gifpick-input { flex:1; min-width:0; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); border-radius:9px; color:#fff; font-size:13px; padding:8px 10px; outline:none; }
+      .cx-gifpick-x { width:30px; height:30px; border-radius:8px; border:1px solid rgba(255,255,255,0.18); background:transparent; color:#fff; font-size:18px; cursor:pointer; flex-shrink:0; }
+      .cx-gifpick-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; max-height:240px; overflow-y:auto; }
+      .cx-gifpick-item { border:none; padding:0; background:rgba(255,255,255,0.04); border-radius:8px; overflow:hidden; cursor:pointer; aspect-ratio:1; }
+      .cx-gifpick-item img { width:100%; height:100%; object-fit:cover; display:block; }
+      .cx-gifpick-msg { color:rgba(255,255,255,0.55); font-size:12px; text-align:center; padding:16px; }
+      .cx-gifpick-credit { display:block; text-align:right; font-size:9px; color:rgba(255,255,255,0.35); margin-top:6px; letter-spacing:0.05em; }
 
       /* Awatar komentarza (deterministyczny kolor + inicjał) */
       .cx-cc-ava { flex-shrink:0; width:30px; height:30px; border-radius:50%; display:grid; place-items:center;
