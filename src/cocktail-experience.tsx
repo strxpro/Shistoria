@@ -3010,7 +3010,12 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
   const corkRef = useRef<THREE.Object3D | null>(null);
   const glassRef = useRef<THREE.Object3D | null>(null);
   const pouringRef = useRef(false);
-  const { invalidate, viewport, camera, pointer } = useThree();
+  const { invalidate, viewport, camera, pointer, gl } = useThree();
+  // Płaszczyzna przycinająca strumień: ukrywa część, która „wchodzi do środka szejkera"
+  // (overlay nie ma modelu szejkera, więc bez tego dolna część strumienia jest widoczna).
+  const rimYRef = useRef(0);
+  const streamClip = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), 0), []);
+  useEffect(() => { try { gl.localClippingEnabled = true; } catch { /* ignore */ } }, [gl]);
 
   const cloned = useMemo(() => scene.clone(true), [scene]);
   const { actions, mixer } = useAnimations(animations, inner);
@@ -3032,6 +3037,9 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
       const t = (CONFIG.shakerRest.z - camera.position.z) / dz;
       target.copy(camera.position).addScaledVector(_aim, t);
     }
+    // Y krawędzi (rim) szejkera = punkt z NDC PRZED korektą — poniżej tej linii
+    // strumień jest „w środku" szejkera i ma być niewidoczny (przycinany).
+    rimYRef.current = target.y;
     // korekta strojenia (live) — gdzie dokładnie wpada strumień
     const T = getPourTune();
     target.x += T.aimX;
@@ -3077,8 +3085,9 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
       emissiveIntensity: isTransp ? 0.05 : 0.25,
       side: THREE.DoubleSide,
       depthWrite: false,
+      clippingPlanes: [streamClip],
     });
-  }, [color]);
+  }, [color, streamClip]);
 
   const NORM_H = 2.6; // wysokość znormalizowanej butelki
 
@@ -3284,6 +3293,8 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
   useFrame(() => {
     invalidate();
     recomputeTarget(); // cel = realny otwór szejkera (z NDC) — odporne na rozmiar canvasu
+    // Przytnij strumień na wysokości krawędzi szejkera: część poniżej (w środku) znika.
+    streamClip.constant = -(rimYRef.current);
 
     // Ruch butelki — NA MOBILE wyłączony (strumień musi być stabilny i przyklejony do szyjki)
     const isMob2 = typeof window !== "undefined" && window.innerWidth < 768;
