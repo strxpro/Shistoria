@@ -5488,6 +5488,17 @@ function DbDrinkCard({ d }: { d: any }) {
     try { await likeDrink(d.id); } catch {}
   };
   const showBurst = () => { setBurst(true); setTimeout(() => setBurst(false), 650); };
+  // TikTok-style: tap zdjęcia w popoucie → fruwające serduszka SVG (każdy tap = nowe)
+  const [hearts, setHearts] = useState<{ id: number; x: number; y: number }[]>([]);
+  const heartId = useRef(0);
+  const popHeart = (e: React.MouseEvent) => {
+    const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = e.clientX - r.left, y = e.clientY - r.top;
+    const id = heartId.current++;
+    setHearts((h) => [...h, { id, x, y }]);
+    setTimeout(() => setHearts((h) => h.filter((p) => p.id !== id)), 1000);
+    doLike();
+  };
   const handleClick = () => {
     if (clickTimer.current) { clearTimeout(clickTimer.current); clickTimer.current = null; return; }
     clickTimer.current = window.setTimeout(() => { clickTimer.current = null; setPopout(true); }, 280);
@@ -5547,8 +5558,21 @@ function DbDrinkCard({ d }: { d: any }) {
         <div className="cx-cc-popout-overlay" onClick={() => setPopout(false)}>
           <button className="cx-cc-popout-close cx-cc-popout-close-fixed" onClick={() => setPopout(false)} aria-label="Chiudi">×</button>
           <div className="cx-cc-popout" onClick={(e) => e.stopPropagation()}>
-            <div className={`cx-cc-popout-left ${d.photo_url ? "has-photo" : ""}`}>
+            <div className={`cx-cc-popout-left ${d.photo_url ? "has-photo" : ""}`} onClick={d.photo_url ? popHeart : undefined}>
               {d.photo_url ? <img src={d.photo_url} alt={d.name} /> : <div style={{ fontSize: 60 }}>🍸</div>}
+              {hearts.map((h) => (
+                <svg key={h.id} className="cx-tt-heart" style={{ left: h.x, top: h.y }} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M12 21s-7.5-4.6-10-9.3C.4 8.4 2 5 5.3 5c2 0 3.4 1.2 4.2 2.4C10.3 6.2 11.7 5 13.7 5 17 5 18.6 8.4 17 11.7 19.5 16.4 12 21 12 21z"/>
+                </svg>
+              ))}
+              {d.photo_url && (
+                <div className="cx-cc-popout-counts">
+                  <span>♥ {likes}</span>
+                  <span>💬 {(comments.length) + Object.values(replies).reduce((s, r) => s + r.length, 0)}</span>
+                  <span>🍸 {d.claimed_count || 0}</span>
+                  <span>👁 {d.views || 0}</span>
+                </div>
+              )}
             </div>
             <div className="cx-cc-popout-right">
               <div className="cx-cc-popout-header">
@@ -7628,6 +7652,10 @@ function CocktailStyles() {
       .cx-cc-popout-left.has-photo img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
       .cx-cc-popout-left.has-photo::after { content:""; position:absolute; left:0; right:0; bottom:0; height:46%;
         background:linear-gradient(180deg, transparent, rgba(0,0,0,0.55) 55%, rgba(0,0,0,0.92)); pointer-events:none; }
+      /* TikTok-style serduszka przy tapaniu zdjęcia */
+      .cx-tt-heart { position:absolute; width:64px; height:64px; transform:translate(-50%,-50%); pointer-events:none; color:#FE2C55; z-index:6; filter:drop-shadow(0 4px 12px rgba(0,0,0,0.4)); animation:ttHeart 1s ease-out forwards; }
+      @keyframes ttHeart { 0%{opacity:0;transform:translate(-50%,-50%) scale(.3) rotate(-15deg);} 15%{opacity:1;transform:translate(-50%,-50%) scale(1.25) rotate(8deg);} 100%{opacity:0;transform:translate(-50%,-140px) scale(1) rotate(-8deg);} }
+      .cx-cc-popout-counts { position:absolute; left:0; right:0; bottom:0; z-index:5; display:flex; gap:16px; justify-content:center; padding:14px; font-size:13px; font-weight:700; color:#fff; pointer-events:none; }
 
       /* D3: komentarze jak na Instagramie */
       .cx-cc-cmt-ig { font-style:normal; color:rgba(255,255,255,0.78); font-size:13px; line-height:1.45; }
