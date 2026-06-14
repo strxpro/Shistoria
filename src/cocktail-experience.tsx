@@ -5477,6 +5477,18 @@ function DbDrinkCard({ d }: { d: any }) {
   const [cmtLikes, setCmtLikes] = useState<Record<string, number>>({});
   const [replyTo, setReplyTo] = useState<{ id: string; author: string } | null>(null);
   const cmtInputRef = useRef<HTMLInputElement>(null);
+  const [cmtTr, setCmtTr] = useState<Record<string, string>>({}); // przetłumaczone komentarze (id → tekst)
+  const focusComment = () => { setPopout(true); setTimeout(() => cmtInputRef.current?.focus(), 80); };
+  const translateComment = async (c: any) => {
+    if (cmtTr[c.id]) { setCmtTr((m) => { const n = { ...m }; delete n[c.id]; return n; }); return; }
+    const tlang = (typeof window !== "undefined" && (window as any).currentLanguage) || "it";
+    try {
+      const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${tlang}&dt=t&q=${encodeURIComponent(c.content)}`);
+      const j = await r.json();
+      const txt = (j?.[0] || []).map((s: any) => s[0]).join("") || c.content;
+      setCmtTr((m) => ({ ...m, [c.id]: txt }));
+    } catch { /* ignore */ }
+  };
   // Ładuj 3 najnowsze komentarze OD RAZU (podgląd na karcie + popout)
   useEffect(() => {
     if (!d.id) return;
@@ -5504,6 +5516,10 @@ function DbDrinkCard({ d }: { d: any }) {
   const avaColor = (name: string) => { let h = 0; for (const c of (name || "?")) h = (h * 31 + c.charCodeAt(0)) % 360; return `hsl(${h} 58% 52%)`; };
   const avaInit = (name: string) => (name || "?").trim().charAt(0).toUpperCase() || "?";
   const replyLbl = ({ it: "Rispondi", pl: "Odpowiedz", en: "Reply", de: "Antworten", fr: "Répondre", es: "Responder" } as Record<string, string>)[lang] || "Rispondi";
+  const trLbl = {
+    tr: ({ it: "Traduci", pl: "Przetłumacz", en: "Translate", de: "Übersetzen", fr: "Traduire", es: "Traducir" } as Record<string, string>)[lang] || "Traduci",
+    orig: ({ it: "Originale", pl: "Oryginał", en: "Original", de: "Original", fr: "Original", es: "Original" } as Record<string, string>)[lang] || "Originale",
+  };
   const likeComment = (id: string) => {
     const wasLiked = !!cmtLiked[id];
     // optymistycznie
@@ -5667,15 +5683,16 @@ function DbDrinkCard({ d }: { d: any }) {
               {/* D3: komentarze jak na Instagramie — avatar + imię + lajk + odpowiedz */}
               <div className="cx-cc-popout-comments">
                 <span className="cx-cc-popout-label">💬 {tt("comments", "Commenti")}</span>
-                {comments.length === 0 && <p className="cx-cc-cmt cx-cc-cmt-empty">{tt("noComments", "Nessun commento — sii il primo!")}</p>}
+                {comments.length === 0 && <p className="cx-cc-cmt cx-cc-cmt-empty" onClick={focusComment} style={{ cursor: "pointer" }}>{tt("noComments", "Nessun commento — sii il primo!")}</p>}
                 {comments.map((c: any) => (
                   <div key={c.id} className="cx-cc-cmt-ig-thread">
                     <div className="cx-cc-cmt-ig-row">
                       <span className="cx-cc-ava" style={{ background: avaColor(c.author) }}>{avaInit(c.author)}</span>
                       <div className="cx-cc-cmt-ig-body">
-                        <p className="cx-cc-cmt-ig-txt"><strong>{c.author}</strong> {c.content}</p>
+                        <p className="cx-cc-cmt-ig-txt"><strong>{c.author}</strong> {cmtTr[c.id] || c.content}</p>
                         <div className="cx-cc-cmt-ig-actions">
                           <button onClick={() => replyToComment(c)}>{replyLbl}</button>
+                          <button onClick={() => translateComment(c)}>{cmtTr[c.id] ? trLbl.orig : trLbl.tr}</button>
                           {(cmtLikes[c.id] || 0) > 0 && <span className="cx-cc-cmt-ig-cnt">{cmtLikes[c.id]} ♥</span>}
                         </div>
                       </div>
@@ -5685,9 +5702,10 @@ function DbDrinkCard({ d }: { d: any }) {
                       <div key={r.id} className="cx-cc-cmt-ig-row cx-cc-cmt-ig-reply">
                         <span className="cx-cc-ava cx-cc-ava-sm" style={{ background: avaColor(r.author) }}>{avaInit(r.author)}</span>
                         <div className="cx-cc-cmt-ig-body">
-                          <p className="cx-cc-cmt-ig-txt"><strong>{r.author}</strong> {r.content}</p>
+                          <p className="cx-cc-cmt-ig-txt"><strong>{r.author}</strong> {cmtTr[r.id] || r.content}</p>
                           <div className="cx-cc-cmt-ig-actions">
                             <button onClick={() => replyToComment(c)}>{replyLbl}</button>
+                            <button onClick={() => translateComment(r)}>{cmtTr[r.id] ? trLbl.orig : trLbl.tr}</button>
                             {(cmtLikes[r.id] || 0) > 0 && <span className="cx-cc-cmt-ig-cnt">{cmtLikes[r.id]} ♥</span>}
                           </div>
                         </div>
@@ -5899,7 +5917,7 @@ function MyDrinkRow({ d, lang, confirm, onEdit, onStats, onAskDelete, onConfirmD
     <div className="cx-mydrink-swipe">
       <div className="cx-mydrink-act cx-mydrink-act-stats" style={{ opacity: dx > 12 ? 1 : 0.25 }}>📊</div>
       <div className="cx-mydrink-act cx-mydrink-act-trash" style={{ opacity: dx < -12 ? 1 : 0.25 }}>🗑</div>
-      <div className="cx-mydrink-card" style={{ transform: `translateX(${dx}px)` }}
+      <div className="cx-mydrink-card" style={{ transform: `translateX(${dx}px)`, transition: drag.current.on ? "none" : "transform .28s cubic-bezier(.2,.8,.2,1)" }}
         onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
         {d.photo_url ? <img src={d.photo_url} alt="" className="cx-mydrink-thumb" draggable={false} /> : <span className="cx-mydrink-thumb cx-mydrink-thumb-ph">🍸</span>}
         <div className="cx-mydrink-info">
