@@ -5134,13 +5134,30 @@ function DbDrinkCard({ d }: { d: any }) {
   } as Record<string, Record<string, string>>)[lang] ?? ({} as Record<string, string>);
   const tt = (k: string, it: string) => T[k] ?? it;
 
-  // D3: komentarze jak na IG — 3 najnowsze pod postem + pole "dodaj komentarz"
+  // D3: komentarze jak na IG — avatary, lajki, odpowiedzi; 3 najnowsze pod postem
   const [comments, setComments] = useState<any[]>([]);
   const [cmtText, setCmtText] = useState("");
+  const [cmtLiked, setCmtLiked] = useState<Record<string, boolean>>({});
+  const [cmtLikes, setCmtLikes] = useState<Record<string, number>>({});
+  const cmtInputRef = useRef<HTMLInputElement>(null);
+  // Ładuj 3 najnowsze komentarze OD RAZU (podgląd na karcie + popout)
   useEffect(() => {
-    if (!popout || !d.id) return;
+    if (!d.id) return;
     getComments(d.id, 3).then(setComments).catch(() => {});
-  }, [popout, d.id]);
+  }, [d.id]);
+  // Deterministyczny kolor awatara z imienia (jak losowy, ale stały dla danej osoby)
+  const avaColor = (name: string) => { let h = 0; for (const c of (name || "?")) h = (h * 31 + c.charCodeAt(0)) % 360; return `hsl(${h} 58% 52%)`; };
+  const avaInit = (name: string) => (name || "?").trim().charAt(0).toUpperCase() || "?";
+  const replyLbl = ({ it: "Rispondi", pl: "Odpowiedz", en: "Reply", de: "Antworten", fr: "Répondre", es: "Responder" } as Record<string, string>)[lang] || "Rispondi";
+  const likeComment = (id: string) => {
+    setCmtLiked((p) => ({ ...p, [id]: !p[id] }));
+    setCmtLikes((p) => ({ ...p, [id]: Math.max(0, (p[id] || 0) + (cmtLiked[id] ? -1 : 1)) }));
+  };
+  const replyToComment = (author: string) => {
+    setPopout(true);
+    setCmtText(`@${author} `);
+    setTimeout(() => cmtInputRef.current?.focus(), 60);
+  };
   const submitComment = async () => {
     const t = cmtText.trim();
     if (!t) return;
@@ -5206,6 +5223,17 @@ function DbDrinkCard({ d }: { d: any }) {
             <button className="cx-cc-cmt-btn" onClick={(e) => { e.stopPropagation(); setPopout(true); }}>💬 {d.comments || 0}</button>
             <span className="cx-cc-claimed-pill">🍸 {d.claimed_count || 0}</span>
           </div>
+          {/* Podgląd 3 najnowszych komentarzy na karcie (jak na IG pod postem) */}
+          {comments.length > 0 && (
+            <div className="cx-cc-cmt-prev">
+              {comments.slice(0, 3).map((c: any) => (
+                <div key={c.id} className="cx-cc-cmt-prev-row" onClick={(e) => { e.stopPropagation(); setPopout(true); }}>
+                  <span className="cx-cc-ava" style={{ background: avaColor(c.author) }}>{avaInit(c.author)}</span>
+                  <span className="cx-cc-cmt-prev-txt"><strong>{c.author}</strong> {c.content}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </article>
 
@@ -5235,15 +5263,25 @@ function DbDrinkCard({ d }: { d: any }) {
               <div className="cx-cc-popout-actions">
                 <button className={`cx-cc-like ${liked ? "on" : ""}`} onClick={doLike}>♥ {likes}</button>
               </div>
-              {/* D3: komentarze jak na Instagramie — 3 najnowsze + pole na nowy */}
+              {/* D3: komentarze jak na Instagramie — avatar + imię + lajk + odpowiedz */}
               <div className="cx-cc-popout-comments">
                 <span className="cx-cc-popout-label">💬 {tt("comments", "Commenti")}</span>
                 {comments.length === 0 && <p className="cx-cc-cmt cx-cc-cmt-empty">{tt("noComments", "Nessun commento — sii il primo!")}</p>}
                 {comments.map((c: any) => (
-                  <p key={c.id} className="cx-cc-cmt cx-cc-cmt-ig"><strong>{c.author}</strong>{c.content}</p>
+                  <div key={c.id} className="cx-cc-cmt-ig-row">
+                    <span className="cx-cc-ava" style={{ background: avaColor(c.author) }}>{avaInit(c.author)}</span>
+                    <div className="cx-cc-cmt-ig-body">
+                      <p className="cx-cc-cmt-ig-txt"><strong>{c.author}</strong> {c.content}</p>
+                      <div className="cx-cc-cmt-ig-actions">
+                        <button onClick={() => replyToComment(c.author)}>{replyLbl}</button>
+                        {(cmtLikes[c.id] || 0) > 0 && <span className="cx-cc-cmt-ig-cnt">{cmtLikes[c.id]} ♥</span>}
+                      </div>
+                    </div>
+                    <button className={`cx-cc-cmt-ig-like ${cmtLiked[c.id] ? "on" : ""}`} onClick={() => likeComment(c.id)} aria-label="Like">♥</button>
+                  </div>
                 ))}
                 <div className="cx-cc-cmt-row">
-                  <input className="cx-cc-cmt-input" value={cmtText} onChange={(e) => setCmtText(e.target.value)}
+                  <input ref={cmtInputRef} className="cx-cc-cmt-input" value={cmtText} onChange={(e) => setCmtText(e.target.value)}
                     placeholder={tt("addComment", "Aggiungi un commento…")} maxLength={180}
                     onKeyDown={(e) => { if (e.key === "Enter") submitComment(); }} />
                   <button className={`cx-cc-cmt-send ${cmtText.trim() ? "on" : ""}`} onClick={submitComment}>{tt("publishCmt", "Pubblica")}</button>
@@ -7085,6 +7123,28 @@ function CocktailStyles() {
       .cx-cc-cmt-input::placeholder { color:rgba(255,255,255,0.38); }
       .cx-cc-cmt-send { background:none; border:none; color:rgba(232,146,124,0.45); font-weight:700; font-size:13px; cursor:pointer; padding:6px 4px; transition:color .2s; }
       .cx-cc-cmt-send.on { color:var(--cx-accent,#E8927C); }
+
+      /* Awatar komentarza (deterministyczny kolor + inicjał) */
+      .cx-cc-ava { flex-shrink:0; width:30px; height:30px; border-radius:50%; display:grid; place-items:center;
+        color:#fff; font-weight:800; font-size:13px; text-shadow:0 1px 2px rgba(0,0,0,0.35); }
+      /* Podgląd komentarzy na karcie (przed popoutem) */
+      .cx-cc-cmt-prev { display:flex; flex-direction:column; gap:5px; margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.07); }
+      .cx-cc-cmt-prev-row { display:flex; align-items:center; gap:7px; cursor:pointer; }
+      .cx-cc-cmt-prev-row .cx-cc-ava { width:22px; height:22px; font-size:10px; }
+      .cx-cc-cmt-prev-txt { font-size:12px; color:rgba(255,255,255,0.7); line-height:1.3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .cx-cc-cmt-prev-txt strong { color:#fff; font-weight:700; margin-right:5px; }
+      /* Komentarz IG w popoucie — avatar + treść + akcje + serce */
+      .cx-cc-cmt-ig-row { display:flex; align-items:flex-start; gap:10px; }
+      .cx-cc-cmt-ig-body { flex:1; min-width:0; }
+      .cx-cc-cmt-ig-txt { margin:0; font-size:13px; line-height:1.45; color:rgba(255,255,255,0.82); }
+      .cx-cc-cmt-ig-txt strong { color:#fff; font-weight:700; margin-right:6px; }
+      .cx-cc-cmt-ig-actions { display:flex; gap:14px; align-items:center; margin-top:3px; }
+      .cx-cc-cmt-ig-actions button { background:none; border:none; color:rgba(255,255,255,0.5); font-size:11px; font-weight:700; cursor:pointer; padding:0; letter-spacing:0.02em; }
+      .cx-cc-cmt-ig-actions button:hover { color:#fff; }
+      .cx-cc-cmt-ig-cnt { font-size:11px; color:rgba(255,255,255,0.5); }
+      .cx-cc-cmt-ig-like { background:none; border:none; cursor:pointer; font-size:15px; line-height:1; color:rgba(255,255,255,0.35); transition:transform .2s var(--spring,cubic-bezier(.2,1.6,.4,1)), color .2s; padding:2px; }
+      .cx-cc-cmt-ig-like:hover { color:rgba(255,255,255,0.6); }
+      .cx-cc-cmt-ig-like.on { color:#FE2C55; transform:scale(1.25); }
 
       /* D7: mobile — popout drinka przesuwany palcem W BOK (zdjęcie ⇄ szczegóły/komentarze) */
       @media (max-width:768px) {
