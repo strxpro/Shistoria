@@ -2184,8 +2184,8 @@ function AdminStyles() {
       .admin-drink-info h4 { margin:0; font-size:16px; } .admin-drink-info span { font-size:12px; opacity:0.6; display:block; }
       .admin-drink-actions { display:flex; gap:8px; flex-wrap:wrap; }
 
-      .admin-orders { display:flex; flex-direction:column; gap:12px; }
-      .admin-order { padding:20px; border-radius:16px; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.14); display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+      .admin-orders { display:flex; flex-direction:column; gap:10px; }
+      .admin-order { padding:13px 16px; border-radius:14px; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.14); display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
       .admin-order.done { opacity:0.5; }
       .admin-order-info h4 { margin:0; font-size:15px; } .admin-order-info span { font-size:12px; opacity:0.6; display:block; }
       .admin-order-time { font-size:11px; opacity:0.4; }
@@ -2532,6 +2532,15 @@ function AdminStyles() {
       /* Bell badge puls przy nowych */
       @keyframes bellPulse { 0%,100%{ transform:scale(1);} 50%{ transform:scale(1.15);} }
       .admin-bell-badge { animation:bellPulse 2s ease-in-out infinite; }
+
+      /* ── DEFINITYWNA reguła mobilna dla WSZYSTKICH popoutów admina (menu-edycja, eventy, skaner) ──
+         Bottom-sheet, zawsze widoczny, przewijalny. !important bo wcześniejsze reguły bazowe nadpisywały. */
+      @media (max-width:768px) {
+        .admin-modal-overlay { align-items:flex-end !important; justify-content:center !important; padding:0 !important; z-index:2000 !important; }
+        .admin-modal, .admin-modal-wide { width:100vw !important; max-width:100vw !important; max-height:90vh !important;
+          overflow-y:auto !important; border-radius:22px 22px 0 0 !important; padding:22px 18px calc(22px + env(safe-area-inset-bottom)) !important; -webkit-overflow-scrolling:touch; }
+        .admin-modal-actions { position:sticky !important; bottom:0 !important; }
+      }
     `}</style>
 
 
