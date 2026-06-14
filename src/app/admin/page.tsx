@@ -1527,7 +1527,7 @@ function MessagesPanel({ compose, onComposeUsed }: { compose?: { email: string; 
 
 // ─── Ospiti Panel (CRM — wszyscy ludzie z mailami + powiązania) ───────────────
 function GuestDetailModal({ guest, onClose, onWrite }: { guest: any; onClose: () => void; onWrite: (g: any) => void }) {
-  const [data, setData] = useState<{ drinks: any[]; orders: number; reviews: any[]; comments: any[]; visits: any[] } | null>(null);
+  const [data, setData] = useState<{ drinks: any[]; orders: number; reviews: any[]; comments: any[]; visits: any[]; liked: any[] } | null>(null);
   const flag = (c: string) => ({ it: "🇮🇹", pl: "🇵🇱", en: "🇬🇧", de: "🇩🇪", fr: "🇫🇷", es: "🇪🇸" } as Record<string, string>)[c] || "🌐";
   useEffect(() => {
     (async () => {
@@ -1537,20 +1537,31 @@ function GuestDetailModal({ guest, onClose, onWrite }: { guest: any; onClose: ()
           supabase.from("drink_orders").select("id", { count: "exact", head: true }).eq("author_name", guest.name),
           supabase.from("reviews").select("content,stars,created_at").eq("email", guest.email).order("created_at", { ascending: false }),
           supabase.from("drink_comments").select("content,created_at,drink_id").eq("author", guest.name).order("created_at", { ascending: false }).limit(20),
-          supabase.from("analytics_visits").select("duration_seconds,top_section,device,os,is_conversion,referrer,created_at").eq("email", guest.email).order("created_at", { ascending: false }).limit(500),
+          supabase.from("analytics_visits").select("duration_seconds,top_section,device,os,is_conversion,referrer,created_at,session_id").eq("email", guest.email).order("created_at", { ascending: false }).limit(500),
         ]);
-        setData({ drinks: drk.data || [], orders: ord.count || 0, reviews: rev.data || [], comments: cmt.data || [], visits: vis.data || [] });
-      } catch { setData({ drinks: [], orders: 0, reviews: [], comments: [], visits: [] }); }
+        // Co polubił — przez sesje powiązane z tym emailem (drink_likes ma session_id)
+        const sessions = [...new Set((vis.data || []).map((v: any) => v.session_id).filter(Boolean))];
+        let liked: any[] = [];
+        if (sessions.length) {
+          const { data: lk } = await supabase.from("drink_likes").select("drink_id").in("session_id", sessions as string[]);
+          const ids = [...new Set((lk || []).map((x: any) => x.drink_id).filter(Boolean))];
+          if (ids.length) { const { data: dn } = await supabase.from("community_drinks").select("id,name").in("id", ids as string[]); liked = dn || []; }
+        }
+        setData({ drinks: drk.data || [], orders: ord.count || 0, reviews: rev.data || [], comments: cmt.data || [], visits: vis.data || [], liked });
+      } catch { setData({ drinks: [], orders: 0, reviews: [], comments: [], visits: [], liked: [] }); }
     })();
   }, [guest.email, guest.name]);
   const tags: string[] = [...(guest.tags || [])];
   // Agregacje analityki
   const visits = data?.visits || [];
   const totalVisits = visits.length;
-  const avgDur = totalVisits ? Math.round(visits.reduce((s, v) => s + (v.duration_seconds || 0), 0) / totalVisits) : 0;
-  const fmtDur = (s: number) => s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`;
+  const totalDur = visits.reduce((s, v) => s + (v.duration_seconds || 0), 0);
+  const avgDur = totalVisits ? Math.round(totalDur / totalVisits) : 0;
+  const lastVisit = visits[0]?.created_at ? new Date(visits[0].created_at).toLocaleDateString("it-IT") : "—";
+  const fmtDur = (s: number) => s >= 3600 ? `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m` : s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`;
   const tally = (key: string) => { const m: Record<string, number> = {}; visits.forEach((v: any) => { const k = v[key]; if (k) m[k] = (m[k] || 0) + 1; }); return Object.entries(m).sort((a, b) => b[1] - a[1]); };
   const devices = tally("device"); const oses = tally("os"); const sections = tally("top_section"); const refs = tally("referrer");
+  const topSection = sections[0]?.[0] || "—";
   const devIco: Record<string, string> = { desktop: "🖥️", mobile: "📱", tablet: "📲" };
   const osIco: Record<string, string> = { Android: "🤖", iOS: "🍏", Windows: "🪟", macOS: "🍎", Linux: "🐧" };
   const maxOf = (arr: [string, number][]) => arr[0]?.[1] || 1;
@@ -1609,17 +1620,26 @@ function GuestDetailModal({ guest, onClose, onWrite }: { guest: any; onClose: ()
               ) : (
                 <>
                   <div className="drk-stats-grid" style={{ gridTemplateColumns: "repeat(3,1fr)", marginTop: 8 }}>
-                    <div className="drk-stat"><span className="drk-stat-ico">👁</span><strong>{totalVisits}</strong><span>Visite</span></div>
-                    <div className="drk-stat"><span className="drk-stat-ico">⏱</span><strong>{fmtDur(avgDur)}</strong><span>Tempo medio</span></div>
+                    <div className="drk-stat"><span className="drk-stat-ico">👁</span><strong>{totalVisits}</strong><span>Visite totali</span></div>
+                    <div className="drk-stat"><span className="drk-stat-ico">⏱</span><strong>{fmtDur(totalDur)}</strong><span>Tempo totale</span></div>
+                    <div className="drk-stat"><span className="drk-stat-ico">📊</span><strong>{fmtDur(avgDur)}</strong><span>Media/visita</span></div>
+                    <div className="drk-stat"><span className="drk-stat-ico">📍</span><strong style={{ fontSize: 15 }}>{topSection}</strong><span>Sezione preferita</span></div>
                     <div className="drk-stat"><span className="drk-stat-ico">🎯</span><strong>{visits.filter((v: any) => v.is_conversion).length}</strong><span>Conversioni</span></div>
+                    <div className="drk-stat"><span className="drk-stat-ico">🗓</span><strong style={{ fontSize: 15 }}>{lastVisit}</strong><span>Ultima visita</span></div>
                   </div>
                   {devices.length > 0 && (<><span className="admin-field-lbl" style={{ display: "block", marginTop: 12 }}>Dispositivo</span><Bars arr={devices} color="rgba(232,146,124,0.7)" ico={devIco} /></>)}
                   {oses.length > 0 && (<><span className="admin-field-lbl" style={{ display: "block", marginTop: 10 }}>Sistema (Android / iPhone / PC)</span><Bars arr={oses} color="rgba(91,184,212,0.7)" ico={osIco} /></>)}
-                  {sections.length > 0 && (<><span className="admin-field-lbl" style={{ display: "block", marginTop: 10 }}>Sezioni preferite</span><Bars arr={sections} color="rgba(241,196,15,0.7)" /></>)}
+                  {sections.length > 0 && (<><span className="admin-field-lbl" style={{ display: "block", marginTop: 10 }}>Dove si ferma di più</span><Bars arr={sections} color="rgba(241,196,15,0.7)" /></>)}
                   {refs.length > 0 && (<><span className="admin-field-lbl" style={{ display: "block", marginTop: 10 }}>Come è arrivato</span><Bars arr={refs} color="rgba(155,213,236,0.6)" /></>)}
                 </>
               )}
             </div>
+            {data.liked.length > 0 && (
+              <div className="drk-stats-cmts" style={{ marginTop: 12 }}>
+                <span className="admin-field-lbl">❤️ Drink che ha messo "mi piace"</span>
+                {data.liked.map((d, i) => <div key={i} className="drk-cmt-row"><span>♥ <strong>{d.name}</strong></span></div>)}
+              </div>
+            )}
           </>
         )}
         <div className="admin-modal-actions">
