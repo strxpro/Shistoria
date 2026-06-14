@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "../../lib/supabase";
 import { translateToAll } from "../../lib/translate";
 import dynamic from "next/dynamic";
+import ErrorBoundary from "../../components/ErrorBoundary";
 
 // Prawdziwy globus 3D (WebGL) — ładowany tylko w przeglądarce (bez SSR)
 const StatsGlobe = dynamic(() => import("../../components/StatsGlobe"), {
@@ -1852,14 +1853,16 @@ function StatsPanel() {
           </div>
 
           {/* Wykresy Chart.js */}
-          <StatsCharts visits={visits} byCountry={byCountry} />
+          <ErrorBoundary fallback={() => null}>
+            <StatsCharts visits={visits} byCountry={byCountry} />
+          </ErrorBoundary>
 
           {/* Kraje — interaktywne słupki z intensywnością */}
           <div className="stats-section">
             <h3>Da dove arrivano i visitatori</h3>
             {byCountry.length === 0 ? <p className="admin-empty">Nessun dato per questo periodo.</p> : (
               <div className="stats-geo">
-                <div className="stats-globe"><StatsGlobe countries={byCountry} /></div>
+                <div className="stats-globe"><ErrorBoundary fallback={() => <div className="stats-globe-loading">🌍</div>}><StatsGlobe countries={byCountry} /></ErrorBoundary></div>
                 <div className="stats-countries">
                   {byCountry.map((c) => (
                     <button key={c.code} className="stats-country" onClick={() => setPopCountry(c.code)}>
