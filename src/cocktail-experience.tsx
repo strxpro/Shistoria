@@ -1287,12 +1287,43 @@ function InSceneGlassPour({ url, withIce, color, onReveal, onDone, onModelReady 
   const pourStreamRef = useRef<THREE.Mesh>(null!);
   const gStreamCurve = useMemo(() => new THREE.QuadraticBezierCurve3(new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()), []);
   const glassTweenRef = useRef<gsap.core.Tween | null>(null);
+  const lastProgRef = useRef(0);
   const pourStreamMat = useMemo(() => new THREE.MeshStandardMaterial({
     color: new THREE.Color(colorRefLocal.current), transparent: true, opacity: 0.85,
     roughness: 0.05, metalness: 0, emissive: new THREE.Color(colorRefLocal.current),
     emissiveIntensity: 0.25, depthWrite: false, side: THREE.DoubleSide,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), []);
+
+  // Buduje ZAKRZYWIONY strumień (łuk Beziera) szejker→szklanka wg suwaków strojenia.
+  const buildStream = useCallback((prog: number) => {
+    const s = pourStreamRef.current;
+    if (!s) return;
+    const on = prog > 0.06 && prog < 0.72;
+    s.visible = on;
+    if (!on) return;
+    const edge = Math.min((prog - 0.06) / 0.08, (0.72 - prog) / 0.1, 1);
+    const w = Math.max(0.18, edge);
+    const T = getPourTune();
+    const c = gStreamCurve;
+    c.v0.set(0, T.gStartY, 0);
+    c.v2.set(0, T.gEndY, 0);
+    c.v1.set(T.gCurve, (T.gStartY + T.gEndY) / 2, 0);
+    const tube = new THREE.TubeGeometry(c, 20, Math.max(0.006, T.gThick * w), 8, false);
+    s.geometry.dispose();
+    s.geometry = tube;
+    s.position.set(0, 0, 0);
+    s.scale.set(1, 1, 1);
+    pourStreamMat.opacity = 0.85 * Math.max(0.25, edge);
+  }, [gStreamCurve, pourStreamMat]);
+
+  // Strojenie na żywo: gdy zmienisz suwaki szklanki (i animacja jest zatrzymana),
+  // odśwież strumień natychmiast.
+  useEffect(() => {
+    const onTune = () => { buildStream(lastProgRef.current); invalidate(); };
+    window.addEventListener("cx-tune-changed", onTune);
+    return () => window.removeEventListener("cx-tune-changed", onTune);
+  }, [buildStream, invalidate]);
 
   useEffect(() => {
     if (!liquidMesh) return;
@@ -1341,28 +1372,9 @@ function InSceneGlassPour({ url, withIce, color, onReveal, onDone, onModelReady 
       onUpdate: () => {
         setTime(scrub.t);
         // H6: strumień widoczny w środkowej fazie nalewania (wjazd/wyjazd wygaszany)
-        const s = pourStreamRef.current;
-        if (s) {
-          const prog = (scrub.t - start) / ((end - start) || 1);
-          const on = prog > 0.06 && prog < 0.72;
-          s.visible = on;
-          if (on) {
-            const edge = Math.min((prog - 0.06) / 0.08, (0.72 - prog) / 0.1, 1);
-            const w = Math.max(0.18, edge);
-            // ZAKRZYWIONY strumień szejker→szklanka (łuk Beziera) wg suwaków strojenia
-            const T = getPourTune();
-            const c = gStreamCurve;
-            c.v0.set(0, T.gStartY, 0);
-            c.v2.set(0, T.gEndY, 0);
-            c.v1.set(T.gCurve, (T.gStartY + T.gEndY) / 2, 0);
-            const tube = new THREE.TubeGeometry(c, 20, Math.max(0.006, T.gThick * w), 8, false);
-            s.geometry.dispose();
-            s.geometry = tube;
-            s.position.set(0, 0, 0);
-            s.scale.set(1, 1, 1);
-            pourStreamMat.opacity = 0.85 * Math.max(0.25, edge);
-          }
-        }
+        const prog = (scrub.t - start) / ((end - start) || 1);
+        lastProgRef.current = prog;
+        buildStream(prog);
       },
       onComplete: () => {
         if (pourStreamRef.current) pourStreamRef.current.visible = false;
@@ -1374,10 +1386,10 @@ function InSceneGlassPour({ url, withIce, color, onReveal, onDone, onModelReady 
       },
     });
     glassTweenRef.current = tween;
-    // FREEZE (strojenie): zatrzymaj/wznów nalewanie z panelu ?tune=1
+    // FREEZE (strojenie): przeskocz do środka nalewania (strumień widoczny) i zatrzymaj
     const onFreeze = () => {
       const f = (window as any).__POUR_FREEZE;
-      if (f) tween.pause(); else tween.resume();
+      if (f) { tween.progress(0.4); tween.pause(); } else { tween.resume(); }
       invalidate();
     };
     window.addEventListener("cx-pour-freeze", onFreeze);
@@ -3142,8 +3154,20 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
     const onReleaseEvt = () => { released = true; pouringRef.current = false; if (tl.paused() && !(window as any).__POUR_FREEZE) tl.resume(); };
     window.addEventListener('cx-pour-release', onReleaseEvt);
     const safety = setTimeout(onReleaseEvt, 30000);
-    // FREEZE (strojenie ?tune=1): zatrzymaj/wznów animację nalewania
-    const onFreeze = () => { if ((window as any).__POUR_FREEZE) tl.pause(); else tl.resume(); invalidate(); };
+    // FREEZE (strojenie ?tune=1): przeskocz do MOMENTU LANIA (butelka przechylona,
+    // strumień leci do szejkera) i zatrzymaj — żeby dało się wygodnie stroić.
+    const onFreeze = () => {
+      if ((window as any).__POUR_FREEZE) {
+        const seekT = model.noStream ? 3.0 : 2.85; // tu butelka/puszka jest przechylona i leje
+        if (tl.time() < seekT) tl.time(seekT);
+        tl.pause();
+        pouringRef.current = true; // strumień aktywny → widać go zamrożony
+      } else {
+        pouringRef.current = false;
+        tl.resume();
+      }
+      invalidate();
+    };
     window.addEventListener('cx-pour-freeze', onFreeze);
 
     // 1) wychodzi z boksu → rośnie na środku (rozmiar dopasowany do viewport)
@@ -3248,7 +3272,8 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
 
     // Ruch butelki — NA MOBILE wyłączony (strumień musi być stabilny i przyklejony do szyjki)
     const isMob2 = typeof window !== "undefined" && window.innerWidth < 768;
-    if (pouringRef.current && outer.current && !isMob2) {
+    const frozen = typeof window !== "undefined" && (window as any).__POUR_FREEZE;
+    if (pouringRef.current && outer.current && !isMob2 && !frozen) {
       const offX = 1.2;
       let targetPosX = target.x - pointer.x * 1.5;
       targetPosX = THREE.MathUtils.clamp(targetPosX, target.x - offX, target.x + offX);
@@ -3370,6 +3395,7 @@ function PourTunePanel() {
       const next = { ...prev, ...patch };
       (window as any).__POUR_TUNE = next;
       try { localStorage.setItem("sh-pour-tune", JSON.stringify(next)); } catch { /* ignore */ }
+      try { window.dispatchEvent(new Event("cx-tune-changed")); } catch { /* ignore */ }
       return next;
     });
   };
