@@ -265,6 +265,8 @@ export type PourTune = {
   scale_m: number; scale_d: number;       // skala modelu podczas lania
   tilt_m: number; tilt_d: number;         // przechył butelki przy laniu (stopnie)
   aimX: number; aimY: number;             // korekta celu strumienia (gdzie wpada względem otworu)
+  // Szklanka (scena nalewania do szklanki) — strumień szejker→szklanka
+  gStartY: number; gEndY: number; gCurve: number; gThick: number;
 };
 const POUR_TUNE_DEFAULT: PourTune = {
   bottleY_m: 2.55, bottleY_d: 2.9,
@@ -272,6 +274,7 @@ const POUR_TUNE_DEFAULT: PourTune = {
   scale_m: 0.5,    scale_d: 0.6,
   tilt_m: 145,     tilt_d: 140,
   aimX: 0,         aimY: 0.4,
+  gStartY: 1.55,   gEndY: 0.7,  gCurve: 0.12, gThick: 0.03,
 };
 function getPourTune(): PourTune {
   if (typeof window === "undefined") return POUR_TUNE_DEFAULT;
@@ -1282,6 +1285,8 @@ function InSceneGlassPour({ url, withIce, color, onReveal, onDone, onModelReady 
 
   // H6: mały strumień z (wbudowanego) szejkera do szklanki — widoczny podczas nalewania
   const pourStreamRef = useRef<THREE.Mesh>(null!);
+  const gStreamCurve = useMemo(() => new THREE.QuadraticBezierCurve3(new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()), []);
+  const glassTweenRef = useRef<gsap.core.Tween | null>(null);
   const pourStreamMat = useMemo(() => new THREE.MeshStandardMaterial({
     color: new THREE.Color(colorRefLocal.current), transparent: true, opacity: 0.85,
     roughness: 0.05, metalness: 0, emissive: new THREE.Color(colorRefLocal.current),
@@ -1344,7 +1349,18 @@ function InSceneGlassPour({ url, withIce, color, onReveal, onDone, onModelReady 
           if (on) {
             const edge = Math.min((prog - 0.06) / 0.08, (0.72 - prog) / 0.1, 1);
             const w = Math.max(0.18, edge);
-            s.scale.set(w, 1, w);
+            // ZAKRZYWIONY strumień szejker→szklanka (łuk Beziera) wg suwaków strojenia
+            const T = getPourTune();
+            const c = gStreamCurve;
+            c.v0.set(0, T.gStartY, 0);
+            c.v2.set(0, T.gEndY, 0);
+            c.v1.set(T.gCurve, (T.gStartY + T.gEndY) / 2, 0);
+            const tube = new THREE.TubeGeometry(c, 20, Math.max(0.006, T.gThick * w), 8, false);
+            s.geometry.dispose();
+            s.geometry = tube;
+            s.position.set(0, 0, 0);
+            s.scale.set(1, 1, 1);
+            pourStreamMat.opacity = 0.85 * Math.max(0.25, edge);
           }
         }
       },
@@ -1357,7 +1373,15 @@ function InSceneGlassPour({ url, withIce, color, onReveal, onDone, onModelReady 
         onDone();
       },
     });
-    return () => { tween.kill(); };
+    glassTweenRef.current = tween;
+    // FREEZE (strojenie): zatrzymaj/wznów nalewanie z panelu ?tune=1
+    const onFreeze = () => {
+      const f = (window as any).__POUR_FREEZE;
+      if (f) tween.pause(); else tween.resume();
+      invalidate();
+    };
+    window.addEventListener("cx-pour-freeze", onFreeze);
+    return () => { window.removeEventListener("cx-pour-freeze", onFreeze); tween.kill(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [withIce, url]);
 
@@ -1365,8 +1389,8 @@ function InSceneGlassPour({ url, withIce, color, onReveal, onDone, onModelReady 
   return (
     <group ref={rootRef}>
       <primitive object={cloned} />
-      {/* H6: strumień nalewania (szejker → szklanka), kolor = mieszanka */}
-      <mesh ref={pourStreamRef} material={pourStreamMat} visible={false} position={[0, 1.15, 0]}>
+      {/* H6: strumień nalewania (szejker → szklanka), kolor = mieszanka, łuk Beziera */}
+      <mesh ref={pourStreamRef} material={pourStreamMat} visible={false} position={[0, 0, 0]}>
         <cylinderGeometry args={[0.02, 0.035, 0.85, 8, 1, true]} />
       </mesh>
       <directionalLight position={[2, 4, 3]} intensity={0.4} />
@@ -3115,9 +3139,12 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
     // Solidna obsługa puszczenia: jeśli 'cx-pour-release' przyjdzie ZANIM dojdziemy do
     // punktu pauzy (np. krótki tap / wczesne puszczenie), zapamiętujemy flagę i nie pauzujemy.
     let released = false;
-    const onReleaseEvt = () => { released = true; pouringRef.current = false; if (tl.paused()) tl.resume(); };
+    const onReleaseEvt = () => { released = true; pouringRef.current = false; if (tl.paused() && !(window as any).__POUR_FREEZE) tl.resume(); };
     window.addEventListener('cx-pour-release', onReleaseEvt);
     const safety = setTimeout(onReleaseEvt, 30000);
+    // FREEZE (strojenie ?tune=1): zatrzymaj/wznów animację nalewania
+    const onFreeze = () => { if ((window as any).__POUR_FREEZE) tl.pause(); else tl.resume(); invalidate(); };
+    window.addEventListener('cx-pour-freeze', onFreeze);
 
     // 1) wychodzi z boksu → rośnie na środku (rozmiar dopasowany do viewport)
     const growScale = isMob ? 1.0 : 1.45;
@@ -3198,6 +3225,7 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
       tl.kill();
       clearTimeout(safety);
       window.removeEventListener('cx-pour-release', onReleaseEvt);
+      window.removeEventListener('cx-pour-freeze', onFreeze);
       playList.forEach((a) => a.stop());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -3352,6 +3380,13 @@ function PourTunePanel() {
     setCopied(true); setTimeout(() => setCopied(false), 1500);
   };
   const reset = () => update(POUR_TUNE_DEFAULT);
+  const [frozen, setFrozen] = useState(false);
+  const toggleFreeze = () => {
+    const v = !frozen;
+    setFrozen(v);
+    (window as any).__POUR_FREEZE = v;
+    window.dispatchEvent(new Event("cx-pour-freeze"));
+  };
 
   if (!on || typeof document === "undefined") return null;
 
@@ -3377,13 +3412,20 @@ function PourTunePanel() {
       </div>
       {open && (
         <div className="cx-tune-body">
+          <button className={`cx-tune-freeze ${frozen ? "on" : ""}`} onClick={toggleFreeze}>{frozen ? "▶ Wznów animację" : "⏸ Zatrzymaj (do strojenia)"}</button>
+          <div className="cx-tune-sep">Butelka / puszka → szejker</div>
           {Row("Wysokość (Y)", yKey as keyof PourTune, 0, 4, 0.05)}
           {Row("W bok (X)", xKey as keyof PourTune, 0, 3, 0.05)}
           {Row("Skala", sKey as keyof PourTune, 0.2, 1.2, 0.02)}
           {Row("Przechył °", tiltKey as keyof PourTune, 90, 180, 1)}
-          <div className="cx-tune-sep">Strumień — gdzie wpada (na żywo)</div>
+          <div className="cx-tune-sep">Strumień → szejker (na żywo)</div>
           {Row("Cel X", "aimX", -2, 2, 0.02)}
           {Row("Cel Y", "aimY", -1.5, 2, 0.02)}
+          <div className="cx-tune-sep">Szklanka — strumień szejker→szklanka</div>
+          {Row("Start (góra)", "gStartY", 0, 3, 0.02)}
+          {Row("Koniec (dół)", "gEndY", -0.5, 2, 0.02)}
+          {Row("Zakrzywienie", "gCurve", -1, 1, 0.02)}
+          {Row("Grubość", "gThick", 0.005, 0.12, 0.005)}
           <div className="cx-tune-actions">
             <button className="cx-tune-copy" onClick={copy}>{copied ? "✓ Skopiowano" : "📋 Copia valori"}</button>
             <button className="cx-tune-reset" onClick={reset}>↺ Reset</button>
@@ -3406,7 +3448,21 @@ function PourTunePanel() {
         .cx-tune-actions button { flex:1; padding:10px; border-radius:10px; border:none; font-weight:700; font-size:12px; cursor:pointer; }
         .cx-tune-copy { background:#E8927C; color:#1a1014; }
         .cx-tune-reset { background:rgba(255,255,255,0.1); color:#fff; }
+        .cx-tune-freeze { width:100%; padding:11px; border-radius:10px; border:none; font-weight:800; font-size:12px; cursor:pointer; margin:2px 0 6px; background:#5BB8D4; color:#08222e; }
+        .cx-tune-freeze.on { background:#F1C40F; color:#3a2c00; }
         .cx-tune-hint { margin:10px 0 0; font-size:10px; line-height:1.4; opacity:0.6; }
+        @media (max-width:768px){
+          .cx-tune { width:min(220px,calc(100vw - 16px)); left:8px; bottom:8px; border-radius:11px; }
+          .cx-tune-head { padding:7px 9px; font-size:10px; }
+          .cx-tune-head button { width:22px; height:22px; font-size:14px; }
+          .cx-tune-body { padding:3px 9px 9px; }
+          .cx-tune-row { grid-template-columns:62px 1fr 34px; gap:5px; margin:5px 0; font-size:9px; }
+          .cx-tune-row b { font-size:9px; }
+          .cx-tune-sep { font-size:8px; margin:8px 0 3px; padding-top:6px; }
+          .cx-tune-actions button { padding:8px; font-size:10px; }
+          .cx-tune-freeze { padding:9px; font-size:11px; }
+          .cx-tune-hint { font-size:9px; }
+        }
       `}</style>
     </div>,
     document.body,
