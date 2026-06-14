@@ -5906,12 +5906,14 @@ function ShareDrinkBtn() {
                   <span className="cx-mini-kicker">{st("livePreview", "Anteprima live")}</span>
                   {myDrink ? (
                     <>
+                      <span className="cx-share-flabel">{st("drinkName", "Nome del drink")}</span>
                       <label className="cx-share-edit">
                         <span className="cx-share-edit-ico">✏️</span>
                         <input className="cx-share-edit-name" value={editName} onChange={(e) => setEditName(e.target.value)}
                           placeholder={st("drinkName", "Nome del drink")} maxLength={40} />
                       </label>
                       <div className="cx-share-details">
+                        <span className="cx-share-flabel">{st("yourName", "Il tuo nome")}</span>
                         <label className="cx-share-edit cx-share-edit-author">
                           <span className="cx-share-edit-ico">✏️</span>
                           <input value={editAuthor} onChange={(e) => setEditAuthor(e.target.value)} placeholder={st("yourName", "Il tuo nome")} maxLength={30} />
@@ -7600,6 +7602,7 @@ function CocktailStyles() {
       .cx-share-edit { display:flex; align-items:center; gap:8px; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14);
         border-radius:12px; padding:8px 12px; margin:2px 0; }
       .cx-share-edit-ico { font-size:13px; opacity:0.7; flex-shrink:0; }
+      .cx-share-flabel { display:block; font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--cx-accent,#E8927C); font-weight:800; margin:8px 2px 2px; }
       .cx-share-edit input { flex:1; min-width:0; background:none; border:none; outline:none; color:#fff; font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:20px; }
       .cx-share-edit-author input { font-family:var(--f-body); font-weight:600; font-size:14px; }
       .cx-share-edit input::placeholder { color:rgba(255,255,255,0.4); }
@@ -7614,8 +7617,8 @@ function CocktailStyles() {
       .cx-share-success-ico { font-size:56px; }
       .cx-share-success h3 { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:32px; color:#fff; margin:0; }
       .cx-share-success p { font-size:15px; color:rgba(255,255,255,0.7); max-width:360px; line-height:1.5; }
-      .cx-comm-share-done { background:rgba(91,184,212,0.2); border-color:rgba(91,184,212,0.4); color:var(--c-sky,#5BB8D4); cursor:default; }
-      .cx-comm-share-done:hover { background:rgba(91,184,212,0.2); color:var(--c-sky,#5BB8D4); }
+      .cx-comm-share-done { background:var(--c-sky,#5BB8D4); border-color:var(--c-sky,#5BB8D4); color:#08222e; cursor:pointer; }
+      .cx-comm-share-done:hover { background:#fff; color:var(--c-deep,#1A3D52); }
 
       
       /* Particles/gwiazdki na tle community */

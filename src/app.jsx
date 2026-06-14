@@ -192,15 +192,22 @@ export default function App() {
       setTweak("language", lang);
     };
     (async () => {
-      try {
-        const res = await fetch("https://ipapi.co/json/", { signal: AbortSignal.timeout?.(3000) });
-        if (res.ok) {
+      // Próbujemy kilku darmowych API geolokalizacji po IP (gdy jedno padnie/limit → następne)
+      const endpoints = [
+        { url: "https://ipwho.is/", pick: (d) => d.country_code },
+        { url: "https://ipapi.co/json/", pick: (d) => d.country_code || d.country },
+        { url: "https://get.geojs.io/v1/ip/country.json", pick: (d) => d.country },
+        { url: "https://ipinfo.io/json", pick: (d) => d.country },
+      ];
+      for (const ep of endpoints) {
+        try {
+          const res = await fetch(ep.url, { cache: "no-store" });
+          if (!res.ok) continue;
           const data = await res.json();
-          const cc = (data.country_code || data.country || "").toUpperCase();
-          const lang = COUNTRY_LANG[cc] || (cc ? "en" : null);
-          if (lang) { applyLang(lang); return; }
-        }
-      } catch { /* fallback poniżej */ }
+          const cc = (ep.pick(data) || "").toString().toUpperCase().slice(0, 2);
+          if (cc) { applyLang(COUNTRY_LANG[cc] || "en"); return; }
+        } catch { /* spróbuj następne API */ }
+      }
       // Fallback: język przeglądarki
       try {
         const nav = (navigator.language || "it").slice(0, 2).toLowerCase();
