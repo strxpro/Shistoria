@@ -3273,6 +3273,30 @@ function PourBottle({ id, color, side, ox, oy, tx, ty, onCorkOpen, onDone }: { i
     // Ruch butelki — NA MOBILE wyłączony (strumień musi być stabilny i przyklejony do szyjki)
     const isMob2 = typeof window !== "undefined" && window.innerWidth < 768;
     const frozen = typeof window !== "undefined" && (window as any).__POUR_FREEZE;
+    // STROJENIE NA ŻYWO: gdy zatrzymane, przesuwaj butelkę/puszkę wg suwaków od razu
+    if (frozen && outer.current && !model.noStream) {
+      const T = getPourTune();
+      const offX = isMob2 ? T.bottleX_m : T.bottleX_d;
+      const bx = side === "right" ? offX : -offX;
+      const by = isMob2 ? T.bottleY_m : T.bottleY_d;
+      const sc = isMob2 ? T.scale_m : T.scale_d;
+      const ti = (side === "right" ? 1 : -1) * deg(isMob2 ? T.tilt_m : T.tilt_d);
+      outer.current.position.set(bx, by, CONFIG.shakerRest.z);
+      outer.current.scale.setScalar(sc);
+      outer.current.rotation.set(0, 0, ti);
+      pouringRef.current = true; // utrzymaj widoczny strumień podczas strojenia
+    } else if (frozen && outer.current && model.noStream) {
+      const T = getPourTune();
+      const offX = isMob2 ? T.bottleX_m : T.bottleX_d;
+      const bx = side === "right" ? offX : -offX;
+      const by = isMob2 ? T.bottleY_m : T.bottleY_d;
+      const sc = isMob2 ? T.scale_m : T.scale_d;
+      const canTilt = (side === "right" ? 1 : -1) * deg(70);
+      outer.current.position.set(bx, by, CONFIG.shakerRest.z);
+      outer.current.scale.setScalar(sc);
+      outer.current.rotation.set(deg(20), 0, canTilt);
+      pouringRef.current = true;
+    }
     if (pouringRef.current && outer.current && !isMob2 && !frozen) {
       const offX = 1.2;
       let targetPosX = target.x - pointer.x * 1.5;
