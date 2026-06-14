@@ -68,7 +68,7 @@ if (typeof window !== "undefined") {
   try { ScrollTrigger.config({ ignoreMobileResize: true }); } catch { /* ignore */ }
 }
 
-import { supabase, getSessionId, createOrder, newOrderId, publishDrink, likeDrink, addComment, getComments, getCommentsFull, toggleCommentLike, getMyCommentLikes, incrementDrinkView, claimDrink as claimDrinkApi } from "./lib/supabase";
+import { supabase, getSessionId, createOrder, newOrderId, publishDrink, likeDrink, addComment, getComments, getCommentsFull, toggleCommentLike, getMyCommentLikes, incrementDrinkView, claimDrink as claimDrinkApi, getDrinkStats, deleteMyDrink } from "./lib/supabase";
 import { findCocktailByIngredients } from "./lib/cocktail-db";
 import { PersonalizedQR } from "./components/PersonalizedQR";
 
@@ -5836,6 +5836,110 @@ function PhotoEditor({ src, onDone, onCancel }: { src: string; onDone: (dataUrl:
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
+ * Lista drinków twórcy (Vedi/Modifica) + wiersz ze swipe + widok statystyk
+ * ──────────────────────────────────────────────────────────────────────── */
+function mdT(lang: string) {
+  const L: Record<string, any> = {
+    it: { title: "Le mie creazioni", hint: "Tocca per modificare · scorri ← elimina · scorri → statistiche", new: "+ Crea un nuovo drink", del: "Eliminare questo drink?", yes: "Sì, elimina", no: "Annulla", ml: "ml", stats: "Statistiche", views: "Visualizzazioni", likes: "Mi piace", comments: "Commenti", claims: "Ritiri", none: "Drink non ancora pubblicato nella community.", loading: "Carico…" },
+    pl: { title: "Moje drinki", hint: "Dotknij = edycja · przesuń ← usuń · przesuń → statystyki", new: "+ Stwórz nowy drink", del: "Usunąć ten drink?", yes: "Tak, usuń", no: "Anuluj", ml: "ml", stats: "Statystyki", views: "Wyświetlenia", likes: "Polubienia", comments: "Komentarze", claims: "Odbiory", none: "Drink nie jest jeszcze opublikowany w community.", loading: "Ładuję…" },
+    en: { title: "My creations", hint: "Tap to edit · swipe ← delete · swipe → stats", new: "+ Create a new drink", del: "Delete this drink?", yes: "Yes, delete", no: "Cancel", ml: "ml", stats: "Statistics", views: "Views", likes: "Likes", comments: "Comments", claims: "Pickups", none: "Drink not published to the community yet.", loading: "Loading…" },
+    de: { title: "Meine Kreationen", hint: "Tippen = bearbeiten · wischen ← löschen · wischen → Statistik", new: "+ Neuen Drink erstellen", del: "Diesen Drink löschen?", yes: "Ja, löschen", no: "Abbrechen", ml: "ml", stats: "Statistik", views: "Aufrufe", likes: "Likes", comments: "Kommentare", claims: "Abholungen", none: "Drink noch nicht in der Community veröffentlicht.", loading: "Lädt…" },
+    fr: { title: "Mes créations", hint: "Touche = modifier · glisse ← supprimer · glisse → stats", new: "+ Créer un nouveau cocktail", del: "Supprimer ce cocktail ?", yes: "Oui, supprimer", no: "Annuler", ml: "ml", stats: "Statistiques", views: "Vues", likes: "J'aime", comments: "Commentaires", claims: "Retraits", none: "Cocktail pas encore publié dans la communauté.", loading: "Chargement…" },
+    es: { title: "Mis creaciones", hint: "Toca = editar · desliza ← eliminar · desliza → estadísticas", new: "+ Crear un nuevo trago", del: "¿Eliminar este trago?", yes: "Sí, eliminar", no: "Cancelar", ml: "ml", stats: "Estadísticas", views: "Visualizaciones", likes: "Me gusta", comments: "Comentarios", claims: "Retiros", none: "Trago aún no publicado en la comunidad.", loading: "Cargando…" },
+  };
+  return L[lang] ?? L.it;
+}
+
+function MyDrinkRow({ d, lang, confirm, onEdit, onStats, onAskDelete, onConfirmDelete, onCancelDelete }: {
+  d: any; lang: string; confirm: boolean;
+  onEdit: () => void; onStats: () => void; onAskDelete: () => void; onConfirmDelete: () => void; onCancelDelete: () => void;
+}) {
+  const [dx, setDx] = useState(0);
+  const drag = useRef<{ on: boolean; sx: number; moved: boolean }>({ on: false, sx: 0, moved: false });
+  const T = mdT(lang);
+  const TH = 70;
+  const down = (e: React.PointerEvent) => { drag.current = { on: true, sx: e.clientX, moved: false }; try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* */ } };
+  const move = (e: React.PointerEvent) => { if (!drag.current.on) return; const delta = e.clientX - drag.current.sx; if (Math.abs(delta) > 6) drag.current.moved = true; setDx(Math.max(-130, Math.min(130, delta))); };
+  const up = () => {
+    if (!drag.current.on) return; drag.current.on = false;
+    const cur = dx; setDx(0);
+    if (cur <= -TH) onAskDelete();
+    else if (cur >= TH) onStats();
+    else if (!drag.current.moved) onEdit();
+  };
+  return (
+    <div className="cx-mydrink-swipe">
+      <div className="cx-mydrink-act cx-mydrink-act-stats" style={{ opacity: dx > 12 ? 1 : 0.25 }}>📊</div>
+      <div className="cx-mydrink-act cx-mydrink-act-trash" style={{ opacity: dx < -12 ? 1 : 0.25 }}>🗑</div>
+      <div className="cx-mydrink-card" style={{ transform: `translateX(${dx}px)` }}
+        onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
+        {d.photo_url ? <img src={d.photo_url} alt="" className="cx-mydrink-thumb" draggable={false} /> : <span className="cx-mydrink-thumb cx-mydrink-thumb-ph">🍸</span>}
+        <div className="cx-mydrink-info">
+          <strong>{d.name || "—"}</strong>
+          <span>{[d.ml ? `${d.ml} ${T.ml}` : "", d.author].filter(Boolean).join(" · ")}</span>
+        </div>
+        <span className="cx-mydrink-chev">›</span>
+      </div>
+      {confirm && (
+        <div className="cx-mydrink-confirm">
+          <span>{T.del}</span>
+          <div className="cx-mydrink-confirm-btns">
+            <button className="cx-mydrink-confirm-no" onClick={onCancelDelete}>{T.no}</button>
+            <button className="cx-mydrink-confirm-yes" onClick={onConfirmDelete}>{T.yes}</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MyDrinksList({ drinks, lang, confirmDel, onEdit, onStats, onAskDelete, onConfirmDelete, onCancelDelete, onNew }: {
+  drinks: any[]; lang: string; confirmDel: number | null;
+  onEdit: (d: any) => void; onStats: (d: any) => void; onAskDelete: (i: number) => void;
+  onConfirmDelete: (i: number) => void; onCancelDelete: () => void; onNew: () => void;
+}) {
+  const T = mdT(lang);
+  return (
+    <div className="cx-mydrinks">
+      <div className="cx-mydrinks-head">
+        <span className="cx-mini-kicker">{T.title}</span>
+        <p className="cx-mydrinks-hint">{T.hint}</p>
+      </div>
+      <div className="cx-mydrinks-list">
+        {drinks.map((d, i) => (
+          <MyDrinkRow key={d.saved_at || i} d={d} lang={lang} confirm={confirmDel === i}
+            onEdit={() => onEdit(d)} onStats={() => onStats(d)} onAskDelete={() => onAskDelete(i)}
+            onConfirmDelete={() => onConfirmDelete(i)} onCancelDelete={onCancelDelete} />
+        ))}
+      </div>
+      <button className="cx-btn cx-mydrinks-new" onClick={onNew}>{T.new}</button>
+    </div>
+  );
+}
+
+function DrinkStatsView({ drink, stats, loading, lang }: { drink: any; stats: any; loading: boolean; lang: string }) {
+  const T = mdT(lang);
+  return (
+    <div className="cx-dstats">
+      <span className="cx-mini-kicker">{T.stats}</span>
+      <h3 className="cx-dstats-name">{drink?.name || "—"}</h3>
+      {loading ? (
+        <p className="cx-dstats-msg">{T.loading}</p>
+      ) : !stats ? (
+        <p className="cx-dstats-msg">{T.none}</p>
+      ) : (
+        <div className="cx-dstats-grid">
+          <div className="cx-dstats-cell"><span className="cx-dstats-ico">👁</span><strong>{stats.views || 0}</strong><span>{T.views}</span></div>
+          <div className="cx-dstats-cell"><span className="cx-dstats-ico">♥</span><strong>{stats.likes || 0}</strong><span>{T.likes}</span></div>
+          <div className="cx-dstats-cell"><span className="cx-dstats-ico">💬</span><strong>{stats.comments || 0}</strong><span>{T.comments}</span></div>
+          <div className="cx-dstats-cell"><span className="cx-dstats-ico">🍸</span><strong>{stats.claimed_count || 0}</strong><span>{T.claims}</span></div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
  * ShareDrinkBtn — popout z podglądem live + upload zdjęcia.
  * ──────────────────────────────────────────────────────────────────────── */
 function ShareDrinkBtn() {
@@ -5850,19 +5954,78 @@ function ShareDrinkBtn() {
   const [editAuthor, setEditAuthor] = useState("");
   const [sharing, setSharing] = useState(false); // generowanie obrazka story
   const [publishProgress, setPublishProgress] = useState(0); // pasek postępu publikacji (0..1)
+  // Vedi/Modifica: lista wszystkich drinków twórcy + tryby widoku
+  const [view, setView] = useState<"list" | "edit" | "stats">("edit");
+  const [allDrinks, setAllDrinks] = useState<any[]>([]);
+  const [statsData, setStatsData] = useState<any>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
+  const [confirmDel, setConfirmDel] = useState<number | null>(null);
 
-  // Odświeżaj dane drinka z localStorage przy każdym otwarciu + auto-wypełnij pola edycji
+  // Wczytaj lokalną listę drinków (najnowsze u góry)
+  const loadDrinks = () => {
+    try {
+      const arr = JSON.parse(localStorage.getItem("sh-my-drinks") || "[]");
+      return Array.isArray(arr) ? arr.slice().reverse() : [];
+    } catch { return []; }
+  };
+
+  // Załaduj drink do edycji
+  const openEdit = (d: any) => {
+    setMyDrink(d);
+    setEditName(d.name || "");
+    setEditAuthor(d.author || "");
+    setPhoto(d.photo_url || null);
+    setRawPhoto(d.photo_url || null);
+    setView("edit");
+  };
+
+  // Otwórz statystyki drinka (z bazy: views/likes/comments/claimed)
+  const openStats = async (d: any) => {
+    setMyDrink(d);
+    setView("stats");
+    setStatsData(null);
+    setStatsLoading(true);
+    try {
+      const s = await getDrinkStats(d.published_id ? { id: d.published_id } : { name: d.name, author: d.author });
+      setStatsData(s);
+    } catch { setStatsData(null); }
+    setStatsLoading(false);
+  };
+
+  // Usuń drink z listy (lokalnie + best-effort z bazy)
+  const removeDrink = async (idxReversed: number) => {
+    const list = loadDrinks();
+    const d = list[idxReversed];
+    if (d?.published_id) { try { await deleteMyDrink(d.published_id); } catch { /* RLS */ } }
+    // mapuj na indeks w oryginalnej (nieodwróconej) tablicy
+    try {
+      const orig = JSON.parse(localStorage.getItem("sh-my-drinks") || "[]");
+      const realIdx = orig.length - 1 - idxReversed;
+      orig.splice(realIdx, 1);
+      localStorage.setItem("sh-my-drinks", JSON.stringify(orig));
+      if (orig.length === 0) localStorage.removeItem("sh-drink-shared");
+    } catch { /* ignore */ }
+    const next = loadDrinks();
+    setAllDrinks(next);
+    setConfirmDel(null);
+    if (next.length === 0) setOpen(false);
+  };
+
+  // Odświeżaj dane przy każdym otwarciu. Z "Vedi/Modifica" (alreadySent) → lista; inaczej edycja ostatniego.
   useEffect(() => {
     if (!open) return;
-    try {
-      const drinks = JSON.parse(localStorage.getItem("sh-my-drinks") || "[]");
-      if (drinks.length > 0) {
-        const d = drinks[drinks.length - 1];
-        setMyDrink(d);
-        setEditName(d.name || "");
-        setEditAuthor(d.author || "");
-      } else setMyDrink(null);
-    } catch { setMyDrink(null); }
+    const list = loadDrinks();
+    setAllDrinks(list);
+    const wasSent = typeof localStorage !== "undefined" && localStorage.getItem("sh-drink-shared") === "true";
+    if (wasSent && list.length > 0) {
+      setView("list");
+    } else if (list.length > 0) {
+      openEdit(list[0]);
+    } else {
+      setMyDrink(null);
+      setView("edit");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   // Sprawdź czy użytkownik już wysłał
@@ -5899,7 +6062,7 @@ function ShareDrinkBtn() {
     const tick = setInterval(() => setPublishProgress((p) => Math.min(0.9, p + 0.12)), 200);
     try {
       // Publikuj do Supabase
-      await publishDrink({
+      const published = await publishDrink({
         name: finalName,
         author_name: finalAuthor,
         ingredients: myDrink.ingredients || [],
@@ -5910,6 +6073,20 @@ function ShareDrinkBtn() {
         photo_url: photo || undefined,
         lang: (typeof window !== "undefined" && (window as any).currentLanguage) || "it",
       });
+      // Zapisz ID z bazy + edytowane pola do lokalnej listy (do statystyk/edycji)
+      if (typeof localStorage !== "undefined") {
+        try {
+          const orig = JSON.parse(localStorage.getItem("sh-my-drinks") || "[]");
+          // dopasuj po nazwie/autorze oryginalnego myDrink (najnowszy pasujący)
+          for (let i = orig.length - 1; i >= 0; i--) {
+            if (orig[i]?.name === myDrink.name && orig[i]?.author === myDrink.author) {
+              orig[i] = { ...orig[i], name: finalName, author: finalAuthor, photo_url: photo || orig[i].photo_url, published_id: published?.id || orig[i].published_id };
+              break;
+            }
+          }
+          localStorage.setItem("sh-my-drinks", JSON.stringify(orig));
+        } catch { /* ignore */ }
+      }
     } catch (e) { console.error("Publish error:", e); }
     // make.com — e-mail do twórcy (jeśli podał email przy drinku)
     if (myDrink.email) {
@@ -6050,10 +6227,13 @@ function ShareDrinkBtn() {
       <button className="cx-comm-share-btn" onClick={() => setOpen(true)}>{(() => { const L: Record<string,string> = {it:"Invia →",pl:"Wyślij →",en:"Submit →",de:"Senden →",fr:"Envoyer →",es:"Enviar →"}; return L[((typeof window!=="undefined"&&(window as any).currentLanguage)||"it") as keyof typeof L]??L.it; })()}</button>
       {open && typeof document !== "undefined" && createPortal(
         <div className="cx-share-overlay" onClick={() => setOpen(false)}>
+          <button className="cx-cc-popout-close cx-cc-popout-close-fixed" onClick={() => setOpen(false)} aria-label="Chiudi">×</button>
           <div className="cx-share-popout" onClick={(e) => e.stopPropagation()}>
-            <button className="cx-cc-popout-close" onClick={() => setOpen(false)}>×</button>
             {publishProgress > 0 && (
               <div className="cx-share-progress"><div className="cx-share-progress-fill" style={{ width: `${Math.round(publishProgress * 100)}%` }} /></div>
+            )}
+            {!sent && ((view === "edit" && allDrinks.length > 1) || view === "stats") && (
+              <button className="cx-share-back" onClick={() => setView("list")} aria-label="Indietro">←</button>
             )}
             {sent ? (
               <div className="cx-share-success">
@@ -6076,6 +6256,20 @@ function ShareDrinkBtn() {
                 </div>
                 {sharing && <p className="cx-share-gen">{(() => { const L: Record<string,string> = {it:"Genero la storia…",pl:"Tworzę relację…",en:"Creating story…",de:"Erstelle Story…",fr:"Création de la story…",es:"Creando la historia…"}; return L[sLang] ?? L.it; })()}</p>}
               </div>
+            ) : view === "list" ? (
+              <MyDrinksList
+                drinks={allDrinks}
+                lang={sLang}
+                confirmDel={confirmDel}
+                onEdit={openEdit}
+                onStats={openStats}
+                onAskDelete={setConfirmDel}
+                onConfirmDelete={removeDrink}
+                onCancelDelete={() => setConfirmDel(null)}
+                onNew={() => { setOpen(false); document.getElementById("cocktail-rise")?.scrollIntoView({ behavior: "smooth" }); }}
+              />
+            ) : view === "stats" ? (
+              <DrinkStatsView drink={myDrink} stats={statsData} loading={statsLoading} lang={sLang} />
             ) : (
               <div className="cx-share-form">
                 {myDrink && (
@@ -6134,6 +6328,12 @@ function ShareDrinkBtn() {
                     <button className="cx-btn cx-share-submit" disabled={!photo} onClick={handleSend}>
                       {st("publish", "Pubblica nella community →")}
                     </button>
+                  )}
+                  {myDrink && allDrinks.length > 0 && (
+                    <button className="cx-share-del-btn" onClick={() => {
+                      const idx = allDrinks.findIndex((x) => x.name === myDrink.name && x.author === myDrink.author && x.saved_at === myDrink.saved_at);
+                      setView("list"); setConfirmDel(idx >= 0 ? idx : null);
+                    }}>🗑 {({ it: "Elimina questo drink", pl: "Usuń ten drink", en: "Delete this drink", de: "Diesen Drink löschen", fr: "Supprimer ce cocktail", es: "Eliminar este trago" } as Record<string, string>)[sLang] || "Elimina"}</button>
                   )}
                 </div>
               </div>
@@ -7839,6 +8039,53 @@ function CocktailStyles() {
       .cx-share-hint { font-size:13px; color:rgba(255,255,255,0.6); line-height:1.5; }
       .cx-share-submit { margin-top:auto; width:100%; box-sizing:border-box; white-space:normal; text-align:center; line-height:1.25; padding:14px 18px; font-size:clamp(13px,3.6vw,15px); }
       .cx-share-submit:disabled { opacity:0.4; cursor:not-allowed; }
+
+      /* Przycisk "wstecz" w popoucie udostępniania */
+      .cx-share-back { position:absolute; top:14px; left:14px; z-index:6; width:38px; height:38px; border-radius:50%;
+        background:rgba(0,0,0,0.5); border:1px solid rgba(255,255,255,0.25); color:#fff; font-size:20px; cursor:pointer;
+        display:grid; place-items:center; backdrop-filter:blur(6px); transition:background .2s; }
+      .cx-share-back:hover { background:rgba(255,255,255,0.15); }
+      /* Przycisk usuwania w panelu edycji */
+      .cx-share-del-btn { margin-top:10px; width:100%; box-sizing:border-box; padding:11px 14px; border-radius:12px;
+        background:rgba(220,38,38,0.12); border:1px solid rgba(220,38,38,0.4); color:#ff8a8a; font-weight:700; font-size:13px; cursor:pointer; transition:all .2s; }
+      .cx-share-del-btn:hover { background:rgba(220,38,38,0.22); }
+
+      /* ── Lista "Le mie creazioni" (Vedi/Modifica) ── */
+      .cx-mydrinks { padding:26px 22px 22px; display:flex; flex-direction:column; gap:14px; }
+      .cx-mydrinks-head { display:flex; flex-direction:column; gap:4px; }
+      .cx-mydrinks-hint { margin:0; font-size:12px; color:rgba(255,255,255,0.5); line-height:1.4; }
+      .cx-mydrinks-list { display:flex; flex-direction:column; gap:10px; }
+      .cx-mydrink-swipe { position:relative; border-radius:14px; overflow:hidden; touch-action:pan-y; }
+      .cx-mydrink-act { position:absolute; top:0; bottom:0; width:64px; display:grid; place-items:center; font-size:24px; z-index:1; transition:opacity .15s; }
+      .cx-mydrink-act-stats { left:0; background:linear-gradient(90deg,#16a34a,#22c55e); color:#fff; }
+      .cx-mydrink-act-trash { right:0; background:linear-gradient(90deg,#dc2626,#b91c1c); color:#fff; }
+      .cx-mydrink-card { position:relative; z-index:2; display:flex; align-items:center; gap:12px; padding:10px 12px;
+        background:#1b2129; border:1px solid rgba(255,255,255,0.08); border-radius:14px; cursor:pointer; user-select:none;
+        -webkit-user-select:none; touch-action:pan-y; }
+      .cx-mydrink-thumb { width:52px; height:52px; border-radius:10px; object-fit:cover; flex-shrink:0; }
+      .cx-mydrink-thumb-ph { display:grid; place-items:center; background:rgba(255,255,255,0.06); font-size:24px; }
+      .cx-mydrink-info { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+      .cx-mydrink-info strong { color:#fff; font-size:15px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .cx-mydrink-info span { color:rgba(255,255,255,0.55); font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+      .cx-mydrink-chev { color:rgba(255,255,255,0.35); font-size:24px; flex-shrink:0; }
+      .cx-mydrink-confirm { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:6px;
+        padding:10px 12px; background:rgba(220,38,38,0.1); border:1px solid rgba(220,38,38,0.35); border-radius:12px; flex-wrap:wrap; }
+      .cx-mydrink-confirm > span { color:#ffb4b4; font-size:13px; font-weight:600; }
+      .cx-mydrink-confirm-btns { display:flex; gap:8px; }
+      .cx-mydrink-confirm-no { padding:7px 14px; border-radius:9px; border:1px solid rgba(255,255,255,0.2); background:transparent; color:#fff; cursor:pointer; font-size:13px; }
+      .cx-mydrink-confirm-yes { padding:7px 14px; border-radius:9px; border:none; background:#dc2626; color:#fff; cursor:pointer; font-weight:700; font-size:13px; }
+      .cx-mydrinks-new { width:100%; box-sizing:border-box; margin-top:4px; }
+
+      /* ── Widok statystyk drinka ── */
+      .cx-dstats { padding:28px 22px 24px; display:flex; flex-direction:column; gap:10px; }
+      .cx-dstats-name { margin:0 0 8px; color:#fff; font-size:22px; }
+      .cx-dstats-msg { color:rgba(255,255,255,0.55); font-size:14px; }
+      .cx-dstats-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+      .cx-dstats-cell { display:flex; flex-direction:column; align-items:center; gap:3px; padding:18px 12px;
+        background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:16px; }
+      .cx-dstats-ico { font-size:24px; }
+      .cx-dstats-cell strong { color:#fff; font-size:26px; font-weight:800; }
+      .cx-dstats-cell span:last-child { color:rgba(255,255,255,0.55); font-size:12px; }
       .cx-share-success { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:60px 32px; text-align:center; }
       .cx-share-success-ico { font-size:56px; }
       .cx-share-success h3 { font-family:var(--f-display,"Syne",serif); font-weight:800; font-size:32px; color:#fff; margin:0; }

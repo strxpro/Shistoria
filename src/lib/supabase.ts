@@ -82,6 +82,32 @@ export async function getCommunityDrinks(limit = 12, offset = 0) {
   return data || [];
 }
 
+/** Statystyki pojedynczego drinka twórcy (po ID z bazy lub po nazwie+autorze). */
+export async function getDrinkStats(opts: { id?: string; name?: string; author?: string }) {
+  let q = supabase
+    .from('community_drinks')
+    .select('id,name,author_name,views,likes,comments,claimed_count,created_at,photo_url');
+  if (opts.id) {
+    q = q.eq('id', opts.id);
+  } else if (opts.name) {
+    q = q.eq('name', opts.name);
+    if (opts.author) q = q.eq('author_name', opts.author);
+  } else {
+    return null;
+  }
+  const { data, error } = await q.order('created_at', { ascending: false }).limit(1);
+  if (error) { console.error('Stats error:', error); return null; }
+  return (data && data[0]) || null;
+}
+
+/** Usuń drink twórcy z community (best-effort — RLS może zablokować). */
+export async function deleteMyDrink(id: string): Promise<boolean> {
+  if (!id) return false;
+  const { error } = await supabase.from('community_drinks').delete().eq('id', id);
+  if (error) { console.warn('Delete drink (RLS?):', error.message); return false; }
+  return true;
+}
+
 export async function likeDrink(drinkId: string) {
   const sid = getSessionId();
   const { error } = await supabase
