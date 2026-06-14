@@ -102,10 +102,15 @@ export default function AdminPage() {
 
   return (
     <div className={`admin admin-theme-${theme}`}>
+      {navOpen && <div className="admin-nav-scrim" onClick={() => setNavOpen(false)} />}
       <aside className={`admin-nav ${navOpen ? "is-open" : ""}`}>
         <div className="admin-logo">
-          <h2>S'Historia</h2>
-          <span>Admin Panel</span>
+          <div className="admin-logo-mark">S'H</div>
+          <div className="admin-logo-txt">
+            <h2>S'Historia</h2>
+            <span>Admin Panel</span>
+          </div>
+          <button className="admin-nav-close" onClick={() => setNavOpen(false)} aria-label="Chiudi menu">✕</button>
         </div>
         <nav>
           {([
@@ -2315,7 +2320,50 @@ function AdminStyles() {
       .admin-bell-item:hover { background:rgba(232,146,124,0.14); }
       .admin-bell-item strong { color:#E8927C; }
       @media (max-width:768px) { .admin-bell-wrap { top:14px; right:14px; } .admin-bell { width:42px; height:42px; } }
+
+      /* ═══ PREMIUM: logo/profil, scrim, mobilny close, mikro-interakcje ═══ */
+      /* Blok logo jako profil (jak w referencji) */
+      .admin-logo { display:flex; align-items:center; gap:12px; }
+      .admin-logo-mark { width:42px; height:42px; flex-shrink:0; border-radius:14px; display:grid; place-items:center;
+        font-weight:800; font-size:15px; letter-spacing:-0.02em; color:#fff;
+        background:linear-gradient(135deg,#E8927C,#5BB8D4); box-shadow:0 6px 18px rgba(232,146,124,0.35); }
+      .admin-logo-txt { display:flex; flex-direction:column; min-width:0; }
+      .admin-logo-txt h2 { font-size:19px; margin:0; line-height:1.1; }
+      .admin-nav-close { display:none; }
+
+      /* Mikro-interakcje nav — przesunięcie ikonki + płynne tło aktywne */
+      .admin-nav nav button { gap:13px; }
+      .admin-nav-ico { transition:transform .3s var(--spring,cubic-bezier(.22,1,.36,1)); }
+      .admin-nav nav button:hover .admin-nav-ico { transform:scale(1.18) rotate(-4deg); }
+      .admin-nav nav button.active .admin-nav-ico { transform:scale(1.12); }
+      .admin-nav nav button { will-change:transform; }
+      .admin-nav nav button:active { transform:scale(.97); }
+
+      /* Przyciski — subtelny „shine" przy hover */
+      .admin-btn { position:relative; overflow:hidden; }
+      .admin-btn::after { content:""; position:absolute; inset:0; background:linear-gradient(120deg,transparent 30%,rgba(255,255,255,0.25) 50%,transparent 70%);
+        transform:translateX(-120%); transition:transform .6s ease; }
+      .admin-btn:hover::after { transform:translateX(120%); }
+
+      /* Karty — kursor + lekkie uniesienie ikon/elementów na hover */
+      .stats-kpi, .admin-order, .admin-event-card, .admin-drink-card { cursor:default; }
+
+      /* Scrim pod wysuwanym menu (telefon) */
+      .admin-nav-scrim { display:none; }
+      @media (max-width:768px) {
+        .admin-nav-scrim { display:block; position:fixed; inset:0; z-index:190; background:rgba(4,8,14,0.55);
+          backdrop-filter:blur(3px); -webkit-backdrop-filter:blur(3px); animation:adminPanelIn .25s ease both; }
+        /* Wyraźny przycisk zamykania w nagłówku menu */
+        .admin-nav-close { display:grid; place-items:center; margin-left:auto; width:38px; height:38px; flex-shrink:0;
+          border-radius:12px; border:1px solid rgba(255,255,255,0.15); background:rgba(255,255,255,0.06);
+          color:inherit; font-size:16px; cursor:pointer; transition:transform .2s, background .2s; }
+        .admin-nav-close:active { transform:scale(.9); }
+        .admin-theme-light .admin-nav-close { background:rgba(0,0,0,0.05); border-color:rgba(0,0,0,0.1); }
+        /* Hamburger chowamy gdy menu otwarte (jest close w środku) */
+        .admin-nav.is-open ~ .admin-nav-toggle { opacity:0; pointer-events:none; }
+      }
     `}</style>
+
 
 
 
