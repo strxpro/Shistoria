@@ -5649,6 +5649,9 @@ function PhotoEditor({ src, onDone, onCancel }: { src: string; onDone: (dataUrl:
   const drag = useRef({ on: false, sx: 0, sy: 0, ox: 0, oy: 0 });
   const imgRef = useRef<HTMLImageElement>(null);
   const boxRef = useRef<HTMLDivElement>(null);
+  // Multitouch: mapa aktywnych palców + baza gestu (pinch zoom + obrót dwoma palcami)
+  const ptrs = useRef<Map<number, { x: number; y: number }>>(new Map());
+  const gesture = useRef<{ dist: number; ang: number; zoom: number; rot: number } | null>(null);
 
   const peLang = (typeof window !== "undefined" && (window as any).currentLanguage) || "it";
   const PE = ({
@@ -5665,17 +5668,49 @@ function PhotoEditor({ src, onDone, onCancel }: { src: string; onDone: (dataUrl:
 
   const onDown = (e: React.PointerEvent) => {
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-    drag.current = { on: true, sx: e.clientX, sy: e.clientY, ox: off.x, oy: off.y };
+    ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (ptrs.current.size === 1) {
+      drag.current = { on: true, sx: e.clientX, sy: e.clientY, ox: off.x, oy: off.y };
+    } else if (ptrs.current.size === 2) {
+      drag.current.on = false;
+      const [a, b] = [...ptrs.current.values()];
+      const dist = Math.hypot(b.x - a.x, b.y - a.y);
+      const ang = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
+      gesture.current = { dist, ang, zoom, rot };
+    }
   };
   const onMove = (e: React.PointerEvent) => {
-    if (!drag.current.on) return;
-    const lim = (boxRef.current?.clientWidth ?? 300) * 0.6;
-    setOff({
-      x: Math.max(-lim, Math.min(lim, drag.current.ox + (e.clientX - drag.current.sx))),
-      y: Math.max(-lim, Math.min(lim, drag.current.oy + (e.clientY - drag.current.sy))),
-    });
+    if (!ptrs.current.has(e.pointerId)) return;
+    ptrs.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (ptrs.current.size >= 2 && gesture.current) {
+      // PINCH (zoom) + ROTACJA dwoma palcami — płynne, ciągłe
+      const [a, b] = [...ptrs.current.values()];
+      const dist = Math.hypot(b.x - a.x, b.y - a.y);
+      const ang = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
+      const nz = Math.max(1, Math.min(4, gesture.current.zoom * (dist / (gesture.current.dist || 1))));
+      const nr = gesture.current.rot + (ang - gesture.current.ang);
+      setZoom(nz);
+      setRot(nr);
+    } else if (drag.current.on) {
+      // PAN jednym palcem
+      const lim = (boxRef.current?.clientWidth ?? 300) * 0.6;
+      setOff({
+        x: Math.max(-lim, Math.min(lim, drag.current.ox + (e.clientX - drag.current.sx))),
+        y: Math.max(-lim, Math.min(lim, drag.current.oy + (e.clientY - drag.current.sy))),
+      });
+    }
   };
-  const onUp = () => { drag.current.on = false; };
+  const onUp = (e: React.PointerEvent) => {
+    ptrs.current.delete(e.pointerId);
+    if (ptrs.current.size < 2) gesture.current = null;
+    if (ptrs.current.size === 0) {
+      drag.current.on = false;
+    } else {
+      // jeśli został jeden palec → wznów pan od jego pozycji
+      const p = [...ptrs.current.values()][0];
+      drag.current = { on: true, sx: p.x, sy: p.y, ox: off.x, oy: off.y };
+    }
+  };
 
   const save = () => {
     const img = imgRef.current, box = boxRef.current;
