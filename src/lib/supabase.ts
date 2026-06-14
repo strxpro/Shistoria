@@ -96,28 +96,106 @@ export async function likeDrink(drinkId: string) {
   return !error;
 }
 
-export async function addComment(drinkId: string, author: string, content: string) {
+export async function addComment(drinkId: string, author: string, content: string, parentId?: string | null) {
+  const payload: Record<string, unknown> = { drink_id: drinkId, author, content };
+  if (parentId) payload.parent_id = parentId;
   const { data, error } = await supabase
     .from('drink_comments')
-    .insert({ drink_id: drinkId, author, content })
+    .insert(payload)
     .select()
     .single();
 
-  if (error) console.error('Comment error:', error);
+  if (error) {
+    // Fallback: jeśli kolumna parent_id jeszcze nie istnieje w bazie, zapisz bez niej
+    if (parentId) {
+      const { data: d2 } = await supabase
+        .from('drink_comments')
+        .insert({ drink_id: drinkId, author, content })
+        .select()
+        .single();
+      if (d2) return d2;
+    }
+    console.error('Comment error:', error);
+  }
   return data;
 }
 
-// D3: najnowsze komentarze drinka (styl IG — 3 ostatnie pod postem)
+// D3: najnowsze komentarze drinka (styl IG — tylko top-level, najnowsze pod postem)
 export async function getComments(drinkId: string, limit = 3) {
-  const { data, error } = await supabase
+  // Top-level = bez parent_id. Gdy kolumna nie istnieje, zapytanie i tak zwróci wszystko.
+  let query = supabase
     .from('drink_comments')
     .select('*')
     .eq('drink_id', drinkId)
     .order('created_at', { ascending: false })
     .limit(limit);
-
-  if (error) console.error('Get comments error:', error);
+  try { query = (query as any).is('parent_id', null); } catch { /* kolumna może nie istnieć */ }
+  const { data, error } = await query;
+  if (error) {
+    // Fallback bez filtra parent_id
+    const { data: d2 } = await supabase
+      .from('drink_comments').select('*').eq('drink_id', drinkId)
+      .order('created_at', { ascending: false }).limit(limit);
+    return d2 || [];
+  }
   return data || [];
+}
+
+// Wszystkie komentarze drinka (top-level + odpowiedzi) — do popoutu IG.
+export async function getCommentsFull(drinkId: string): Promise<{ top: any[]; repliesByParent: Record<string, any[]> }> {
+  const { data, error } = await supabase
+    .from('drink_comments')
+    .select('*')
+    .eq('drink_id', drinkId)
+    .order('created_at', { ascending: true });
+  if (error || !data) return { top: [], repliesByParent: {} };
+  const top: any[] = [];
+  const repliesByParent: Record<string, any[]> = {};
+  for (const c of data) {
+    if (c.parent_id) {
+      (repliesByParent[c.parent_id] ||= []).push(c);
+    } else {
+      top.push(c);
+    }
+  }
+  // top: najnowsze pierwsze
+  top.reverse();
+  return { top, repliesByParent };
+}
+
+// Polub / cofnij polubienie komentarza (toggle). Zwraca nowy stan: true=polubiony.
+export async function toggleCommentLike(commentId: string): Promise<boolean> {
+  if (!commentId || commentId.startsWith('tmp-')) return false;
+  const sid = getSessionId();
+  // Sprawdź, czy już polubione
+  const { data: existing } = await supabase
+    .from('comment_likes')
+    .select('id')
+    .eq('comment_id', commentId)
+    .eq('session_id', sid)
+    .maybeSingle();
+  if (existing) {
+    await supabase.from('comment_likes').delete().eq('comment_id', commentId).eq('session_id', sid);
+    await supabase.rpc('decrement_comment_likes', { cmt_uuid: commentId });
+    return false;
+  }
+  const { error } = await supabase.from('comment_likes').insert({ comment_id: commentId, session_id: sid });
+  if (error && error.code === '23505') return true; // już polubione (wyścig)
+  await supabase.rpc('increment_comment_likes', { cmt_uuid: commentId });
+  return true;
+}
+
+// Które komentarze polubił bieżący użytkownik (do inicjalizacji serduszek).
+export async function getMyCommentLikes(commentIds: string[]): Promise<Set<string>> {
+  const ids = commentIds.filter((id) => id && !id.startsWith('tmp-'));
+  if (ids.length === 0) return new Set();
+  const sid = getSessionId();
+  const { data } = await supabase
+    .from('comment_likes')
+    .select('comment_id')
+    .eq('session_id', sid)
+    .in('comment_id', ids);
+  return new Set((data || []).map((r: any) => r.comment_id));
 }
 
 // ─── Orders (QR barman) ───────────────────────────────────────────────────────

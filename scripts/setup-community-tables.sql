@@ -61,6 +61,47 @@ CREATE TABLE IF NOT EXISTS drink_comments (
 
 CREATE INDEX IF NOT EXISTS idx_drink_comments_drink ON drink_comments(drink_id);
 
+-- Komentarze IG-style: lajki + odpowiedzi (parent_id). Jeśli tabela już istnieje:
+ALTER TABLE drink_comments ADD COLUMN IF NOT EXISTS likes integer DEFAULT 0;
+ALTER TABLE drink_comments ADD COLUMN IF NOT EXISTS parent_id uuid REFERENCES drink_comments(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_drink_comments_parent ON drink_comments(parent_id);
+
+-- Dedup lajków komentarzy (jeden session_id = jeden lajk na komentarz)
+CREATE TABLE IF NOT EXISTS comment_likes (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  comment_id uuid NOT NULL REFERENCES drink_comments(id) ON DELETE CASCADE,
+  session_id text NOT NULL,
+  created_at timestamptz DEFAULT now(),
+  UNIQUE(comment_id, session_id)
+);
+ALTER TABLE comment_likes ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public read comment_likes" ON comment_likes;
+DROP POLICY IF EXISTS "Public insert comment_likes" ON comment_likes;
+DROP POLICY IF EXISTS "Public delete comment_likes" ON comment_likes;
+CREATE POLICY "Public read comment_likes" ON comment_likes FOR SELECT USING (true);
+CREATE POLICY "Public insert comment_likes" ON comment_likes FOR INSERT WITH CHECK (true);
+CREATE POLICY "Public delete comment_likes" ON comment_likes FOR DELETE USING (true);
+
+-- Pozwól front-endowi aktualizować licznik lajków komentarza (UPDATE)
+DROP POLICY IF EXISTS "Public update drink_comments" ON drink_comments;
+CREATE POLICY "Public update drink_comments" ON drink_comments FOR UPDATE USING (true);
+
+-- RPC: +/- lajk komentarza (bezpieczne, nie schodzi poniżej 0)
+CREATE OR REPLACE FUNCTION increment_comment_likes(cmt_uuid uuid)
+RETURNS void AS $$
+BEGIN
+  UPDATE drink_comments SET likes = COALESCE(likes, 0) + 1 WHERE id = cmt_uuid;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION decrement_comment_likes(cmt_uuid uuid)
+RETURNS void AS $$
+BEGIN
+  UPDATE drink_comments SET likes = GREATEST(0, COALESCE(likes, 0) - 1) WHERE id = cmt_uuid;
+END;
+$$ LANGUAGE plpgsql;
+
+
 -- ─── Events ──────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS events (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,

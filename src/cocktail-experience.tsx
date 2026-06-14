@@ -68,7 +68,7 @@ if (typeof window !== "undefined") {
   try { ScrollTrigger.config({ ignoreMobileResize: true }); } catch { /* ignore */ }
 }
 
-import { supabase, getSessionId, createOrder, newOrderId, publishDrink, likeDrink, addComment, getComments, claimDrink as claimDrinkApi } from "./lib/supabase";
+import { supabase, getSessionId, createOrder, newOrderId, publishDrink, likeDrink, addComment, getComments, getCommentsFull, toggleCommentLike, getMyCommentLikes, claimDrink as claimDrinkApi } from "./lib/supabase";
 import { findCocktailByIngredients } from "./lib/cocktail-db";
 import { PersonalizedQR } from "./components/PersonalizedQR";
 
@@ -5136,39 +5136,79 @@ function DbDrinkCard({ d }: { d: any }) {
 
   // D3: komentarze jak na IG — avatary, lajki, odpowiedzi; 3 najnowsze pod postem
   const [comments, setComments] = useState<any[]>([]);
+  const [replies, setReplies] = useState<Record<string, any[]>>({});
   const [cmtText, setCmtText] = useState("");
   const [cmtLiked, setCmtLiked] = useState<Record<string, boolean>>({});
   const [cmtLikes, setCmtLikes] = useState<Record<string, number>>({});
+  const [replyTo, setReplyTo] = useState<{ id: string; author: string } | null>(null);
   const cmtInputRef = useRef<HTMLInputElement>(null);
   // Ładuj 3 najnowsze komentarze OD RAZU (podgląd na karcie + popout)
   useEffect(() => {
     if (!d.id) return;
-    getComments(d.id, 3).then(setComments).catch(() => {});
+    getComments(d.id, 3).then((cs) => {
+      setComments(cs);
+      setCmtLikes((p) => { const n = { ...p }; cs.forEach((c: any) => { n[c.id] = c.likes || 0; }); return n; });
+    }).catch(() => {});
   }, [d.id]);
+  // Po otwarciu popoutu — załaduj pełną listę (top-level + odpowiedzi) i moje lajki
+  useEffect(() => {
+    if (!popout || !d.id) return;
+    getCommentsFull(d.id).then(async ({ top, repliesByParent }) => {
+      setComments(top);
+      setReplies(repliesByParent);
+      const all = [...top, ...Object.values(repliesByParent).flat()];
+      setCmtLikes((p) => { const n = { ...p }; all.forEach((c: any) => { n[c.id] = c.likes || 0; }); return n; });
+      try {
+        const mine = await getMyCommentLikes(all.map((c: any) => c.id));
+        setCmtLiked((p) => { const n = { ...p }; mine.forEach((id) => { n[id] = true; }); return n; });
+      } catch {}
+    }).catch(() => {});
+  }, [popout, d.id]);
   // Deterministyczny kolor awatara z imienia (jak losowy, ale stały dla danej osoby)
   const avaColor = (name: string) => { let h = 0; for (const c of (name || "?")) h = (h * 31 + c.charCodeAt(0)) % 360; return `hsl(${h} 58% 52%)`; };
   const avaInit = (name: string) => (name || "?").trim().charAt(0).toUpperCase() || "?";
   const replyLbl = ({ it: "Rispondi", pl: "Odpowiedz", en: "Reply", de: "Antworten", fr: "Répondre", es: "Responder" } as Record<string, string>)[lang] || "Rispondi";
   const likeComment = (id: string) => {
-    setCmtLiked((p) => ({ ...p, [id]: !p[id] }));
-    setCmtLikes((p) => ({ ...p, [id]: Math.max(0, (p[id] || 0) + (cmtLiked[id] ? -1 : 1)) }));
+    const wasLiked = !!cmtLiked[id];
+    // optymistycznie
+    setCmtLiked((p) => ({ ...p, [id]: !wasLiked }));
+    setCmtLikes((p) => ({ ...p, [id]: Math.max(0, (p[id] || 0) + (wasLiked ? -1 : 1)) }));
+    // trwale (best-effort)
+    toggleCommentLike(id).then((nowLiked) => {
+      setCmtLiked((p) => ({ ...p, [id]: nowLiked }));
+    }).catch(() => {});
   };
-  const replyToComment = (author: string) => {
+  const replyToComment = (c: any) => {
     setPopout(true);
-    setCmtText(`@${author} `);
+    setReplyTo({ id: c.id, author: c.author });
+    setCmtText(`@${c.author} `);
     setTimeout(() => cmtInputRef.current?.focus(), 60);
   };
   const submitComment = async () => {
     const t = cmtText.trim();
     if (!t) return;
+    const parent = replyTo;
     setCmtText("");
+    setReplyTo(null);
     let author = "Guest";
     try {
       const h = JSON.parse(localStorage.getItem("sh-my-drinks") || "[]");
       if (h.length > 0 && h[h.length - 1].author) author = h[h.length - 1].author;
     } catch {}
-    setComments((prev) => [{ id: `tmp-${Date.now()}`, author, content: t, created_at: new Date().toISOString() }, ...prev].slice(0, 3));
-    try { await addComment(d.id, author, t); } catch {}
+    const tmpId = `tmp-${Date.now()}`;
+    const optimistic = { id: tmpId, author, content: t, created_at: new Date().toISOString(), parent_id: parent?.id || null, likes: 0 };
+    if (parent) {
+      setReplies((prev) => ({ ...prev, [parent.id]: [...(prev[parent.id] || []), optimistic] }));
+    } else {
+      setComments((prev) => [optimistic, ...prev]);
+    }
+    let saved: any = null;
+    try { saved = await addComment(d.id, author, t, parent?.id || null); } catch {}
+    // Zamień tymczasowe id na prawdziwe (żeby lajki działały trwale)
+    if (saved?.id) {
+      if (parent) setReplies((prev) => ({ ...prev, [parent.id]: (prev[parent.id] || []).map((c) => c.id === tmpId ? { ...c, id: saved.id } : c) }));
+      else setComments((prev) => prev.map((c) => c.id === tmpId ? { ...c, id: saved.id } : c));
+    }
     // Powiadomienie make.com o nowym komentarzu (best-effort, nieblokujące)
     try {
       const { notifyComment } = await import("./lib/make-webhooks");
@@ -5268,18 +5308,39 @@ function DbDrinkCard({ d }: { d: any }) {
                 <span className="cx-cc-popout-label">💬 {tt("comments", "Commenti")}</span>
                 {comments.length === 0 && <p className="cx-cc-cmt cx-cc-cmt-empty">{tt("noComments", "Nessun commento — sii il primo!")}</p>}
                 {comments.map((c: any) => (
-                  <div key={c.id} className="cx-cc-cmt-ig-row">
-                    <span className="cx-cc-ava" style={{ background: avaColor(c.author) }}>{avaInit(c.author)}</span>
-                    <div className="cx-cc-cmt-ig-body">
-                      <p className="cx-cc-cmt-ig-txt"><strong>{c.author}</strong> {c.content}</p>
-                      <div className="cx-cc-cmt-ig-actions">
-                        <button onClick={() => replyToComment(c.author)}>{replyLbl}</button>
-                        {(cmtLikes[c.id] || 0) > 0 && <span className="cx-cc-cmt-ig-cnt">{cmtLikes[c.id]} ♥</span>}
+                  <div key={c.id} className="cx-cc-cmt-ig-thread">
+                    <div className="cx-cc-cmt-ig-row">
+                      <span className="cx-cc-ava" style={{ background: avaColor(c.author) }}>{avaInit(c.author)}</span>
+                      <div className="cx-cc-cmt-ig-body">
+                        <p className="cx-cc-cmt-ig-txt"><strong>{c.author}</strong> {c.content}</p>
+                        <div className="cx-cc-cmt-ig-actions">
+                          <button onClick={() => replyToComment(c)}>{replyLbl}</button>
+                          {(cmtLikes[c.id] || 0) > 0 && <span className="cx-cc-cmt-ig-cnt">{cmtLikes[c.id]} ♥</span>}
+                        </div>
                       </div>
+                      <button className={`cx-cc-cmt-ig-like ${cmtLiked[c.id] ? "on" : ""}`} onClick={() => likeComment(c.id)} aria-label="Like">♥</button>
                     </div>
-                    <button className={`cx-cc-cmt-ig-like ${cmtLiked[c.id] ? "on" : ""}`} onClick={() => likeComment(c.id)} aria-label="Like">♥</button>
+                    {(replies[c.id] || []).map((r: any) => (
+                      <div key={r.id} className="cx-cc-cmt-ig-row cx-cc-cmt-ig-reply">
+                        <span className="cx-cc-ava cx-cc-ava-sm" style={{ background: avaColor(r.author) }}>{avaInit(r.author)}</span>
+                        <div className="cx-cc-cmt-ig-body">
+                          <p className="cx-cc-cmt-ig-txt"><strong>{r.author}</strong> {r.content}</p>
+                          <div className="cx-cc-cmt-ig-actions">
+                            <button onClick={() => replyToComment(c)}>{replyLbl}</button>
+                            {(cmtLikes[r.id] || 0) > 0 && <span className="cx-cc-cmt-ig-cnt">{cmtLikes[r.id]} ♥</span>}
+                          </div>
+                        </div>
+                        <button className={`cx-cc-cmt-ig-like ${cmtLiked[r.id] ? "on" : ""}`} onClick={() => likeComment(r.id)} aria-label="Like">♥</button>
+                      </div>
+                    ))}
                   </div>
                 ))}
+                {replyTo && (
+                  <div className="cx-cc-cmt-replying">
+                    <span>↪︎ {replyLbl} <strong>@{replyTo.author}</strong></span>
+                    <button onClick={() => { setReplyTo(null); setCmtText(""); }} aria-label="Annulla">×</button>
+                  </div>
+                )}
                 <div className="cx-cc-cmt-row">
                   <input ref={cmtInputRef} className="cx-cc-cmt-input" value={cmtText} onChange={(e) => setCmtText(e.target.value)}
                     placeholder={tt("addComment", "Aggiungi un commento…")} maxLength={180}
@@ -7198,6 +7259,15 @@ function CocktailStyles() {
       .cx-cc-cmt-ig-like { background:none; border:none; cursor:pointer; font-size:15px; line-height:1; color:rgba(255,255,255,0.35); transition:transform .2s var(--spring,cubic-bezier(.2,1.6,.4,1)), color .2s; padding:2px; }
       .cx-cc-cmt-ig-like:hover { color:rgba(255,255,255,0.6); }
       .cx-cc-cmt-ig-like.on { color:#FE2C55; transform:scale(1.25); }
+      /* Wątek + odpowiedzi (IG-style) */
+      .cx-cc-cmt-ig-thread { display:flex; flex-direction:column; gap:12px; }
+      .cx-cc-cmt-ig-reply { margin-left:30px; padding-left:12px; border-left:2px solid rgba(255,255,255,0.08); }
+      .cx-cc-ava-sm { width:24px; height:24px; font-size:11px; }
+      .cx-cc-cmt-replying { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:7px 12px; margin-bottom:8px;
+        background:rgba(232,146,124,0.12); border:1px solid rgba(232,146,124,0.3); border-radius:10px; font-size:12px; color:rgba(255,255,255,0.8); }
+      .cx-cc-cmt-replying strong { color:#E8927C; }
+      .cx-cc-cmt-replying button { background:none; border:none; color:rgba(255,255,255,0.6); font-size:16px; cursor:pointer; line-height:1; padding:0 2px; }
+      .cx-cc-cmt-replying button:hover { color:#fff; }
 
       /* D7: mobile — popout drinka przesuwany palcem W BOK (zdjęcie ⇄ szczegóły/komentarze) */
       @media (max-width:768px) {
