@@ -1214,6 +1214,21 @@ async function toItalian(text: string): Promise<string> {
   } catch { return text; }
 }
 
+function msgIsImage(s: string): boolean {
+  return /^https?:\/\/\S+\.(gif|webp|png|jpe?g)(\?\S*)?$/i.test((s || "").trim()) || /\/storage\/v1\/object\/public\/chat\//i.test(s || "");
+}
+function msgIsLocation(s: string): boolean {
+  return /^https?:\/\/\S*(maps\.google|google\.[^/]+\/maps|maps\.app\.goo\.gl|\?q=)/i.test((s || "").trim());
+}
+function MsgContent({ content, lang }: { content: string; lang?: string }) {
+  if (msgIsImage(content)) return <img className="amsg-img" src={content} alt="" loading="lazy" />;
+  if (msgIsLocation(content)) {
+    const lbl = ({ it: "La nostra posizione", pl: "Nasza lokalizacja", en: "Our location", de: "Unser Standort", fr: "Notre adresse", es: "Nuestra ubicación" } as Record<string, string>)[(lang || "it").slice(0, 2)] || "La nostra posizione";
+    return <a className="amsg-loc" href={content} target="_blank" rel="noopener">📍 {lbl}</a>;
+  }
+  return <p>{content}</p>;
+}
+
 function MessagesPanel({ compose, onComposeUsed }: { compose?: { email: string; name?: string; lang?: string } | null; onComposeUsed?: () => void } = {}) {
   const [messages, setMessages] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1223,6 +1238,29 @@ function MessagesPanel({ compose, onComposeUsed }: { compose?: { email: string; 
   const [trMap, setTrMap] = useState<Record<string, string>>({});
   const [search, setSearch] = useState("");
   const [personInfo, setPersonInfo] = useState<{ msgs: number; drinks: number; orders: number; reviews: number } | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [delArm, setDelArm] = useState(false); // podwójne potwierdzenie kosza
+  const fileRef = useRef<HTMLInputElement>(null);
+  // Lokalizacja restauracji (edytowalna przez env NEXT_PUBLIC_MAPS_URL)
+  const MAPS_URL = process.env.NEXT_PUBLIC_MAPS_URL || "https://maps.google.com/?q=S%27Historia";
+
+  // Upload zdjęcia do Supabase Storage (bucket "chat") i wyślij jako wiadomość
+  const onPickImage = async (file: File | null) => {
+    if (!file || !activeThread) return;
+    setUploading(true);
+    try {
+      const path = `chat/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
+      const { error } = await supabase.storage.from("chat").upload(path, file, { upsert: false, contentType: file.type });
+      if (error) throw error;
+      const { data } = supabase.storage.from("chat").getPublicUrl(path);
+      if (data?.publicUrl) await sendReply(data.publicUrl);
+    } catch (e) {
+      alert("Caricamento immagine fallito. Crea il bucket 'chat' (pubblico) in Supabase Storage.");
+    }
+    setUploading(false);
+    if (fileRef.current) fileRef.current.value = "";
+  };
+  const shareLocation = () => { if (activeThread) sendReply(MAPS_URL); };
 
   const load = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -1313,11 +1351,12 @@ function MessagesPanel({ compose, onComposeUsed }: { compose?: { email: string; 
     load(true);
   };
 
-  const sendReply = async () => {
-    if (!draft.trim() || !activeThread) return;
+  const sendReply = async (raw?: string) => {
+    const replyIt = (typeof raw === "string" ? raw : draft).trim();
+    if (!replyIt || !activeThread) return;
+    const isUrl = /^https?:\/\//i.test(replyIt);
     setSending(true);
     const target = activeThread.last;
-    const replyIt = draft.trim();
     // Wykryj JĘZYK KLIENTA z jego ostatniej wiadomości (kontakt z IMAP ma zapisane "it",
     // więc nie ufamy temu — wykrywamy realny język tekstu klienta).
     let lang = (target.language || "it").slice(0, 2);
@@ -1342,9 +1381,9 @@ function MessagesPanel({ compose, onComposeUsed }: { compose?: { email: string; 
     } else {
       await supabase.from("contact_messages").update({ is_read: true }).eq("email", activeThread.email);
     }
-    // Pre-tłumaczenie odpowiedzi na język klienta
+    // Pre-tłumaczenie odpowiedzi na język klienta (URL-e: zdjęcia/lokalizacja — nie tłumaczymy)
     let replyTranslated = replyIt;
-    if (lang !== "it") {
+    if (lang !== "it" && !isUrl) {
       try {
         const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=it&tl=${lang}&dt=t&q=${encodeURIComponent(replyIt)}`);
         const j = await r.json();
@@ -1377,11 +1416,11 @@ function MessagesPanel({ compose, onComposeUsed }: { compose?: { email: string; 
   };
 
   const removeThread = async (email: string) => {
-    if (confirm("Eliminare tutta la conversazione?")) {
-      await supabase.from("contact_messages").delete().eq("email", email);
-      setActiveEmail(null);
-      load();
-    }
+    if (!delArm) { setDelArm(true); setTimeout(() => setDelArm(false), 3500); return; }
+    setDelArm(false);
+    await supabase.from("contact_messages").delete().eq("email", email);
+    setActiveEmail(null);
+    load();
   };
 
   return (
@@ -1392,7 +1431,7 @@ function MessagesPanel({ compose, onComposeUsed }: { compose?: { email: string; 
       </header>
 
       {loading ? <Skeleton /> : (
-        <div className="amsg-chat">
+        <div className="amsg-chat" data-active={activeThread && activeEmail ? "1" : "0"}>
           {/* Lewa kolumna: szukajka + lista konwersacji */}
           <div className="amsg-listcol">
             <div className="amsg-search">
@@ -1421,6 +1460,7 @@ function MessagesPanel({ compose, onComposeUsed }: { compose?: { email: string; 
             {activeThread ? (
               <>
                 <div className="amsg-conv-head">
+                  <button className="amsg-back" onClick={() => setActiveEmail(null)} aria-label="Indietro">←</button>
                   <div>
                     <strong>{activeThread.name}</strong>
                     <span className="amsg-conv-meta">{activeThread.email} · 🌐 {activeThread.last.language}</span>
@@ -1433,7 +1473,7 @@ function MessagesPanel({ compose, onComposeUsed }: { compose?: { email: string; 
                       </div>
                     )}
                   </div>
-                  <button className="admin-btn-sm admin-btn-danger" onClick={() => removeThread(activeThread.email)}>🗑</button>
+                  <button className={`amsg-trash ${delArm ? "arm" : ""}`} onClick={() => removeThread(activeThread.email)}>{delArm ? "Confermi? 🗑" : "🗑"}</button>
                 </div>
                 <div className="amsg-bubbles">
                   {activeThread.msgs.map((m: any) => (
@@ -1441,7 +1481,7 @@ function MessagesPanel({ compose, onComposeUsed }: { compose?: { email: string; 
                       {m.is_staff ? (
                         /* Odpowiedź obsługi — osobny dymek po prawej */
                         <div className="amsg-bubble amsg-out">
-                          <p>{m.message}</p>
+                          <MsgContent content={m.message} lang={activeThread.last.language} />
                           <span className="amsg-time">Tu · {new Date(m.created_at).toLocaleString("it-IT")}</span>
                         </div>
                       ) : (
@@ -1449,7 +1489,7 @@ function MessagesPanel({ compose, onComposeUsed }: { compose?: { email: string; 
                           {/* Wiadomość klienta — po lewej */}
                           {m.message && (
                             <div className="amsg-bubble amsg-in">
-                              <p>{m.message}</p>
+                              <MsgContent content={m.message} lang={activeThread.last.language} />
                               {trMap[m.id] && (
                                 <p className="amsg-tr">🇮🇹 {trMap[m.id]}</p>
                               )}
@@ -1469,9 +1509,12 @@ function MessagesPanel({ compose, onComposeUsed }: { compose?: { email: string; 
                   ))}
                 </div>
                 <div className="amsg-input">
-                  <textarea value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Scrivi in italiano — verrà tradotto nella lingua del cliente..." rows={2}
+                  <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => onPickImage(e.target.files?.[0] || null)} />
+                  <button className="amsg-icon-btn" onClick={() => fileRef.current?.click()} disabled={uploading} aria-label="Foto" title="Invia foto">{uploading ? "…" : "📷"}</button>
+                  <button className="amsg-icon-btn" onClick={shareLocation} aria-label="Posizione" title="Condividi posizione">📍</button>
+                  <textarea value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Scrivi in italiano — verrà tradotto nella lingua del cliente..." rows={1}
                     onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply(); } }} />
-                  <button className="admin-btn" onClick={sendReply} disabled={sending || !draft.trim()}>{sending ? "..." : "Invia →"}</button>
+                  <button className="amsg-send" onClick={() => sendReply()} disabled={sending || !draft.trim()} aria-label="Invia">{sending ? "…" : "➤"}</button>
                 </div>
               </>
             ) : <p className="admin-empty">Seleziona una conversazione.</p>}
@@ -2240,7 +2283,26 @@ function AdminStyles() {
       .amsg-input { display:flex; gap:10px; padding:14px; border-top:1px solid rgba(255,255,255,0.08); }
       .amsg-input textarea { flex:1; resize:none; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:12px; color:#fff; padding:10px 14px; font-family:inherit; font-size:14px; outline:none; }
       .amsg-input textarea:focus { border-color:#E8927C; }
-      @media (max-width:768px) { .amsg-chat { grid-template-columns:1fr; height:auto; } .amsg-list { flex-direction:row; overflow-x:auto; border-right:none; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:8px; } .amsg-thread { flex-direction:column; min-width:80px; } .amsg-thread-preview { display:none; } .amsg-conv { height:60vh; } }
+      .amsg-icon-btn { flex-shrink:0; width:42px; height:42px; border-radius:12px; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.06); color:#fff; font-size:18px; cursor:pointer; }
+      .amsg-icon-btn:hover { background:rgba(255,255,255,0.14); }
+      .amsg-send { flex-shrink:0; width:44px; height:44px; border-radius:50%; border:none; background:var(--c-coral,#E8927C); color:#fff; font-size:18px; cursor:pointer; display:grid; place-items:center; transition:transform .15s, opacity .2s; }
+      .amsg-send:hover { transform:scale(1.08); } .amsg-send:disabled { opacity:0.4; cursor:not-allowed; }
+      .amsg-back { display:none; width:38px; height:38px; flex-shrink:0; border-radius:50%; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.06); color:#fff; font-size:18px; cursor:pointer; margin-right:6px; }
+      .amsg-trash { flex-shrink:0; padding:8px 12px; border-radius:10px; border:1px solid rgba(220,38,38,0.4); background:rgba(220,38,38,0.12); color:#ff8a8a; font-weight:700; font-size:13px; cursor:pointer; transition:all .2s; }
+      .amsg-trash.arm { background:#dc2626; color:#fff; border-color:#dc2626; animation:bellPulse 1s ease-in-out infinite; }
+      .amsg-img { max-width:200px; max-height:220px; border-radius:12px; display:block; }
+      .amsg-loc { display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:12px; background:rgba(91,184,212,0.15); border:1px solid rgba(91,184,212,0.5); color:#9bd6ec; font-weight:700; text-decoration:none; font-size:13px; }
+      @media (max-width:768px) {
+        .amsg-chat { grid-template-columns:1fr; height:auto; }
+        .amsg-list { flex-direction:column; overflow-x:visible; border-right:none; border-bottom:none; padding-bottom:0; }
+        .amsg-thread { flex-direction:row; min-width:0; }
+        .amsg-thread-preview { display:block; }
+        /* Mobile: po wybraniu konwersacji — czat na PEŁNY ekran, lista schowana */
+        .amsg-chat[data-active="1"] .amsg-listcol { display:none; }
+        .amsg-chat[data-active="0"] .amsg-conv { display:none; }
+        .amsg-chat[data-active="1"] .amsg-conv { height:72vh; }
+        .amsg-back { display:grid; place-items:center; }
+      }
       .admin-badge { display:inline-block; margin-left:8px; color:#f1c40f; }
       /* ── Menu zdjęcia ── */
       .menu-thumb { width:48px; height:48px; border-radius:8px; object-fit:cover; display:block; }
