@@ -4992,11 +4992,10 @@ function GlassPicker({ open, color, withIce, onIceChange, onPick }: {
     <div className={`cx-popout ${open ? "show" : ""}`} role="dialog" aria-hidden={!open}>
       <div className="cx-popout-inner">
         {step === "video" ? (
-          <div className="cx-video-step" onClick={() => setStep("glass")}>
-            <div className="cx-video-placeholder">
-              <div className="cx-video-finger">👆</div>
-              <span className="cx-video-hint">{tr.hint}</span>
-            </div>
+          <div className="cx-video-step">
+            <video className="cx-shake-video" src="/andrea.mp4" autoPlay muted playsInline preload="auto"
+              onEnded={() => setStep("glass")} onClick={() => setStep("glass")} />
+            <span className="cx-video-skip" onClick={() => setStep("glass")}>{tr.hint} →</span>
           </div>
         ) : (
           <>
@@ -7608,7 +7607,10 @@ function CocktailStyles() {
       .cx-popout-inner { background:linear-gradient(160deg, rgba(18,40,54,0.86), rgba(10,24,34,0.82)); backdrop-filter:blur(28px);
         border-radius:34px; padding:clamp(26px,4vw,42px); text-align:center; border:1px solid var(--cx-stroke);
         box-shadow:0 50px 130px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.14); }
-      .cx-video-step { cursor:pointer; width:100%; aspect-ratio:16/9; display:flex; align-items:center; justify-content:center; }
+      .cx-video-step { cursor:pointer; width:100%; aspect-ratio:16/9; display:flex; align-items:center; justify-content:center; position:relative; }
+      .cx-shake-video { width:100%; height:100%; object-fit:cover; border-radius:20px; background:#0c1a24; display:block; }
+      .cx-video-skip { position:absolute; bottom:12px; right:14px; z-index:3; font-size:12px; font-weight:700; color:#fff; cursor:pointer;
+        background:rgba(0,0,0,0.5); padding:6px 12px; border-radius:999px; backdrop-filter:blur(6px); border:1px solid rgba(255,255,255,0.25); }
       .cx-video-placeholder { width:100%; height:100%; border-radius:20px; background:radial-gradient(ellipse at 50% 40%, #1e3a4e, #0c1a24);
         display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px;
         border:1px solid rgba(255,255,255,0.08); overflow:hidden; }
