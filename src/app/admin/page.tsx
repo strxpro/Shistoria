@@ -1064,6 +1064,11 @@ function DrinksPanel() {
   const remove = async (id: string) => {
     if (confirm("Eliminare questo drink?")) { await supabase.from("community_drinks").delete().eq("id", id); load(); }
   };
+  // Swipe w prawo → przypnij (Nomina jako zwycięzca = korona, ląduje wyżej)
+  const nominate = async (d: any) => {
+    await supabase.from("community_drinks").update({ is_drink_of_month: !d.is_drink_of_month }).eq("id", d.id);
+    load();
+  };
 
   return (
     <div className="admin-panel">
@@ -1102,13 +1107,22 @@ function DrinksPanel() {
               const sx = swipe.id === d.id ? swipe.x : 0;
               return (
               <div key={d.id} className="admin-drink-swipe">
+                <button className="admin-drink-pin" onClick={() => nominate(d)} aria-label="Nomina">📌</button>
                 <button className="admin-drink-trash" onClick={() => remove(d.id)} aria-label="Elimina">🗑</button>
                 <div
                   className={`admin-drink-card ${d.is_drink_of_month ? "is-month" : ""}`}
-                  style={{ transform: `translateX(${sx}px)`, transition: swipeStart.current ? "none" : "transform .25s ease" }}
+                  style={{ transform: `translateX(${sx}px)`, transition: swipeStart.current ? "none" : "transform .28s cubic-bezier(.2,.85,.25,1)" }}
                   onTouchStart={(e) => { swipeStart.current = { x: e.touches[0].clientX, id: d.id }; movedRef.current = false; }}
-                  onTouchMove={(e) => { if (!swipeStart.current || swipeStart.current.id !== d.id) return; const dx = e.touches[0].clientX - swipeStart.current.x; if (Math.abs(dx) > 6) movedRef.current = true; setSwipe({ id: d.id, x: Math.max(-92, Math.min(0, dx)) }); }}
-                  onTouchEnd={() => { setSwipe((s) => ({ id: d.id, x: s.id === d.id && s.x < -50 ? -84 : 0 })); swipeStart.current = null; }}
+                  onTouchMove={(e) => { if (!swipeStart.current || swipeStart.current.id !== d.id) return; const dx = e.touches[0].clientX - swipeStart.current.x; if (Math.abs(dx) > 6) movedRef.current = true; setSwipe({ id: d.id, x: Math.max(-92, Math.min(92, dx)) }); }}
+                  onTouchEnd={() => {
+                    swipeStart.current = null;
+                    setSwipe((s) => {
+                      const x = s.id === d.id ? s.x : 0;
+                      if (x > 55) { setTimeout(() => nominate(d), 0); return { id: "", x: 0 }; }
+                      if (x < -50) return { id: d.id, x: -84 };
+                      return { id: d.id, x: 0 };
+                    });
+                  }}
                   onClick={(e) => { if (movedRef.current) { movedRef.current = false; return; } if ((e.target as HTMLElement).closest("button")) return; setStatsDrink(d); }}
                   role="button"
                 >
@@ -2860,8 +2874,10 @@ function AdminStyles() {
       .admin-drink-card { padding:16px; border-radius:16px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.16); display:flex; flex-direction:column; gap:10px; }
       /* Swipe-to-delete (telefon): przesuń kartę w lewo → odsłania kosz */
       .admin-drink-swipe { position:relative; border-radius:16px; overflow:hidden; }
-      .admin-drink-swipe .admin-drink-card { position:relative; z-index:2; }
+      .admin-drink-swipe .admin-drink-card { position:relative; z-index:2; background:#13212e; }
+      .admin-theme-light .admin-drink-swipe .admin-drink-card { background:#ffffff; }
       .admin-drink-trash { position:absolute; top:0; right:0; bottom:0; width:84px; border:none; background:linear-gradient(90deg,#b91c1c,#dc2626); color:#fff; font-size:26px; cursor:pointer; z-index:1; display:flex; align-items:center; justify-content:center; }
+      .admin-drink-pin { position:absolute; top:0; left:0; bottom:0; width:84px; border:none; background:linear-gradient(90deg,#15803d,#16a34a); color:#fff; font-size:24px; cursor:pointer; z-index:1; display:flex; align-items:center; justify-content:center; }
       .admin-drink-ingr { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
       .admin-drink-ingr-pill { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:999px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.16); font-size:11px; font-weight:600; color:#fff; }
       .admin-drink-ingr-pill > span { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
