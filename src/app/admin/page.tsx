@@ -1046,6 +1046,16 @@ function DrinksPanel() {
   const swipeStart = useRef<{ x: number; id: string } | null>(null);
   const movedRef = useRef(false);
   const [statsDrink, setStatsDrink] = useState<any>(null);
+  const [selMode, setSelMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const toggleSel = (id: string) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const exitSel = () => { setSelMode(false); setSelected(new Set()); };
+  const bulkDeleteDrinks = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    if (!confirm(`Eliminare ${ids.length} drink selezionati?`)) return;
+    await supabase.from("community_drinks").delete().in("id", ids);
+    exitSel(); load();
+  };
   const [, forceTick] = useState(0);
   useEffect(() => { const t = setInterval(() => forceTick((n) => n + 1), 30000); return () => clearInterval(t); }, []);
 
@@ -1113,6 +1123,15 @@ function DrinksPanel() {
             ))}
           </div>
           <button className="admin-btn" onClick={announceWinner_}>👑 Proclama {period === "week" ? "Drink della Settimana" : "Drink del Mese"}</button>
+          {selMode ? (
+            <>
+              <button className="admin-btn-ghost" onClick={() => setSelected(new Set(ranked.map((d) => d.id)))}>Seleziona tutto</button>
+              <button className="admin-btn admin-btn-danger" onClick={() => bulkDeleteDrinks([...selected])} disabled={selected.size === 0}>🗑 Elimina ({selected.size})</button>
+              <button className="admin-btn-ghost" onClick={exitSel}>Annulla</button>
+            </>
+          ) : (
+            <button className="admin-btn-ghost" onClick={() => setSelMode(true)}>☑ Seleziona</button>
+          )}
         </div>
       </header>
       <p className="drk-auto-note">✅ La proclamazione è <strong>automatica</strong> ({period === "week" ? "ogni settimana" : "ogni mese"}) — prossima tra <strong>{adminCountdown(period)}</strong>. Non devi fare nulla; usa il pulsante 👑 solo se c'è un problema o vuoi proclamare prima.</p>
@@ -1138,15 +1157,16 @@ function DrinksPanel() {
             {ranked.map((d, i) => {
               const sx = swipe.id === d.id ? swipe.x : 0;
               return (
-              <div key={d.id} className="admin-drink-swipe">
-                <button className="admin-drink-pin" onClick={() => nominate(d)} aria-label="Nomina">📌</button>
-                <button className="admin-drink-trash" onClick={() => remove(d.id)} aria-label="Elimina">🗑</button>
+              <div key={d.id} className={`admin-drink-swipe ${selMode && selected.has(d.id) ? "drk-sel" : ""}`}>
+                {selMode && <span className={`admin-drink-selcb ${selected.has(d.id) ? "on" : ""}`} aria-hidden="true">{selected.has(d.id) ? "✓" : ""}</span>}
+                {!selMode && <button className="admin-drink-pin" onClick={() => nominate(d)} aria-label="Nomina">📌</button>}
+                {!selMode && <button className="admin-drink-trash" onClick={() => remove(d.id)} aria-label="Elimina">🗑</button>}
                 <div
                   className={`admin-drink-card ${d.is_drink_of_month ? "is-month" : ""}`}
-                  style={{ transform: `translateX(${sx}px)`, transition: swipeStart.current ? "none" : "transform .28s cubic-bezier(.2,.85,.25,1)" }}
-                  onTouchStart={(e) => { swipeStart.current = { x: e.touches[0].clientX, id: d.id }; movedRef.current = false; }}
-                  onTouchMove={(e) => { if (!swipeStart.current || swipeStart.current.id !== d.id) return; const dx = e.touches[0].clientX - swipeStart.current.x; if (Math.abs(dx) > 6) movedRef.current = true; setSwipe({ id: d.id, x: Math.max(-92, Math.min(92, dx)) }); }}
-                  onTouchEnd={() => {
+                  style={{ transform: `translateX(${selMode ? 0 : sx}px)`, transition: swipeStart.current ? "none" : "transform .28s cubic-bezier(.2,.85,.25,1)" }}
+                  onTouchStart={selMode ? undefined : (e) => { swipeStart.current = { x: e.touches[0].clientX, id: d.id }; movedRef.current = false; }}
+                  onTouchMove={selMode ? undefined : (e) => { if (!swipeStart.current || swipeStart.current.id !== d.id) return; const dx = e.touches[0].clientX - swipeStart.current.x; if (Math.abs(dx) > 6) movedRef.current = true; setSwipe({ id: d.id, x: Math.max(-92, Math.min(92, dx)) }); }}
+                  onTouchEnd={selMode ? undefined : () => {
                     swipeStart.current = null;
                     setSwipe((s) => {
                       const x = s.id === d.id ? s.x : 0;
@@ -1155,7 +1175,7 @@ function DrinksPanel() {
                       return { id: d.id, x: 0 };
                     });
                   }}
-                  onClick={(e) => { if (movedRef.current) { movedRef.current = false; return; } if ((e.target as HTMLElement).closest("button")) return; setStatsDrink(d); }}
+                  onClick={(e) => { if (selMode) { toggleSel(d.id); return; } if (movedRef.current) { movedRef.current = false; return; } if ((e.target as HTMLElement).closest("button")) return; setStatsDrink(d); }}
                   role="button"
                 >
                 <button className="admin-drink-x" onClick={(e) => { e.stopPropagation(); remove(d.id); }} aria-label="Elimina">×</button>
@@ -2984,6 +3004,10 @@ function AdminStyles() {
       .admin-theme-light .admin-drink-swipe .admin-drink-card { background:#ffffff; }
       .admin-drink-trash { position:absolute; top:0; right:0; bottom:0; width:84px; border:none; background:linear-gradient(90deg,#b91c1c,#dc2626); color:#fff; font-size:26px; cursor:pointer; z-index:1; display:flex; align-items:center; justify-content:center; }
       .admin-drink-pin { position:absolute; top:0; left:0; bottom:0; width:84px; border:none; background:linear-gradient(90deg,#15803d,#16a34a); color:#fff; font-size:24px; cursor:pointer; z-index:1; display:flex; align-items:center; justify-content:center; }
+      .admin-drink-swipe.drk-sel { outline:2px solid #E8927C; outline-offset:2px; border-radius:18px; }
+      .admin-drink-selcb { position:absolute; top:10px; left:10px; z-index:5; width:26px; height:26px; border-radius:50%; display:grid; place-items:center;
+        background:rgba(0,0,0,0.5); border:2px solid #E8927C; color:#fff; font-size:14px; font-weight:800; pointer-events:none; }
+      .admin-drink-selcb.on { background:#E8927C; }
       .admin-drink-ingr { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
       .admin-drink-ingr-pill { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:999px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.16); font-size:11px; font-weight:600; color:#fff; }
       .admin-drink-ingr-pill > span { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
