@@ -2032,7 +2032,6 @@ function ReviewsPanel() {
 function HoursPanel() {
   const [rows, setRows] = useState<{ day: string; time: string; closed: boolean }[]>([]);
   const [slots, setSlots] = useState<string[]>([]);
-  const [slotsText, setSlotsText] = useState("");
   const [closedDates, setClosedDates] = useState<string[]>([]); // YYYY-MM-DD chiusure straordinarie
   const [loading, setLoading] = useState(true);
   const [saved, setSaved] = useState(false);
@@ -2042,14 +2041,30 @@ function HoursPanel() {
     const { data } = await supabase.from("opening_hours").select("*").eq("id", 1).single();
     setRows(data?.hours || [{ day: "Lun — Dom", time: "12:00 — 14:30 · 19:00 — 23:00", closed: false }, { day: "Martedì", time: "chiuso", closed: true }]);
     const sl = data?.time_slots || ["12:00","12:30","13:00","13:30","14:00","14:30","19:00","19:30","20:00","20:30","21:00","21:30","22:00","22:30","23:00"];
-    setSlots(sl); setSlotsText(sl.join(", "));
+    setSlots(sl);
     setClosedDates(data?.closed_dates || []);
     setLoading(false);
   };
   useEffect(() => { load(); }, []);
 
+  // Auto-generacja slotów rezerwacji co 30 min z godzin otwarcia (bez ręcznego wpisywania)
+  const genSlots = (rws: { day: string; time: string; closed: boolean }[]): string[] => {
+    const set = new Set<string>();
+    const re = /(\d{1,2}):(\d{2})\s*[—–\-]\s*(\d{1,2}):(\d{2})/g;
+    rws.forEach((r) => {
+      if (r.closed) return;
+      let m: RegExpExecArray | null;
+      re.lastIndex = 0;
+      while ((m = re.exec(r.time))) {
+        let cur = +m[1] * 60 + +m[2]; const end = +m[3] * 60 + +m[4];
+        while (cur <= end) { set.add(`${String(Math.floor(cur / 60)).padStart(2, "0")}:${String(cur % 60).padStart(2, "0")}`); cur += 30; }
+      }
+    });
+    return [...set].sort();
+  };
+
   const save = async () => {
-    const time_slots = slotsText.split(",").map((s) => s.trim()).filter(Boolean);
+    const time_slots = genSlots(rows);
     await supabase.from("opening_hours").upsert({ id: 1, hours: rows, time_slots, closed_dates: closedDates, updated_at: new Date().toISOString() });
     setSlots(time_slots);
     setSaved(true); setTimeout(() => setSaved(false), 2500);
@@ -2060,8 +2075,7 @@ function HoursPanel() {
   const toggleClosedDate = async (dateStr: string) => {
     const next = closedDates.includes(dateStr) ? closedDates.filter((d) => d !== dateStr) : [...closedDates, dateStr].sort();
     setClosedDates(next);
-    const time_slots = slotsText.split(",").map((s) => s.trim()).filter(Boolean);
-    await supabase.from("opening_hours").upsert({ id: 1, hours: rows, time_slots, closed_dates: next, updated_at: new Date().toISOString() });
+    await supabase.from("opening_hours").upsert({ id: 1, hours: rows, time_slots: genSlots(rows), closed_dates: next, updated_at: new Date().toISOString() });
   };
 
   const updRow = (i: number, k: string, v: any) => setRows((r) => r.map((row, idx) => idx === i ? { ...row, [k]: v } : row));
@@ -2090,28 +2104,23 @@ function HoursPanel() {
         <button className="admin-btn-ghost" onClick={addRow}>+ Aggiungi riga</button>
       </div>
 
-      <div style={{ marginTop: 28 }}>
-        <label style={{ display: "block", fontSize: 13, opacity: 0.6, marginBottom: 8 }}>Orari prenotabili (separati da virgola — usati nel form di prenotazione)</label>
-        <textarea className="hours-slots" rows={2} value={slotsText} onChange={(e) => setSlotsText(e.target.value)} placeholder="12:00, 12:30, 19:00, ..." />
-      </div>
+      <p className="hours-auto-note">⏱ Gli orari prenotabili si generano <strong>automaticamente ogni 30 min</strong> dagli orari di apertura qui sopra. Non devi inserirli a mano.</p>
 
       {/* Chiusura straordinaria — zamknij konkretny dzień jednym klikiem */}
-      <div style={{ marginTop: 32 }}>
+      <div style={{ marginTop: 28 }}>
         <h2 style={{ fontSize: 18, margin: "0 0 6px" }}>Chiusura straordinaria</h2>
         <p style={{ opacity: 0.6, fontSize: 13, margin: "0 0 14px" }}>Chiudi un giorno specifico con un clic. Appare subito sul sito (in tempo reale).</p>
         <div className="hours-quick">
           {(() => {
-            const today = new Date();
-            const tomorrow = new Date(); tomorrow.setDate(today.getDate() + 1);
-            const tToday = fmtDate(today), tTom = fmtDate(tomorrow);
+            const mk = (off: number) => { const d = new Date(); d.setDate(d.getDate() + off); return fmtDate(d); };
+            const opts: [string, string][] = [["Oggi", mk(0)], ["Domani", mk(1)], ["Dopodomani", mk(2)]];
             return (
               <>
-                <button className={`hours-quick-btn ${closedDates.includes(tToday) ? "is-closed" : ""}`} onClick={() => toggleClosedDate(tToday)}>
-                  {closedDates.includes(tToday) ? "✓ Oggi chiuso" : "Chiudi oggi"}
-                </button>
-                <button className={`hours-quick-btn ${closedDates.includes(tTom) ? "is-closed" : ""}`} onClick={() => toggleClosedDate(tTom)}>
-                  {closedDates.includes(tTom) ? "✓ Domani chiuso" : "Chiudi domani"}
-                </button>
+                {opts.map(([lbl, ds]) => (
+                  <button key={ds} className={`hours-quick-btn ${closedDates.includes(ds) ? "is-closed" : ""}`} onClick={() => toggleClosedDate(ds)}>
+                    {closedDates.includes(ds) ? `✓ ${lbl} chiuso` : `Chiudi ${lbl.toLowerCase()}`}
+                  </button>
+                ))}
                 <input type="date" className="hours-date-input" onChange={(e) => { if (e.target.value) toggleClosedDate(e.target.value); }} />
               </>
             );
@@ -2600,6 +2609,8 @@ function AdminStyles() {
       .hours-closed { display:flex; align-items:center; gap:6px; font-size:13px; color:rgba(255,255,255,0.7); white-space:nowrap; }
       .hours-slots { width:100%; box-sizing:border-box; padding:12px 14px; border-radius:10px; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.05); color:#fff; font-size:14px; font-family:inherit; }
       .hours-quick { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+      .hours-auto-note { margin-top:14px; font-size:13px; color:rgba(255,255,255,0.6); line-height:1.5; }
+      .admin-theme-light .hours-auto-note { color:rgba(0,0,0,0.55); }
       .hours-quick-btn { padding:11px 18px; border-radius:12px; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.05); color:#fff; font-size:14px; font-weight:600; cursor:pointer; transition:all .2s; }
       .hours-quick-btn:hover { background:rgba(255,255,255,0.1); }
       .hours-quick-btn.is-closed { background:rgba(231,76,60,0.2); border-color:rgba(231,76,60,0.5); color:#ff9d92; }
