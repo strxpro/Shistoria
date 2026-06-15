@@ -791,7 +791,7 @@ function EventsPanel() {
         <button className="admin-btn" onClick={openNew}>+ Nuovo evento</button>
       </header>
 
-      {editEvt && (
+      {editEvt && typeof document !== "undefined" && createPortal(
         <div className="admin-modal-overlay" onClick={close}>
           <div className="admin-modal admin-modal-wide" onClick={(e) => e.stopPropagation()}>
             {/* Stepper — 3 kroki */}
@@ -923,7 +923,8 @@ function EventsPanel() {
               </>
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       {loading ? <Skeleton /> : (
