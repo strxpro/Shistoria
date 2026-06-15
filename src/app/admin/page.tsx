@@ -425,8 +425,13 @@ function MenuPanel() {
     if (!pdfPreview) return;
     setPdfBusy(true); setPdfMsg("Traduzione e salvataggio...");
     try {
-      let i = 0;
+      // Dedup: pomijamy pozycje o nazwie już istniejącej w menu (case-insensitive) i duplikaty w samym PDF
+      const existing = new Set(items.map((it) => (it.name || "").trim().toLowerCase()));
+      let i = 0, skipped = 0;
       for (const it of pdfPreview) {
+        const key = (it.name || "").trim().toLowerCase();
+        if (!key || existing.has(key)) { skipped++; continue; }
+        existing.add(key);
         setPdfMsg(`Salvataggio ${++i}/${pdfPreview.length}...`);
         const payload: any = { ...it, sort_order: 5000 + i };
         try {
@@ -439,10 +444,10 @@ function MenuPanel() {
         } catch { /* tłumaczenie opcjonalne */ }
         await supabase.from("menu_items").insert(payload);
       }
-      setPdfMsg(`✓ Importate ${pdfPreview.length} voci.`);
+      setPdfMsg(`✓ Importate ${i} voci${skipped ? ` · ${skipped} duplicati saltati` : ""}.`);
       setPdfPreview(null);
       load();
-      setTimeout(() => setPdfMsg(""), 3000);
+      setTimeout(() => setPdfMsg(""), 3500);
     } catch (err: any) {
       setPdfMsg("Errore salvataggio: " + (err?.message || ""));
     }
@@ -484,7 +489,6 @@ function MenuPanel() {
             📄 Importa PDF
             <input type="file" accept="application/pdf" hidden onChange={handlePdf} disabled={pdfBusy} />
           </label>
-          <button className="admin-btn-ghost" onClick={() => importMenu(false)}>🔄 Reimporta dal sito</button>
           <button className="admin-btn" onClick={() => setEditItem({ section: "ristorante", category: "", name: "", price: "", description: "" })}>
             + Aggiungi piatto
           </button>
@@ -571,13 +575,13 @@ function MenuPanel() {
             <tbody>
               {filtered.map((it) => (
                 <tr key={it.id}>
-                  <td>{it.image_url ? <img src={it.image_url} alt="" className="menu-thumb" /> : <span className="menu-thumb menu-thumb-ph">🍽</span>}</td>
-                  <td>{it.category}</td>
-                  <td><strong>{it.name}</strong>{it.is_featured && <span className="admin-badge">★</span>}</td>
-                  <td>{it.price}</td>
-                  <td>{(it.likes || 0) > 0 ? <span className="menu-likes-badge">❤️ {it.likes}</span> : "—"}</td>
-                  <td>{it.allergens || "—"}</td>
-                  <td>
+                  <td data-label="Foto">{it.image_url ? <img src={it.image_url} alt="" className="menu-thumb" /> : <span className="menu-thumb menu-thumb-ph">🍽</span>}</td>
+                  <td data-label="Categoria">{it.category}</td>
+                  <td data-label="Nome"><strong>{it.name}</strong>{it.is_featured && <span className="admin-badge">★</span>}</td>
+                  <td data-label="Prezzo">{it.price}</td>
+                  <td data-label="❤️">{(it.likes || 0) > 0 ? <span className="menu-likes-badge">❤️ {it.likes}</span> : "—"}</td>
+                  <td data-label="Allergeni">{it.allergens || "—"}</td>
+                  <td className="menu-row-actions">
                     <button className="admin-btn-sm" onClick={() => setEditItem(it)}>✎</button>
                     <button className="admin-btn-sm admin-btn-danger" onClick={() => remove(it.id)}>✕</button>
                   </td>
@@ -2995,6 +2999,19 @@ function AdminStyles() {
         .admin-modal, .admin-modal-wide { width:100vw !important; max-width:100vw !important; max-height:90vh !important;
           overflow-y:auto !important; border-radius:22px 22px 0 0 !important; padding:22px 18px calc(22px + env(safe-area-inset-bottom)) !important; -webkit-overflow-scrolling:touch; }
         .admin-modal-actions { position:sticky !important; bottom:0 !important; }
+      }
+
+      /* ── Telefon: tabela Menu → karty (zero przewijania w bok) ── */
+      @media (max-width:768px) {
+        .admin-table { overflow:visible !important; }
+        .admin-table table, .admin-table thead, .admin-table tbody, .admin-table tr, .admin-table td { display:block !important; min-width:0 !important; width:auto !important; }
+        .admin-table thead { display:none !important; }
+        .admin-table tr { background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); border-radius:14px; padding:10px 14px; margin-bottom:10px; }
+        .admin-table td { border:none !important; padding:5px 0 !important; display:flex !important; justify-content:space-between; gap:12px; align-items:center; text-align:right; }
+        .admin-table td::before { content:attr(data-label); font-size:11px; opacity:0.55; font-weight:700; text-transform:uppercase; text-align:left; }
+        .admin-table td.menu-row-actions { justify-content:flex-end; padding-top:8px !important; }
+        .admin-table td.menu-row-actions::before { display:none; }
+        .admin-theme-light .admin-table tr { background:#fff; border-color:rgba(0,0,0,0.08); }
       }
     `}</style>
 
