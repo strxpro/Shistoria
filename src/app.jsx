@@ -315,21 +315,32 @@ export default function App() {
           <Bar t={tr} dark={t.barDark} />
         </RiseCard>
         <RiseCard id="cocktail-rise" z={3} peek="Cocktail" peekBg="linear-gradient(180deg, #BFE6F5 0%, #173445 100%)" bg="var(--c-deep)" riseTo="start start">
-          <ErrorBoundary fallback={(msg, stack) => (
+          <ErrorBoundary fallback={(msg, stack) => {
+            const L = (typeof window !== "undefined" && window.currentLanguage) || "it";
+            const T = ({
+              it: { t: "Apri il Cocktail Maker 3D", d: "Il browser non riesce ad avviare la grafica 3D. Di solito basta: 1) attivare l'accelerazione hardware (Impostazioni → Sistema → \"Usa accelerazione grafica\") e 2) chiudere alcune schede aperte, poi ricaricare.", r: "↻ Riprova", det: "Dettagli tecnici" },
+              pl: { t: "Otwórz Kreator 3D", d: "Przeglądarka nie może uruchomić grafiki 3D. Zwykle pomaga: 1) włączyć akcelerację sprzętową (Ustawienia → System → \"Używaj akceleracji sprzętowej\") i 2) zamknąć część otwartych kart, potem odświeżyć.", r: "↻ Spróbuj ponownie", det: "Szczegóły techniczne" },
+              en: { t: "Open the 3D Cocktail Maker", d: "Your browser can't start 3D graphics. Usually it helps to: 1) enable hardware acceleration (Settings → System → \"Use graphics acceleration\") and 2) close some open tabs, then reload.", r: "↻ Retry", det: "Technical details" },
+              de: { t: "3D-Cocktail-Maker öffnen", d: "Der Browser kann die 3D-Grafik nicht starten. Meist hilft: 1) Hardwarebeschleunigung aktivieren (Einstellungen → System) und 2) einige Tabs schließen, dann neu laden.", r: "↻ Erneut", det: "Technische Details" },
+              fr: { t: "Ouvrir le Cocktail Maker 3D", d: "Le navigateur ne peut pas lancer la 3D. En général : 1) active l'accélération matérielle (Paramètres → Système) et 2) ferme quelques onglets, puis recharge.", r: "↻ Réessayer", det: "Détails techniques" },
+              es: { t: "Abrir el Cocktail Maker 3D", d: "El navegador no puede iniciar los gráficos 3D. Suele ayudar: 1) activar la aceleración por hardware (Ajustes → Sistema) y 2) cerrar algunas pestañas, luego recargar.", r: "↻ Reintentar", det: "Detalles técnicos" },
+            })[L] || ({ t: "Cocktail Maker", d: "Grafica 3D non disponibile. Attiva l'accelerazione hardware del browser e chiudi alcune schede.", r: "↻ Riprova", det: "Dettagli" });
+            return (
             <div style={{minHeight:"60vh",display:"flex",alignItems:"center",justifyContent:"center",background:"var(--c-deep)",color:"#fff",textAlign:"center",padding:"32px"}}>
-              <div style={{maxWidth:"600px"}}>
-                <p style={{fontFamily:"var(--f-display)",fontWeight:800,fontSize:"24px",marginBottom:"12px"}}>Cocktail Maker</p>
-                <p style={{opacity:0.7,fontSize:"14px",marginBottom:"16px"}}>Esperienza 3D temporaneamente non disponibile.</p>
-                <button onClick={() => window.location.reload()} style={{padding:"10px 22px",borderRadius:"999px",border:"1px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.08)",color:"#fff",cursor:"pointer",fontWeight:700,marginBottom:"18px"}}>↻ Riprova</button>
+              <div style={{maxWidth:"560px"}}>
+                <p style={{fontFamily:"var(--f-display)",fontWeight:800,fontSize:"24px",marginBottom:"12px"}}>{T.t}</p>
+                <p style={{opacity:0.78,fontSize:"14px",marginBottom:"18px",lineHeight:1.6}}>{T.d}</p>
+                <button onClick={() => window.location.reload()} style={{padding:"10px 22px",borderRadius:"999px",border:"1px solid rgba(255,255,255,0.3)",background:"rgba(255,255,255,0.08)",color:"#fff",cursor:"pointer",fontWeight:700,marginBottom:"18px"}}>{T.r}</button>
                 {msg && (
                   <details style={{textAlign:"left",fontSize:"11px",opacity:0.5,marginTop:"8px"}}>
-                    <summary style={{cursor:"pointer",opacity:0.7}}>Dettagli tecnici</summary>
+                    <summary style={{cursor:"pointer",opacity:0.7}}>{T.det}</summary>
                     <pre style={{whiteSpace:"pre-wrap",wordBreak:"break-word",marginTop:"6px"}}>{msg}{stack ? "\n"+stack : ""}</pre>
                   </details>
                 )}
               </div>
             </div>
-          )}>
+          );}}>
+
             <CocktailExperience />
           </ErrorBoundary>
         </RiseCard>
