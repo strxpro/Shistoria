@@ -1973,6 +1973,9 @@ function NewsletterPanel() {
 function ReviewsPanel() {
   const [reviews, setReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [addOpen, setAddOpen] = useState(false);
+  const [form, setForm] = useState({ name: "", content: "", stars: 5, source: "Google", photo_url: "", language: "it" });
+  const [busy, setBusy] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -1994,18 +1997,97 @@ function ReviewsPanel() {
     }
   };
 
+  // Upload zdjęcia recenzji do bucketa "assets"
+  const uploadPhoto = async (file: File) => {
+    setBusy(true);
+    try {
+      const path = `reviews/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
+      const { error } = await supabase.storage.from("assets").upload(path, file, { upsert: true });
+      if (error) { alert("Errore upload: " + error.message); return; }
+      const { data } = supabase.storage.from("assets").getPublicUrl(path);
+      setForm((f) => ({ ...f, photo_url: data.publicUrl }));
+    } finally { setBusy(false); }
+  };
+
+  // Dodanie recenzji zewnętrznej (Google/TripAdvisor) ręcznie — od razu approvata
+  const addExternal = async () => {
+    if (!form.name.trim() || !form.content.trim()) { alert("Nome e testo obbligatori."); return; }
+    setBusy(true);
+    try {
+      await supabase.from("reviews").insert({
+        name: form.name.trim(),
+        content: form.content.trim(),
+        stars: Math.max(1, Math.min(5, form.stars)),
+        source: form.source,
+        photo_url: form.photo_url || null,
+        language: form.language || "it",
+        is_approved: true,
+      });
+      setForm({ name: "", content: "", stars: 5, source: "Google", photo_url: "", language: "it" });
+      setAddOpen(false);
+      load();
+    } catch (e: any) { alert("Errore: " + (e?.message || e)); }
+    finally { setBusy(false); }
+  };
+
   return (
     <div className="admin-panel">
       <header className="admin-panel-head">
-        <h1>Recensioni Locali</h1>
-        <span className="admin-count">{reviews.filter(r => !r.is_approved).length} in attesa</span>
+        <h1>Recensioni</h1>
+        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <span className="admin-count">{reviews.filter(r => !r.is_approved).length} in attesa</span>
+          <button className="admin-btn" onClick={() => setAddOpen(true)}>+ Recensione esterna</button>
+        </div>
       </header>
+
+      {addOpen && (
+        <div className="admin-modal-overlay" onClick={() => !busy && setAddOpen(false)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <h3 style={{ margin: "0 0 12px" }}>Aggiungi recensione (Google / TripAdvisor)</h3>
+            <p style={{ opacity: 0.65, fontSize: 13, marginTop: -6 }}>
+              Copia una recensione reale da Google o TripAdvisor e incollala qui — apparirà subito sul sito.
+            </p>
+            <div style={{ display: "flex", gap: 8, margin: "4px 0 12px" }}>
+              {["Google", "TripAdvisor", "Locale"].map((s) => (
+                <button key={s} className={`admin-btn-sm ${form.source === s ? "" : "admin-btn-ghost"}`} onClick={() => setForm((f) => ({ ...f, source: s }))}>{s}</button>
+              ))}
+            </div>
+            <label className="admin-field"><span>Nome cliente *</span>
+              <input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Es. Marco R." />
+            </label>
+            <label className="admin-field"><span>Testo recensione *</span>
+              <textarea rows={3} value={form.content} onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))} placeholder="La loro esperienza…" />
+            </label>
+            <div style={{ display: "flex", gap: 16, alignItems: "center", margin: "4px 0 12px" }}>
+              <div className="rec-star-pick" style={{ display: "flex", gap: 4 }}>
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button key={n} type="button" onClick={() => setForm((f) => ({ ...f, stars: n }))}
+                    style={{ background: "none", border: "none", cursor: "pointer", fontSize: 22, color: n <= form.stars ? "#f1c40f" : "#555" }}>★</button>
+                ))}
+              </div>
+              <select value={form.language} onChange={(e) => setForm((f) => ({ ...f, language: e.target.value }))} style={{ padding: "6px 10px", borderRadius: 8 }}>
+                {["it", "pl", "en", "de", "fr", "es"].map((l) => <option key={l} value={l}>{l}</option>)}
+              </select>
+            </div>
+            <label className="admin-field"><span>Foto (facoltativo)</span>
+              <input type="file" accept="image/*" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadPhoto(f); }} />
+            </label>
+            {form.photo_url && <img src={form.photo_url} alt="" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8, marginBottom: 10 }} />}
+            <div className="admin-modal-actions">
+              <button className="admin-btn" onClick={addExternal} disabled={busy}>{busy ? "…" : "Aggiungi recensione"}</button>
+              <button className="admin-btn-ghost" onClick={() => setAddOpen(false)} disabled={busy}>Annulla</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {loading ? <Skeleton /> : (
         <div className="admin-orders">
           {reviews.map((r) => (
             <div key={r.id} className={`admin-order ${r.is_approved ? "" : ""}`}>
+              {r.photo_url && <img src={r.photo_url} alt="" style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />}
               <div className="admin-order-info">
-                <h4>{r.name} <span style={{ color: "#f1c40f" }}>{"★".repeat(r.stars)}</span></h4>
+                <h4>{r.name} <span style={{ color: "#f1c40f" }}>{"★".repeat(r.stars)}</span> <span style={{ opacity: 0.5, fontSize: 12 }}>{r.source}</span></h4>
                 <span>{r.email || "—"} · 🌐 {r.language}</span>
                 <span className="admin-order-time">{new Date(r.created_at).toLocaleString("it-IT")}</span>
               </div>
@@ -2020,7 +2102,7 @@ function ReviewsPanel() {
               </div>
             </div>
           ))}
-          {reviews.length === 0 && <p className="admin-empty">Nessuna recensione locale.</p>}
+          {reviews.length === 0 && <p className="admin-empty">Nessuna recensione.</p>}
         </div>
       )}
     </div>

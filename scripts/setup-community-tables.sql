@@ -170,9 +170,13 @@ CREATE TABLE IF NOT EXISTS reviews (
   stars integer DEFAULT 5 CHECK (stars >= 1 AND stars <= 5),
   language text DEFAULT 'it',
   images jsonb DEFAULT '[]'::jsonb,
+  photo_url text,
   is_approved boolean DEFAULT false,
   created_at timestamptz DEFAULT now()
 );
+
+-- Jeśli tabela już istnieje (migracja): dodaj kolumnę photo_url
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS photo_url text;
 
 ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public read approved reviews" ON reviews FOR SELECT USING (is_approved = true);

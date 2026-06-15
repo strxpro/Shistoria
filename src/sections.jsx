@@ -929,7 +929,7 @@ function Recensioni({ t }) {
   const [filter, setFilter] = useStateE("all");
   const [writeOpen, setWriteOpen] = useStateE(false);
   const [writeTab, setWriteTab] = useStateE("local"); // "local" | "google"
-  const [reviewForm, setReviewForm] = useStateE({ name: "", email: "", text: "", stars: 5 });
+  const [reviewForm, setReviewForm] = useStateE({ name: "", email: "", text: "", stars: 5, photo_url: "" });
   const [reviewSent, setReviewSent] = useStateE(false);
   const [hoverStar, setHoverStar] = useStateE(0);
   const sources = ["all", "Google", "TripAdvisor", "Locale"];
@@ -945,7 +945,7 @@ function Recensioni({ t }) {
         const sb = createClient(url, key);
         const fetchR = async () => {
           const { data } = await sb.from("reviews").select("*").eq("is_approved", true).order("created_at", { ascending: false });
-          if (data) setDbReviews(data.map((r) => ({ name: r.name, text: r.content, source: r.source || "Locale", stars: r.stars || 5 })));
+          if (data) setDbReviews(data.map((r) => ({ name: r.name, text: r.content, source: r.source || "Locale", stars: r.stars || 5, photo_url: r.photo_url || null })));
         };
         await fetchR();
         ch = sb.channel("reviews_rt").on("postgres_changes", { event: "*", schema: "public", table: "reviews" }, fetchR).subscribe();
@@ -975,6 +975,7 @@ function Recensioni({ t }) {
         source: "Locale",
         stars,
         language: lang,
+        photo_url: reviewForm.photo_url || null,
       });
     } catch (err) { console.error("Review submit error:", err); }
     // Mail z podziękowaniem w języku klienta (best-effort, nieblokujące)
@@ -1014,6 +1015,7 @@ function Recensioni({ t }) {
           {stream.map((r, i) => (
             <article key={i} className="rec-card">
               <div className="rec-stars">{"★".repeat(r.stars)}<span style={{ color: "var(--c-line)" }}>{"★".repeat(5 - r.stars)}</span></div>
+              {r.photo_url && <img className="rec-photo" src={r.photo_url} alt="" loading="lazy" />}
               <blockquote className="rec-text">"{r.text}"</blockquote>
               <div className="rec-meta">
                 <span className="rec-name">{r.name}</span>
@@ -1065,6 +1067,23 @@ function Recensioni({ t }) {
                   <span className="rec-star-val">{reviewForm.stars}/5</span>
                 </div>
                 <textarea placeholder="La tua esperienza..." rows={4} value={reviewForm.text} onChange={(e) => setReviewForm(f => ({...f, text: e.target.value}))} required />
+                <label className="rec-photo-upload">
+                  {reviewForm.photo_url
+                    ? <img src={reviewForm.photo_url} alt="" />
+                    : <span>📷 {({ it: "Aggiungi una foto", pl: "Dodaj zdjęcie", en: "Add a photo", de: "Foto hinzufügen", fr: "Ajouter une photo", es: "Añadir foto" })[(typeof window !== "undefined" && window.currentLanguage) || "it"] || "Aggiungi una foto"}</span>}
+                  <input type="file" accept="image/*" hidden onChange={async (e) => {
+                    const file = e.target.files?.[0]; if (!file) return;
+                    try {
+                      const { createClient } = await import("@supabase/supabase-js");
+                      const url = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://slatelpipxtqveydgslc.supabase.co';
+                      const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNsYXRlbHBpcHh0cXZleWRnc2xjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1ODcyNTQsImV4cCI6MjA5NjE2MzI1NH0.5dwE9IStThjC-krTtgg7PtEwmTnr_bQ_TEbQhgMpHdY';
+                      const sb = createClient(url, key);
+                      const path = `reviews/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.]/g, "_")}`;
+                      const { error } = await sb.storage.from("assets").upload(path, file, { upsert: true });
+                      if (!error) { const { data } = sb.storage.from("assets").getPublicUrl(path); setReviewForm(f => ({ ...f, photo_url: data.publicUrl })); }
+                    } catch {}
+                  }} />
+                </label>
                 <button type="submit" className="btn rec-submit-btn">Invia →</button>
               </form>
             )}
@@ -1093,6 +1112,10 @@ function Recensioni({ t }) {
         .rec-track:hover { animation-play-state: paused; }
         .rec-card { flex: 0 0 380px; background: #fff; border: 1px solid var(--c-line); border-radius: 20px; padding: 32px; display: flex; flex-direction: column; gap: 16px; }
         .rec-stars { color: var(--c-coral); font-size: 16px; letter-spacing: 4px; }
+        .rec-photo { width:100%; height:180px; object-fit:cover; border-radius:12px; }
+        .rec-photo-upload { display:flex; align-items:center; justify-content:center; min-height:54px; border:1.5px dashed var(--c-line); border-radius:12px; cursor:pointer; font-size:13px; opacity:.8; transition:.2s; overflow:hidden; }
+        .rec-photo-upload:hover { opacity:1; border-color:var(--c-coral); }
+        .rec-photo-upload img { width:100%; height:120px; object-fit:cover; border-radius:10px; }
         .rec-text { font-family: var(--f-serif); font-style: italic; font-size: 18px; line-height: 1.5; color: var(--c-deep); }
         .rec-meta { display: flex; justify-content: space-between; padding-top: 16px; border-top: 1px solid var(--c-line); }
         .rec-name { font-family: var(--f-display); font-weight: 700; font-size: 14px; }
