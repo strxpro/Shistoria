@@ -973,6 +973,7 @@ function Recensioni({ t }) {
   const sources = ["all", "Google", "TripAdvisor", "Locale"];
   const recLang = (typeof window !== "undefined" && window.currentLanguage) || "it";
   const [recPopout, setRecPopout] = useStateE(null);   // recenzja w popoucie (więcej detali)
+  const recScroller = useRefE(null);
   const [recTr, setRecTr] = useStateE({});             // { idx: przetłumaczony tekst }
   // Etykiety UI sekcji — przetłumaczone na 6 języków
   const L = (o) => o[recLang] || o.it;
@@ -1026,7 +1027,6 @@ function Recensioni({ t }) {
 
   const data = dbReviews.length > 0 ? [...dbReviews, ...staticData] : staticData;
   const filtered = filter === "all" ? data : data.filter((r) => r.source === filter);
-  const stream = filtered.concat(filtered);
 
   const submitReview = async (e) => {
     e.preventDefault();
@@ -1080,9 +1080,10 @@ function Recensioni({ t }) {
         </div>
       </div>
 
-      <div className="rec-marquee">
-        <div className="rec-track">
-          {stream.map((r, i) => (
+      <div className="rec-carousel">
+        <button className="rec-nav rec-nav-l" onClick={() => recScroller.current?.scrollBy({ left: -Math.round((recScroller.current?.clientWidth || 340) * 0.8), behavior: "smooth" })} aria-label="Precedente">‹</button>
+        <div className="rec-scroller" ref={recScroller}>
+          {filtered.map((r, i) => (
             <article key={i} className="rec-card" onClick={() => setRecPopout({ ...r, _i: i })}>
               <div className="rec-stars">{"★".repeat(r.stars)}<span style={{ color: "var(--c-line)" }}>{"★".repeat(5 - r.stars)}</span></div>
               {r.photo_url && <img className="rec-photo" src={r.photo_url} alt="" loading="lazy" />}
@@ -1102,6 +1103,7 @@ function Recensioni({ t }) {
             </article>
           ))}
         </div>
+        <button className="rec-nav rec-nav-r" onClick={() => recScroller.current?.scrollBy({ left: Math.round((recScroller.current?.clientWidth || 340) * 0.8), behavior: "smooth" })} aria-label="Successivo">›</button>
       </div>
 
       {/* Popout — pełna recenzja (więcej detali) */}
@@ -1202,19 +1204,21 @@ function Recensioni({ t }) {
         .rec-filter.active { background: var(--c-deep); color: #fff; border-color: var(--c-deep); }
         .rec-write-btn { background:var(--c-coral); color:#fff; border-color:var(--c-coral); margin-left:auto; }
         .rec-write-btn:hover { background:#d9745c; }
-        .rec-marquee { overflow: hidden; position: relative; }
-        .rec-marquee::before, .rec-marquee::after { content: ''; position: absolute; top: 0; bottom: 0; width: 120px; z-index: 2; pointer-events: none; }
-        .rec-marquee::before { left: 0; background: linear-gradient(90deg, #EBF6FA 0%, transparent 100%); }
-        .rec-marquee::after { right: 0; background: linear-gradient(-90deg, #EBF6FA 0%, transparent 100%); }
-        .rec-track { display: flex; gap: 24px; animation: marquee 90s linear infinite; padding: 24px 0; width: max-content; }
-        .rec-track:hover { animation-play-state: paused; }
-        .rec-card { flex: 0 0 380px; background: #fff; border: 1px solid var(--c-line); border-radius: 20px; padding: 32px; display: flex; flex-direction: column; gap: 16px; }
+        .rec-carousel { position: relative; }
+        .rec-scroller { display: flex; gap: 20px; overflow-x: auto; scroll-snap-type: x mandatory; padding: 24px clamp(20px, 6vw, 80px); scrollbar-width: none; -webkit-overflow-scrolling: touch; scroll-padding-left: clamp(20px,6vw,80px); }
+        .rec-scroller::-webkit-scrollbar { display: none; }
+        .rec-card { scroll-snap-align: start; flex: 0 0 360px; background: #fff; border: 1px solid var(--c-line); border-radius: 20px; padding: 32px; display: flex; flex-direction: column; gap: 16px; }
+        .rec-nav { position: absolute; top: 50%; transform: translateY(-50%); z-index: 3; width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--c-line); background: #fff; color: var(--c-deep); font-size: 26px; line-height: 1; cursor: pointer; display: grid; place-items: center; box-shadow: 0 6px 20px rgba(0,0,0,0.12); transition: all .2s; }
+        .rec-nav:hover { background: var(--c-coral); color: #fff; border-color: transparent; }
+        .rec-nav-l { left: 10px; }
+        .rec-nav-r { right: 10px; }
+        @media (max-width: 768px) { .rec-nav { display: none; } }
         .rec-stars { color: var(--c-coral); font-size: 16px; letter-spacing: 4px; }
         .rec-photo { width:100%; height:180px; object-fit:cover; border-radius:12px; }
         .rec-photo-upload { display:flex; align-items:center; justify-content:center; min-height:54px; border:1.5px dashed var(--c-line); border-radius:12px; cursor:pointer; font-size:13px; opacity:.8; transition:.2s; overflow:hidden; }
         .rec-photo-upload:hover { opacity:1; border-color:var(--c-coral); }
         .rec-photo-upload img { width:100%; height:120px; object-fit:cover; border-radius:10px; }
-        .rec-text { font-family: var(--f-serif); font-style: italic; font-size: 18px; line-height: 1.5; color: var(--c-deep); }
+        .rec-text { font-family: var(--f-serif); font-style: italic; font-size: 18px; line-height: 1.5; color: var(--c-deep); display:-webkit-box; -webkit-line-clamp:5; -webkit-box-orient:vertical; overflow:hidden; }
         .rec-meta { display: flex; justify-content: space-between; padding-top: 16px; border-top: 1px solid var(--c-line); }
         .rec-name { font-family: var(--f-display); font-weight: 700; font-size: 14px; }
         .rec-source { font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--c-sky); }
@@ -1255,7 +1259,7 @@ function Recensioni({ t }) {
         .rec-write-success { text-align:center; padding:32px; }
         .rec-write-success span { font-size:40px; display:block; margin-bottom:12px; }
         .rec-write-success h4 { font-size:20px; margin:0 0 8px; }
-        @media (max-width:768px) { .rec-card { flex:0 0 300px; padding:24px; } .rec-text { font-size:15px; } }
+        @media (max-width:768px) { .rec-card { flex:0 0 calc(50% - 10px); padding:18px; gap:12px; } .rec-text { font-size:13px; -webkit-line-clamp:4; } .rec-photo { height:110px; } .rec-card-actions { flex-direction:column; } .rec-tr-btn { font-size:11px; padding:5px 8px; } }
       `}</style>
     </section>
   );
