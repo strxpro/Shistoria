@@ -8,7 +8,7 @@
  * - responsywny, wyśrodkowany
  */
 
-import React, { useRef, useMemo, useState } from "react";
+import React, { useRef, useMemo, useState, useEffect } from "react";
 import { Canvas, useFrame, useLoader, ThreeEvent } from "@react-three/fiber";
 import * as THREE from "three";
 import { OrbitControls } from "@react-three/drei";
@@ -93,35 +93,48 @@ function EarthSphere({ countries, autoRotate, onSelect }: { countries: Country[]
 
 // ─── MAPA PŁASKA 2D ─────────────────────────────────────────────────────────
 function FlatMap({ countries, onSelect }: { countries: Country[]; onSelect: (c: Country) => void }) {
-  const tex = useLoader(THREE.TextureLoader, EARTH_TEX);
-  const maxC = Math.max(1, ...countries.map((c) => c.count));
-  // płaszczyzna 2:1 (równoprostokątna projekcja)
-  const W = 4, H = 2;
-  const markers = useMemo(() => countries.map((c) => {
-    const co = COUNTRY_COORDS[c.code?.toUpperCase()];
-    if (!co) return null;
-    const [lat, lon] = co;
-    const x = (lon / 180) * (W / 2);
-    const y = (lat / 90) * (H / 2);
-    return { c, x, y };
-  }).filter(Boolean) as any[], [countries]);
-  return (
-    <group>
-      <mesh>
-        <planeGeometry args={[W, H]} />
-        <meshBasicMaterial map={tex} />
-      </mesh>
-      {markers.map((m) => (
-        <mesh key={m.c.code} position={[m.x, m.y, 0.02]}
-          onClick={(e: ThreeEvent<MouseEvent>) => { e.stopPropagation(); onSelect(m.c); }}
-          onPointerOver={(e) => { e.stopPropagation(); document.body.style.cursor = "pointer"; }}
-          onPointerOut={() => { document.body.style.cursor = ""; }}>
-          <circleGeometry args={[0.04 + (m.c.count / maxC) * 0.06, 18]} />
-          <meshBasicMaterial color="#FF6B4A" />
-        </mesh>
-      ))}
-    </group>
-  );
+  const elRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<any>(null);
+  useEffect(() => {
+    let cleanup = () => {};
+    (async () => {
+      // Leaflet CSS z CDN (bez importu .css w TS) — wstaw raz
+      if (typeof document !== "undefined" && !document.getElementById("leaflet-css")) {
+        const link = document.createElement("link");
+        link.id = "leaflet-css"; link.rel = "stylesheet";
+        link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
+        document.head.appendChild(link);
+      }
+      const mod: any = await import("leaflet");
+      const L: any = mod.default || mod;
+      if (!elRef.current || mapRef.current) return;
+      const map = L.map(elRef.current, {
+        center: [30, 10], zoom: 1.5, minZoom: 1, maxZoom: 8,
+        zoomControl: true, scrollWheelZoom: true, worldCopyJump: true, attributionControl: false,
+      });
+      mapRef.current = map;
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", { subdomains: "abcd", maxZoom: 8 }).addTo(map);
+      const maxC = Math.max(1, ...countries.map((c) => c.count));
+      const pts: [number, number][] = [];
+      countries.forEach((c) => {
+        const co = COUNTRY_COORDS[c.code?.toUpperCase()];
+        if (!co) return;
+        pts.push([co[0], co[1]]);
+        const r = 7 + (c.count / maxC) * 20;
+        const m = L.circleMarker([co[0], co[1]], { radius: r, color: "#fff", weight: 2, fillColor: "#E8927C", fillOpacity: 0.85 }).addTo(map);
+        m.bindTooltip(`<b>${c.name}</b> — ${c.count}`, { direction: "top", className: "atr-leaf-tip" });
+        m.on("click", () => onSelect(c));
+      });
+      if (pts.length > 1) { try { map.fitBounds(pts, { padding: [30, 30], maxZoom: 4 }); } catch {} }
+      const onResize = () => map.invalidateSize();
+      window.addEventListener("resize", onResize);
+      const t = setTimeout(() => map.invalidateSize(), 250);
+      cleanup = () => { window.removeEventListener("resize", onResize); clearTimeout(t); map.remove(); mapRef.current = null; };
+    })();
+    return () => cleanup();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [countries]);
+  return <div ref={elRef} style={{ width: "100%", height: "100%" }} aria-label="Mappa dei visitatori" />;
 }
 
 export default function StatsGlobe({ countries }: { countries: Country[] }) {
@@ -138,27 +151,31 @@ export default function StatsGlobe({ countries }: { countries: Country[] }) {
         <button onClick={() => setFlat(true)} style={btn(flat)}>🗺️ Mappa</button>
       </div>
 
-      <div style={{ width: "100%", aspectRatio: flat ? "2 / 1" : "1 / 1", cursor: dragging ? "grabbing" : "grab", borderRadius: 16, overflow: "hidden", background: "radial-gradient(circle at 50% 40%, #1a3346, #0a1822)" }}>
-        <Canvas camera={{ position: [0, 0, flat ? 3.2 : 4.4], fov: 42 }} dpr={[1, 2]} gl={{ antialias: true, alpha: true }}>
-          <ambientLight intensity={1.4} />
-          <directionalLight position={[5, 3, 5]} intensity={1.2} />
-          <directionalLight position={[-5, -2, -3]} intensity={0.5} color="#bfe3f5" />
-          <React.Suspense fallback={null}>
-            {flat ? <FlatMap countries={countries} onSelect={setSel} /> : <EarthSphere countries={countries} autoRotate={!dragging && !sel} onSelect={setSel} />}
-          </React.Suspense>
-          <OrbitControls
-            enablePan={false}
-            enableZoom={true}
-            minDistance={flat ? 1.6 : 2.4}
-            maxDistance={flat ? 5 : 8}
-            enableRotate={!flat}
-            rotateSpeed={0.5}
-            minPolarAngle={0.25}
-            maxPolarAngle={Math.PI - 0.25}
-            onStart={() => setDragging(true)}
-            onEnd={() => setDragging(false)}
-          />
-        </Canvas>
+      <div style={{ width: "100%", aspectRatio: flat ? "2 / 1" : "1 / 1", cursor: flat ? "default" : (dragging ? "grabbing" : "grab"), borderRadius: 16, overflow: "hidden", background: "radial-gradient(circle at 50% 40%, #1a3346, #0a1822)" }}>
+        {flat ? (
+          <FlatMap countries={countries} onSelect={setSel} />
+        ) : (
+          <Canvas camera={{ position: [0, 0, 4.4], fov: 42 }} dpr={[1, 2]} gl={{ antialias: true, alpha: true }}>
+            <ambientLight intensity={1.4} />
+            <directionalLight position={[5, 3, 5]} intensity={1.2} />
+            <directionalLight position={[-5, -2, -3]} intensity={0.5} color="#bfe3f5" />
+            <React.Suspense fallback={null}>
+              <EarthSphere countries={countries} autoRotate={!dragging && !sel} onSelect={setSel} />
+            </React.Suspense>
+            <OrbitControls
+              enablePan={false}
+              enableZoom={true}
+              minDistance={2.4}
+              maxDistance={8}
+              enableRotate={true}
+              rotateSpeed={0.5}
+              minPolarAngle={0.25}
+              maxPolarAngle={Math.PI - 0.25}
+              onStart={() => setDragging(true)}
+              onEnd={() => setDragging(false)}
+            />
+          </Canvas>
+        )}
       </div>
 
       {/* info wybranego kraju — POPOUT (modal wyśrodkowany) */}
