@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "../../lib/supabase";
 import { translateToAll } from "../../lib/translate";
 import dynamic from "next/dynamic";
@@ -900,7 +901,8 @@ function DrinkStatsModal({ drink, onClose }: { drink: any; onClose: () => void }
       setLoading(false);
     })();
   }, [drink.id]);
-  return (
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <div className="admin-modal-overlay" onClick={onClose}>
       <div className="admin-modal admin-modal-wide" onClick={(e) => e.stopPropagation()}>
         <h3>{drink.name} <span style={{ opacity: 0.5, fontWeight: 400, fontSize: 14 }}>di {drink.author_name}</span></h3>
@@ -924,7 +926,8 @@ function DrinkStatsModal({ drink, onClose }: { drink: any; onClose: () => void }
           <button className="admin-btn-ghost" onClick={onClose}>Chiudi</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -1662,7 +1665,8 @@ function GuestDetailModal({ guest, onClose, onWrite }: { guest: any; onClose: ()
       ))}
     </div>
   );
-  return (
+  if (typeof document === "undefined") return null;
+  return createPortal(
     <div className="admin-modal-overlay" onClick={onClose}>
       <div className="admin-modal admin-modal-wide" onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -1733,7 +1737,8 @@ function GuestDetailModal({ guest, onClose, onWrite }: { guest: any; onClose: ()
           <button className="admin-btn-ghost" onClick={onClose}>Chiudi</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
