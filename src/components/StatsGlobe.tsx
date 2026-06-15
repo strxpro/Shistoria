@@ -124,8 +124,6 @@ function FlatMap({ countries, onSelect }: { countries: Country[]; onSelect: (c: 
   );
 }
 
-const flagEmoji = (code: string) => code && code.length === 2 ? String.fromCodePoint(...[...code.toUpperCase()].map((c) => 127397 + c.charCodeAt(0))) : "🌍";
-
 export default function StatsGlobe({ countries }: { countries: Country[] }) {
   const [dragging, setDragging] = useState(false);
   const [flat, setFlat] = useState(false);
@@ -171,7 +169,7 @@ export default function StatsGlobe({ countries }: { countries: Country[] }) {
             style={{ position: "relative", width: "100%", maxWidth: 360, borderRadius: 22, padding: "30px 24px 26px", textAlign: "center", background: "linear-gradient(160deg,#16384c,#0d2230)", border: "1px solid rgba(232,146,124,0.4)", boxShadow: "0 30px 90px rgba(0,0,0,0.55)", color: "#fff" }}>
             <button onClick={() => setSel(null)} aria-label="Chiudi"
               style={{ position: "absolute", top: 12, right: 12, width: 34, height: 34, borderRadius: "50%", border: "none", background: "rgba(255,255,255,0.1)", color: "#fff", fontSize: 16, cursor: "pointer" }}>✕</button>
-            <div style={{ fontSize: 68, lineHeight: 1 }}>{flagEmoji(sel.code)}</div>
+            <div style={{ fontSize: 68, lineHeight: 1 }}>{/^[a-zA-Z]{2}$/.test(sel.code || "") ? <img src={`https://flagcdn.com/w80/${sel.code.toLowerCase()}.png`} alt={sel.code} style={{ width: 76, height: "auto", borderRadius: 6, boxShadow: "0 4px 14px rgba(0,0,0,0.4)" }} /> : "🌍"}</div>
             <h3 style={{ margin: "14px 0 2px", fontSize: 26, fontWeight: 800 }}>{sel.name}</h3>
             <p style={{ margin: 0, fontSize: 12, letterSpacing: 3, textTransform: "uppercase", opacity: 0.55 }}>{sel.code}</p>
             <div style={{ display: "flex", gap: 12, marginTop: 22 }}>

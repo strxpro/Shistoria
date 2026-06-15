@@ -32,6 +32,17 @@ function Skeleton({ rows = 5 }: { rows?: number }) {
   );
 }
 
+// Flaga jako OBRAZEK (flagcdn) — renderuje się na każdym systemie, też na Windows,
+// gdzie emoji flag (regional indicators) nie działają i pokazują się jako "PL"/"??".
+function FlagImg({ code, size = 22 }: { code?: string; size?: number }) {
+  const cc = (code || "").trim().toLowerCase();
+  if (!/^[a-z]{2}$/.test(cc)) return <span style={{ fontSize: size - 2, lineHeight: 1 }} aria-hidden="true">🌍</span>;
+  return <img src={`https://flagcdn.com/w40/${cc}.png`} alt={cc.toUpperCase()} loading="lazy"
+    style={{ width: size, height: "auto", borderRadius: 3, display: "inline-block", verticalAlign: "middle", boxShadow: "0 1px 3px rgba(0,0,0,0.3)" }} />;
+}
+// Język UI → kod kraju flagi (en → Wielka Brytania)
+const LANG_CC: Record<string, string> = { it: "it", pl: "pl", en: "gb", de: "de", fr: "fr", es: "es" };
+
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>("menu");
   const [authed, setAuthed] = useState(false);
@@ -1604,7 +1615,6 @@ function MessagesPanel({ compose, onComposeUsed }: { compose?: { email: string; 
 // ─── Ospiti Panel (CRM — wszyscy ludzie z mailami + powiązania) ───────────────
 function GuestDetailModal({ guest, onClose, onWrite }: { guest: any; onClose: () => void; onWrite: (g: any) => void }) {
   const [data, setData] = useState<{ drinks: any[]; orders: number; reviews: any[]; comments: any[]; visits: any[]; liked: any[] } | null>(null);
-  const flag = (c: string) => ({ it: "🇮🇹", pl: "🇵🇱", en: "🇬🇧", de: "🇩🇪", fr: "🇫🇷", es: "🇪🇸" } as Record<string, string>)[c] || "🌐";
   useEffect(() => {
     (async () => {
       try {
@@ -1671,7 +1681,7 @@ function GuestDetailModal({ guest, onClose, onWrite }: { guest: any; onClose: ()
       <div className="admin-modal admin-modal-wide" onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span className="amsg-avatar" style={{ width: 48, height: 48, fontSize: 20 }}>{(guest.name || "?").charAt(0).toUpperCase()}</span>
-          <div><h3 style={{ margin: 0 }}>{guest.name} {flag(guest.lang)}</h3><p style={{ margin: 0, opacity: 0.6, fontSize: 13 }}>{guest.email}</p></div>
+          <div><h3 style={{ margin: 0 }}>{guest.name} <FlagImg code={LANG_CC[guest.lang]} size={18} /></h3><p style={{ margin: 0, opacity: 0.6, fontSize: 13 }}>{guest.email}</p></div>
         </div>
         <div className="amsg-person" style={{ margin: "12px 0 4px" }}>
           {tags.map((tg) => <span key={tg} className="amsg-badge">{tg === "newsletter" ? "📧 Newsletter" : tg === "messaggi" ? "💬 Messaggi" : "⭐ Recensione"}</span>)}
@@ -1777,7 +1787,6 @@ function OspitiPanel({ onWrite }: { onWrite: (g: { email: string; name?: string;
   const q = search.trim().toLowerCase();
   const filtered = q ? guests.filter((g) => g.email.includes(q) || (g.name || "").toLowerCase().includes(q)) : guests;
   const tagCls: Record<string, string> = { newsletter: "amsg-badge", messaggi: "amsg-badge-sky", recensione: "amsg-badge-gold" };
-  const flag = (c: string) => ({ it: "🇮🇹", pl: "🇵🇱", en: "🇬🇧", de: "🇩🇪", fr: "🇫🇷", es: "🇪🇸" } as Record<string, string>)[c] || "🌐";
 
   return (
     <div className="admin-panel">
@@ -1798,7 +1807,7 @@ function OspitiPanel({ onWrite }: { onWrite: (g: { email: string; name?: string;
               <div className="ospiti-card-top">
                 <span className="amsg-avatar">{(g.name || "?").charAt(0).toUpperCase()}</span>
                 <div className="ospiti-card-id">
-                  <h4>{g.name} <span style={{ opacity: 0.5, fontWeight: 400, fontSize: 12 }}>{flag(g.lang)}</span></h4>
+                  <h4>{g.name} <span style={{ opacity: 0.5, fontWeight: 400, fontSize: 12 }}><FlagImg code={LANG_CC[g.lang]} size={16} /></span></h4>
                   <p>{g.email}</p>
                 </div>
               </div>
@@ -2324,7 +2333,7 @@ function StatsPanel() {
     const map: Record<string, { code: string; name: string; count: number; durations: number[]; sections: Record<string, number>; conversions: number }> = {};
     for (const v of visits) {
       const code = v.country || "??";
-      const e = (map[code] ||= { code, name: v.country_name || code, count: 0, durations: [], sections: {}, conversions: 0 });
+      const e = (map[code] ||= { code, name: v.country_name || (code !== "??" ? code : "Sconosciuto"), count: 0, durations: [], sections: {}, conversions: 0 });
       e.count++; if (v.duration_seconds) e.durations.push(v.duration_seconds);
       if (v.top_section) e.sections[v.top_section] = (e.sections[v.top_section] || 0) + 1;
       if (v.is_conversion) e.conversions++;
@@ -2338,7 +2347,6 @@ function StatsPanel() {
   const emailVisits = visits.filter((v) => v.referrer === "email" || v.utm_source === "email").length;
   const convRate = totalVisits ? Math.round((conversions / totalVisits) * 100) : 0;
   const avgDuration = totalVisits ? Math.round(visits.reduce((s, v) => s + (v.duration_seconds || 0), 0) / totalVisits) : 0;
-  const flag = (code: string) => code && code.length === 2 ? String.fromCodePoint(...[...code.toUpperCase()].map((c) => 127397 + c.charCodeAt(0))) : "🌍";
   const intensity = (c: number) => { const r = c / maxCount; return `rgba(232,146,124,${0.15 + r * 0.85})`; };
   const fmtDur = (s: number) => s >= 60 ? `${Math.floor(s/60)}m ${s%60}s` : `${s}s`;
   const popData = byCountry.find((c) => c.code === popCountry);
@@ -2387,7 +2395,7 @@ function StatsPanel() {
                 <div className="stats-countries">
                   {byCountry.map((c) => (
                     <button key={c.code} className="stats-country" onClick={() => setPopCountry(c.code)}>
-                      <span className="stats-country-flag">{flag(c.code)}</span>
+                      <span className="stats-country-flag"><FlagImg code={c.code} /></span>
                       <span className="stats-country-name">{c.name}</span>
                       <span className="stats-country-bar-wrap">
                         <span className="stats-country-bar" style={{ width: `${(c.count / maxCount) * 100}%`, background: intensity(c.count) }} />
@@ -2405,7 +2413,7 @@ function StatsPanel() {
             <div className="stats-pop-overlay" onClick={() => setPopCountry(null)}>
               <div className="stats-pop" onClick={(e) => e.stopPropagation()}>
                 <button className="stats-pop-close" onClick={() => setPopCountry(null)}>×</button>
-                <div className="stats-pop-head"><span style={{ fontSize: 40 }}>{flag(popData.code)}</span><h2>{popData.name}</h2></div>
+                <div className="stats-pop-head"><span style={{ fontSize: 40 }}><FlagImg code={popData.code} size={40} /></span><h2>{popData.name}</h2></div>
                 <div className="stats-pop-grid">
                   <div><span className="stats-pop-val">{popData.count}</span><span className="stats-pop-lbl">Visitatori</span></div>
                   <div><span className="stats-pop-val">{popData.durations.length ? fmtDur(Math.round(popData.durations.reduce((a,b)=>a+b,0)/popData.durations.length)) : "—"}</span><span className="stats-pop-lbl">Tempo medio</span></div>
