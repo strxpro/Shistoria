@@ -2297,6 +2297,16 @@ function StatsPanel() {
   const [visits, setVisits] = useState<any[]>([]);
   const [sections, setSections] = useState<any[]>([]);
   const [popCountry, setPopCountry] = useState<string | null>(null);
+  const [online, setOnline] = useState(0);
+
+  // „Online ora" — Supabase Realtime Presence (te same kanaly co strona publiczna)
+  useEffect(() => {
+    const ch = supabase.channel("online-visitors");
+    ch.on("presence", { event: "sync" }, () => {
+      try { setOnline(Object.keys(ch.presenceState()).length); } catch {}
+    }).subscribe();
+    return () => { try { supabase.removeChannel(ch); } catch {} };
+  }, []);
 
   // Zakres dat → from/to ISO
   const rangeDates = () => {
@@ -2371,6 +2381,7 @@ function StatsPanel() {
         <>
           {/* KPI ogólne */}
           <div className="stats-kpis">
+            <div className="stats-kpi stats-kpi-online"><span className="stats-kpi-val"><span className="stats-online-dot" />{online}</span><span className="stats-kpi-lbl">Online ora</span></div>
             <div className="stats-kpi"><span className="stats-kpi-val">{totalVisits}</span><span className="stats-kpi-lbl">Visite</span></div>
             <div className="stats-kpi"><span className="stats-kpi-val">{conversions}</span><span className="stats-kpi-lbl">Conversioni ({convRate}%)</span></div>
             <div className="stats-kpi"><span className="stats-kpi-val">{emailVisits}</span><span className="stats-kpi-lbl">Da email</span></div>
@@ -2715,6 +2726,9 @@ function AdminStyles() {
       .stats-kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; margin-bottom:28px; }
       .stats-kpi { background:linear-gradient(135deg,rgba(232,146,124,0.12),rgba(91,184,212,0.08)); border:1px solid rgba(255,255,255,0.1); border-radius:16px; padding:18px; display:flex; flex-direction:column; gap:4px; }
       .stats-kpi-val { font-size:30px; font-weight:800; color:#fff; }
+      .stats-kpi-online { border-color:rgba(46,204,113,0.4); background:linear-gradient(135deg,rgba(46,204,113,0.18),rgba(91,184,212,0.08)); }
+      .stats-online-dot { display:inline-block; width:11px; height:11px; border-radius:50%; background:#2ecc71; margin-right:8px; vertical-align:middle; box-shadow:0 0 0 0 rgba(46,204,113,0.6); animation:onlinePulse 1.8s infinite; }
+      @keyframes onlinePulse { 0%{ box-shadow:0 0 0 0 rgba(46,204,113,0.55);} 70%{ box-shadow:0 0 0 9px rgba(46,204,113,0);} 100%{ box-shadow:0 0 0 0 rgba(46,204,113,0);} }
       .stats-kpi-lbl { font-size:12px; color:rgba(255,255,255,0.6); }
       .stats-section { margin-bottom:28px; }
       .stats-section h3 { font-size:16px; margin:0 0 14px; color:#fff; }

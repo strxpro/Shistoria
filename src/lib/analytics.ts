@@ -102,6 +102,15 @@ export async function startTracking() {
   };
   window.addEventListener("pagehide", flush);
   window.addEventListener("beforeunload", flush);
+
+  // Presence — „ile osób jest teraz online" (Supabase Realtime, darmowe, bez kosztów)
+  try {
+    const pch = supabase.channel("online-visitors", { config: { presence: { key: sid } } });
+    pch.subscribe((status) => {
+      if (status === "SUBSCRIBED") pch.track({ online_at: new Date().toISOString(), country, country_name, lang });
+    });
+    (window as any).__shPresence = pch; // trzymamy referencję, by kanał żył póki karta otwarta
+  } catch { /* realtime opcjonalny */ }
 }
 
 /** Oznacz wejście w sekcję (z IntersectionObserver w app). */
