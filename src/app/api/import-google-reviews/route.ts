@@ -1,26 +1,31 @@
 /**
- * /api/import-google-reviews — automatyczny import recenzji z wizytówki Google.
+ * /api/import-google-reviews — automatyczny, DARMOWY import recenzji z Google do bazy.
  *
- * Używa OFICJALNEGO Google Places API (Place Details → pole `reviews`).
- * NIE scrapuje (scraping Google/TripAdvisor łamie ich regulamin i jest kruchy).
+ * NIE scrapuje (scraping Google łamie regulamin, jest kruchy i blokowany).
+ * Używa OFICJALNYCH, darmowych API Google. Dwa tryby (wykrywane z env):
  *
- * Konfiguracja (env w Vercel):
- *   GOOGLE_PLACES_API_KEY — klucz API (Google Cloud → Places API włączone)
- *   GOOGLE_PLACE_ID       — Place ID lokalu (z https://developers.google.com/maps/documentation/places/web-service/place-id)
- *   ANNOUNCE_SECRET       — (opcjonalnie) sekret do wywołań z crona
+ * ── TRYB A: Google Business Profile API (ZALECANY) — WSZYSTKIE recenzje ──────
+ *   Darmowe dla właściciela wizytówki. Zwraca KOMPLET recenzji (z paginacją),
+ *   z imieniem, oceną, treścią i zdjęciem profilowym autora.
+ *   Wymaga (jednorazowo) OAuth refresh token konta, które ZARZĄDZA wizytówką:
+ *     GOOGLE_OAUTH_CLIENT_ID
+ *     GOOGLE_OAUTH_CLIENT_SECRET
+ *     GOOGLE_OAUTH_REFRESH_TOKEN     (scope: https://www.googleapis.com/auth/business.manage)
+ *     GOOGLE_BUSINESS_ACCOUNT_ID     (np. 123456789  — z mybusinessaccountmanagement accounts.list)
+ *     GOOGLE_BUSINESS_LOCATION_ID    (np. 987654321  — z business.information locations.list)
+ *   Refresh token najłatwiej wygenerować przez OAuth Playground (instrukcja w
+ *   GOOGLE_REVIEWS_IMPORT.md). Wszystko za darmo.
  *
- * Wywołanie (np. cron-job.org raz dziennie):
- *   GET /api/import-google-reviews?secret=XXX
+ * ── TRYB B: Places API (fallback) — maks. 5 najnowszych ──────────────────────
+ *     GOOGLE_PLACES_API_KEY
+ *     GOOGLE_PLACE_ID
+ *   Prostszy, ale Google zwraca tylko ~5 recenzji na lokal (limit API).
  *
- * Dedup: kolumna reviews.ext_id (UNIQUE) = `google:<time>:<autor>`.
- * Nowe recenzje są od razu approvate (is_approved=true) i pojawiają się na stronie.
+ * Wywołanie (cron-job.org raz dziennie — nowe recenzje dochodzą same):
+ *   GET /api/import-google-reviews?secret=ANNOUNCE_SECRET
  *
- * Uwaga: Google Places API zwraca maks. ~5 najnowszych recenzji na lokal
- * (ograniczenie API). Dla pełnej historii potrzebny jest płatny dostęp/ręczny
- * import w panelu admina (Recensioni → „+ Recensione esterna").
- *
- * TripAdvisor: nie ma otwartego API do pobierania recenzji bez akceptacji do
- * ich Content API (wymaga wniosku). Dlatego TripAdvisor dodajesz ręcznie w adminie.
+ * Dedup: kolumna reviews.ext_id (UNIQUE). Nowe są od razu approvate.
+ * TripAdvisor nie ma darmowego API do pobierania — dodajesz ręcznie w adminie.
  */
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "../../../lib/supabase";
@@ -28,54 +33,130 @@ import { supabase } from "../../../lib/supabase";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const KEY = process.env.GOOGLE_PLACES_API_KEY || "";
-const PLACE_ID = process.env.GOOGLE_PLACE_ID || "";
 const SECRET = process.env.ANNOUNCE_SECRET || "shistoria-cron";
+
+// ── env ──
+const OAUTH_CLIENT_ID = process.env.GOOGLE_OAUTH_CLIENT_ID || "";
+const OAUTH_CLIENT_SECRET = process.env.GOOGLE_OAUTH_CLIENT_SECRET || "";
+const OAUTH_REFRESH_TOKEN = process.env.GOOGLE_OAUTH_REFRESH_TOKEN || "";
+const GBP_ACCOUNT = process.env.GOOGLE_BUSINESS_ACCOUNT_ID || "";
+const GBP_LOCATION = process.env.GOOGLE_BUSINESS_LOCATION_ID || "";
+const PLACES_KEY = process.env.GOOGLE_PLACES_API_KEY || "";
+const PLACE_ID = process.env.GOOGLE_PLACE_ID || "";
+
+const STAR_ENUM: Record<string, number> = { ONE: 1, TWO: 2, THREE: 3, FOUR: 4, FIVE: 5 };
+
+/** Zapis pojedynczej recenzji (dedup po ext_id). Zwraca true gdy dodano. */
+async function upsertReview(r: {
+  name: string; content: string; stars: number; language?: string; photo_url?: string | null; ext_id: string;
+}): Promise<boolean> {
+  if (!r.content.trim()) return false;
+  const exists = await supabase.from("reviews").select("id").eq("ext_id", r.ext_id).maybeSingle();
+  if (exists.data) return false;
+  const ins = await supabase.from("reviews").insert({
+    name: r.name || "Google",
+    content: r.content.trim(),
+    stars: Math.max(1, Math.min(5, r.stars || 5)),
+    source: "Google",
+    language: r.language || "it",
+    photo_url: r.photo_url || null,
+    ext_id: r.ext_id,
+    is_approved: true,
+  });
+  return !ins.error;
+}
+
+/** Świeży access token z refresh tokena. */
+async function getAccessToken(): Promise<string | null> {
+  try {
+    const res = await fetch("https://oauth2.googleapis.com/token", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({
+        client_id: OAUTH_CLIENT_ID,
+        client_secret: OAUTH_CLIENT_SECRET,
+        refresh_token: OAUTH_REFRESH_TOKEN,
+        grant_type: "refresh_token",
+      }),
+    });
+    const j = await res.json();
+    return j.access_token || null;
+  } catch { return null; }
+}
+
+/** TRYB A — Business Profile API: pobierz WSZYSTKIE recenzje (paginacja). */
+async function importBusinessProfile() {
+  const token = await getAccessToken();
+  if (!token) return { mode: "business_profile", error: "oauth_token_failed" };
+  const base = `https://mybusiness.googleapis.com/v4/accounts/${GBP_ACCOUNT}/locations/${GBP_LOCATION}/reviews`;
+  let pageToken: string | undefined;
+  let found = 0, imported = 0, pages = 0;
+  do {
+    const url = `${base}?pageSize=50${pageToken ? `&pageToken=${pageToken}` : ""}`;
+    const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+    if (!res.ok) {
+      const txt = await res.text();
+      return { mode: "business_profile", error: "api_error", status: res.status, detail: txt.slice(0, 300), imported };
+    }
+    const j = await res.json();
+    const reviews: any[] = j.reviews || [];
+    found += reviews.length;
+    for (const rv of reviews) {
+      const ok = await upsertReview({
+        name: rv.reviewer?.displayName || "Google",
+        content: rv.comment || "",
+        stars: STAR_ENUM[rv.starRating] || 5,
+        photo_url: rv.reviewer?.profilePhotoUrl || null,
+        ext_id: `gbp:${rv.reviewId || rv.name || rv.createTime}`,
+      });
+      if (ok) imported++;
+    }
+    pageToken = j.nextPageToken;
+    pages++;
+    if (pages > 40) break; // bezpiecznik (2000 recenzji)
+  } while (pageToken);
+  return { mode: "business_profile", found, imported, pages };
+}
+
+/** TRYB B — Places API: ~5 najnowszych. */
+async function importPlaces() {
+  const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(PLACE_ID)}&fields=reviews&reviews_sort=newest&language=it&key=${encodeURIComponent(PLACES_KEY)}`;
+  const res = await fetch(url);
+  const j = await res.json();
+  if (j.status && j.status !== "OK") return { mode: "places", error: "api_error", status: j.status, message: j.error_message || "" };
+  const reviews: any[] = j?.result?.reviews || [];
+  let imported = 0;
+  for (const rv of reviews) {
+    const ok = await upsertReview({
+      name: rv.author_name || "Google",
+      content: rv.text || "",
+      stars: Math.round(rv.rating || 5),
+      language: rv.language || "it",
+      photo_url: rv.profile_photo_url || null,
+      ext_id: `google:${rv.time}:${String(rv.author_name || "").slice(0, 24)}`,
+    });
+    if (ok) imported++;
+  }
+  return { mode: "places", found: reviews.length, imported };
+}
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  // Jeśli sekret jest ustawiony w env, wymagaj go (ochrona przed nadużyciem limitu API).
   if (process.env.ANNOUNCE_SECRET && searchParams.get("secret") !== SECRET) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  if (!KEY || !PLACE_ID) {
-    return NextResponse.json({ error: "missing_google_config", hint: "Ustaw GOOGLE_PLACES_API_KEY i GOOGLE_PLACE_ID w env" }, { status: 500 });
-  }
 
-  const url = `https://maps.googleapis.com/maps/api/place/details/json?place_id=${encodeURIComponent(PLACE_ID)}&fields=reviews&reviews_sort=newest&language=it&key=${encodeURIComponent(KEY)}`;
-  let reviews: any[] = [];
-  try {
-    const r = await fetch(url);
-    const j = await r.json();
-    if (j.status && j.status !== "OK") {
-      return NextResponse.json({ error: "google_api_error", status: j.status, message: j.error_message || "" }, { status: 502 });
-    }
-    reviews = j?.result?.reviews || [];
-  } catch (e: any) {
-    return NextResponse.json({ error: "fetch_failed", message: e?.message || String(e) }, { status: 502 });
+  // Preferuj Business Profile (wszystkie recenzje), inaczej Places (5).
+  if (OAUTH_REFRESH_TOKEN && OAUTH_CLIENT_ID && OAUTH_CLIENT_SECRET && GBP_ACCOUNT && GBP_LOCATION) {
+    const r = await importBusinessProfile();
+    return NextResponse.json({ ok: !r.error, ...r });
   }
-
-  let imported = 0;
-  const skipped: string[] = [];
-  for (const rv of reviews) {
-    const text = (rv.text || "").trim();
-    if (!text) { skipped.push("no_text"); continue; }
-    const ext_id = `google:${rv.time}:${String(rv.author_name || "").slice(0, 24)}`;
-    const exists = await supabase.from("reviews").select("id").eq("ext_id", ext_id).maybeSingle();
-    if (exists.data) { skipped.push("dup"); continue; }
-    const ins = await supabase.from("reviews").insert({
-      name: rv.author_name || "Google",
-      content: text,
-      stars: Math.max(1, Math.min(5, Math.round(rv.rating || 5))),
-      source: "Google",
-      language: rv.language || rv.original_language || "it",
-      photo_url: rv.profile_photo_url || null,
-      ext_id,
-      is_approved: true,
-    });
-    if (!ins.error) imported++;
-    else skipped.push(ins.error.message);
+  if (PLACES_KEY && PLACE_ID) {
+    const r = await importPlaces();
+    return NextResponse.json({ ok: !r.error, ...r });
   }
-
-  return NextResponse.json({ ok: true, found: reviews.length, imported, skipped });
+  return NextResponse.json({
+    error: "missing_config",
+    hint: "Ustaw GOOGLE_OAUTH_* + GOOGLE_BUSINESS_* (wszystkie recenzje) albo GOOGLE_PLACES_API_KEY + GOOGLE_PLACE_ID (5 recenzji). Szczególy: GOOGLE_REVIEWS_IMPORT.md",
+  }, { status: 500 });
 }
