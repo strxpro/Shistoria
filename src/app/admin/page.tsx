@@ -43,6 +43,36 @@ function FlagImg({ code, size = 22 }: { code?: string; size?: number }) {
 // Język UI → kod kraju flagi (en → Wielka Brytania)
 const LANG_CC: Record<string, string> = { it: "it", pl: "pl", en: "gb", de: "de", fr: "fr", es: "es" };
 
+// Żywy podgląd motywu eventu — animowane SVG (SMIL, samowystarczalne, bez dodatkowego CSS)
+function EvTemplatePreview({ id, accent }: { id: string; accent: string }) {
+  const a = accent || "#fff";
+  const svg = { width: "100%", height: "100%", viewBox: "0 0 120 80", preserveAspectRatio: "xMidYMid slice", style: { display: "block" } } as any;
+  switch (id) {
+    case "festa": // konfetti spadające
+      return (<svg {...svg} aria-hidden="true">{Array.from({ length: 10 }).map((_, i) => { const x = 6 + i * 11.5; const dur = 1.8 + (i % 4) * 0.5; return (
+        <rect key={i} x={x} y={-6} width="4" height="4" rx="1" fill={i % 2 ? a : "#fff"} opacity="0.9">
+          <animate attributeName="y" from="-6" to="86" dur={`${dur}s`} repeatCount="indefinite" begin={`${i * 0.2}s`} />
+          <animateTransform attributeName="transform" type="rotate" from={`0 ${x} 0`} to={`360 ${x} 80`} dur={`${dur}s`} repeatCount="indefinite" begin={`${i * 0.2}s`} />
+        </rect>); })}</svg>);
+    case "dj": // gramofon + equalizer
+      return (<svg {...svg} aria-hidden="true"><g transform="translate(34,40)"><circle r="22" fill="rgba(0,0,0,0.35)" stroke={a} strokeWidth="1.5" /><circle r="13" fill="none" stroke={a} strokeWidth="0.6" opacity="0.5" /><g><circle r="5" fill={a} /><circle cx="0" cy="-13" r="1.6" fill="#fff" /><animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="3s" repeatCount="indefinite" /></g></g>{[0, 1, 2, 3, 4].map((i) => (<rect key={i} x={70 + i * 9} width="6" rx="2" fill={a}><animate attributeName="height" values="10;42;16;34;10" dur={`${0.7 + i * 0.13}s`} repeatCount="indefinite" /><animate attributeName="y" values="55;23;49;31;55" dur={`${0.7 + i * 0.13}s`} repeatCount="indefinite" /></rect>))}</svg>);
+    case "ospite": // reflektor + gwiazda
+      return (<svg {...svg} aria-hidden="true"><polygon points="60,8 52,80 68,80" fill={a} opacity="0.18"><animate attributeName="opacity" values="0.1;0.28;0.1" dur="2.5s" repeatCount="indefinite" /></polygon><path d="M60 22l4 9 10 1-7.5 7 2 10-8.5-5-8.5 5 2-10-7.5-7 10-1z" fill={a}><animateTransform attributeName="transform" type="rotate" from="0 60 36" to="360 60 36" dur="9s" repeatCount="indefinite" /></path></svg>);
+    case "live": // nuty + fala
+      return (<svg {...svg} aria-hidden="true"><path d="M0 50 Q15 35 30 50 T60 50 T90 50 T120 50" fill="none" stroke={a} strokeWidth="2" opacity="0.6"><animate attributeName="d" values="M0 50 Q15 35 30 50 T60 50 T90 50 T120 50;M0 50 Q15 62 30 50 T60 50 T90 50 T120 50;M0 50 Q15 35 30 50 T60 50 T90 50 T120 50" dur="2.5s" repeatCount="indefinite" /></path>{[20, 55, 90].map((x, i) => (<g key={i}><circle cx={x} cy={28} r="5" fill={a}><animate attributeName="cy" values="28;20;28" dur={`${1.4 + i * 0.4}s`} repeatCount="indefinite" /></circle><rect x={x + 4} y={10} width="2" height="18" fill={a}><animate attributeName="y" values="10;2;10" dur={`${1.4 + i * 0.4}s`} repeatCount="indefinite" /></rect></g>))}</svg>);
+    case "degustazione": // kieliszki wina
+      return (<svg {...svg} aria-hidden="true">{[35, 60, 85].map((x, i) => (<g key={i} transform={`translate(${x},20)`}><path d="M-7 0 a7 7 0 0 0 14 0 z" fill={a} opacity="0.85"><animate attributeName="opacity" values="0.5;0.9;0.5" dur={`${2 + i * 0.5}s`} repeatCount="indefinite" /></path><rect x="-0.7" y="7" width="1.5" height="20" fill={a} /><rect x="-6" y="27" width="12" height="2" rx="1" fill={a} /></g>))}</svg>);
+    case "aperitivo": // koktajl + bąbelki
+      return (<svg {...svg} aria-hidden="true"><path d="M44 26 L76 26 L62 50 L58 50 Z" fill={a} opacity="0.8" /><rect x="59" y="50" width="2" height="16" fill={a} /><rect x="50" y="66" width="20" height="2" rx="1" fill={a} />{[52, 60, 68].map((x, i) => (<circle key={i} cx={x} cy={30} r="2" fill="#fff" opacity="0.9"><animate attributeName="cy" from="34" to="20" dur={`${1.6 + i * 0.4}s`} repeatCount="indefinite" begin={`${i * 0.3}s`} /><animate attributeName="opacity" values="0;0.9;0" dur={`${1.6 + i * 0.4}s`} repeatCount="indefinite" begin={`${i * 0.3}s`} /></circle>))}</svg>);
+    case "cena": // talerz + sztućce
+      return (<svg {...svg} aria-hidden="true"><circle cx="60" cy="40" r="22" fill="none" stroke={a} strokeWidth="2"><animate attributeName="r" values="20;23;20" dur="3s" repeatCount="indefinite" /></circle><circle cx="60" cy="40" r="13" fill="none" stroke={a} strokeWidth="1" opacity="0.5" /><g stroke={a} strokeWidth="2" strokeLinecap="round"><line x1="30" y1="26" x2="30" y2="54" /><line x1="90" y1="26" x2="90" y2="54" /></g></svg>);
+    case "notte": // fajerwerki / gwiazdy
+      return (<svg {...svg} aria-hidden="true">{[[35, 30], [80, 24], [60, 50]].map(([cx, cy], i) => (<g key={i}>{Array.from({ length: 8 }).map((_, j) => { const ang = (j * Math.PI) / 4; return (<line key={j} x1={cx} y1={cy} x2={cx + Math.cos(ang) * 12} y2={cy + Math.sin(ang) * 12} stroke={i % 2 ? "#fff" : a} strokeWidth="1.5" strokeLinecap="round"><animate attributeName="opacity" values="0;1;0" dur={`${1.8 + i * 0.4}s`} repeatCount="indefinite" begin={`${i * 0.5}s`} /></line>); })}</g>))}</svg>);
+    default:
+      return (<svg {...svg} aria-hidden="true"><circle cx="60" cy="40" r="16" fill={a} /></svg>);
+  }
+}
+
 export default function AdminPage() {
   const [tab, setTab] = useState<Tab>("menu");
   const [authed, setAuthed] = useState(false);
@@ -786,7 +816,7 @@ function EventsPanel() {
                     <button key={t.id} className={`ev-tpl-card ${editEvt.template === t.id ? "active" : ""}`}
                       style={{ background: t.colors.bg }}
                       onClick={() => setEditEvt({ ...editEvt, template: t.id, custom_colors: t.colors })}>
-                      <span className="ev-tpl-dot" style={{ background: t.colors.accent }} />
+                      <span className="ev-tpl-preview"><EvTemplatePreview id={t.id} accent={t.colors.accent} /></span>
                       <span className="ev-tpl-label">{t.label}</span>
                       {editEvt.template === t.id && <span className="ev-tpl-check" style={{ color: t.colors.accent }}>✓</span>}
                     </button>
@@ -1640,6 +1670,11 @@ function MessagesPanel({ compose, onComposeUsed }: { compose?: { email: string; 
     await supabase.from("contact_messages").update({ is_read: true }).eq("email", email);
     load(true);
   };
+  // Auto-odczyt: gdy otwarty wątek ma nieprzeczytane (też po nadejściu nowej wiadomości na żywo)
+  useEffect(() => {
+    if (activeThread?.email && activeThread.unread) markThreadRead(activeThread.email);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeThread?.email, activeThread?.unread]);
 
   const sendReply = async (raw?: string) => {
     const replyIt = (typeof raw === "string" ? raw : draft).trim();
@@ -2878,7 +2913,7 @@ function AdminStyles() {
       .amsg-conv-head strong { color:#fff; font-size:15px; display:block; }
       .amsg-conv-meta { color:rgba(255,255,255,0.45); font-size:12px; }
       .amsg-bubbles { flex:1; overflow-y:auto; padding:18px; display:flex; flex-direction:column; gap:10px; }
-      .amsg-bubble { max-width:75%; padding:10px 14px; border-radius:16px; font-size:14px; line-height:1.4; }
+      .amsg-bubble { max-width:75%; padding:11px 15px; border-radius:16px; font-size:14px; line-height:1.45; overflow-wrap:anywhere; word-break:break-word; white-space:pre-wrap; box-shadow:0 1px 2px rgba(0,0,0,0.15); }
       .amsg-bubble p { margin:0; }
       .amsg-in { align-self:flex-start; background:#243845; color:#fff; border-bottom-left-radius:4px; }
       .amsg-out { align-self:flex-end; background:#E8927C; color:#1a1014; border-bottom-right-radius:4px; }
@@ -3096,12 +3131,12 @@ function AdminStyles() {
       /* Siatka szablonów — 4 w rzędzie (desktop), 2x2 (telefon) */
       .ev-tpl-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin:8px 0 4px; }
       @media (max-width:600px) { .ev-tpl-grid { grid-template-columns:repeat(2,1fr); } }
-      .ev-tpl-card { position:relative; aspect-ratio:1/1.1; border-radius:16px; border:2px solid rgba(255,255,255,0.12); cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; color:#fff; padding:10px; transition:all .2s; }
-      .ev-tpl-card:hover { transform:translateY(-3px); }
+      .ev-tpl-card { position:relative; aspect-ratio:1/1.05; border-radius:16px; border:2px solid rgba(255,255,255,0.12); cursor:pointer; display:flex; flex-direction:column; align-items:stretch; justify-content:flex-end; gap:0; color:#fff; padding:0; overflow:hidden; transition:transform .2s, border-color .2s, box-shadow .2s; }
+      .ev-tpl-card:hover { transform:translateY(-3px); box-shadow:0 10px 30px rgba(0,0,0,0.4); }
       .ev-tpl-card.active { border-color:#fff; box-shadow:0 8px 28px rgba(0,0,0,0.4); }
-      .ev-tpl-dot { width:30px; height:30px; border-radius:50%; }
-      .ev-tpl-label { font-size:12px; font-weight:700; text-align:center; line-height:1.2; }
-      .ev-tpl-check { position:absolute; top:8px; right:10px; font-size:18px; font-weight:900; }
+      .ev-tpl-preview { position:absolute; inset:0; display:block; }
+      .ev-tpl-label { position:relative; z-index:2; font-size:12px; font-weight:800; text-align:center; line-height:1.2; padding:8px 6px; background:linear-gradient(180deg,transparent,rgba(0,0,0,0.55)); }
+      .ev-tpl-check { position:absolute; top:8px; right:10px; z-index:3; font-size:18px; font-weight:900; }
       .ev-social-note { font-size:12px; line-height:1.5; padding:10px 12px; border-radius:10px; background:rgba(91,184,212,0.12); border:1px solid rgba(91,184,212,0.3); margin-top:6px; opacity:0.9; }
       /* Anteprima evento */
       .ev-preview-switch { display:flex; gap:8px; margin:0 0 18px; }
