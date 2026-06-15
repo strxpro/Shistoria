@@ -136,8 +136,13 @@ function Ristorante({ t }) {
       <div className="container">
         <div className="rist-chef reveal">
           <div className="rist-chef-img">
-            <Placeholder type="dark" label="LOOP VIDEO · Vino aperto e pesce sfilettato al tavolo" style={{ width: "100%", height: "100%" }} />
-            <div className="rist-chef-play">▶</div>
+            <video
+              className="rist-chef-video"
+              src="/kuchnia-web.mp4"
+              poster="/kuchnia-poster.webp"
+              autoPlay loop muted playsInline preload="metadata"
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
           </div>
           <div className="rist-chef-text">
             <span className="eyebrow">— {t("ristorante.chefEyebrow")}</span>
