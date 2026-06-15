@@ -597,6 +597,41 @@ function MenuPanel() {
 }
 
 // ─── Events Panel ─────────────────────────────────────────────────────────────
+function ItalianCalendar({ value, onChange, accent }: { value: string; onChange: (d: string) => void; accent?: string }) {
+  const months = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
+  const wd = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"];
+  const sel = value ? new Date(value + "T00:00:00") : null;
+  const [view, setView] = useState(() => { const b = sel || new Date(); return new Date(b.getFullYear(), b.getMonth(), 1); });
+  const y = view.getFullYear(), m = view.getMonth();
+  const startDow = (new Date(y, m, 1).getDay() + 6) % 7;
+  const dim = new Date(y, m + 1, 0).getDate();
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < startDow; i++) cells.push(null);
+  for (let d = 1; d <= dim; d++) cells.push(d);
+  const fmt = (d: number) => `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+  return (
+    <div className="ev-cal">
+      <div className="ev-cal-head">
+        <button type="button" onClick={() => setView(new Date(y, m - 1, 1))} aria-label="Mese precedente">‹</button>
+        <span>{months[m]} {y}</span>
+        <button type="button" onClick={() => setView(new Date(y, m + 1, 1))} aria-label="Mese successivo">›</button>
+      </div>
+      <div className="ev-cal-wd">{wd.map((d) => <span key={d}>{d}</span>)}</div>
+      <div className="ev-cal-grid">
+        {cells.map((d, i) => {
+          if (d === null) return <span key={i} />;
+          const ds = fmt(d); const isSel = value === ds; const dt = new Date(y, m, d); const isToday = dt.getTime() === today.getTime();
+          return (
+            <button type="button" key={i} className={`ev-cal-day ${isSel ? "sel" : ""} ${isToday ? "today" : ""}`}
+              style={isSel && accent ? { background: accent, borderColor: accent } : undefined} onClick={() => onChange(ds)}>{d}</button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function EventsPanel() {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -739,7 +774,7 @@ function EventsPanel() {
                   <label>Titolo</label>
                   <input value={editEvt.title} onChange={(e) => setEditEvt({ ...editEvt, title: e.target.value })} placeholder="Nome dell'evento" />
                   <label>Data</label>
-                  <input type="date" value={editEvt.event_date} onChange={(e) => setEditEvt({ ...editEvt, event_date: e.target.value })} />
+                  <ItalianCalendar value={editEvt.event_date} onChange={(d) => setEditEvt({ ...editEvt, event_date: d })} accent={editEvt.custom_colors?.accent} />
                   <label>Tag</label>
                   <input value={editEvt.tag || ""} onChange={(e) => setEditEvt({ ...editEvt, tag: e.target.value })} placeholder="es. Live Music, Degustazione..." />
                   <label>Generi musicali (opzionale)</label>
@@ -2487,6 +2522,20 @@ function AdminStyles() {
       .ev-social.on.ev-social-fb { background:#1877f2; border-color:transparent; color:#fff; }
       .ev-social.on.ev-social-story { background:linear-gradient(45deg,#feda75,#fa7e1e,#d62976,#962fbf); border-color:transparent; color:#fff; }
       .admin-theme-light .ev-genre, .admin-theme-light .ev-social { color:#15202b; }
+      /* Własny kalendarz po włosku (data eventu) */
+      .ev-cal { background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:12px; margin-bottom:14px; }
+      .ev-cal-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+      .ev-cal-head span { font-weight:800; font-size:15px; text-transform:capitalize; }
+      .ev-cal-head button { width:32px; height:32px; border-radius:9px; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); color:inherit; font-size:18px; cursor:pointer; }
+      .ev-cal-wd { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-bottom:4px; }
+      .ev-cal-wd span { text-align:center; font-size:10px; font-weight:700; opacity:0.5; text-transform:uppercase; }
+      .ev-cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+      .ev-cal-day { aspect-ratio:1; border-radius:9px; border:1px solid transparent; background:rgba(255,255,255,0.05); color:inherit; font-size:13px; cursor:pointer; transition:all .15s; }
+      .ev-cal-day:hover { background:rgba(255,255,255,0.14); }
+      .ev-cal-day.today { border-color:rgba(255,255,255,0.4); font-weight:800; }
+      .ev-cal-day.sel { background:var(--c-coral,#E8927C); border-color:transparent; color:#fff; font-weight:800; }
+      .admin-theme-light .ev-cal { background:#f6f8fb; border-color:rgba(0,0,0,0.08); }
+      .admin-theme-light .ev-cal-day { background:rgba(0,0,0,0.04); }
 
       /* ── Ospiti: węższe karty w siatce ── */
       .ospiti-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px; }
