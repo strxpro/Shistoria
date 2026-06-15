@@ -8191,7 +8191,7 @@ function CocktailStyles() {
         .cx-cc-popout-left.has-photo { min-height:62vh; }
         .cx-cc-popout-right { max-height:92vh; overflow-y:auto; touch-action:pan-y; }
         .cx-cc-right-thumb { display:block; width:100%; border:none; padding:0; background:none; cursor:pointer; }
-        .cx-cc-right-thumb img { width:100%; height:130px; object-fit:cover; border-radius:14px; display:block; }
+        .cx-cc-right-thumb img { width:100%; height:200px; object-fit:cover; border-radius:14px; display:block; }
         .cx-cc-popout-close { position:fixed; top:max(14px, env(safe-area-inset-top)); right:14px; }
       }
 
