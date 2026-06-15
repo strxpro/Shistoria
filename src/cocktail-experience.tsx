@@ -5721,8 +5721,8 @@ function DbDrinkCard({ d }: { d: any }) {
 
       {popout && typeof document !== "undefined" && createPortal(
         <div className="cx-cc-popout-overlay" onClick={() => setPopout(false)}>
-          <button className="cx-cc-popout-close cx-cc-popout-close-fixed" onClick={() => setPopout(false)} aria-label="Chiudi">×</button>
           <div className="cx-cc-popout" onClick={(e) => e.stopPropagation()}>
+            <button className="cx-cc-popout-close cx-cc-popout-close-incard" onClick={() => setPopout(false)} aria-label="Chiudi">×</button>
             <div className={`cx-cc-popout-left ${d.photo_url ? "has-photo" : ""}`} onClick={d.photo_url ? popHeart : undefined}>
               {d.photo_url ? <img src={d.photo_url} alt={d.name} /> : <div style={{ fontSize: 60 }}>🍸</div>}
               {hearts.map((h) => (
@@ -7608,6 +7608,7 @@ function CocktailStyles() {
         border-radius:34px; padding:clamp(26px,4vw,42px); text-align:center; border:1px solid var(--cx-stroke);
         box-shadow:0 50px 130px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.14); }
       .cx-video-step { cursor:pointer; width:100%; aspect-ratio:16/9; display:flex; align-items:center; justify-content:center; position:relative; }
+      .cx-popout-inner:has(.cx-video-step) { padding:0 !important; border:none !important; background:none !important; box-shadow:none !important; }
       .cx-shake-video { width:100%; height:100%; object-fit:cover; border-radius:20px; background:#0c1a24; display:block; }
       .cx-video-skip { position:absolute; bottom:12px; right:14px; z-index:3; font-size:12px; font-weight:700; color:#fff; cursor:pointer;
         background:rgba(0,0,0,0.5); padding:6px 12px; border-radius:999px; backdrop-filter:blur(6px); border:1px solid rgba(255,255,255,0.25); }
@@ -8083,6 +8084,9 @@ function CocktailStyles() {
       .cx-cc-popout-close:hover { background:#fff; color:#000; }
       /* Close X zawsze w rogu ekranu (poza scrollowanym popoutem, nie ucięty) */
       .cx-cc-popout-close-fixed { position:fixed; top:max(16px, env(safe-area-inset-top)); right:16px; z-index:10001; }
+      /* Close X w rogu KARTY popoutu (desktop); na telefonie fixed, by zawsze byl osiagalny */
+      .cx-cc-popout-close-incard { position:absolute; top:12px; right:12px; z-index:20; }
+      @media (max-width:768px) { .cx-cc-popout-close-incard { position:fixed; top:max(12px, env(safe-area-inset-top)); right:12px; } }
       .cx-cc-burst { position:absolute; inset:0; display:grid; place-items:center; z-index:4; pointer-events:none; font-size:80px;
         animation:ccBurst .65s cubic-bezier(.17,.89,.32,1.28); filter:drop-shadow(0 4px 14px rgba(0,0,0,0.5)); }
       @keyframes ccBurst { 0%{transform:scale(0) rotate(-15deg);opacity:0;} 35%{transform:scale(1.2) rotate(6deg);opacity:1;} 70%{transform:scale(0.95);} 100%{transform:scale(1.05);opacity:0;} }
@@ -8136,7 +8140,7 @@ function CocktailStyles() {
       .cx-cc-cmt-ig strong { color:#fff; font-weight:700; margin-right:6px; }
       .cx-cc-cmt-empty { opacity:0.55; }
       .cx-cc-cmt-row { display:flex; align-items:center; gap:8px; border-top:1px solid rgba(255,255,255,0.08); padding-top:10px; margin-top:2px; }
-      .cx-cc-cmt-input { flex:1; min-width:0; background:none; border:none; outline:none; color:#fff; font-size:13px; padding:8px 0; }
+      .cx-cc-cmt-input { flex:1; min-width:0; background:none; border:none; outline:none; color:#fff; font-size:16px; padding:8px 0; }
       .cx-cc-cmt-input::placeholder { color:rgba(255,255,255,0.38); }
       .cx-cc-cmt-send { background:none; border:none; color:rgba(232,146,124,0.45); font-weight:700; font-size:13px; cursor:pointer; padding:6px 4px; transition:color .2s; }
       .cx-cc-cmt-send.on { color:var(--cx-accent,#E8927C); }
@@ -8146,7 +8150,7 @@ function CocktailStyles() {
       /* Wyszukiwarka GIF (GIPHY) */
       .cx-gifpick { background:#0d1116; border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:10px; margin-bottom:8px; }
       .cx-gifpick-bar { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
-      .cx-gifpick-input { flex:1; min-width:0; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); border-radius:9px; color:#fff; font-size:13px; padding:8px 10px; outline:none; }
+      .cx-gifpick-input { flex:1; min-width:0; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); border-radius:9px; color:#fff; font-size:16px; padding:8px 10px; outline:none; }
       .cx-gifpick-x { width:30px; height:30px; border-radius:8px; border:1px solid rgba(255,255,255,0.18); background:transparent; color:#fff; font-size:18px; cursor:pointer; flex-shrink:0; }
       .cx-gifpick-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; max-height:240px; overflow-y:auto; }
       .cx-gifpick-item { border:none; padding:0; background:rgba(255,255,255,0.04); border-radius:8px; overflow:hidden; cursor:pointer; aspect-ratio:1; }

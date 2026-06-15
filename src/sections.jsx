@@ -172,7 +172,20 @@ function Eventi({ t }) {
     return { visible: true, scale, opacity, x, z };
   };
 
-  if (events.length === 0) return null;
+  if (events.length === 0) return (
+    <section className="eventi" id="eventi">
+      <div className="container">
+        <div className="ev-head reveal">
+          <span className="kicker">— {t("eventi.eyebrow")} · 05</span>
+          <SplitReveal as="h2" className="h2">{t("eventi.heading")}</SplitReveal>
+        </div>
+        <div className="ev-empty reveal">
+          <span className="ev-empty-ico">🗓️</span>
+          <p>{({ it: "Nessun evento in programma al momento. Torna presto — stiamo preparando qualcosa di speciale!", pl: "Brak zaplanowanych wydarzeń. Zajrzyj wkrótce — szykujemy coś specjalnego!", en: "No events scheduled right now. Check back soon — something special is coming!", de: "Aktuell keine Events geplant. Schau bald wieder vorbei — etwas Besonderes kommt!", fr: "Aucun événement prévu pour le moment. Reviens bientôt — on prépare quelque chose de spécial !", es: "No hay eventos programados por ahora. Vuelve pronto — ¡estamos preparando algo especial!" })[evLang] || "Nessun evento in programma."}</p>
+        </div>
+      </div>
+    </section>
+  );
 
   return (
     <section className="eventi" id="eventi">
@@ -329,6 +342,11 @@ function Eventi({ t }) {
         .ev-head .kicker { display: block; margin-bottom: 24px; }
         .ev-head .h2 { text-wrap:balance; word-break:keep-all; }
         .ev-intro { font-family: var(--f-serif); font-style: italic; font-size: clamp(18px, 2vw, 26px); line-height: 1.4; margin-top: 28px; max-width: 560px; color: var(--c-deep); }
+        .ev-empty { display:flex; flex-direction:column; align-items:center; gap:14px; text-align:center; padding:48px 24px; max-width:520px; margin:24px auto 0;
+          border-radius:24px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); }
+        .ev-empty-ico { font-size:46px; animation:cxFloat 3s ease-in-out infinite; }
+        .ev-empty p { font-family:var(--f-serif); font-style:italic; font-size:clamp(16px,2vw,20px); line-height:1.5; color:var(--c-deep); margin:0; }
+        @keyframes cxFloat { 0%,100%{ transform:translateY(0); } 50%{ transform:translateY(-8px); } }
 
         .ev-carousel { position:relative; display:flex; align-items:center; justify-content:center; height:min(600px, 82vh); overflow:visible; touch-action:pan-y; perspective:1000px; cursor:pointer; }
         .ev-card { position:absolute; width:min(380px, 78vw); aspect-ratio:9/16; border-radius:24px; overflow:hidden; cursor:pointer;
