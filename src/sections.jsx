@@ -166,8 +166,8 @@ function Eventi({ t }) {
     const isAdj = absDiff === 1;
     const scale = isCenter ? 1 : isAdj ? 0.85 : 0.68;
     const opacity = isCenter ? 1 : isAdj ? 0.78 : 0.4;
-    const baseShift = typeof window !== "undefined" && window.innerWidth < 768 ? 200 : 320;
-    const x = diff * (isAdj ? baseShift : baseShift * 1.7);
+    const baseShift = typeof window !== "undefined" && window.innerWidth < 768 ? 200 : Math.min(760, (typeof window !== "undefined" ? window.innerWidth : 1200) * 0.62);
+    const x = diff * (isAdj ? baseShift : baseShift * 1.6);
     const z = isCenter ? 3 : isAdj ? 2 : 1;
     return { visible: true, scale, opacity, x, z };
   };
@@ -336,6 +336,12 @@ function Eventi({ t }) {
           transition:transform .65s cubic-bezier(.22,.9,.36,1), opacity .5s ease;
           box-shadow:0 20px 60px rgba(0,0,0,0.3); will-change:transform,opacity; transform-style:preserve-3d; }
         .ev-card-active { box-shadow:0 30px 80px rgba(0,0,0,0.45); }
+        /* Desktop: szeroka karuzela pełnoekranowa (landscape), sąsiedzi podglądają z boków */
+        @media (min-width:769px) {
+          .ev-carousel { height:min(560px, 76vh); }
+          .ev-card { width:min(900px, 70vw); aspect-ratio:16/10; }
+          .ev-card-active { width:min(960px, 74vw); }
+        }
         .ev-playstop { position:absolute; bottom:14px; right:14px; z-index:20; width:38px; height:38px; border-radius:50%; border:none;
           background:rgba(0,0,0,0.5); color:#fff; font-size:12px; cursor:pointer; display:grid; place-items:center; backdrop-filter:blur(6px);
           transition:background .2s; }
