@@ -163,6 +163,26 @@ function Eventi({ t }) {
   };
   const weatherBg = weather ? WEATHER_BG[weather.key] : "";
 
+  // Ozdobny badge daty (duży dzień + miesiąc) w rogu karty eventu
+  const MONTHS = {
+    it: ["GEN","FEB","MAR","APR","MAG","GIU","LUG","AGO","SET","OTT","NOV","DIC"],
+    pl: ["STY","LUT","MAR","KWI","MAJ","CZE","LIP","SIE","WRZ","PAŹ","LIS","GRU"],
+    en: ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"],
+    de: ["JAN","FEB","MÄR","APR","MAI","JUN","JUL","AUG","SEP","OKT","NOV","DEZ"],
+    fr: ["JAN","FÉV","MAR","AVR","MAI","JUIN","JUIL","AOÛ","SEP","OCT","NOV","DÉC"],
+    es: ["ENE","FEB","MAR","ABR","MAY","JUN","JUL","AGO","SEP","OCT","NOV","DIC"],
+  };
+  const dateBadge = (rawDate) => {
+    if (!rawDate) return null;
+    const m = String(rawDate).match(/(\d{4})-(\d{2})-(\d{2})/);
+    let dt = null;
+    if (m) dt = new Date(+m[1], +m[2] - 1, +m[3]);
+    else { const d = new Date(rawDate); if (!isNaN(d)) dt = d; }
+    if (!dt) return null;
+    const mon = (MONTHS[evLang] || MONTHS.it)[dt.getMonth()];
+    return { day: dt.getDate(), mon };
+  };
+
   useEffectE(() => {
     let ch;
     const load = async () => {
@@ -320,6 +340,9 @@ function Eventi({ t }) {
                 <div className="ev-card-bg" style={{ background: e.custom_colors?.bg || (e.phType === "food" ? "#2d1b0e" : e.phType === "sea" ? "#0e2840" : "#1a1040") }}>
                   {e.image_url && <img src={e.image_url} alt="" style={{ width:"100%", height:"100%", objectFit:"cover", opacity:0.7 }} />}
                 </div>
+                {(() => { const b = dateBadge(e.event_date || e.date); return b ? (
+                  <div className="ev-date-badge"><span className="ev-date-badge-day">{b.day}</span><span className="ev-date-badge-mon">{b.mon}</span></div>
+                ) : null; })()}
                 <div className="ev-card-content">
                   <span className="ev-card-tag">{e.tag || "Evento"}</span>
                   <h4 className="ev-card-title">{e.title}</h4>
@@ -369,6 +392,9 @@ function Eventi({ t }) {
             <div className="ev-full-img" style={{ background: eventPopout.custom_colors?.bg || (eventPopout.phType === "food" ? "#2d1b0e" : eventPopout.phType === "sea" ? "#0e2840" : "#1a1040") }}>
               {eventPopout.image_url && <img src={eventPopout.image_url} alt={eventPopout.title} />}
               <span className="ev-card-tag ev-full-tag">{eventPopout.tag || "Evento"}</span>
+              {(() => { const b = dateBadge(eventPopout.event_date || eventPopout.date); return b ? (
+                <div className="ev-date-badge ev-date-badge-lg"><span className="ev-date-badge-day">{b.day}</span><span className="ev-date-badge-mon">{b.mon}</span></div>
+              ) : null; })()}
             </div>
             <div className="ev-full-body">
               <span className="ev-full-date">{eventPopout.event_date || eventPopout.date || ""}</span>
@@ -451,6 +477,18 @@ function Eventi({ t }) {
         @keyframes evWxShake { 0%,100% { transform: translateY(0); } 25% { transform: translateY(1px); } 75% { transform: translateY(-1px); } }
         .ev-card-weather { display:inline-flex; align-items:center; gap:4px; margin-left:10px; font-size:11px; opacity:.8; vertical-align:middle; }
         .ev-full-weather { margin:6px 0 0; display:flex; }
+        /* Ozdobny badge daty — duży dzień + miesiąc, w prawym górnym rogu karty */
+        .ev-date-badge { position:absolute; top:14px; right:14px; z-index:4; display:flex; flex-direction:column; align-items:center; justify-content:center;
+          width:62px; height:66px; border-radius:16px; background:rgba(20,16,28,0.55); backdrop-filter:blur(10px);
+          border:1px solid rgba(255,255,255,0.22); box-shadow:0 8px 24px rgba(0,0,0,0.35); color:#fff; line-height:1;
+          animation: evDateIn .6s cubic-bezier(.2,.8,.2,1) both; }
+        .ev-date-badge::before { content:""; position:absolute; top:-1px; left:50%; transform:translateX(-50%); width:26px; height:4px; border-radius:0 0 6px 6px; background:var(--c-coral,#E8927C); }
+        @keyframes evDateIn { from { opacity:0; transform: translateY(-8px) scale(.9); } to { opacity:1; transform:none; } }
+        .ev-date-badge-day { font-family:var(--f-display); font-weight:800; font-size:30px; letter-spacing:-1px; }
+        .ev-date-badge-mon { font-size:11px; font-weight:700; letter-spacing:2px; opacity:.85; margin-top:3px; }
+        .ev-date-badge-lg { width:82px; height:88px; border-radius:20px; top:20px; right:auto; left:20px; }
+        .ev-date-badge-lg .ev-date-badge-day { font-size:42px; }
+        .ev-date-badge-lg .ev-date-badge-mon { font-size:13px; }
         @media (max-width:768px){ .ev-weather-loc { display:none; } .ev-weather { font-size:12px; padding:6px 12px; } }
         .ev-head { max-width: 720px; margin-bottom: 64px; text-wrap:balance; }
         .ev-head .kicker { display: block; margin-bottom: 24px; }

@@ -177,6 +177,9 @@ CREATE TABLE IF NOT EXISTS reviews (
 
 -- Jeśli tabela już istnieje (migracja): dodaj kolumnę photo_url
 ALTER TABLE reviews ADD COLUMN IF NOT EXISTS photo_url text;
+-- Dedup importu recenzji zewnętrznych (Google): unikalne ext_id
+ALTER TABLE reviews ADD COLUMN IF NOT EXISTS ext_id text;
+CREATE UNIQUE INDEX IF NOT EXISTS reviews_ext_id_uniq ON reviews (ext_id) WHERE ext_id IS NOT NULL;
 
 ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Public read approved reviews" ON reviews FOR SELECT USING (is_approved = true);
