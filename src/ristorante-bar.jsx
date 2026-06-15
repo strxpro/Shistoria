@@ -96,8 +96,11 @@ function buildDishIngredients() {
 
 function Ristorante({ t }) {
   const dishIngredients = useStateR(() => buildDishIngredients())[0];
+  const lang = (typeof window !== "undefined" && window.currentLanguage) || "it";
   const fallback = Array.isArray(t("ristorante.ingredientsList")) ? t("ristorante.ingredientsList") : window.INGREDIENTS;
-  const ingredients = dishIngredients && dishIngredients.length > 6 ? dishIngredients : fallback;
+  // Składniki z opisów dań są po włosku — używamy ich TYLKO dla wersji włoskiej.
+  // W innych językach: przetłumaczona lista z data.js (ristorante.ingredientsList).
+  const ingredients = (lang === "it" && dishIngredients && dishIngredients.length > 6) ? dishIngredients : fallback;
   // G1: prawdziwy ScrollReveal z importu — wcześniej window.ScrollReveal nigdy nie istniał,
   // więc fallback renderował GOŁY tekst (bez <p>) przyklejony do nagłówka.
 

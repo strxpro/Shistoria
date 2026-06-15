@@ -1405,7 +1405,7 @@ function Contatti({ t }) {
             </div>
             <div className="cnt-mini-map">
               <iframe
-                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3066.8!2d9.15!3d41.13!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x12d94b8c3d1c3af5%3A0x4cb4a7a1a282bf52!2sRena+Majore!5e0!3m2!1sit!2sit!4v1"
+                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3003.5575151109288!2d9.177738399999999!3d41.1660057!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x12dbe1efedcb2e3f%3A0xccb4a7eca182bf52!2sRistorante%20Bar%20S'Historia!5e0!3m2!1sit!2sit!4v1781541820887!5m2!1sit!2sit"
                 width="100%" height="100%" style={{ border: 0, borderRadius: 16 }} allowFullScreen="" loading="lazy" referrerPolicy="no-referrer-when-downgrade" title="S'Historia location"
               />
             </div>
