@@ -1089,17 +1089,25 @@ function SwipeDeleteRow({ children, onDelete }: { children: React.ReactNode; onD
   const [dx, setDx] = useState(0);
   const [removing, setRemoving] = useState(false);
   const drag = useRef({ on: false, sx: 0, moved: false });
-  const TH = 90;
+  const TH = 90; // próg usunięcia (px w lewo)
   const down = (e: React.PointerEvent) => { drag.current = { on: true, sx: e.clientX, moved: false }; };
-  const move = (e: React.PointerEvent) => { if (!drag.current.on) return; const d = e.clientX - drag.current.sx; if (Math.abs(d) > 6) drag.current.moved = true; setDx(Math.max(0, Math.min(170, d))); };
+  const move = (e: React.PointerEvent) => {
+    if (!drag.current.on) return;
+    const d = e.clientX - drag.current.sx;
+    if (Math.abs(d) > 6) drag.current.moved = true;
+    // tylko w LEWO (kosz pokazuje się z prawej); lekki opór za progiem
+    setDx(Math.min(0, Math.max(-180, d)));
+  };
   const up = () => {
     if (!drag.current.on) return; drag.current.on = false;
-    if (dx >= TH) { setRemoving(true); setTimeout(onDelete, 300); } else setDx(0);
+    if (dx <= -TH) { setRemoving(true); setTimeout(onDelete, 280); }
+    else setDx(0);
   };
+  const armed = dx <= -TH;
   return (
     <div className={`admin-swipe ${removing ? "removing" : ""}`}>
-      <div className="admin-swipe-trash"><span>🗑 Elimina</span></div>
-      <div className="admin-swipe-fg" style={{ transform: `translateX(${removing ? 480 : dx}px)`, transition: drag.current.on ? "none" : "transform .3s cubic-bezier(.2,.8,.2,1)" }}
+      <div className={`admin-swipe-trash ${armed ? "armed" : ""}`}><span>🗑 {armed ? "Rilascia" : "Elimina"}</span></div>
+      <div className="admin-swipe-fg" style={{ transform: `translateX(${removing ? -520 : dx}px)`, transition: drag.current.on ? "none" : "transform .32s cubic-bezier(.2,.85,.25,1)" }}
         onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
         {children}
       </div>
@@ -1269,7 +1277,7 @@ function OrdersPanel() {
                 </div>
                 <div className="admin-order-ingr">
                   {(o.ingredients || []).slice(0, 5).map((ing: any, i: number) => (
-                    <span key={i} className="admin-pill" style={{ background: (ing.color || "#888") + "33", color: ing.color || "#fff" }}>{ing.name}</span>
+                    <span key={i} className="admin-pill" style={{ background: (ing.color || "#888") + "22", border: `1px solid ${(ing.color || "#888")}66`, color: "#fff" }}><span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: ing.color || "#888", marginRight: 6, verticalAlign: "middle" }} />{ing.name}</span>
                   ))}
                 </div>
                 {o.status !== "completed" ? (
@@ -3141,12 +3149,14 @@ function AdminStyles() {
       .admin-qrcam video { width:100%; height:100%; object-fit:cover; display:block; }
       .admin-qrcam-frame { position:absolute; inset:18%; border:3px solid rgba(255,255,255,0.85); border-radius:18px; box-shadow:0 0 0 100vmax rgba(0,0,0,0.35); }
 
-      /* ── Swipe-w-prawo → usuń (listy admina) ── */
+      /* ── Swipe-w-lewo → usuń (listy admina); kosz pojawia się z PRAWEJ ── */
       .admin-swipe { position:relative; border-radius:14px; overflow:hidden; }
       .admin-swipe.removing { transition:opacity .3s ease, transform .3s ease; opacity:0; transform:scale(0.96); }
-      .admin-swipe-trash { position:absolute; inset:0; display:flex; align-items:center; padding-left:22px; border-radius:14px;
-        background:linear-gradient(90deg,#dc2626,#b91c1c); color:#fff; font-weight:800; letter-spacing:0.02em; }
-      .admin-swipe-fg { position:relative; z-index:2; touch-action:pan-y; }
+      .admin-swipe-trash { position:absolute; inset:0; display:flex; align-items:center; justify-content:flex-end; padding-right:22px; border-radius:14px;
+        background:linear-gradient(90deg,#b91c1c,#dc2626); color:#fff; font-weight:800; letter-spacing:0.02em; transition:filter .15s; }
+      .admin-swipe-trash.armed { filter:brightness(1.2); }
+      .admin-swipe-fg { position:relative; z-index:2; touch-action:pan-y; background:#0f1b26; border-radius:14px; }
+      .admin-theme-light .admin-swipe-fg { background:#ffffff; }
 
       /* ── Drink Clienti: notka auto-ogłoszenia, guzik usuwania w rogu, popout statystyk ── */
       .drk-auto-note { margin:-6px 0 18px; font-size:12.5px; color:rgba(255,255,255,0.6); }
