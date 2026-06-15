@@ -1399,6 +1399,17 @@ function Contatti({ t }) {
   const [submitted, setSubmitted] = useStateE(false);
   const [sending, setSending] = useStateE(false);
   const [errors, setErrors] = useStateE({});
+  const clang = (typeof window !== "undefined" && window.currentLanguage) || "it";
+  const CL = (o) => o[clang] || o.it;
+  const cT = {
+    address: CL({ it: "Indirizzo", pl: "Adres", en: "Address", de: "Adresse", fr: "Adresse", es: "Dirección" }),
+    phone: CL({ it: "Telefono", pl: "Telefon", en: "Phone", de: "Telefon", fr: "Téléphone", es: "Teléfono" }),
+    email: CL({ it: "Email", pl: "Email", en: "Email", de: "E-Mail", fr: "Email", es: "Email" }),
+    confirm24: CL({ it: "Ti scriveremo entro 24 ore per confermare.", pl: "Odpiszemy w ciągu 24 godzin, aby potwierdzić.", en: "We'll write within 24 hours to confirm.", de: "Wir melden uns innerhalb von 24 Stunden zur Bestätigung.", fr: "Nous t'écrirons sous 24 heures pour confirmer.", es: "Te escribiremos en 24 horas para confirmar." }),
+    msgPh: CL({ it: "Allergie, occasione speciale, richieste...", pl: "Alergie, okazja specjalna, prośby...", en: "Allergies, special occasion, requests...", de: "Allergien, besonderer Anlass, Wünsche...", fr: "Allergies, occasion spéciale, demandes...", es: "Alergias, ocasión especial, peticiones..." }),
+    prefixErr: CL({ it: "Aggiungi il prefisso internazionale (es. +39, +48).", pl: "Dodaj numer kierunkowy kraju (np. +39, +48).", en: "Add the international prefix (e.g. +39, +48).", de: "Füge die Ländervorwahl hinzu (z. B. +39, +48).", fr: "Ajoute l'indicatif international (ex. +39, +48).", es: "Añade el prefijo internacional (ej. +39, +48)." }),
+    newReq: CL({ it: "Nuova richiesta", pl: "Nowa prośba", en: "New request", de: "Neue Anfrage", fr: "Nouvelle demande", es: "Nueva solicitud" }),
+  };
 
   // Godziny do wyboru (wg godzin otwarcia restauracji)
   const TIME_SLOTS = ["12:00","12:30","13:00","13:30","14:00","14:30","19:00","19:30","20:00","20:30","21:00","21:30","22:00","22:30","23:00"];
@@ -1435,6 +1446,8 @@ function Contatti({ t }) {
     if (!form.firstName) err.firstName = true;
     if (!form.lastName) err.lastName = true;
     if (!form.email || !form.email.includes("@")) err.email = true;
+    // Numer opcjonalny, ale jeśli podany — wymagany prefiks kraju (np. +39, +48)
+    if (form.phone && form.phone.trim() && !/^\+\d{1,4}[\s\d().-]{5,}$/.test(form.phone.trim())) err.phone = true;
     setErrors(err);
     if (Object.keys(err).length > 0) return;
 
@@ -1499,15 +1512,15 @@ function Contatti({ t }) {
           {/* Info */}
           <div className="cnt-info">
             <div className="cnt-info-block">
-              <span className="kicker" style={{ color: "rgba(255,255,255,0.5)" }}>Indirizzo</span>
+              <span className="kicker" style={{ color: "rgba(255,255,255,0.5)" }}>{cT.address}</span>
               <p className="cnt-info-text">{t("contatti.address")}</p>
             </div>
             <div className="cnt-info-block">
-              <span className="kicker" style={{ color: "rgba(255,255,255,0.5)" }}>Telefono</span>
+              <span className="kicker" style={{ color: "rgba(255,255,255,0.5)" }}>{cT.phone}</span>
               <a href={`tel:${t("contatti.phone")}`} className="cnt-info-link">{t("contatti.phone")}</a>
             </div>
             <div className="cnt-info-block">
-              <span className="kicker" style={{ color: "rgba(255,255,255,0.5)" }}>Email</span>
+              <span className="kicker" style={{ color: "rgba(255,255,255,0.5)" }}>{cT.email}</span>
               <a href={`mailto:${t("contatti.email")}`} className="cnt-info-link">{t("contatti.email")}</a>
             </div>
             <div className="cnt-info-block">
@@ -1528,17 +1541,18 @@ function Contatti({ t }) {
 
           {/* Form */}
           <div className="cnt-form-wrap">
-            {submitted ? (
-              <div className="cnt-success">
-                <button className="cnt-success-close" onClick={resetForm} aria-label="Chiudi">×</button>
-                <div className="cnt-success-icon">✦</div>
-                <h3>{t("contatti.success")}</h3>
-                <p>Ti scriveremo entro 24 ore per confermare.</p>
-                <button className="cnt-success-again" onClick={resetForm}>
-                  {({ it: "Nuova richiesta", pl: "Nowa prośba", en: "New request", de: "Neue Anfrage", fr: "Nouvelle demande", es: "Nueva solicitud" })[(typeof window !== "undefined" && window.currentLanguage) || "it"]}
-                </button>
-              </div>
-            ) : (
+            {submitted && typeof document !== "undefined" && createPortal(
+              <div className="cnt-success-overlay" onClick={resetForm}>
+                <div className="cnt-success" onClick={(e) => e.stopPropagation()}>
+                  <button className="cnt-success-close" onClick={resetForm} aria-label="Chiudi">×</button>
+                  <div className="cnt-success-icon">✦</div>
+                  <h3>{t("contatti.success")}</h3>
+                  <p>{cT.confirm24}</p>
+                  <button className="cnt-success-again" onClick={resetForm}>{cT.newReq}</button>
+                </div>
+              </div>,
+              document.body,
+            )}
               <form className="cnt-form" onSubmit={submit}>
                 <h3 className="cnt-form-title">{t("contatti.formTitle")}</h3>
                 <div className="cnt-form-grid">
@@ -1554,9 +1568,10 @@ function Contatti({ t }) {
                     <label>{t("contatti.fields.email")} *</label>
                     <input type="email" value={form.email} onChange={upd("email")} placeholder="mario@email.com" />
                   </div>
-                  <div className="field">
+                  <div className={`field ${errors.phone ? "err" : ""}`}>
                     <label>{t("contatti.fields.phone")}</label>
-                    <input value={form.phone} onChange={upd("phone")} placeholder="+39 ..." />
+                    <input value={form.phone} onChange={upd("phone")} placeholder="+39 ..." inputMode="tel" />
+                    {errors.phone && <span className="cnt-field-err">{cT.prefixErr}</span>}
                   </div>
                   <div className="field">
                     <label>{t("contatti.fields.date")}</label>
@@ -1576,7 +1591,7 @@ function Contatti({ t }) {
                   </div>
                   <div className="field" style={{ gridColumn: "1 / -1" }}>
                     <label>{t("contatti.fields.message")}</label>
-                    <textarea rows={3} value={form.message} onChange={upd("message")} placeholder="Allergie, occasione speciale, richieste..." />
+                    <textarea rows={3} value={form.message} onChange={upd("message")} placeholder={cT.msgPh} />
                   </div>
                 </div>
                 <button type="submit" className={`btn cnt-submit ${sending ? "is-sending" : ""}`} disabled={sending}>
@@ -1590,7 +1605,6 @@ function Contatti({ t }) {
                   </span>
                 </button>
               </form>
-            )}
           </div>
         </div>
       </div>
@@ -1623,6 +1637,7 @@ function Contatti({ t }) {
         .cnt-form-grid { display: grid; grid-template-columns: 1fr; gap: 24px; }
         @media (min-width: 640px) { .cnt-form-grid { grid-template-columns: 1fr 1fr; } }
         .field.err input { border-bottom-color: var(--c-coral); animation: shake 0.3s; }
+        .cnt-field-err { display:block; margin-top:6px; font-size:12px; color:var(--c-coral); }
         @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
         .stepper { display: flex; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.2); }
         .cnt-select { width: 100%; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.16); border-radius: 12px; color: #fff;
@@ -1687,6 +1702,11 @@ function Contatti({ t }) {
         .cnt-dots span:nth-child(3) { animation-delay: .3s; }
         @keyframes cntBounce { 0%,80%,100% { transform: translateY(0); opacity: .5; } 40% { transform: translateY(-7px); opacity: 1; } }
         .cnt-success { position: relative; background: rgba(91,184,212,0.1); border: 1px solid var(--c-sky); border-radius: 24px; padding: 80px 40px; text-align: center; animation: cntToastIn .4s cubic-bezier(.2,.9,.3,1); }
+        /* Popout sukcesu — wyśrodkowany na ekranie (telefon i desktop), nie wychodzi poza ramkę */
+        .cnt-success-overlay { position: fixed; inset: 0; z-index: 10000; background: rgba(8,12,18,0.7); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; padding: 20px; animation: cntOvFade .25s ease; }
+        @keyframes cntOvFade { from { opacity: 0; } to { opacity: 1; } }
+        .cnt-success-overlay .cnt-success { width: min(440px, 100%); max-height: 90vh; overflow-y: auto; background: #0e1c28; box-sizing: border-box; padding: 56px 28px 40px; }
+        @media (max-width: 768px) { .cnt-success-overlay .cnt-success { padding: 48px 22px 32px; } .cnt-success-overlay .cnt-success h3 { font-size: 26px; } .cnt-success-overlay .cnt-success p { font-size: 16px; } }
         @keyframes cntToastIn { from { opacity: 0; transform: translateY(16px) scale(.97); } to { opacity: 1; transform: none; } }
         .cnt-success-close { position: absolute; top: 16px; right: 16px; width: 38px; height: 38px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.2); background: rgba(0,0,0,0.25); color: #fff; font-size: 22px; cursor: pointer; display: grid; place-items: center; transition: all .2s; }
         .cnt-success-close:hover { background: var(--c-coral); border-color: transparent; }
