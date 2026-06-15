@@ -339,7 +339,7 @@ export default function App() {
                 )}
               </div>
             </div>
-          );}}>
+          );}} autoRetry={2}>
 
             <CocktailExperience />
           </ErrorBoundary>
