@@ -2233,6 +2233,21 @@ function ReviewsPanel() {
       load();
     }
   };
+  const [selMode, setSelMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const toggleSel = (id: string) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const exitSel = () => { setSelMode(false); setSelected(new Set()); };
+  const bulkRemove = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    if (!confirm(`Eliminare ${ids.length} recensioni selezionate?`)) return;
+    await supabase.from("reviews").delete().in("id", ids);
+    exitSel(); load();
+  };
+  const bulkApprove = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    await supabase.from("reviews").update({ is_approved: true }).in("id", ids);
+    exitSel(); load();
+  };
 
   // Upload zdjęcia recenzji do bucketa "assets"
   const uploadPhoto = async (file: File) => {
@@ -2271,9 +2286,19 @@ function ReviewsPanel() {
     <div className="admin-panel">
       <header className="admin-panel-head">
         <h1>Recensioni</h1>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <span className="admin-count">{reviews.filter(r => !r.is_approved).length} in attesa</span>
           <button className="admin-btn" onClick={() => setAddOpen(true)}>+ Recensione esterna</button>
+          {selMode ? (
+            <>
+              <button className="admin-btn-ghost" onClick={() => setSelected(new Set(reviews.map((r) => r.id)))}>Seleziona tutto</button>
+              <button className="admin-btn-sm admin-btn-gold" onClick={() => bulkApprove([...selected])} disabled={selected.size === 0}>★ Approva ({selected.size})</button>
+              <button className="admin-btn admin-btn-danger" onClick={() => bulkRemove([...selected])} disabled={selected.size === 0}>🗑 ({selected.size})</button>
+              <button className="admin-btn-ghost" onClick={exitSel}>Annulla</button>
+            </>
+          ) : (
+            <button className="admin-btn-ghost" onClick={() => setSelMode(true)}>☑ Seleziona</button>
+          )}
         </div>
       </header>
 
@@ -2321,7 +2346,8 @@ function ReviewsPanel() {
       {loading ? <Skeleton /> : (
         <div className="admin-orders">
           {reviews.map((r) => (
-            <div key={r.id} className={`admin-order ${r.is_approved ? "" : ""}`}>
+            <div key={r.id} className={`admin-order ${selMode && selected.has(r.id) ? "drk-sel" : ""}`} onClick={selMode ? () => toggleSel(r.id) : undefined} style={selMode ? { cursor: "pointer" } : undefined}>
+              {selMode && <span className={`admin-drink-selcb ${selected.has(r.id) ? "on" : ""}`} style={{ position: "static", marginRight: 4 }} aria-hidden="true">{selected.has(r.id) ? "✓" : ""}</span>}
               {r.photo_url && <img src={r.photo_url} alt="" style={{ width: 56, height: 56, objectFit: "cover", borderRadius: 8, flexShrink: 0 }} />}
               <div className="admin-order-info">
                 <h4>{r.name} <span style={{ color: "#f1c40f" }}>{"★".repeat(r.stars)}</span> <span style={{ opacity: 0.5, fontSize: 12 }}>{r.source}</span></h4>
@@ -2332,10 +2358,10 @@ function ReviewsPanel() {
                 "{r.content}"
               </div>
               <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                <button className={`admin-btn-sm ${r.is_approved ? "admin-btn-gold" : ""}`} onClick={() => approve(r.id, !r.is_approved)}>
+                {!selMode && <button className={`admin-btn-sm ${r.is_approved ? "admin-btn-gold" : ""}`} onClick={() => approve(r.id, !r.is_approved)}>
                   {r.is_approved ? "★ Approvata" : "☆ Approva"}
-                </button>
-                <button className="admin-btn-sm admin-btn-danger" onClick={() => remove(r.id)}>✕</button>
+                </button>}
+                {!selMode && <button className="admin-btn-sm admin-btn-danger" onClick={() => remove(r.id)}>✕</button>}
               </div>
             </div>
           ))}
