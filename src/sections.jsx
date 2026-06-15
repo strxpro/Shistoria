@@ -1399,7 +1399,7 @@ function CustomDatePicker({ value, onChange, lang, closedDates = [] }) {
 
 // ─── Contatti ─────────────────────────────────────────────────────────────────
 function Contatti({ t }) {
-  const [form, setForm] = useStateE({ firstName: "", lastName: "", email: "", phone: "", date: "", time: "", people: 2, message: "" });
+  const [form, setForm] = useStateE({ firstName: "", lastName: "", email: "", phone: "", date: "", time: "", people: 2, message: "", waContact: false });
   const [submitted, setSubmitted] = useStateE(false);
   const [sending, setSending] = useStateE(false);
   const [errors, setErrors] = useStateE({});
@@ -1413,6 +1413,7 @@ function Contatti({ t }) {
     msgPh: CL({ it: "Allergie, occasione speciale, richieste...", pl: "Alergie, okazja specjalna, prośby...", en: "Allergies, special occasion, requests...", de: "Allergien, besonderer Anlass, Wünsche...", fr: "Allergies, occasion spéciale, demandes...", es: "Alergias, ocasión especial, peticiones..." }),
     prefixErr: CL({ it: "Aggiungi il prefisso internazionale (es. +39, +48).", pl: "Dodaj numer kierunkowy kraju (np. +39, +48).", en: "Add the international prefix (e.g. +39, +48).", de: "Füge die Ländervorwahl hinzu (z. B. +39, +48).", fr: "Ajoute l'indicatif international (ex. +39, +48).", es: "Añade el prefijo internacional (ej. +39, +48)." }),
     newReq: CL({ it: "Nuova richiesta", pl: "Nowa prośba", en: "New request", de: "Neue Anfrage", fr: "Nouvelle demande", es: "Nueva solicitud" }),
+    wa: CL({ it: "Contattami anche su WhatsApp", pl: "Skontaktuj się ze mną też przez WhatsApp", en: "Contact me also on WhatsApp", de: "Kontaktiere mich auch per WhatsApp", fr: "Contactez-moi aussi sur WhatsApp", es: "Contáctame también por WhatsApp" }),
   };
 
   // Godziny do wyboru (wg godzin otwarcia restauracji)
@@ -1494,6 +1495,28 @@ function Contatti({ t }) {
     // Krótka animacja "wypełnienia" przycisku przed pokazaniem toast
     await new Promise((r) => setTimeout(r, 700));
     try { const a = await import("./lib/analytics"); a.trackConversion(); } catch {}
+
+    // WhatsApp: jeśli zaznaczono — otwórz czat z restauracją z gotową wiadomością PO WŁOSKU (jakby pisał klient)
+    if (form.waContact) {
+      let msgIt = form.message || "";
+      if (msgIt && lang !== "it") {
+        try {
+          const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=it&dt=t&q=${encodeURIComponent(msgIt)}`);
+          const j = await r.json();
+          msgIt = (j?.[0] || []).map((s) => s[0]).join("") || form.message;
+        } catch { /* zostaw oryginał */ }
+      }
+      const lines = [
+        "Ciao! Vorrei prenotare un tavolo da S'Historia.",
+        `Nome: ${fullName}`,
+        form.date ? `Data: ${form.date}` : "",
+        form.time ? `Ora: ${form.time}` : "",
+        `Persone: ${form.people}`,
+        msgIt ? `Note: ${msgIt}` : "",
+      ].filter(Boolean);
+      try { window.open(`https://wa.me/393287648456?text=${encodeURIComponent(lines.join("\n"))}`, "_blank"); } catch {}
+    }
+
     setSending(false);
     setSubmitted(true);
   };
@@ -1597,6 +1620,14 @@ function Contatti({ t }) {
                     <label>{t("contatti.fields.message")}</label>
                     <textarea rows={3} value={form.message} onChange={upd("message")} placeholder={cT.msgPh} />
                   </div>
+                  <label className="cnt-wa-opt" style={{ gridColumn: "1 / -1" }}>
+                    <input type="checkbox" checked={form.waContact} onChange={(e) => setForm((f) => ({ ...f, waContact: e.target.checked }))} />
+                    <span className="cnt-wa-opt-box" aria-hidden="true" />
+                    <span className="cnt-wa-opt-txt">
+                      <svg viewBox="0 0 24 24" width="18" height="18" fill="#25D366" aria-hidden="true" style={{ verticalAlign: "middle", marginRight: 6 }}><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38c1.45.79 3.08 1.21 4.79 1.21 5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2zm5.52 13.99c-.25.7-1.47 1.34-2.02 1.38-.52.05-1.18.07-1.9-.12-.44-.14-1-.33-1.73-.64-3.04-1.31-5.02-4.37-5.17-4.57-.15-.2-1.24-1.64-1.24-3.13s.78-2.22 1.06-2.53c.28-.3.61-.38.81-.38l.58.01c.19.01.44-.07.69.52.25.6.85 2.07.93 2.22.07.15.12.32.02.52-.1.2-.15.32-.3.5-.15.17-.31.39-.45.52-.15.15-.3.31-.13.6.17.3.76 1.25 1.63 2.02 1.12 1 2.07 1.31 2.36 1.46.3.15.47.12.64-.07.17-.2.74-.86.94-1.16.2-.3.39-.25.66-.15.27.1 1.71.81 2 .96.3.15.5.22.57.35.07.12.07.72-.18 1.42z"/></svg>
+                      {cT.wa}
+                    </span>
+                  </label>
                 </div>
                 <button type="submit" className={`btn cnt-submit ${sending ? "is-sending" : ""}`} disabled={sending}>
                   <span className="cnt-submit-fill" aria-hidden="true" />
@@ -1642,6 +1673,12 @@ function Contatti({ t }) {
         @media (min-width: 640px) { .cnt-form-grid { grid-template-columns: 1fr 1fr; } }
         .field.err input { border-bottom-color: var(--c-coral); animation: shake 0.3s; }
         .cnt-field-err { display:block; margin-top:6px; font-size:12px; color:var(--c-coral); }
+        .cnt-wa-opt { display:flex; align-items:center; gap:10px; cursor:pointer; padding:6px 0; user-select:none; }
+        .cnt-wa-opt input { position:absolute; opacity:0; width:0; height:0; }
+        .cnt-wa-opt-box { width:22px; height:22px; flex-shrink:0; border-radius:7px; border:1px solid rgba(255,255,255,0.3); background:rgba(255,255,255,0.04); position:relative; transition:all .2s; }
+        .cnt-wa-opt input:checked + .cnt-wa-opt-box { background:#25D366; border-color:#25D366; }
+        .cnt-wa-opt input:checked + .cnt-wa-opt-box::after { content:"✓"; position:absolute; inset:0; display:grid; place-items:center; color:#fff; font-size:14px; font-weight:800; }
+        .cnt-wa-opt-txt { font-size:14px; color:rgba(255,255,255,0.85); display:inline-flex; align-items:center; }
         @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
         .stepper { display: flex; align-items: center; gap: 16px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.2); }
         .cnt-select { width: 100%; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.16); border-radius: 12px; color: #fff;
