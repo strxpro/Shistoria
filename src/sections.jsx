@@ -895,7 +895,7 @@ function Attrazioni({ t }) {
                 </button>
               );
             })}
-            <a href="https://www.google.com/maps/place/Via+Delfino,+07020+Rena+Majore+OT,+Italia" target="_blank" rel="noopener" className="btn atr-directions">
+            <a href="https://www.google.com/maps/dir/?api=1&destination=41.1660057%2C9.1777384" target="_blank" rel="noopener" className="btn atr-directions">
               ◎ {t("attrazioni.directions")} <span className="arrow">→</span>
             </a>
           </div>
@@ -916,11 +916,11 @@ function Attrazioni({ t }) {
         /* Mobile: mapa przyklejona na górze (z tłem), kategorie i lista przewijają się POD nią */
         @media (max-width: 1023px) {
           .atr-cats { position: relative; z-index: 1; margin-bottom: 16px; padding-bottom: 16px; }
-          .atr-map { position: sticky; top: 60px; z-index: 10; margin-bottom: 16px; padding: 8px 0 12px; background: var(--c-bg); }
+          .atr-map { position: sticky; top: 60px; z-index: 10; margin-bottom: 16px; padding: 8px 0 16px; background: var(--c-bg); box-shadow: 0 14px 18px -6px var(--c-bg); }
           .atr-map-bg { aspect-ratio: 16/10; box-shadow: 0 16px 40px rgba(26,61,82,0.18); background: #D8ECF3; }
-          /* lista pod mapą; ostatni element (przycisk dojazdu) ma zapas, by nie chował się pod mapę */
+          /* lista i przycisk dojazdu chowają się POD sticky mapę (mapa zasłania treść od góry) */
           .atr-list { position: relative; z-index: 4; }
-          .atr-directions { position: relative; z-index: 11; margin-top: 24px; align-self: center; }
+          .atr-directions { position: relative; z-index: 4; margin-top: 24px; align-self: center; }
         }
         .atr-map-bg { position: relative; aspect-ratio: 4/3; border-radius: 20px; overflow: hidden; background: #D8ECF3; box-shadow: 0 24px 80px rgba(26,61,82,0.12); }
         /* Leaflet map */
