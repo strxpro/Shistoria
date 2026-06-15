@@ -600,14 +600,22 @@ function EventsPanel() {
   const [step, setStep] = useState<1 | 2 | 3>(1); // 3-krokowy stepper
   const [previewMode, setPreviewMode] = useState<"mobile" | "desktop">("mobile");
   const [uploading, setUploading] = useState(false);
+  const [genreInput, setGenreInput] = useState("");
 
-  // 4 szablony (2x2 na telefonie, 4 w rzędzie na komputerze)
+  // Stonowane, „cieekawe" szablony-motywy (gradienty) — bez prostych płaskich tła
   const TEMPLATES = [
-    { id: "jazz", label: "🎵 Jazz Night", colors: { bg: "#1a1040", accent: "#9b59b6" } },
-    { id: "degustazione", label: "🍷 Degustazione", colors: { bg: "#2d1b0e", accent: "#c0392b" } },
-    { id: "cena", label: "🍽 Cena Speciale", colors: { bg: "#0d2818", accent: "#27ae60" } },
-    { id: "aperitivo", label: "🌅 Aperitivo", colors: { bg: "#1a2a3a", accent: "#f39c12" } },
+    { id: "festa", label: "Festa", colors: { bg: "linear-gradient(135deg,#2a0a3a,#6a1b9a)", accent: "#e040fb" } },
+    { id: "dj", label: "DJ Set", colors: { bg: "linear-gradient(135deg,#06121f,#0d47a1)", accent: "#00e5ff" } },
+    { id: "ospite", label: "Ospite Speciale", colors: { bg: "linear-gradient(135deg,#2a0606,#b71c1c)", accent: "#ffd54f" } },
+    { id: "live", label: "Live Music", colors: { bg: "linear-gradient(135deg,#15082e,#7b1fa2)", accent: "#ff80ab" } },
+    { id: "degustazione", label: "Degustazione", colors: { bg: "linear-gradient(135deg,#241405,#8d3a12)", accent: "#e67e22" } },
+    { id: "aperitivo", label: "Aperitivo", colors: { bg: "linear-gradient(135deg,#10202e,#b9770e)", accent: "#ffca28" } },
+    { id: "cena", label: "Cena Speciale", colors: { bg: "linear-gradient(135deg,#08231a,#1b7a44)", accent: "#2ecc71" } },
+    { id: "notte", label: "Notte / Capodanno", colors: { bg: "linear-gradient(135deg,#05060f,#283593)", accent: "#ffd700" } },
   ];
+  const GENRES = ["Pop", "Reggaeton", "Disco", "House", "Techno", "Latino", "Rock", "Jazz", "R&B", "Hip-Hop", "Commerciale", "Anni '80", "Anni '90", "Revival"];
+  const toggleGenre = (g: string) => setEditEvt((p: any) => { const cur: string[] = p.genres || []; return { ...p, genres: cur.includes(g) ? cur.filter((x) => x !== g) : [...cur, g] }; });
+  const addCustomGenre = () => { const g = genreInput.trim(); if (!g) return; setEditEvt((p: any) => ({ ...p, genres: [...new Set([...(p.genres || []), g])] })); setGenreInput(""); };
 
   const load = async () => {
     setLoading(true);
@@ -617,7 +625,7 @@ function EventsPanel() {
   };
   useEffect(() => { load(); }, []);
 
-  const openNew = () => { setEditEvt({ title: "", description: "", event_date: "", tag: "", template: "jazz", custom_colors: TEMPLATES[0].colors }); setStep(1); };
+  const openNew = () => { setEditEvt({ title: "", description: "", event_date: "", tag: "", template: "festa", custom_colors: TEMPLATES[0].colors, genres: [] }); setStep(1); };
   const openEdit = (evt: any) => { setEditEvt({ ...evt, shareInstagram: !!evt.share_instagram, shareFacebook: !!evt.share_facebook }); setStep(1); };
   const close = () => { setEditEvt(null); setStep(1); };
 
@@ -639,8 +647,11 @@ function EventsPanel() {
 
   const save = async (evt: any) => {
     // mapuj camelCase z formularza na kolumny DB + usuń pola spoza schematu
-    const { shareInstagram, shareFacebook, ...rest } = evt;
-    const payload: any = { ...rest, is_published: true, share_instagram: !!shareInstagram, share_facebook: !!shareFacebook, posted: false };
+    const { shareInstagram, shareFacebook, shareStory, genres, ...rest } = evt;
+    // Gatunki muzyki dopisujemy do tagu (bez zmiany schematu DB)
+    const baseTag = (rest.tag || "").split("·")[0].trim();
+    const tag = (genres && genres.length) ? [baseTag, genres.join(", ")].filter(Boolean).join(" · ") : baseTag;
+    const payload: any = { ...rest, tag, is_published: true, share_instagram: !!shareInstagram, share_facebook: !!shareFacebook, posted: false };
     if (evt.id) {
       await supabase.from("events").update(payload).eq("id", evt.id);
     } else {
@@ -727,15 +738,38 @@ function EventsPanel() {
                   <input type="date" value={editEvt.event_date} onChange={(e) => setEditEvt({ ...editEvt, event_date: e.target.value })} />
                   <label>Tag</label>
                   <input value={editEvt.tag || ""} onChange={(e) => setEditEvt({ ...editEvt, tag: e.target.value })} placeholder="es. Live Music, Degustazione..." />
+                  <label>Generi musicali (opzionale)</label>
+                  <div className="ev-genres">
+                    {GENRES.map((g) => (
+                      <button type="button" key={g} className={`ev-genre ${(editEvt.genres || []).includes(g) ? "on" : ""}`} onClick={() => toggleGenre(g)}>{g}</button>
+                    ))}
+                    {(editEvt.genres || []).filter((g: string) => !GENRES.includes(g)).map((g: string) => (
+                      <button type="button" key={g} className="ev-genre on" onClick={() => toggleGenre(g)}>{g} ✕</button>
+                    ))}
+                  </div>
+                  <div className="ev-genre-add">
+                    <input value={genreInput} onChange={(e) => setGenreInput(e.target.value)} placeholder="Altro genere…" onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addCustomGenre(); } }} />
+                    <button type="button" className="admin-btn-sm" onClick={addCustomGenre}>+ Aggiungi</button>
+                  </div>
                   <label>Descrizione (italiano — si traduce automaticamente)</label>
                   <textarea value={editEvt.description || ""} onChange={(e) => setEditEvt({ ...editEvt, description: e.target.value })} placeholder="Descrivi l'evento..." />
                   <label>Condividi sui social (alla pubblicazione)</label>
-                  <div className="admin-form-row" style={{ gap: 16 }}>
-                    <label><input type="checkbox" checked={editEvt.shareInstagram || false} onChange={(e) => setEditEvt({ ...editEvt, shareInstagram: e.target.checked })} /> 📸 Instagram Story</label>
-                    <label><input type="checkbox" checked={editEvt.shareFacebook || false} onChange={(e) => setEditEvt({ ...editEvt, shareFacebook: e.target.checked })} /> 📘 Facebook Post</label>
+                  <div className="ev-social-toggles">
+                    <button type="button" className={`ev-social ev-social-ig ${editEvt.shareInstagram ? "on" : ""}`} onClick={() => setEditEvt({ ...editEvt, shareInstagram: !editEvt.shareInstagram })}>
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="1" fill="currentColor" stroke="none"/></svg>
+                      Instagram
+                    </button>
+                    <button type="button" className={`ev-social ev-social-story ${editEvt.shareStory ? "on" : ""}`} onClick={() => setEditEvt({ ...editEvt, shareStory: !editEvt.shareStory })}>
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="9" strokeDasharray="4 3"/><circle cx="12" cy="12" r="4"/></svg>
+                      Story
+                    </button>
+                    <button type="button" className={`ev-social ev-social-fb ${editEvt.shareFacebook ? "on" : ""}`} onClick={() => setEditEvt({ ...editEvt, shareFacebook: !editEvt.shareFacebook })}>
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M13.5 21v-7h2.4l.4-3h-2.8V9.1c0-.9.3-1.5 1.6-1.5h1.3V4.9c-.2 0-1-.1-1.9-.1-1.9 0-3.2 1.2-3.2 3.3V11H9v3h2.3v7h2.2z"/></svg>
+                      Facebook
+                    </button>
                   </div>
-                  {(editEvt.shareInstagram || editEvt.shareFacebook) && (
-                    <p className="ev-social-note">ℹ️ Per pubblicare automaticamente su Instagram/Facebook serve la configurazione (vedi file <strong>SOCIAL_AUTOPOST.md</strong>). Al salvataggio l'evento viene segnato come "da pubblicare".</p>
+                  {(editEvt.shareInstagram || editEvt.shareFacebook || editEvt.shareStory) && (
+                    <p className="ev-social-note">Per pubblicare automaticamente serve la configurazione (vedi <strong>SOCIAL_AUTOPOST.md</strong>). Al salvataggio l'evento viene segnato come "da pubblicare".</p>
                   )}
                 </div>
                 <div className="admin-modal-actions">
@@ -761,7 +795,7 @@ function EventsPanel() {
                       <h4 className="ev-preview-title">{editEvt.title || "Titolo evento"}</h4>
                       {editEvt.event_date && <span className="ev-preview-date">{new Date(editEvt.event_date + "T00:00:00").toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" })}</span>}
                       {editEvt.description && <p className="ev-preview-desc">{editEvt.description}</p>}
-                      <button className="ev-preview-btn" style={{ borderColor: editEvt.custom_colors?.accent }}>🔔 Avvisami</button>
+                      <button className="ev-preview-btn" style={{ borderColor: editEvt.custom_colors?.accent }}>Avvisami</button>
                     </div>
                   </div>
                 </div>
@@ -2437,6 +2471,19 @@ function AdminStyles() {
       .amsg-trash.arm { background:#dc2626; color:#fff; border-color:#dc2626; animation:bellPulse 1s ease-in-out infinite; }
       .amsg-img { max-width:200px; max-height:220px; border-radius:12px; display:block; }
       .amsg-loc { display:inline-flex; align-items:center; gap:6px; padding:8px 14px; border-radius:12px; background:rgba(91,184,212,0.15); border:1px solid rgba(91,184,212,0.5); color:#9bd6ec; font-weight:700; text-decoration:none; font-size:13px; }
+      /* ── Eventi: gatunki + guziki social ── */
+      .ev-genres { display:flex; flex-wrap:wrap; gap:7px; margin-bottom:10px; }
+      .ev-genre { padding:6px 12px; border-radius:999px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.05); color:#fff; font-size:12px; font-weight:600; cursor:pointer; transition:all .15s; }
+      .ev-genre.on { background:var(--c-coral,#E8927C); border-color:transparent; }
+      .ev-genre-add { display:flex; gap:8px; margin-bottom:6px; }
+      .ev-genre-add input { flex:1; min-width:0; }
+      .ev-social-toggles { display:flex; gap:10px; flex-wrap:wrap; }
+      .ev-social { display:inline-flex; align-items:center; gap:8px; padding:10px 16px; border-radius:12px; border:2px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.05); color:rgba(255,255,255,0.7); font-weight:700; font-size:13px; cursor:pointer; transition:all .2s; }
+      .ev-social.on.ev-social-ig { background:linear-gradient(45deg,#f09433,#e6683c,#dc2743,#cc2366,#bc1888); border-color:transparent; color:#fff; }
+      .ev-social.on.ev-social-fb { background:#1877f2; border-color:transparent; color:#fff; }
+      .ev-social.on.ev-social-story { background:linear-gradient(45deg,#feda75,#fa7e1e,#d62976,#962fbf); border-color:transparent; color:#fff; }
+      .admin-theme-light .ev-genre, .admin-theme-light .ev-social { color:#15202b; }
+
       /* ── Ospiti: węższe karty w siatce ── */
       .ospiti-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px; }
       .ospiti-card { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:16px; padding:14px; cursor:pointer; display:flex; flex-direction:column; gap:10px; transition:transform .2s, border-color .2s; }
