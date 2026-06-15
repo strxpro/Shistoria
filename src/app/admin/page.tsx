@@ -702,12 +702,15 @@ function EventsPanel() {
     // Gatunki muzyki dopisujemy do tagu (bez zmiany schematu DB)
     const baseTag = (rest.tag || "").split("·")[0].trim();
     const tag = (genres && genres.length) ? [baseTag, genres.join(", ")].filter(Boolean).join(" · ") : baseTag;
-    const payload: any = { ...rest, tag, is_published: true, share_instagram: !!shareInstagram, share_facebook: !!shareFacebook, posted: false };
-    if (evt.id) {
-      await supabase.from("events").update(payload).eq("id", evt.id);
-    } else {
-      await supabase.from("events").insert(payload);
-    }
+    // event_date to kolumna typu `date` — pusty string ją wywala. Normalizuj: pusty → null, inaczej → YYYY-MM-DD
+    let ed: string | null = rest.event_date || null;
+    if (ed && !/^\d{4}-\d{2}-\d{2}$/.test(String(ed))) { const d = new Date(ed); ed = isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10); }
+    if (!rest.title || !rest.title.trim()) { alert("Inserisci il titolo dell'evento."); return; }
+    const payload: any = { ...rest, event_date: ed, tag, is_published: true, share_instagram: !!shareInstagram, share_facebook: !!shareFacebook, posted: false };
+    const res = evt.id
+      ? await supabase.from("events").update(payload).eq("id", evt.id)
+      : await supabase.from("events").insert(payload);
+    if (res.error) { alert("Errore nel salvataggio dell'evento: " + res.error.message); console.error("event save error", res.error); return; }
     close();
     load();
   };
@@ -979,10 +982,10 @@ function DrinksPanel() {
   const ranked = [...drinks].sort((a, b) => scoreOf(b) - scoreOf(a));
 
   const announceWinner_ = async () => {
-    if (ranked.length === 0) { alert("Brak drinków."); return; }
+    if (ranked.length === 0) { alert("Nessun drink."); return; }
     const winner = ranked[0];
     const label = period === "week" ? "Drink della Settimana" : "Drink del Mese";
-    if (!confirm(`Ogłosić "${winner.name}" jako ${label} i wysłać e-mail do wszystkich twórców?`)) return;
+    if (!confirm(`Proclamare "${winner.name}" come ${label} e inviare l'email a tutti i creatori?`)) return;
     await supabase.from("community_drinks").update({ is_drink_of_month: false }).neq("id", "00000000-0000-0000-0000-000000000000");
     await supabase.from("community_drinks").update({ is_drink_of_month: true }).eq("id", winner.id);
     const recipients = drinks
@@ -992,8 +995,8 @@ function DrinksPanel() {
     try {
       const { announceWinner } = await import("../../lib/make-webhooks");
       await announceWinner({ winner_drink: winner.name, winner_author: winner.author_name, winner_email: winner.author_email, winner_lang: winner.language || "it", recipients, period });
-      alert(`Ogłoszono "${winner.name}"! E-mail wysłany do ${recipients.length} twórców (+ zwycięzca osobno).`);
-    } catch (e) { console.error(e); alert("Drink oznaczony, ale e-mail nie wyszedł (sprawdź make.com)."); }
+      alert(`Proclamato "${winner.name}"! Email inviata a ${recipients.length} creatori (+ vincitore separatamente).`);
+    } catch (e) { console.error(e); alert("Drink segnato, ma l'email non è partita (controlla make.com)."); }
     load();
   };
 
@@ -1011,10 +1014,10 @@ function DrinksPanel() {
               <button key={id} className={period === id ? "active" : ""} onClick={() => setPeriod(id)}>{lbl}</button>
             ))}
           </div>
-          <button className="admin-btn" onClick={announceWinner_}>👑 Ogłoś {period === "week" ? "Drink Settimana" : "Drink Mese"}</button>
+          <button className="admin-btn" onClick={announceWinner_}>👑 Proclama {period === "week" ? "Drink della Settimana" : "Drink del Mese"}</button>
         </div>
       </header>
-      <p className="drk-auto-note">⏳ Prossima proclamazione automatica {period === "week" ? "settimanale" : "mensile"} tra <strong>{adminCountdown(period)}</strong> · puoi anche proclamare ora con 👑</p>
+      <p className="drk-auto-note">✅ La proclamazione è <strong>automatica</strong> ({period === "week" ? "ogni settimana" : "ogni mese"}) — prossima tra <strong>{adminCountdown(period)}</strong>. Non devi fare nulla; usa il pulsante 👑 solo se c'è un problema o vuoi proclamare prima.</p>
 
       {statsDrink && <DrinkStatsModal drink={statsDrink} onClose={() => setStatsDrink(null)} />}
 
