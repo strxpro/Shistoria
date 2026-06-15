@@ -1394,6 +1394,7 @@ function MessagesPanel({ compose, onComposeUsed }: { compose?: { email: string; 
   const [activeEmail, setActiveEmail] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [pendingLoc, setPendingLoc] = useState(false); // 📍 lokalizacja dodana do wiadomości (wyśle się dopiero przy „Invia")
   const [trMap, setTrMap] = useState<Record<string, string>>({});
   const [search, setSearch] = useState("");
   const [personInfo, setPersonInfo] = useState<{ msgs: number; drinks: number; orders: number; reviews: number } | null>(null);
@@ -1419,7 +1420,14 @@ function MessagesPanel({ compose, onComposeUsed }: { compose?: { email: string; 
     setUploading(false);
     if (fileRef.current) fileRef.current.value = "";
   };
-  const shareLocation = () => { if (activeThread) sendReply(MAPS_URL); };
+  const shareLocation = () => { setPendingLoc((v) => !v); };
+  // Wysyłka: najpierw tekst (jeśli jest), potem lokalizacja (jeśli dodana pigułką)
+  const handleSend = async () => {
+    if (!activeThread) return;
+    const hadText = !!draft.trim();
+    if (hadText) await sendReply();
+    if (pendingLoc) { await sendReply(MAPS_URL); setPendingLoc(false); }
+  };
 
   const load = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -1670,10 +1678,13 @@ function MessagesPanel({ compose, onComposeUsed }: { compose?: { email: string; 
                 <div className="amsg-input">
                   <input ref={fileRef} type="file" accept="image/*" hidden onChange={(e) => onPickImage(e.target.files?.[0] || null)} />
                   <button className="amsg-icon-btn" onClick={() => fileRef.current?.click()} disabled={uploading} aria-label="Foto" title="Invia foto">{uploading ? "…" : "📷"}</button>
-                  <button className="amsg-icon-btn" onClick={shareLocation} aria-label="Posizione" title="Condividi posizione">📍</button>
+                  <button className={`amsg-icon-btn ${pendingLoc ? "amsg-icon-on" : ""}`} onClick={shareLocation} aria-label="Posizione" title="Aggiungi posizione">📍</button>
+                  {pendingLoc && (
+                    <span className="amsg-loc-chip">📍 Posizione<button onClick={() => setPendingLoc(false)} aria-label="Rimuovi">✕</button></span>
+                  )}
                   <textarea value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Scrivi in italiano — verrà tradotto nella lingua del cliente..." rows={1}
-                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendReply(); } }} />
-                  <button className="amsg-send" onClick={() => sendReply()} disabled={sending || !draft.trim()} aria-label="Invia">{sending ? "…" : "➤"}</button>
+                    onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }} />
+                  <button className="amsg-send" onClick={handleSend} disabled={sending || (!draft.trim() && !pendingLoc)} aria-label="Invia">{sending ? "…" : "➤"}</button>
                 </div>
               </>
             ) : <p className="admin-empty">Seleziona una conversazione.</p>}
@@ -2690,6 +2701,10 @@ function AdminStyles() {
       .amsg-input textarea:focus { border-color:#E8927C; }
       .amsg-icon-btn { flex-shrink:0; width:42px; height:42px; border-radius:12px; border:1px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.06); color:#fff; font-size:18px; cursor:pointer; }
       .amsg-icon-btn:hover { background:rgba(255,255,255,0.14); }
+      .amsg-icon-on { background:#25D366 !important; border-color:#25D366 !important; }
+      .amsg-loc-chip { display:inline-flex; align-items:center; gap:6px; flex-shrink:0; padding:6px 10px; border-radius:999px; background:rgba(91,184,212,0.18); border:1px solid rgba(91,184,212,0.4); color:#fff; font-size:12px; font-weight:600; align-self:center; }
+      .amsg-loc-chip button { background:none; border:none; color:#fff; opacity:0.7; cursor:pointer; font-size:12px; padding:0 0 0 2px; }
+      .amsg-loc-chip button:hover { opacity:1; }
       .amsg-send { flex-shrink:0; width:44px; height:44px; border-radius:50%; border:none; background:var(--c-coral,#E8927C); color:#fff; font-size:18px; cursor:pointer; display:grid; place-items:center; transition:transform .15s, opacity .2s; }
       .amsg-send:hover { transform:scale(1.08); } .amsg-send:disabled { opacity:0.4; cursor:not-allowed; }
       .amsg-back { display:none; width:38px; height:38px; flex-shrink:0; border-radius:50%; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.06); color:#fff; font-size:18px; cursor:pointer; margin-right:6px; }
