@@ -906,6 +906,9 @@ function adminCountdown(period: "week" | "month"): string {
 function DrinkStatsModal({ drink, onClose }: { drink: any; onClose: () => void }) {
   const [comments, setComments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<null | "views" | "likes" | "comments" | "orders">(null);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [ordersLoaded, setOrdersLoaded] = useState(false);
   useEffect(() => {
     (async () => {
       try {
@@ -915,30 +918,88 @@ function DrinkStatsModal({ drink, onClose }: { drink: any; onClose: () => void }
       setLoading(false);
     })();
   }, [drink.id]);
+  useEffect(() => {
+    if (view !== "orders" || ordersLoaded) return;
+    (async () => {
+      try {
+        const { data } = await supabase.from("drink_orders").select("*").eq("drink_id", drink.id).order("created_at", { ascending: false });
+        setOrders(data || []);
+      } catch { setOrders([]); }
+      setOrdersLoaded(true);
+    })();
+  }, [view, ordersLoaded, drink.id]);
   if (typeof document === "undefined") return null;
   return createPortal(
     <div className="admin-modal-overlay" onClick={onClose}>
       <div className="admin-modal admin-modal-wide" onClick={(e) => e.stopPropagation()}>
-        <h3>{drink.name} <span style={{ opacity: 0.5, fontWeight: 400, fontSize: 14 }}>di {drink.author_name}</span></h3>
-        <div className="drk-stats-grid">
-          <div className="drk-stat"><span className="drk-stat-ico">👁</span><strong>{drink.views || 0}</strong><span>Visualizzazioni</span></div>
-          <div className="drk-stat"><span className="drk-stat-ico">♥</span><strong>{drink.likes || 0}</strong><span>Mi piace</span></div>
-          <div className="drk-stat"><span className="drk-stat-ico">💬</span><strong>{drink.comments || comments.length}</strong><span>Commenti</span></div>
-          <div className="drk-stat"><span className="drk-stat-ico">🍸</span><strong>{drink.claimed_count || 0}</strong><span>Ordini/Ritiri</span></div>
-        </div>
-        <div className="drk-stats-cmts">
-          <span className="admin-field-lbl">Commenti</span>
-          {loading ? <p className="admin-empty">…</p> : comments.length === 0 ? <p className="admin-empty">Nessun commento.</p> : comments.map((c) => (
-            <div key={c.id} className="drk-cmt-row">
-              <span className="amsg-avatar" style={{ width: 28, height: 28, fontSize: 12 }}>{(c.author || "?").charAt(0).toUpperCase()}</span>
-              <div><strong>{c.author}</strong> <span style={{ opacity: 0.8 }}>{/^https?:\/\/\S+\.(gif|webp|png|jpe?g)/i.test(c.content) ? "🖼 GIF/foto" : c.content}</span>
-                <div style={{ fontSize: 11, opacity: 0.4 }}>{new Date(c.created_at).toLocaleString("it-IT")}</div></div>
+        {view ? (
+          <>
+            <div className="drk-detail-head">
+              <button className="admin-btn-ghost drk-back" onClick={() => setView(null)}>← Indietro</button>
+              <h3 style={{ margin: 0 }}>
+                {view === "views" && "👁 Visualizzazioni"}
+                {view === "likes" && "♥ Mi piace"}
+                {view === "comments" && "💬 Commenti"}
+                {view === "orders" && "🍸 Ordini / Ritiri"}
+              </h3>
             </div>
-          ))}
-        </div>
-        <div className="admin-modal-actions">
-          <button className="admin-btn-ghost" onClick={onClose}>Chiudi</button>
-        </div>
+            {view === "comments" && (
+              <div className="drk-stats-cmts">
+                {loading ? <p className="admin-empty">…</p> : comments.length === 0 ? <p className="admin-empty">Nessun commento.</p> : comments.map((c) => (
+                  <div key={c.id} className="drk-cmt-row">
+                    <span className="amsg-avatar" style={{ width: 28, height: 28, fontSize: 12 }}>{(c.author || "?").charAt(0).toUpperCase()}</span>
+                    <div><strong>{c.author}</strong> <span style={{ opacity: 0.8 }}>{/^https?:\/\/\S+\.(gif|webp|png|jpe?g)/i.test(c.content) ? "🖼 GIF/foto" : c.content}</span>
+                      <div style={{ fontSize: 11, opacity: 0.4 }}>{new Date(c.created_at).toLocaleString("it-IT")}</div></div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {view === "orders" && (
+              <div className="drk-stats-cmts">
+                {!ordersLoaded ? <p className="admin-empty">…</p> : orders.length === 0 ? <p className="admin-empty">Nessun ordine/ritiro.</p> : orders.map((o) => (
+                  <div key={o.id} className="drk-cmt-row">
+                    <span className="amsg-avatar" style={{ width: 28, height: 28, fontSize: 12 }}>{(o.author_name || "?").charAt(0).toUpperCase()}</span>
+                    <div><strong>{o.author_name || "Anonimo"}</strong> <span style={{ opacity: 0.7 }}>{o.status === "completed" ? "✓ Completato" : "In attesa"}{o.pickup_code ? ` · ${o.pickup_code}` : ""}</span>
+                      <div style={{ fontSize: 11, opacity: 0.4 }}>{new Date(o.created_at).toLocaleString("it-IT")}</div></div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {(view === "views" || view === "likes") && (
+              <div className="drk-detail-big">
+                <div className="drk-detail-num">{view === "views" ? (drink.views || 0) : (drink.likes || 0)}</div>
+                <p className="admin-empty">{view === "views" ? "Numero totale di visualizzazioni del drink nella community." : "Numero di Mi piace ricevuti dalla community."}</p>
+              </div>
+            )}
+            <div className="admin-modal-actions">
+              <button className="admin-btn-ghost" onClick={onClose}>Chiudi</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <h3>{drink.name} <span style={{ opacity: 0.5, fontWeight: 400, fontSize: 14 }}>di {drink.author_name}</span></h3>
+            <div className="drk-stats-grid">
+              <button className="drk-stat drk-stat-btn" onClick={() => setView("views")}><span className="drk-stat-ico">👁</span><strong>{drink.views || 0}</strong><span>Visualizzazioni</span></button>
+              <button className="drk-stat drk-stat-btn" onClick={() => setView("likes")}><span className="drk-stat-ico">♥</span><strong>{drink.likes || 0}</strong><span>Mi piace</span></button>
+              <button className="drk-stat drk-stat-btn" onClick={() => setView("comments")}><span className="drk-stat-ico">💬</span><strong>{drink.comments || comments.length}</strong><span>Commenti</span></button>
+              <button className="drk-stat drk-stat-btn" onClick={() => setView("orders")}><span className="drk-stat-ico">🍸</span><strong>{drink.claimed_count || 0}</strong><span>Ordini/Ritiri</span></button>
+            </div>
+            <p className="drk-tap-hint">👆 Tocca una statistica per i dettagli</p>
+            <div className="drk-stats-cmts">
+              <span className="admin-field-lbl">Ultimi commenti</span>
+              {loading ? <p className="admin-empty">…</p> : comments.length === 0 ? <p className="admin-empty">Nessun commento.</p> : comments.slice(0, 4).map((c) => (
+                <div key={c.id} className="drk-cmt-row">
+                  <span className="amsg-avatar" style={{ width: 28, height: 28, fontSize: 12 }}>{(c.author || "?").charAt(0).toUpperCase()}</span>
+                  <div><strong>{c.author}</strong> <span style={{ opacity: 0.8 }}>{/^https?:\/\/\S+\.(gif|webp|png|jpe?g)/i.test(c.content) ? "🖼 GIF/foto" : c.content}</span>
+                    <div style={{ fontSize: 11, opacity: 0.4 }}>{new Date(c.created_at).toLocaleString("it-IT")}</div></div>
+                </div>
+              ))}
+            </div>
+            <div className="admin-modal-actions">
+              <button className="admin-btn-ghost" onClick={onClose}>Chiudi</button>
+            </div>
+          </>
+        )}
       </div>
     </div>,
     document.body,
@@ -3170,6 +3231,13 @@ function AdminStyles() {
       .drk-stat { display:flex; flex-direction:column; align-items:center; gap:2px; padding:14px 8px; border-radius:14px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); }
       .admin-theme-light .drk-stat { background:rgba(0,0,0,0.04); border-color:rgba(0,0,0,0.08); }
       .drk-stat-ico { font-size:20px; } .drk-stat strong { font-size:22px; font-weight:800; } .drk-stat span:last-child { font-size:11px; opacity:0.6; }
+      .drk-stat-btn { cursor:pointer; font-family:inherit; color:inherit; transition:all .18s; }
+      .drk-stat-btn:hover { background:rgba(232,146,124,0.16); border-color:rgba(232,146,124,0.45); transform:translateY(-2px); }
+      .drk-tap-hint { font-size:12px; opacity:0.5; text-align:center; margin:-6px 0 14px; }
+      .drk-detail-head { display:flex; align-items:center; gap:14px; margin-bottom:16px; }
+      .drk-back { padding:8px 14px !important; font-weight:700; }
+      .drk-detail-big { text-align:center; padding:24px 8px; }
+      .drk-detail-num { font-size:64px; font-weight:800; color:var(--c-coral,#E8927C); line-height:1; }
       .drk-stats-cmts { display:flex; flex-direction:column; gap:10px; max-height:40vh; overflow-y:auto; }
       .admin-field-lbl { font-size:12px; letter-spacing:0.06em; text-transform:uppercase; opacity:0.55; }
       .drk-cmt-row { display:flex; gap:10px; align-items:flex-start; font-size:13px; }
