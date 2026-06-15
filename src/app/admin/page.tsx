@@ -1192,7 +1192,7 @@ function DrinksPanel() {
 }
 
 // ─── Orders Panel ─────────────────────────────────────────────────────────────
-function SwipeDeleteRow({ children, onDelete }: { children: React.ReactNode; onDelete: () => void }) {
+function SwipeDeleteRow({ children, onDelete, onTap }: { children: React.ReactNode; onDelete: () => void; onTap?: () => void }) {
   const [dx, setDx] = useState(0);
   const [removing, setRemoving] = useState(false);
   const drag = useRef({ on: false, sx: 0, moved: false });
@@ -1208,7 +1208,7 @@ function SwipeDeleteRow({ children, onDelete }: { children: React.ReactNode; onD
   const up = () => {
     if (!drag.current.on) return; drag.current.on = false;
     if (dx <= -TH) { setRemoving(true); setTimeout(onDelete, 280); }
-    else setDx(0);
+    else { if (!drag.current.moved && dx === 0 && onTap) onTap(); setDx(0); }
   };
   const armed = dx <= -TH;
   return (
@@ -1272,6 +1272,7 @@ function OrdersPanel() {
   const [scanMsg, setScanMsg] = useState("");
   const [selMode, setSelMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [detailOrder, setDetailOrder] = useState<any>(null);
 
   const load = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -1421,9 +1422,35 @@ function OrdersPanel() {
                 </label>
               );
             }
-            return <SwipeDeleteRow key={o.id} onDelete={() => deleteOrder(o.id)}>{inner}</SwipeDeleteRow>;
+            return <SwipeDeleteRow key={o.id} onDelete={() => deleteOrder(o.id)} onTap={() => setDetailOrder(o)}>{inner}</SwipeDeleteRow>;
           })}
           {filtered.length === 0 && <p className="admin-empty">Nessun ordine in questa categoria.</p>}
+        </div>
+      )}
+
+      {detailOrder && (
+        <div className="admin-modal-overlay" onClick={() => setDetailOrder(null)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>{detailOrder.drink_name} <span style={{ opacity: 0.5, fontWeight: 400, fontSize: 14 }}>di {detailOrder.author_name}</span></h3>
+            <div className="drk-stats-grid" style={{ gridTemplateColumns: "repeat(3,1fr)" }}>
+              <div className="drk-stat"><span className="drk-stat-ico">🥤</span><strong>{detailOrder.total_ml || 0}ml</strong><span>Volume</span></div>
+              <div className="drk-stat"><span className="drk-stat-ico">💪</span><strong style={{ fontSize: 15 }}>{detailOrder.strength_label || "—"}</strong><span>Forza</span></div>
+              <div className="drk-stat"><span className="drk-stat-ico">{detailOrder.status === "completed" ? "✓" : "⏳"}</span><strong style={{ fontSize: 15 }}>{detailOrder.status === "completed" ? "Completato" : "In attesa"}</strong><span>Stato</span></div>
+            </div>
+            {detailOrder.pickup_code && <p style={{ fontSize: 14 }}>Codice ritiro: <strong style={{ letterSpacing: 2 }}>{detailOrder.pickup_code}</strong></p>}
+            <p style={{ fontSize: 13, opacity: 0.6 }}>{new Date(detailOrder.created_at).toLocaleString("it-IT")}</p>
+            <span className="admin-field-lbl">Ingredienti</span>
+            <div className="admin-drink-ingr" style={{ marginTop: 8 }}>
+              {(detailOrder.ingredients || []).map((ing: any, i: number) => (
+                <span key={i} className="admin-drink-ingr-pill"><span style={{ background: ing.color || "#888" }} />{ing.name}{ing.ml ? ` · ${ing.ml}ml` : ""}</span>
+              ))}
+            </div>
+            <div className="admin-modal-actions">
+              {detailOrder.status !== "completed" && <button className="admin-btn" onClick={() => { markDone(detailOrder.id); setDetailOrder(null); }}>✓ Segna fatto</button>}
+              <button className="admin-btn-ghost admin-btn-danger" onClick={() => { deleteOrder(detailOrder.id); setDetailOrder(null); }}>🗑 Elimina</button>
+              <button className="admin-btn-ghost" onClick={() => setDetailOrder(null)}>Chiudi</button>
+            </div>
+          </div>
         </div>
       )}
     </div>
