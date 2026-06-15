@@ -125,12 +125,20 @@ function decodeMime(s: string): string {
 
 // Wyciągnij CZYSTY tekst z surowej odpowiedzi FETCH (obsługa multipart MIME + quoted-printable + HTML)
 function extractBody(raw: string): string {
-  // 1) odetnij część przed pierwszym literalem {n}\r\n (to są dane FETCH/nagłówki IMAP)
-  let body = raw;
-  const litIdx = raw.search(/\}\r?\n/);
-  if (litIdx >= 0) body = raw.slice(litIdx + raw.slice(litIdx).indexOf("\n") + 1);
-  // utnij końcówkę odpowiedzi IMAP ") A.. OK"
-  body = body.replace(/\)\s*A\d+ OK[\s\S]*$/i, "");
+  // 1) Wyizoluj DOKŁADNIE sekcję BODY[TEXT] {N}\r\n<N bajtów> (nie literał nagłówka!)
+  let body = "";
+  const mt = raw.match(/BODY\[TEXT\][^{]*\{(\d+)\}\r?\n/i);
+  if (mt && mt.index != null) {
+    const start = mt.index + mt[0].length;
+    const n = parseInt(mt[1], 10);
+    body = raw.slice(start, start + n);
+  } else {
+    // fallback: stara heurystyka (gdy serwer nie zwraca literału {n})
+    body = raw;
+    const litIdx = raw.search(/\}\r?\n/);
+    if (litIdx >= 0) body = raw.slice(litIdx + raw.slice(litIdx).indexOf("\n") + 1);
+    body = body.replace(/\)\s*A\d+ OK[\s\S]*$/i, "");
+  }
 
   // 2) jeśli to multipart — znajdź granicę i wybierz część text/plain (albo text/html)
   const boundaryMatch = body.match(/boundary="?([^"\r\n;]+)"?/i);
@@ -145,10 +153,14 @@ function extractBody(raw: string): string {
 
   // 3) usuń nagłówki części (wszystko do pierwszej pustej linii) — zostaw samą treść
   const headerEnd = body.search(/\r?\n\r?\n/);
-  const isQP = /content-transfer-encoding:\s*quoted-printable/i.test(body.slice(0, headerEnd >= 0 ? headerEnd : 400));
-  const isB64 = /content-transfer-encoding:\s*base64/i.test(body.slice(0, headerEnd >= 0 ? headerEnd : 400));
-  const isHtml = /content-type:\s*text\/html/i.test(body.slice(0, headerEnd >= 0 ? headerEnd : 400));
-  if (headerEnd >= 0) body = body.slice(headerEnd).replace(/^\r?\n\r?\n/, "");
+  const headPeek = body.slice(0, headerEnd >= 0 ? headerEnd : 400);
+  const isQP = /content-transfer-encoding:\s*quoted-printable/i.test(headPeek);
+  const isB64 = /content-transfer-encoding:\s*base64/i.test(headPeek);
+  const isHtml = /content-type:\s*text\/html/i.test(headPeek);
+  // tnij nagłówki części TYLKO gdy faktycznie wyglądają na nagłówki MIME
+  if (headerEnd >= 0 && /^(content-type|content-transfer-encoding|content-disposition|mime-version):/im.test(headPeek)) {
+    body = body.slice(headerEnd).replace(/^\r?\n\r?\n/, "");
+  }
 
   // 4) dekodowanie
   if (isB64) {
@@ -168,7 +180,10 @@ function extractBody(raw: string): string {
       .replace(/&nbsp;/gi, " ").replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">").replace(/&#39;|&apos;/gi, "'").replace(/&quot;/gi, '"');
   }
 
-  // 6) sprzątanie: usuń pozostałe granice MIME i nadmiar białych znaków
+  // 6) ODETNIJ zacytowaną historię (oryginalny mail pod odpowiedzią)
+  body = stripQuotedReply(body);
+
+  // 7) sprzątanie: usuń pozostałe granice MIME i nadmiar białych znaków
   body = body
     .replace(/--[A-Za-z0-9'._-]{10,}--?/g, "")
     .replace(/\r/g, "")
@@ -177,6 +192,32 @@ function extractBody(raw: string): string {
     .trim();
 
   return body || "(messaggio vuoto)";
+}
+
+// Odetnij cytat oryginalnej wiadomości (linie ">" i nagłówki typu "Il ... ha scritto:")
+function stripQuotedReply(text: string): string {
+  const lines = text.split(/\n/);
+  const reSep = [
+    /^\s*On .+ wrote:/i,
+    /^\s*Il .+ ha scritto:/i,
+    /^\s*W dniu .+ napisa/i,
+    /^\s*Le .+ a écrit/i,
+    /^\s*El .+ escribió/i,
+    /^\s*Am .+ schrieb/i,
+    /^-{2,}\s*Original Message/i,
+    /^_{5,}/,
+    /^\s*Da:\s/i, /^\s*From:\s/i, /^\s*Von:\s/i, /^\s*De:\s/i, /^\s*Od:\s/i,
+  ];
+  let cut = lines.length;
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i];
+    if (reSep.some((re) => re.test(l))) { cut = i; break; }
+    // blok cytowany ">" — jeśli zaczyna się i mamy już jakiś tekst powyżej
+    if (/^\s*>/.test(l) && i > 0) { cut = i; break; }
+  }
+  const kept = lines.slice(0, cut).join("\n").trim();
+  // jeśli odcięliśmy wszystko (np. cała wiadomość była cytatem) — zwróć oryginał
+  return kept.length >= 2 ? kept : text.trim();
 }
 
 // Wykryj język tekstu (Google translate detect — darmowy endpoint). Zwraca kod 2-literowy.
