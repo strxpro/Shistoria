@@ -1238,6 +1238,8 @@ function OrdersPanel() {
   const [camOn, setCamOn] = useState(false);
   const [codeInput, setCodeInput] = useState("");
   const [scanMsg, setScanMsg] = useState("");
+  const [selMode, setSelMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const load = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -1267,6 +1269,16 @@ function OrdersPanel() {
   const deleteOrder = async (id: string) => {
     await supabase.from("drink_orders").delete().eq("id", id);
     setOrders((prev) => prev.filter((o) => o.id !== id));
+  };
+  // Tryb zaznaczania + masowe usuwanie
+  const toggleSel = (id: string) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const exitSel = () => { setSelMode(false); setSelected(new Set()); };
+  const bulkDelete = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    if (!confirm(`Eliminare ${ids.length} ordini selezionati?`)) return;
+    await supabase.from("drink_orders").delete().in("id", ids);
+    setOrders((prev) => prev.filter((o) => !ids.includes(o.id)));
+    exitSel();
   };
 
   // Odbiór przez kod (ważny 15 min)
@@ -1315,6 +1327,15 @@ function OrdersPanel() {
             ))}
           </div>
           <button className="admin-btn" onClick={() => { setScanOpen(true); setScanMsg(""); setCamOn(true); }}>📷 Scansiona / Codice</button>
+          {selMode ? (
+            <>
+              <button className="admin-btn-ghost" onClick={() => setSelected(new Set(filtered.map((o) => o.id)))}>Seleziona tutto</button>
+              <button className="admin-btn admin-btn-danger" onClick={() => bulkDelete([...selected])} disabled={selected.size === 0}>🗑 Elimina ({selected.size})</button>
+              <button className="admin-btn-ghost" onClick={exitSel}>Annulla</button>
+            </>
+          ) : (
+            <button className="admin-btn-ghost" onClick={() => setSelMode(true)}>☑ Seleziona</button>
+          )}
         </div>
       </header>
 
@@ -1341,8 +1362,8 @@ function OrdersPanel() {
 
       {loading ? <Skeleton /> : (
         <div className="admin-orders">
-          {filtered.map((o) => (
-            <SwipeDeleteRow key={o.id} onDelete={() => deleteOrder(o.id)}>
+          {filtered.map((o) => {
+            const inner = (
               <div className={`admin-order ${o.status === "completed" ? "done" : ""}`}>
                 <div className="admin-order-info">
                   <h4>{o.drink_name}</h4>
@@ -1359,8 +1380,17 @@ function OrdersPanel() {
                   <button className="admin-btn" onClick={() => markDone(o.id)}>✓ Fatto</button>
                 ) : <span className="admin-done-badge">✓ Completato</span>}
               </div>
-            </SwipeDeleteRow>
-          ))}
+            );
+            if (selMode) {
+              return (
+                <label key={o.id} className={`admin-sel-row ${selected.has(o.id) ? "sel" : ""}`}>
+                  <input type="checkbox" className="admin-sel-cb" checked={selected.has(o.id)} onChange={() => toggleSel(o.id)} />
+                  <div className="admin-sel-body">{inner}</div>
+                </label>
+              );
+            }
+            return <SwipeDeleteRow key={o.id} onDelete={() => deleteOrder(o.id)}>{inner}</SwipeDeleteRow>;
+          })}
           {filtered.length === 0 && <p className="admin-empty">Nessun ordine in questa categoria.</p>}
         </div>
       )}
@@ -2888,6 +2918,10 @@ function AdminStyles() {
       .admin-drink-actions { display:flex; gap:8px; flex-wrap:wrap; }
 
       .admin-orders { display:flex; flex-direction:column; gap:10px; }
+      .admin-sel-row { display:flex; align-items:center; gap:12px; cursor:pointer; padding:4px 6px; border-radius:14px; transition:background .15s; }
+      .admin-sel-row.sel { background:rgba(232,146,124,0.12); }
+      .admin-sel-cb { width:22px; height:22px; flex-shrink:0; accent-color:#E8927C; cursor:pointer; }
+      .admin-sel-body { flex:1; min-width:0; }
       .admin-order { padding:13px 16px; border-radius:14px; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.14); display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
       .admin-order.done { opacity:0.5; }
       .admin-order-info h4 { margin:0; font-size:15px; } .admin-order-info span { font-size:12px; opacity:0.6; display:block; }
