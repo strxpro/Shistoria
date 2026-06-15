@@ -18,6 +18,48 @@ function HeartIcon({ filled, className = "", style }) {
 import { motion } from "framer-motion";
 const { useState: useStateM, useEffect: useEffectM, useRef: useRefM, useMemo: useMemoM } = React;
 
+// ─── Auto-tłumaczenie statycznego menu (gdy brak tłumaczeń w DB) ──────────────
+// Tłumaczy nazwy/opisy dań z IT na język UI przez darmowy endpoint Google.
+// Mapowanie 1 tekst → 1 tłumaczenie (pewne), TRWAŁY cache w localStorage,
+// pula współbieżności (max 6). Gorszy przypadek = zostaje oryginał (włoski).
+const _mtMem = {}; // { `${lang}:${text}`: translated }
+async function _gTranslate(text, lang) {
+  const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=it&tl=${lang}&dt=t&q=${encodeURIComponent(text)}`);
+  const j = await r.json();
+  return (j?.[0] || []).map((s) => s[0]).join("") || text;
+}
+function useMenuAutoTr(texts, lang) {
+  const [, force] = useStateM(0);
+  const key = (texts || []).filter(Boolean).join("|");
+  useEffectM(() => {
+    if (!lang || lang === "it" || typeof window === "undefined") return;
+    let alive = true;
+    const todo = [];
+    for (const txt of (texts || [])) {
+      if (!txt) continue;
+      const k = `${lang}:${txt}`;
+      if (_mtMem[k] != null) continue;
+      try { const c = localStorage.getItem(`mt:${k}`); if (c != null) { _mtMem[k] = c; continue; } } catch {}
+      if (!todo.includes(txt)) todo.push(txt);
+    }
+    if (todo.length === 0) return;
+    let idx = 0;
+    const worker = async () => {
+      while (alive && idx < todo.length) {
+        const txt = todo[idx++];
+        try {
+          const tr = await _gTranslate(txt, lang);
+          _mtMem[`${lang}:${txt}`] = tr;
+          try { localStorage.setItem(`mt:${lang}:${txt}`, tr); } catch {}
+        } catch { _mtMem[`${lang}:${txt}`] = txt; }
+      }
+    };
+    Promise.all(Array.from({ length: 6 }, worker)).then(() => { if (alive) force((n) => n + 1); });
+    return () => { alive = false; };
+  }, [key, lang]);
+  return (txt) => (txt && lang !== "it" && _mtMem[`${lang}:${txt}`]) || txt;
+}
+
 // Legenda alergenów UE (1-14) — wielojęzyczna
 const ALLERGEN_LEGEND = {
   it: { 1:"Glutine", 2:"Crostacei", 3:"Uova", 4:"Pesce", 5:"Arachidi", 6:"Soia", 7:"Latte", 8:"Frutta a guscio", 9:"Sedano", 10:"Senape", 11:"Sesamo", 12:"Solfiti", 13:"Lupini", 14:"Molluschi" },
@@ -70,18 +112,26 @@ function MobileFullMenu() {
   // klucz pozycji = nazwa znormalizowana
   const itemKey = (it) => String(it.name || "").trim().toLowerCase();
   const getLikes = (it) => (likesMap[itemKey(it)]?.likes || 0);
-  // tłumaczenia z DB (jeśli admin zapisał) — IT zostaje oryginał
+  // Auto-tłumaczenie statycznego menu (gdy brak i18n w DB)
+  const _lg = (typeof window !== "undefined" && window.currentLanguage) || "it";
+  const _allTexts = useMemoM(() => {
+    const arr = [];
+    (window.FULL_MENU || []).forEach((c) => (c.items || []).forEach((it) => { if (it.name) arr.push(it.name); if (it.desc) arr.push(it.desc); }));
+    return arr;
+  }, []);
+  const autoTr = useMenuAutoTr(_allTexts, _lg);
+  // tłumaczenia z DB (jeśli admin zapisał) → auto-translate → IT oryginał
   const trName = (it) => {
     const lg = (typeof window !== "undefined" && window.currentLanguage) || "it";
     if (lg === "it") return it.name;
     const rec = likesMap[itemKey(it)];
-    return (rec?.name_i18n && rec.name_i18n[lg]) || it.name;
+    return (rec?.name_i18n && rec.name_i18n[lg]) || autoTr(it.name);
   };
   const trDesc = (it) => {
     const lg = (typeof window !== "undefined" && window.currentLanguage) || "it";
     if (lg === "it") return it.desc;
     const rec = likesMap[itemKey(it)];
-    return (rec?.desc_i18n && rec.desc_i18n[lg]) || it.desc;
+    return (rec?.desc_i18n && rec.desc_i18n[lg]) || autoTr(it.desc);
   };
   const isLiked = (it) => {
     const id = likesMap[itemKey(it)]?.id;
@@ -425,8 +475,9 @@ function MobileFullMenu() {
         .mfm-item { display: flex; gap: 12px; align-items: flex-start; padding: 14px 0; border-bottom: 1px solid var(--c-line); cursor: pointer; }
         .mfm-item.feat { background: rgba(245,237,224,0.5); border-radius: 12px; padding: 14px 12px; margin: 6px 0; border-bottom: 1px solid transparent; }
         /* danie najczęściej lubiane w kategorii — wyróżnione jak featured */
-        .mfm-item.top-liked { position: relative; background: linear-gradient(90deg, rgba(254,44,85,0.06), rgba(245,237,224,0.4)); border: 1px solid rgba(254,44,85,0.25); border-radius: 14px; padding: 22px 12px 14px; margin: 8px 0; border-bottom: 1px solid rgba(254,44,85,0.25); }
-        .mfm-topliked-badge { position: absolute; top: -9px; left: 12px; display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; background: #FE2C55; color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 0.02em; box-shadow: 0 4px 12px rgba(254,44,85,0.4); }
+        .mfm-list { overflow: visible; }
+        .mfm-item.top-liked { position: relative; background: linear-gradient(90deg, rgba(254,44,85,0.06), rgba(245,237,224,0.4)); border: 1px solid rgba(254,44,85,0.25); border-radius: 14px; padding: 26px 12px 14px; margin: 18px 0 10px; border-bottom: 1px solid rgba(254,44,85,0.25); overflow: visible; }
+        .mfm-topliked-badge { position: absolute; top: -11px; left: 50%; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 4px; padding: 3px 12px; border-radius: 999px; background: #FE2C55; color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; box-shadow: 0 4px 12px rgba(254,44,85,0.4); z-index: 3; }
         .mfm-topliked-badge svg { font-size: 11px; }
         .mfm-item-thumb { flex: 0 0 auto; width: 56px; height: 56px; border-radius: 12px; overflow: hidden; background: linear-gradient(135deg, var(--c-sand), #E8DDC8); display: flex; align-items: center; justify-content: center; position: relative; -webkit-user-select: none; user-select: none; }
         /* I più amati — pozioma karuzela na górze menu */
@@ -545,7 +596,11 @@ function DesktopFullMenu() {
   const itemKey = (it) => String(it.name || "").trim().toLowerCase();
   const getLikes = (it) => (likesMap[itemKey(it)]?.likes || 0);
   const isLiked = (it) => { const id = likesMap[itemKey(it)]?.id; return id ? likedSet.has(id) : false; };
-  const trName = (it) => { const lg = (typeof window !== "undefined" && window.currentLanguage) || "it"; if (lg === "it") return it.name; const r = likesMap[itemKey(it)]; return (r?.name_i18n && r.name_i18n[lg]) || it.name; };
+  const _lgD = (typeof window !== "undefined" && window.currentLanguage) || "it";
+  const _allTextsD = useMemoM(() => { const arr = []; (window.FULL_MENU || []).forEach((c) => (c.items || []).forEach((it) => { if (it.name) arr.push(it.name); if (it.desc) arr.push(it.desc); })); return arr; }, []);
+  const autoTr = useMenuAutoTr(_allTextsD, _lgD);
+  const trName = (it) => { const lg = (typeof window !== "undefined" && window.currentLanguage) || "it"; if (lg === "it") return it.name; const r = likesMap[itemKey(it)]; return (r?.name_i18n && r.name_i18n[lg]) || autoTr(it.name); };
+  const trDesc = (it) => { const lg = (typeof window !== "undefined" && window.currentLanguage) || "it"; if (lg === "it") return it.desc; const r = likesMap[itemKey(it)]; return (r?.desc_i18n && r.desc_i18n[lg]) || autoTr(it.desc); };
   const toggleLike = async (it) => {
     const k = itemKey(it); const rec = likesMap[k]; if (!rec?.id) return;
     const was = likedSet.has(rec.id); const delta = was ? -1 : 1;
@@ -783,15 +838,22 @@ function DesktopFullMenu() {
                   <span className="fmenu-cat-line" />
                 </header>
                 <ul className="fmenu-list">
-                  {cat.items.slice().sort((a, b) => getLikes(b) - getLikes(a)).map((it, i) => (
+                  {(() => {
+                    const lang = (typeof window !== "undefined" && window.currentLanguage) || "it";
+                    const sorted = cat.items.slice().sort((a, b) => getLikes(b) - getLikes(a));
+                    const topLikes = getLikes(sorted[0]);
+                    return sorted.map((it, i) => {
+                      const isTopLiked = topLikes > 0 && getLikes(it) === topLikes && i === 0;
+                      return (
                     <motion.li 
                       key={i} 
-                      className={`fmenu-row ${it.featured ? "featured" : ""}`}
+                      className={`fmenu-row ${it.featured ? "featured" : ""} ${isTopLiked ? "top-liked" : ""}`}
                       initial={{ opacity: 0, y: 15 }}
                       whileInView={{ opacity: 1, y: 0 }}
                       viewport={{ once: true, amount: 0.2 }}
                       transition={{ duration: 0.6, delay: i * 0.05, ease: "easeOut" }}
                     >
+                      {isTopLiked && <span className="fmenu-topliked-badge"><HeartIcon filled /> {({ it:"Il più amato", en:"Most loved", pl:"Najczęściej lubiane", de:"Beliebtest", fr:"Le plus aimé", es:"El más amado" })[lang] || "Il più amato"}</span>}
                       {/* Miniatura zdjęcia dania (placeholder do czasu prawdziwych zdjęć) — klik otwiera podgląd */}
                       <div className="fmenu-row-thumb"
                         onClick={(e) => { e.stopPropagation(); setDishPopout({ ...it, icon: cat.icon }); }}
@@ -813,7 +875,7 @@ function DesktopFullMenu() {
                           {it.featured && <span className="fmenu-row-star">★</span>}
                           {it.allergen && <span className="fmenu-row-allergen">({it.allergen})</span>}
                         </h4>
-                        {it.desc && <p className="fmenu-row-desc">{it.desc}</p>}
+                        {it.desc && <p className="fmenu-row-desc">{trDesc(it)}</p>}
                       </div>
                       <div className="fmenu-row-dots" />
                       <div className="fmenu-row-price">
@@ -824,7 +886,9 @@ function DesktopFullMenu() {
                         {it.note && <span className="fmenu-row-note">/ {it.note}</span>}
                       </div>
                     </motion.li>
-                  ))}
+                      );
+                    });
+                  })()}
                 </ul>
               </div>
             ))}
@@ -848,8 +912,8 @@ function DesktopFullMenu() {
               {dishPopout.img ? <img src={dishPopout.img} alt={dishPopout.name} /> : <span className="fmenu-dish-ph">{dishPopout.icon}</span>}
             </div>
             <div className="fmenu-dish-body">
-              <h3>{dishPopout.name}{dishPopout.featured && <span className="fmenu-row-star"> ★</span>}</h3>
-              {dishPopout.desc && <p className="fmenu-dish-desc">{dishPopout.desc}</p>}
+              <h3>{trName(dishPopout)}{dishPopout.featured && <span className="fmenu-row-star"> ★</span>}</h3>
+              {dishPopout.desc && <p className="fmenu-dish-desc">{trDesc(dishPopout)}</p>}
               <div className="fmenu-dish-foot">
                 <span className="fmenu-dish-price">{typeof window !== "undefined" && window.convertPrice ? window.convertPrice(dishPopout.price, window.currentLanguage) : dishPopout.price}</span>
                 {dishPopout.allergen && <span className="fmenu-dish-allergen">Allergeni: {dishPopout.allergen}</span>}
@@ -937,6 +1001,11 @@ function DesktopFullMenu() {
         .fmenu-row:last-child { border-bottom: 0; }
         .fmenu-row:hover { background: rgba(245,237,224,0.5); }
         .fmenu-row.featured { background: linear-gradient(90deg, rgba(91,184,212,0.08) 0%, transparent 100%); padding: 20px 16px; margin: 4px -16px; border-radius: 16px; border-bottom-color: transparent; grid-template-columns: 88px 1fr auto auto; }
+        /* Danie najczęściej lubiane (desktop) — pigułka „Il più amato" WYŚRODKOWANA na górze, nieucinana */
+        .fmenu-list { overflow: visible; }
+        .fmenu-row.top-liked { position: relative; background: linear-gradient(90deg, rgba(254,44,85,0.06), rgba(91,184,212,0.04)); border: 1px solid rgba(254,44,85,0.22); border-radius: 16px; padding: 28px 16px 16px; margin: 18px -16px 10px; border-bottom-color: transparent; overflow: visible; }
+        .fmenu-topliked-badge { position: absolute; top: -13px; left: 50%; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 5px; padding: 4px 14px; border-radius: 999px; background: #FE2C55; color: #fff; font-size: 11px; font-weight: 700; letter-spacing: 0.02em; white-space: nowrap; box-shadow: 0 6px 16px rgba(254,44,85,0.4); z-index: 3; }
+        .fmenu-topliked-badge svg { width: 12px; height: 12px; }
         /* Miniatura zdjęcia dania — elegancka, powiększa się na hover */
         .fmenu-row-thumb { width: 64px; height: 64px; border-radius: 14px; overflow: hidden; flex-shrink: 0; position: relative; cursor: pointer;
           background: linear-gradient(135deg, var(--c-sand) 0%, #E8DDC8 100%); display: grid; place-items: center;
