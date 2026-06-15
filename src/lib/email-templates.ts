@@ -74,6 +74,10 @@ function shell(innerHtml: string): string {
     </div>
     <!-- Footer -->
     <div style="text-align:center;padding:32px 28px;background:#0a1822;color:${BRAND.muted};font-size:12px;line-height:2;border-top:1px solid rgba(255,255,255,0.06);">
+      <a href="https://www.google.com/maps/dir/?api=1&destination=41.1660057,9.1777384" style="display:block;margin:0 auto 18px;max-width:520px;text-decoration:none;">
+        <img src="https://staticmap.openstreetmap.de/staticmap.php?center=41.1660057,9.1777384&zoom=15&size=520x200&maptype=mapnik&markers=41.1660057,9.1777384,lightblue1" alt="Mappa — S'Historia, Rena Majore" width="520" style="display:block;width:100%;max-width:520px;height:auto;border-radius:14px;border:1px solid rgba(255,255,255,0.1);" />
+        <span style="display:inline-block;margin-top:8px;color:${BRAND.coral};font-weight:600;font-size:12px;">📍 Apri indicazioni / Otwórz nawigację →</span>
+      </a>
       <a href="${BRAND.site}" style="color:${BRAND.sky};text-decoration:none;font-weight:600;letter-spacing:1px;">www.shistoria.it</a><br>
       Via Delfino · 07020 Rena Majore (OT), Sardegna<br>
       <span style="opacity:0.6;">info@shistoria.it · +39 328 764 8456</span>
