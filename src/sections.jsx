@@ -1402,6 +1402,7 @@ function Contatti({ t }) {
   const [form, setForm] = useStateE({ firstName: "", lastName: "", email: "", phone: "", date: "", time: "", people: 2, message: "", waContact: false });
   const [submitted, setSubmitted] = useStateE(false);
   const [sending, setSending] = useStateE(false);
+  const [waUrl, setWaUrl] = useStateE("");
   const [errors, setErrors] = useStateE({});
   const clang = (typeof window !== "undefined" && window.currentLanguage) || "it";
   const CL = (o) => o[clang] || o.it;
@@ -1413,7 +1414,9 @@ function Contatti({ t }) {
     msgPh: CL({ it: "Allergie, occasione speciale, richieste...", pl: "Alergie, okazja specjalna, prośby...", en: "Allergies, special occasion, requests...", de: "Allergien, besonderer Anlass, Wünsche...", fr: "Allergies, occasion spéciale, demandes...", es: "Alergias, ocasión especial, peticiones..." }),
     prefixErr: CL({ it: "Aggiungi il prefisso internazionale (es. +39, +48).", pl: "Dodaj numer kierunkowy kraju (np. +39, +48).", en: "Add the international prefix (e.g. +39, +48).", de: "Füge die Ländervorwahl hinzu (z. B. +39, +48).", fr: "Ajoute l'indicatif international (ex. +39, +48).", es: "Añade el prefijo internacional (ej. +39, +48)." }),
     newReq: CL({ it: "Nuova richiesta", pl: "Nowa prośba", en: "New request", de: "Neue Anfrage", fr: "Nouvelle demande", es: "Nueva solicitud" }),
-    wa: CL({ it: "Contattami anche su WhatsApp", pl: "Skontaktuj się ze mną też przez WhatsApp", en: "Contact me also on WhatsApp", de: "Kontaktiere mich auch per WhatsApp", fr: "Contactez-moi aussi sur WhatsApp", es: "Contáctame también por WhatsApp" }),
+    wa: CL({ it: "Preferisco il contatto via WhatsApp", pl: "Wolę kontakt przez WhatsApp", en: "I prefer contact via WhatsApp", de: "Ich bevorzuge Kontakt über WhatsApp", fr: "Je préfère le contact via WhatsApp", es: "Prefiero el contacto por WhatsApp" }),
+    waBtn: CL({ it: "Scrivici su WhatsApp", pl: "Napisz do nas na WhatsApp", en: "Message us on WhatsApp", de: "Schreib uns auf WhatsApp", fr: "Écris-nous sur WhatsApp", es: "Escríbenos por WhatsApp" }),
+    waHint: CL({ it: "Clicca per inviarci il tuo messaggio già pronto.", pl: "Kliknij, aby wysłać do nas gotową wiadomość.", en: "Click to send us your ready message.", de: "Klicke, um uns deine fertige Nachricht zu senden.", fr: "Clique pour nous envoyer ton message prêt.", es: "Haz clic para enviarnos tu mensaje listo." }),
   };
 
   // Godziny do wyboru (wg godzin otwarcia restauracji)
@@ -1496,7 +1499,8 @@ function Contatti({ t }) {
     await new Promise((r) => setTimeout(r, 700));
     try { const a = await import("./lib/analytics"); a.trackConversion(); } catch {}
 
-    // WhatsApp: jeśli zaznaczono — otwórz czat z restauracją z gotową wiadomością PO WŁOSKU (jakby pisał klient)
+    // WhatsApp: jeśli zaznaczono — przygotuj GOTOWĄ wiadomość PO WŁOSKU (naturalną, jakby pisał klient).
+    // NIE otwieramy od razu — w popoucie pojawi się przycisk „Wyślij na WhatsApp".
     if (form.waContact) {
       let msgIt = form.message || "";
       if (msgIt && lang !== "it") {
@@ -1506,15 +1510,17 @@ function Contatti({ t }) {
           msgIt = (j?.[0] || []).map((s) => s[0]).join("") || form.message;
         } catch { /* zostaw oryginał */ }
       }
-      const lines = [
-        "Ciao! Vorrei prenotare un tavolo da S'Historia.",
-        `Nome: ${fullName}`,
-        form.date ? `Data: ${form.date}` : "",
-        form.time ? `Ora: ${form.time}` : "",
-        `Persone: ${form.people}`,
-        msgIt ? `Note: ${msgIt}` : "",
-      ].filter(Boolean);
-      try { window.open(`https://wa.me/393287648456?text=${encodeURIComponent(lines.join("\n"))}`, "_blank"); } catch {}
+      // Naturalna wiadomość po włosku
+      let txt = `Ciao! Mi chiamo ${fullName}. Vorrei prenotare un tavolo per ${form.people} person${form.people === 1 ? "a" : "e"}`;
+      if (form.date) txt += ` il ${form.date}`;
+      if (form.time) txt += ` alle ${form.time}`;
+      txt += `. La mia email è ${form.email}`;
+      if (form.phone) txt += `, il mio numero è ${form.phone}`;
+      txt += ".";
+      if (msgIt) txt += ` La mia domanda: ${msgIt}`;
+      setWaUrl(`https://wa.me/393287648456?text=${encodeURIComponent(txt)}`);
+    } else {
+      setWaUrl("");
     }
 
     setSending(false);
@@ -1522,9 +1528,10 @@ function Contatti({ t }) {
   };
 
   const resetForm = () => {
-    setForm({ firstName: "", lastName: "", email: "", phone: "", date: "", time: "", people: 2, message: "" });
+    setForm({ firstName: "", lastName: "", email: "", phone: "", date: "", time: "", people: 2, message: "", waContact: false });
     setSubmitted(false);
     setErrors({});
+    setWaUrl("");
   };
 
   return (
@@ -1575,6 +1582,13 @@ function Contatti({ t }) {
                   <div className="cnt-success-icon">✦</div>
                   <h3>{t("contatti.success")}</h3>
                   <p>{cT.confirm24}</p>
+                  {waUrl && (
+                    <a className="cnt-success-wa" href={waUrl} target="_blank" rel="noopener">
+                      <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M12.04 2c-5.46 0-9.91 4.45-9.91 9.91 0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38c1.45.79 3.08 1.21 4.79 1.21 5.46 0 9.91-4.45 9.91-9.91S17.5 2 12.04 2zm0 18.15c-1.52 0-3.01-.41-4.31-1.18l-.31-.18-3.12.82.83-3.04-.2-.31a8.2 8.2 0 0 1-1.26-4.37c0-4.54 3.7-8.24 8.24-8.24 2.2 0 4.27.86 5.83 2.42a8.18 8.18 0 0 1 2.41 5.82c0 4.54-3.7 8.24-8.24 8.24zm4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.13-.16.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.12-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.01-.38.11-.51.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.43.06-.66.31-.22.25-.86.85-.86 2.07 0 1.22.89 2.4 1.01 2.56.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.68-1.18.21-.58.21-1.07.14-1.18-.06-.1-.22-.16-.47-.28z"/></svg>
+                      {cT.waBtn}
+                    </a>
+                  )}
+                  {waUrl && <p className="cnt-success-wa-hint">{cT.waHint}</p>}
                   <button className="cnt-success-again" onClick={resetForm}>{cT.newReq}</button>
                 </div>
               </div>,
@@ -1754,8 +1768,13 @@ function Contatti({ t }) {
         .cnt-success-again { margin-top: 24px; padding: 12px 26px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.25); background: transparent; color: #fff; font-family: var(--f-body); font-size: 14px; font-weight: 600; cursor: pointer; transition: all .2s; }
         .cnt-success-again:hover { background: var(--c-coral); border-color: transparent; }
         .cnt-success-icon { font-size: 64px; color: var(--c-coral); margin-bottom: 24px; }
-        .cnt-success h3 { font-family: var(--f-display); font-weight: 800; font-size: 32px; letter-spacing: -0.02em; }
-        .cnt-success p { font-family: var(--f-serif); font-style: italic; opacity: 0.7; margin-top: 8px; font-size: 18px; }
+        .cnt-success h3 { font-family: var(--f-display); font-weight: 800; font-size: 32px; letter-spacing: -0.02em; color: #fff; }
+        .cnt-success p { font-family: var(--f-serif); font-style: italic; opacity: 0.85; margin-top: 8px; font-size: 18px; color: #fff; }
+        /* Popout sukcesu — wymuś biały tekst (czytelne na telefonie) */
+        .cnt-success-overlay .cnt-success, .cnt-success-overlay .cnt-success h3, .cnt-success-overlay .cnt-success p { color: #fff !important; }
+        .cnt-success-wa { display:inline-flex; align-items:center; gap:10px; margin-top:22px; padding:14px 26px; border-radius:999px; background:#25D366; color:#fff !important; font-weight:800; font-size:15px; text-decoration:none; box-shadow:0 10px 26px rgba(37,211,102,0.4); transition:transform .15s, filter .15s; }
+        .cnt-success-wa:hover { transform:translateY(-2px); filter:brightness(1.06); }
+        .cnt-success-wa-hint { font-size:13px !important; opacity:0.7 !important; font-style:normal !important; margin-top:10px !important; }
       `}</style>
     </section>
   );
