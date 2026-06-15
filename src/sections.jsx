@@ -74,6 +74,47 @@ function IgStories() {
   );
 }
 
+// ─── Pogoda (Open-Meteo — darmowe, BEZ klucza API) ──────────────────────────────
+// Rena Majore, Sardegna ≈ 41.05N, 9.19E
+const WEATHER_COORDS = { lat: 41.053, lon: 9.187 };
+// Mapowanie kodu WMO → klucz pogody + ikona SVG inline
+const wmoToKey = (code) => {
+  if (code === 0) return "clear";
+  if (code === 1 || code === 2) return "partly";
+  if (code === 3) return "cloudy";
+  if (code >= 45 && code <= 48) return "fog";
+  if (code >= 51 && code <= 57) return "drizzle";
+  if (code >= 61 && code <= 67) return "rain";
+  if (code >= 71 && code <= 77) return "snow";
+  if (code >= 80 && code <= 82) return "rain";
+  if (code >= 85 && code <= 86) return "snow";
+  if (code >= 95) return "storm";
+  return "cloudy";
+};
+const WEATHER_TR = {
+  clear:   { it: "Sereno", pl: "Słonecznie", en: "Clear", de: "Klar", fr: "Dégagé", es: "Despejado" },
+  partly:  { it: "Poco nuvoloso", pl: "Częściowe zachmurzenie", en: "Partly cloudy", de: "Teils bewölkt", fr: "Peu nuageux", es: "Parcialmente nublado" },
+  cloudy:  { it: "Nuvoloso", pl: "Pochmurno", en: "Cloudy", de: "Bewölkt", fr: "Nuageux", es: "Nublado" },
+  fog:     { it: "Nebbia", pl: "Mgła", en: "Fog", de: "Nebel", fr: "Brouillard", es: "Niebla" },
+  drizzle: { it: "Pioviggine", pl: "Mżawka", en: "Drizzle", de: "Nieselregen", fr: "Bruine", es: "Llovizna" },
+  rain:    { it: "Pioggia", pl: "Deszcz", en: "Rain", de: "Regen", fr: "Pluie", es: "Lluvia" },
+  snow:    { it: "Neve", pl: "Śnieg", en: "Snow", de: "Schnee", fr: "Neige", es: "Nieve" },
+  storm:   { it: "Temporale", pl: "Burza", en: "Thunderstorm", de: "Gewitter", fr: "Orage", es: "Tormenta" },
+};
+// Emoji ikona pogody (lekka, działa wszędzie)
+const WEATHER_ICON = { clear: "☀️", partly: "⛅", cloudy: "☁️", fog: "🌫️", drizzle: "🌦️", rain: "🌧️", snow: "❄️", storm: "⛈️" };
+// Gradient tła sekcji dopasowany do pogody
+const WEATHER_BG = {
+  clear:   "radial-gradient(120% 80% at 80% -10%, #ffd16622, transparent 55%), radial-gradient(100% 70% at 10% 0%, #5bb8d41a, transparent 50%)",
+  partly:  "radial-gradient(120% 80% at 80% -10%, #ffd1661a, transparent 55%), radial-gradient(100% 70% at 10% 0%, #8fb6c41f, transparent 50%)",
+  cloudy:  "radial-gradient(120% 80% at 50% -10%, #8a98a81f, transparent 60%)",
+  fog:     "radial-gradient(120% 90% at 50% -10%, #b0b6bc1c, transparent 65%)",
+  drizzle: "radial-gradient(120% 80% at 30% -10%, #5b86b41f, transparent 60%)",
+  rain:    "radial-gradient(120% 80% at 30% -10%, #4a6fa52a, transparent 60%)",
+  snow:    "radial-gradient(120% 80% at 50% -10%, #cfe3f028, transparent 60%)",
+  storm:   "radial-gradient(120% 80% at 40% -10%, #5b4a8a2e, transparent 60%)",
+};
+
 // ─── Eventi ───────────────────────────────────────────────────────────────────
 function Eventi({ t }) {
   const [events, setEvents] = useStateE([]);
@@ -87,6 +128,40 @@ function Eventi({ t }) {
   const [remSent, setRemSent] = useStateE(false);
   const evLang = (typeof window !== "undefined" && window.currentLanguage) || "it";
   const remindLabel = ({ it: "Ricordamelo", pl: "Przypomnij mi", en: "Remind me", de: "Erinnere mich", fr: "Rappelle-moi", es: "Recuérdamelo" })[evLang] || "Ricordamelo";
+
+  // Pogoda — obecna + prognoza 16 dni (Open-Meteo, darmowe bez klucza)
+  const [weather, setWeather] = useStateE(null); // { key, temp }
+  const [forecast, setForecast] = useStateE({}); // { "YYYY-MM-DD": { key, tmax, tmin } }
+  useEffectE(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const u = `https://api.open-meteo.com/v1/forecast?latitude=${WEATHER_COORDS.lat}&longitude=${WEATHER_COORDS.lon}&current=temperature_2m,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=Europe%2FRome&forecast_days=16`;
+        const r = await fetch(u);
+        const j = await r.json();
+        if (!alive) return;
+        if (j.current) setWeather({ key: wmoToKey(j.current.weather_code), temp: Math.round(j.current.temperature_2m) });
+        if (j.daily?.time) {
+          const map = {};
+          j.daily.time.forEach((d, i) => {
+            map[d] = { key: wmoToKey(j.daily.weather_code[i]), tmax: Math.round(j.daily.temperature_2m_max[i]), tmin: Math.round(j.daily.temperature_2m_min[i]) };
+          });
+          setForecast(map);
+        }
+      } catch {}
+    })();
+    return () => { alive = false; };
+  }, []);
+  // Prognoza dla daty eventu (jeśli w zasięgu 16 dni). event_date może być ISO lub tekstem.
+  const forecastFor = (rawDate) => {
+    if (!rawDate || !Object.keys(forecast).length) return null;
+    let iso = "";
+    const m = String(rawDate).match(/(\d{4})-(\d{2})-(\d{2})/);
+    if (m) iso = `${m[1]}-${m[2]}-${m[3]}`;
+    else { const dt = new Date(rawDate); if (!isNaN(dt)) iso = dt.toISOString().slice(0, 10); }
+    return forecast[iso] || null;
+  };
+  const weatherBg = weather ? WEATHER_BG[weather.key] : "";
 
   useEffectE(() => {
     let ch;
@@ -188,12 +263,21 @@ function Eventi({ t }) {
   );
 
   return (
-    <section className="eventi" id="eventi">
+    <section className="eventi" id="eventi" data-weather={weather?.key || ""}>
+      {weatherBg && <div className="ev-weather-bg" style={{ background: weatherBg }} aria-hidden="true" />}
       <div className="container">
         <div className="ev-head reveal">
           <span className="kicker">— {t("eventi.eyebrow")} · 05</span>
           <SplitReveal as="h2" className="h2">{t("eventi.heading")}</SplitReveal>
           <TextClipReveal text={t("eventi.intro")} className="ev-intro" />
+          {weather && (
+            <div className={`ev-weather ev-weather-${weather.key}`} title={WEATHER_TR[weather.key]?.[evLang]}>
+              <span className="ev-weather-ico" aria-hidden="true">{WEATHER_ICON[weather.key]}</span>
+              <span className="ev-weather-temp">{weather.temp}°</span>
+              <span className="ev-weather-desc">{WEATHER_TR[weather.key]?.[evLang] || ""}</span>
+              <span className="ev-weather-loc">Rena Majore</span>
+            </div>
+          )}
         </div>
 
         {/* Relacje z Instagrama (stories) — pod nagłówkiem, nad eventami. TYMCZASOWO WYŁĄCZONE. */}
@@ -240,6 +324,11 @@ function Eventi({ t }) {
                   <span className="ev-card-tag">{e.tag || "Evento"}</span>
                   <h4 className="ev-card-title">{e.title}</h4>
                   <span className="ev-card-date">{e.event_date || e.date || ""}</span>
+                  {(() => { const f = forecastFor(e.event_date || e.date); return f ? (
+                    <span className="ev-card-weather" title={WEATHER_TR[f.key]?.[evLang]}>
+                      <span aria-hidden="true">{WEATHER_ICON[f.key]}</span> {f.tmax}°/{f.tmin}°
+                    </span>
+                  ) : null; })()}
                   {e.description && <p className="ev-card-desc">{e.description}</p>}
                   {isActive && (
                     <button className="ev-remind-btn" onClick={(ev) => { ev.stopPropagation(); setReminderEvent(e); }}>
@@ -283,6 +372,11 @@ function Eventi({ t }) {
             </div>
             <div className="ev-full-body">
               <span className="ev-full-date">{eventPopout.event_date || eventPopout.date || ""}</span>
+              {(() => { const f = forecastFor(eventPopout.event_date || eventPopout.date); return f ? (
+                <span className="ev-card-weather ev-full-weather" title={WEATHER_TR[f.key]?.[evLang]}>
+                  <span aria-hidden="true">{WEATHER_ICON[f.key]}</span> {WEATHER_TR[f.key]?.[evLang]} · {f.tmax}°/{f.tmin}°
+                </span>
+              ) : null; })()}
               <h3 className="ev-full-title">{eventPopout.title}</h3>
               {eventPopout.description && <p className="ev-full-desc">{eventPopout.description}</p>}
               <button className="ev-remind-btn ev-full-remind" onClick={() => { setEventPopout(null); setReminderEvent(eventPopout); }}>
@@ -337,7 +431,27 @@ function Eventi({ t }) {
         document.body,
       )}
       <style>{`
-        .eventi { background: var(--c-bg); padding: 120px 0; overflow:hidden; }
+        .eventi { background: var(--c-bg); padding: 120px 0; overflow:hidden; position:relative; }
+        .ev-weather-bg { position:absolute; inset:0; z-index:0; pointer-events:none; opacity:0; animation: evWxFade 1.2s ease forwards; transition: background 1.5s ease; }
+        @keyframes evWxFade { to { opacity:1; } }
+        .eventi .container { position:relative; z-index:1; }
+        /* Widget pogody */
+        .ev-weather { display:inline-flex; align-items:center; gap:8px; margin-top:18px; padding:8px 14px; border-radius:999px;
+          background: rgba(255,255,255,0.055); border:1px solid rgba(255,255,255,0.12); backdrop-filter: blur(8px);
+          font-size:13px; color:var(--c-ink); animation: evWxIn .7s cubic-bezier(.2,.8,.2,1) both; }
+        @keyframes evWxIn { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform:none; } }
+        .ev-weather-ico { font-size:18px; display:inline-block; animation: evWxFloat 4s ease-in-out infinite; }
+        @keyframes evWxFloat { 0%,100% { transform: translateY(0) rotate(0); } 50% { transform: translateY(-2px) rotate(-4deg); } }
+        .ev-weather-temp { font-weight:700; font-size:15px; }
+        .ev-weather-desc { opacity:.85; }
+        .ev-weather-loc { opacity:.5; font-size:11px; padding-left:8px; border-left:1px solid rgba(255,255,255,0.14); }
+        .ev-weather-clear .ev-weather-ico { animation: evWxSpin 18s linear infinite; }
+        @keyframes evWxSpin { to { transform: rotate(360deg); } }
+        .ev-weather-rain .ev-weather-ico, .ev-weather-drizzle .ev-weather-ico, .ev-weather-storm .ev-weather-ico { animation: evWxShake 2.2s ease-in-out infinite; }
+        @keyframes evWxShake { 0%,100% { transform: translateY(0); } 25% { transform: translateY(1px); } 75% { transform: translateY(-1px); } }
+        .ev-card-weather { display:inline-flex; align-items:center; gap:4px; margin-left:10px; font-size:11px; opacity:.8; vertical-align:middle; }
+        .ev-full-weather { margin:6px 0 0; display:flex; }
+        @media (max-width:768px){ .ev-weather-loc { display:none; } .ev-weather { font-size:12px; padding:6px 12px; } }
         .ev-head { max-width: 720px; margin-bottom: 64px; text-wrap:balance; }
         .ev-head .kicker { display: block; margin-bottom: 24px; }
         .ev-head .h2 { text-wrap:balance; word-break:keep-all; }

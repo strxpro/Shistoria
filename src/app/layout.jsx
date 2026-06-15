@@ -8,6 +8,16 @@ export const metadata = {
   },
 };
 
+// Blokada auto-zoomu na telefonie: stuknięcie w pole tekstowe / podwójne
+// stuknięcie nie powiększa już całej strony (iOS/Android). user-scalable=no.
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+};
+
 export default function RootLayout({ children }) {
   return (
     <html lang="pl">
