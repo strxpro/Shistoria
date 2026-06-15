@@ -94,6 +94,37 @@ export default function AdminPage() {
   }, []);
   const toggleTheme = () => setTheme((t) => { const n = t === "dark" ? "light" : "dark"; try { localStorage.setItem("sh-admin-theme", n); } catch {} return n; });
 
+  // Efekt głębi/parallax: ruch telefonem (deviceorientation) → CSS vars --gx/--gy.
+  // Daje wrażenie przestrzeni (tło aurora + lekki tilt kafelków). Bezpieczny: bez zgody/wsparcia po prostu nie działa.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const root = document.documentElement;
+    const onOrient = (e: DeviceOrientationEvent) => {
+      const gx = Math.max(-1, Math.min(1, (e.gamma || 0) / 35)); // lewo/prawo
+      const gy = Math.max(-1, Math.min(1, ((e.beta || 0) - 45) / 35)); // przód/tył
+      root.style.setProperty("--gx", gx.toFixed(3));
+      root.style.setProperty("--gy", gy.toFixed(3));
+    };
+    // Desktop: lekki parallax od myszy
+    const onMouse = (e: MouseEvent) => {
+      root.style.setProperty("--gx", ((e.clientX / window.innerWidth) * 2 - 1).toFixed(3));
+      root.style.setProperty("--gy", ((e.clientY / window.innerHeight) * 2 - 1).toFixed(3));
+    };
+    const start = () => {
+      const DOE: any = (window as any).DeviceOrientationEvent;
+      if (DOE && typeof DOE.requestPermission === "function") {
+        DOE.requestPermission().then((s: string) => { if (s === "granted") window.addEventListener("deviceorientation", onOrient); }).catch(() => {});
+      } else if (DOE) {
+        window.addEventListener("deviceorientation", onOrient);
+      }
+    };
+    // iOS wymaga gestu do zgody — wywołaj przy pierwszym dotknięciu
+    window.addEventListener("touchstart", start, { once: true });
+    if (window.matchMedia("(pointer:fine)").matches) window.addEventListener("mousemove", onMouse);
+    else start();
+    return () => { window.removeEventListener("deviceorientation", onOrient); window.removeEventListener("mousemove", onMouse); window.removeEventListener("touchstart", start); };
+  }, []);
+
   // Prosty PIN do admina (w produkcji zastąpić Supabase Auth)
   const checkPin = () => {
     if (pin === "shistoria2026") { setAuthed(true); setPinErr(false); }
@@ -124,6 +155,7 @@ export default function AdminPage() {
 
   return (
     <div className={`admin admin-theme-${theme}`}>
+      <div className="admin-aurora" aria-hidden="true"><span /><span /><span /></div>
       {navOpen && <div className="admin-nav-scrim" onClick={() => setNavOpen(false)} />}
       <aside className={`admin-nav ${navOpen ? "is-open" : ""}`}>
         <div className="admin-logo">
@@ -2653,6 +2685,23 @@ function AdminStyles() {
       .admin-pin-error { display:block; color:#e74c3c; font-size:13px; font-weight:600; margin:-6px 0 14px; }
 
       .admin { display:grid; grid-template-columns:260px 1fr; min-height:100vh; background:#0a0e14; color:#fff; font-family:system-ui; }
+      /* Aurora — animowane, kolorowe tło z efektem głębi (parallax od --gx/--gy) */
+      .admin-aurora { position:fixed; inset:0; z-index:0; overflow:hidden; pointer-events:none; }
+      .admin-aurora span { position:absolute; border-radius:50%; filter:blur(70px); opacity:0.5; will-change:transform; }
+      .admin-aurora span:nth-child(1) { width:480px; height:480px; top:-120px; left:-80px; background:radial-gradient(circle,#E8927C,transparent 70%);
+        transform:translate(calc(var(--gx,0)*-28px), calc(var(--gy,0)*-28px)); animation:auroraA 18s ease-in-out infinite alternate; }
+      .admin-aurora span:nth-child(2) { width:520px; height:520px; bottom:-160px; right:-100px; background:radial-gradient(circle,#5BB8D4,transparent 70%);
+        transform:translate(calc(var(--gx,0)*32px), calc(var(--gy,0)*32px)); animation:auroraB 22s ease-in-out infinite alternate; }
+      .admin-aurora span:nth-child(3) { width:380px; height:380px; top:40%; left:55%; background:radial-gradient(circle,#9b59b6,transparent 70%); opacity:0.32;
+        transform:translate(calc(var(--gx,0)*18px), calc(var(--gy,0)*18px)); animation:auroraC 26s ease-in-out infinite alternate; }
+      @keyframes auroraA { to { transform:translate(calc(var(--gx,0)*-28px + 40px), calc(var(--gy,0)*-28px + 30px)) scale(1.15); } }
+      @keyframes auroraB { to { transform:translate(calc(var(--gx,0)*32px - 30px), calc(var(--gy,0)*32px - 20px)) scale(1.1); } }
+      @keyframes auroraC { to { transform:translate(calc(var(--gx,0)*18px + 20px), calc(var(--gy,0)*18px - 30px)) scale(1.2); } }
+      .admin-theme-light .admin-aurora span { opacity:0.28; }
+      .admin-nav, .admin-main { position:relative; z-index:1; }
+      /* Lekki tilt kafelków statystyk wg ruchu (głębia) */
+      .stats-kpi, .drk-stat { transform:perspective(700px) rotateX(calc(var(--gy,0)*2deg)) rotateY(calc(var(--gx,0)*-2deg)); transition:transform .25s ease; }
+      @media (prefers-reduced-motion: reduce) { .admin-aurora span { animation:none; } .stats-kpi, .drk-stat { transform:none; } }
       .admin-nav-toggle { display:none; }
       @media (max-width:768px) {
         .admin { grid-template-columns:1fr; }
