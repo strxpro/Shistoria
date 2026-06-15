@@ -2829,9 +2829,9 @@ function AdminStyles() {
       @keyframes auroraC { to { transform:translate(calc(var(--gx,0)*18px + 20px), calc(var(--gy,0)*18px - 30px)) scale(1.2); } }
       .admin-theme-light .admin-aurora span { opacity:0.28; }
       .admin-nav, .admin-main { position:relative; z-index:1; }
-      /* Lekki tilt kafelków statystyk wg ruchu (głębia) */
-      .stats-kpi, .drk-stat { transform:perspective(700px) rotateX(calc(var(--gy,0)*2deg)) rotateY(calc(var(--gx,0)*-2deg)); transition:transform .25s ease; }
-      @media (prefers-reduced-motion: reduce) { .admin-aurora span { animation:none; } .stats-kpi, .drk-stat { transform:none; } }
+      /* Lekki tilt kafelków statystyk wg ruchu (głębia) — tylko KPI na stronie statystyk */
+      .stats-kpi { transform:perspective(700px) rotateX(calc(var(--gy,0)*2deg)) rotateY(calc(var(--gx,0)*-2deg)); transition:transform .25s ease; }
+      @media (prefers-reduced-motion: reduce) { .admin-aurora span { animation:none; } .stats-kpi { transform:none; } }
       .admin-nav-toggle { display:none; }
       @media (max-width:768px) {
         .admin { grid-template-columns:1fr; }
