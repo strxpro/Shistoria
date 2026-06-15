@@ -2586,7 +2586,7 @@ function CocktailExperience() {
         <div className="cx-canvas">
           {inView && (
             <Canvas frameloop={isMobileDevice ? "always" : "demand"} shadows={!isMobileDevice} dpr={isMobileDevice ? [1, 1.5] : [1, 2]}
-              gl={{ antialias: true, alpha: true, powerPreference: "high-performance", failIfMajorPerformanceCaveat: false }}
+              gl={{ antialias: true, alpha: true, powerPreference: "default", failIfMajorPerformanceCaveat: false }}
               camera={{ position: [CONFIG.camPos.x, CONFIG.camPos.y, CONFIG.camPos.z], fov: 36 }}>
               <Scene initialColor={mixedColor} onReady={onSceneReady}
                 glassPour={(glassPourOpen || glassFilled) ? {
@@ -3405,7 +3405,7 @@ function PourOverlay({ req, onDone }: { req: PourReq | null; onDone: () => void 
         className="cx-pour-canvas"
         frameloop="always"
         dpr={[1, 1.5]}
-        gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
+        gl={{ antialias: true, alpha: true, powerPreference: "default", failIfMajorPerformanceCaveat: false }}
         camera={{ position: [CONFIG.camPos.x, CONFIG.camPos.y, CONFIG.camPos.z], fov: 36 }}
       >
         <ambientLight intensity={0.8} />
@@ -3792,7 +3792,7 @@ function GlassPourScene({ open, url, withIce, color, opacity, onDone }: {
     <div className={`cx-glasspour ${blur ? "is-blur" : ""}`}>
       <Canvas
         className="cx-pour-canvas" frameloop="always" dpr={[1, 1.5]} shadows
-        gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
+        gl={{ antialias: true, alpha: true, powerPreference: "default", failIfMajorPerformanceCaveat: false }}
         camera={{ position: [0, 0.5, 7], fov: 34 }}
       >
         <ambientLight intensity={0.6} />
