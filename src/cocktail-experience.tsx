@@ -5750,7 +5750,9 @@ function DbDrinkCard({ d }: { d: any }) {
               <div className="cx-cc-popout-header">
                 <span className="cx-cc-popout-by">{tt("by", "by")} {d.author_name}</span>
                 <h3 className="cx-cc-popout-name">{d.name}</h3>
-                <div className="cx-cc-popout-strength" style={{ color: strengthColor }}><span className="cx-cc-popout-dot" style={{ background: strengthColor }} />{strengthLabelTr(d.strength_label)}</div>
+                {d.strength_label && d.strength_label !== "—" && (
+                  <div className="cx-cc-popout-strength" style={{ color: strengthColor }}><span className="cx-cc-popout-dot" style={{ background: strengthColor }} />{strengthLabelTr(d.strength_label)}</div>
+                )}
               </div>
               <button className="cx-cc-claim-btn cx-cc-claim-top" onClick={handleOrder}>{tt("order", "🍸 Ordina questo drink")}</button>
               <div className="cx-cc-claimed-count">🍸 {d.claimed_count || 0} {tt("retired", "volte ritirato")}</div>
@@ -6153,17 +6155,31 @@ function ShareDrinkBtn() {
   // Po publikacji (alreadySent) → lista wszystkich kreacji (publikowane + do opublikowania).
   useEffect(() => {
     if (!open) return;
-    const list = loadDrinks();
-    setAllDrinks(list);
+    const local = loadDrinks();
+    setAllDrinks(local);
     const wasSent = typeof localStorage !== "undefined" && localStorage.getItem("sh-drink-shared") === "true";
-    if (wasSent && list.length > 0) {
-      setView("list");
-    } else if (list.length > 0) {
-      openEdit(list[0]);
-    } else {
-      setMyDrink(null);
-      setView("edit");
-    }
+    if (wasSent && local.length > 0) setView("list");
+    else if (local.length > 0) openEdit(local[0]);
+    else { setMyDrink(null); setView("edit"); }
+
+    // Dociągnij OPUBLIKOWANE drinki z serwera po zapamiętanym emailu (widoczne na każdej przeglądarce).
+    (async () => {
+      let email = "";
+      try { email = (JSON.parse(localStorage.getItem("sh-identity") || "{}").email || "").trim().toLowerCase(); } catch { /* */ }
+      if (!email) return;
+      try {
+        const { data } = await supabase.from("community_drinks").select("id,name,author_name,total_ml,strength_label,color,photo_url,created_at").eq("author_email", email).order("created_at", { ascending: false });
+        if (!data || data.length === 0) return;
+        const server = data.map((d: any) => ({ name: d.name, author: d.author_name, ml: d.total_ml, strength: d.strength_label, color: d.color, photo_url: d.photo_url, published_id: d.id, saved_at: d.created_at }));
+        // Scal: opublikowane (z serwera) na górze, potem lokalne nieopublikowane (bez duplikatów po nazwie+autorze)
+        const key = (x: any) => `${(x.name || "").toLowerCase()}|${(x.author || "").toLowerCase()}`;
+        const seen = new Set(server.map(key));
+        const localOnly = local.filter((x: any) => !seen.has(key(x)) && !x.published_id);
+        const merged = [...server, ...localOnly];
+        setAllDrinks(merged);
+        if (wasSent && merged.length > 0) setView("list");
+      } catch { /* offline → zostaje lokalna lista */ }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
@@ -6212,6 +6228,7 @@ function ShareDrinkBtn() {
       const published = await publishDrink({
         name: finalName,
         author_name: finalAuthor,
+        author_email: myDrink.email || (() => { try { return JSON.parse(localStorage.getItem("sh-identity") || "{}").email || undefined; } catch { return undefined; } })(),
         ingredients: myDrink.ingredients || [],
         total_ml: myDrink.ml || 0,
         strength_label: myDrink.strength || "—",
