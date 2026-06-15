@@ -971,6 +971,38 @@ function Recensioni({ t }) {
   const [reviewSent, setReviewSent] = useStateE(false);
   const [hoverStar, setHoverStar] = useStateE(0);
   const sources = ["all", "Google", "TripAdvisor", "Locale"];
+  const recLang = (typeof window !== "undefined" && window.currentLanguage) || "it";
+  const [recPopout, setRecPopout] = useStateE(null);   // recenzja w popoucie (więcej detali)
+  const [recTr, setRecTr] = useStateE({});             // { idx: przetłumaczony tekst }
+  // Etykiety UI sekcji — przetłumaczone na 6 języków
+  const L = (o) => o[recLang] || o.it;
+  const recT = {
+    all: L({ it: "Tutte", pl: "Wszystkie", en: "All", de: "Alle", fr: "Toutes", es: "Todas" }),
+    local: L({ it: "Locale", pl: "Lokalne", en: "Local", de: "Lokal", fr: "Local", es: "Local" }),
+    write: L({ it: "Scrivi messaggio", pl: "Napisz wiadomość", en: "Write a message", de: "Nachricht schreiben", fr: "Écrire un message", es: "Escribir mensaje" }),
+    translate: L({ it: "Traduci", pl: "Przetłumacz", en: "Translate", de: "Übersetzen", fr: "Traduire", es: "Traducir" }),
+    original: L({ it: "Originale", pl: "Oryginał", en: "Original", de: "Original", fr: "Original", es: "Original" }),
+    details: L({ it: "Più dettagli", pl: "Więcej szczegółów", en: "More details", de: "Mehr Details", fr: "Plus de détails", es: "Más detalles" }),
+    reviews: L({ it: "recensioni", pl: "opinii", en: "reviews", de: "Bewertungen", fr: "avis", es: "reseñas" }),
+    googleCta: L({ it: "Lascia una recensione su Google — ci aiuta tantissimo!", pl: "Zostaw opinię w Google — bardzo nam pomaga!", en: "Leave a Google review — it helps us a lot!", de: "Hinterlasse eine Google-Bewertung — das hilft uns sehr!", fr: "Laisse un avis Google — ça nous aide beaucoup !", es: "Deja una reseña en Google — ¡nos ayuda muchísimo!" }),
+    googleBtn: L({ it: "Scrivi su Google", pl: "Napisz w Google", en: "Write on Google", de: "Auf Google schreiben", fr: "Écrire sur Google", es: "Escribir en Google" }),
+    successTitle: L({ it: "Grazie per il tuo messaggio!", pl: "Dziękujemy za wiadomość!", en: "Thanks for your message!", de: "Danke für deine Nachricht!", fr: "Merci pour ton message !", es: "¡Gracias por tu mensaje!" }),
+    successSub: L({ it: "Sarà visibile dopo approvazione.", pl: "Będzie widoczna po zatwierdzeniu.", en: "It will be visible after approval.", de: "Nach Freigabe sichtbar.", fr: "Visible après approbation.", es: "Visible tras aprobación." }),
+    namePh: L({ it: "Il tuo nome *", pl: "Twoje imię *", en: "Your name *", de: "Dein Name *", fr: "Ton nom *", es: "Tu nombre *" }),
+    emailPh: L({ it: "Email (per ricevere il nostro grazie)", pl: "Email (by otrzymać podziękowanie)", en: "Email (to receive our thanks)", de: "E-Mail (für unseren Dank)", fr: "Email (pour recevoir nos remerciements)", es: "Email (para recibir nuestro agradecimiento)" }),
+    expPh: L({ it: "La tua esperienza...", pl: "Twoje doświadczenie...", en: "Your experience...", de: "Deine Erfahrung...", fr: "Ton expérience...", es: "Tu experiencia..." }),
+    send: L({ it: "Invia", pl: "Wyślij", en: "Send", de: "Senden", fr: "Envoyer", es: "Enviar" }),
+  };
+  // Tłumaczenie pojedynczej recenzji na język UI (darmowy endpoint Google)
+  const translateReview = async (idx, text) => {
+    if (recTr[idx]) { setRecTr((p) => { const n = { ...p }; delete n[idx]; return n; }); return; }
+    try {
+      const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${recLang}&dt=t&q=${encodeURIComponent(text)}`);
+      const j = await r.json();
+      const tr = (j?.[0] || []).map((s) => s[0]).join("") || text;
+      setRecTr((p) => ({ ...p, [idx]: tr }));
+    } catch {}
+  };
 
   // Wczytaj zatwierdzone recenzje z DB (dodane przez gości, zatwierdzone w adminie) + realtime
   useEffectE(() => {
@@ -983,7 +1015,7 @@ function Recensioni({ t }) {
         const sb = createClient(url, key);
         const fetchR = async () => {
           const { data } = await sb.from("reviews").select("*").eq("is_approved", true).order("created_at", { ascending: false });
-          if (data) setDbReviews(data.map((r) => ({ name: r.name, text: r.content, source: r.source || "Locale", stars: r.stars || 5, photo_url: r.photo_url || null })));
+          if (data) setDbReviews(data.map((r) => ({ name: r.name, text: r.content, source: r.source || "Locale", stars: r.stars || 5, photo_url: r.photo_url || null, language: r.language || "it" })));
         };
         await fetchR();
         ch = sb.channel("reviews_rt").on("postgres_changes", { event: "*", schema: "public", table: "reviews" }, fetchR).subscribe();
@@ -1032,18 +1064,18 @@ function Recensioni({ t }) {
           <div className="rec-stats">
             <div><span>4.9</span><label>★ Google</label></div>
             <div><span>5.0</span><label>★ TripAdvisor</label></div>
-            <div><span>340+</span><label>recensioni</label></div>
+            <div><span>340+</span><label>{recT.reviews}</label></div>
           </div>
         </div>
 
         <div className="rec-filters reveal">
           {sources.map((s) => (
             <button key={s} className={`rec-filter ${filter === s ? "active" : ""}`} onClick={() => setFilter(s)}>
-              {s === "all" ? "Tutte" : s}
+              {s === "all" ? recT.all : s === "Locale" ? recT.local : s}
             </button>
           ))}
           <button className="rec-filter rec-write-btn" onClick={() => setWriteOpen(true)}>
-            ✎ Scrivi messaggio
+            ✎ {recT.write}
           </button>
         </div>
       </div>
@@ -1051,10 +1083,18 @@ function Recensioni({ t }) {
       <div className="rec-marquee">
         <div className="rec-track">
           {stream.map((r, i) => (
-            <article key={i} className="rec-card">
+            <article key={i} className="rec-card" onClick={() => setRecPopout({ ...r, _i: i })}>
               <div className="rec-stars">{"★".repeat(r.stars)}<span style={{ color: "var(--c-line)" }}>{"★".repeat(5 - r.stars)}</span></div>
               {r.photo_url && <img className="rec-photo" src={r.photo_url} alt="" loading="lazy" />}
-              <blockquote className="rec-text">"{r.text}"</blockquote>
+              <blockquote className="rec-text">"{recTr[i] || r.text}"</blockquote>
+              <div className="rec-card-actions">
+                <button className="rec-tr-btn" onClick={(e) => { e.stopPropagation(); translateReview(i, r.text); }}>
+                  🌐 {recTr[i] ? recT.original : recT.translate}
+                </button>
+                <button className="rec-tr-btn rec-details-btn" onClick={(e) => { e.stopPropagation(); setRecPopout({ ...r, _i: i }); }}>
+                  {recT.details} →
+                </button>
+              </div>
               <div className="rec-meta">
                 <span className="rec-name">{r.name}</span>
                 <span className="rec-source">{r.source}</span>
@@ -1064,32 +1104,52 @@ function Recensioni({ t }) {
         </div>
       </div>
 
+      {/* Popout — pełna recenzja (więcej detali) */}
+      {recPopout && typeof document !== "undefined" && createPortal(
+        <div className="rec-detail-overlay" onClick={() => setRecPopout(null)}>
+          <div className="rec-detail-pop" onClick={(e) => e.stopPropagation()}>
+            <button className="rec-detail-close" onClick={() => setRecPopout(null)} aria-label="Chiudi">×</button>
+            {recPopout.photo_url && <img className="rec-detail-photo" src={recPopout.photo_url} alt="" />}
+            <div className="rec-stars rec-detail-stars">{"★".repeat(recPopout.stars)}<span style={{ color: "var(--c-line)" }}>{"★".repeat(5 - recPopout.stars)}</span></div>
+            <blockquote className="rec-detail-text">"{recTr[recPopout._i] || recPopout.text}"</blockquote>
+            <button className="rec-tr-btn" onClick={() => translateReview(recPopout._i, recPopout.text)}>
+              🌐 {recTr[recPopout._i] ? recT.original : recT.translate}
+            </button>
+            <div className="rec-detail-meta">
+              <span className="rec-name">{recPopout.name}</span>
+              <span className="rec-source">{recPopout.source}</span>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
+
       {/* Popout — scrivi messaggio (2 zakładki: Locale / Google) */}
       {writeOpen && (
         <div className="rec-write-overlay" onClick={() => setWriteOpen(false)}>
           <div className="rec-write-popout" onClick={(e) => e.stopPropagation()}>
             <button className="rec-write-close" onClick={() => setWriteOpen(false)}>×</button>
             <div className="rec-write-tabs">
-              <button className={writeTab === "local" ? "active" : ""} onClick={() => setWriteTab("local")}>✎ Locale</button>
+              <button className={writeTab === "local" ? "active" : ""} onClick={() => setWriteTab("local")}>✎ {recT.local}</button>
               <button className={writeTab === "google" ? "active" : ""} onClick={() => setWriteTab("google")}>⭐ Google</button>
             </div>
             {writeTab === "google" ? (
               <div className="rec-write-google">
-                <p>Lascia una recensione su Google — ci aiuta tantissimo!</p>
+                <p>{recT.googleCta}</p>
                 <a href="https://g.page/r/CVK_gqHsp7TMEAE/review" target="_blank" rel="noopener" className="btn rec-google-btn">
-                  Scrivi su Google ★ →
+                  {recT.googleBtn} ★ →
                 </a>
               </div>
             ) : reviewSent ? (
               <div className="rec-write-success">
                 <span>🎉</span>
-                <h4>Grazie per il tuo messaggio!</h4>
-                <p>Sarà visibile dopo approvazione.</p>
+                <h4>{recT.successTitle}</h4>
+                <p>{recT.successSub}</p>
               </div>
             ) : (
               <form className="rec-write-form" onSubmit={submitReview}>
-                <input placeholder="Il tuo nome *" value={reviewForm.name} onChange={(e) => setReviewForm(f => ({...f, name: e.target.value}))} required />
-                <input type="email" placeholder="Email (per ricevere il nostro grazie)" value={reviewForm.email} onChange={(e) => setReviewForm(f => ({...f, email: e.target.value}))} />
+                <input placeholder={recT.namePh} value={reviewForm.name} onChange={(e) => setReviewForm(f => ({...f, name: e.target.value}))} required />
+                <input type="email" placeholder={recT.emailPh} value={reviewForm.email} onChange={(e) => setReviewForm(f => ({...f, email: e.target.value}))} />
                 <div className="rec-star-pick" role="radiogroup" aria-label="Valutazione">
                   {[1,2,3,4,5].map((n) => (
                     <button
@@ -1104,7 +1164,7 @@ function Recensioni({ t }) {
                   ))}
                   <span className="rec-star-val">{reviewForm.stars}/5</span>
                 </div>
-                <textarea placeholder="La tua esperienza..." rows={4} value={reviewForm.text} onChange={(e) => setReviewForm(f => ({...f, text: e.target.value}))} required />
+                <textarea placeholder={recT.expPh} rows={4} value={reviewForm.text} onChange={(e) => setReviewForm(f => ({...f, text: e.target.value}))} required />
                 <label className="rec-photo-upload">
                   {reviewForm.photo_url
                     ? <img src={reviewForm.photo_url} alt="" />
@@ -1122,7 +1182,7 @@ function Recensioni({ t }) {
                     } catch {}
                   }} />
                 </label>
-                <button type="submit" className="btn rec-submit-btn">Invia →</button>
+                <button type="submit" className="btn rec-submit-btn">{recT.send} →</button>
               </form>
             )}
           </div>
@@ -1158,6 +1218,23 @@ function Recensioni({ t }) {
         .rec-meta { display: flex; justify-content: space-between; padding-top: 16px; border-top: 1px solid var(--c-line); }
         .rec-name { font-family: var(--f-display); font-weight: 700; font-size: 14px; }
         .rec-source { font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--c-sky); }
+        /* przyciski na karcie: tłumacz + więcej detali */
+        .rec-card { cursor: pointer; }
+        .rec-card-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:auto; }
+        .rec-tr-btn { font-size:12px; font-weight:600; color:var(--c-sky); background:rgba(91,184,212,0.1); border:1px solid rgba(91,184,212,0.25); border-radius:999px; padding:5px 12px; cursor:pointer; transition:.2s; }
+        .rec-tr-btn:hover { background:rgba(91,184,212,0.2); }
+        .rec-details-btn { color:var(--c-coral); background:rgba(232,146,124,0.1); border-color:rgba(232,146,124,0.25); }
+        /* popout pełnej recenzji */
+        .rec-detail-overlay { position:fixed; inset:0; z-index:10000; background:rgba(0,0,0,0.62); display:flex; align-items:center; justify-content:center; padding:24px; backdrop-filter:blur(4px); animation:recDetFade .25s ease; }
+        @keyframes recDetFade { from{opacity:0;} to{opacity:1;} }
+        .rec-detail-pop { width:min(520px,94vw); max-height:88vh; overflow-y:auto; background:#fff; border-radius:24px; padding:36px 30px 30px; position:relative; color:var(--c-deep); animation:recDetIn .35s cubic-bezier(.2,.8,.2,1); }
+        @keyframes recDetIn { from{opacity:0; transform:translateY(16px) scale(.97);} to{opacity:1; transform:none;} }
+        .rec-detail-close { position:absolute; top:14px; right:14px; width:34px; height:34px; border-radius:50%; border:1px solid var(--c-line); background:#fff; font-size:20px; cursor:pointer; color:var(--c-deep); }
+        .rec-detail-photo { width:100%; max-height:280px; object-fit:cover; border-radius:16px; margin-bottom:18px; }
+        .rec-detail-stars { font-size:18px; letter-spacing:4px; color:var(--c-coral); margin-bottom:12px; }
+        .rec-detail-text { font-family:var(--f-serif); font-style:italic; font-size:21px; line-height:1.5; color:var(--c-deep); margin:0 0 16px; }
+        .rec-detail-meta { display:flex; justify-content:space-between; align-items:center; padding-top:16px; margin-top:16px; border-top:1px solid var(--c-line); }
+        @media (max-width:768px){ .rec-detail-text { font-size:18px; } .rec-detail-pop { padding:30px 22px 24px; } }
         .rec-write-overlay { position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; padding:24px; }
         .rec-write-popout { width:min(480px,92vw); max-height:85vh; overflow-y:auto; background:#fff; border-radius:24px; padding:32px; position:relative; color:var(--c-deep); }
         .rec-write-close { position:absolute; top:16px; right:16px; width:32px; height:32px; border-radius:50%; border:1px solid var(--c-line); background:transparent; font-size:18px; cursor:pointer; display:grid; place-items:center; }
