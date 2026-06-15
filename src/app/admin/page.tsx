@@ -2071,6 +2071,16 @@ function NewsletterPanel() {
   const remove = async (id: string) => {
     if (confirm("Rimuovere questo iscritto?")) { await supabase.from("newsletter").delete().eq("id", id); load(true); }
   };
+  const [selMode, setSelMode] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const toggleSel = (id: string) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const exitSel = () => { setSelMode(false); setSelected(new Set()); };
+  const bulkRemove = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    if (!confirm(`Rimuovere ${ids.length} iscritti selezionati?`)) return;
+    await supabase.from("newsletter").delete().in("id", ids);
+    exitSel(); load(true);
+  };
 
   // ── Broadcast: powiadom wszystkich subskrybentów o nowym drinku/evencie ──
   const [bcOpen, setBcOpen] = useState(false);
@@ -2151,6 +2161,17 @@ function NewsletterPanel() {
         <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cerca per nome o email…" />
         {search && <button className="amsg-search-clear" onClick={() => setSearch("")}>✕</button>}
       </div>
+      <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+        {selMode ? (
+          <>
+            <button className="admin-btn-ghost" onClick={() => setSelected(new Set(filtered.map((s) => s.id)))}>Seleziona tutto</button>
+            <button className="admin-btn admin-btn-danger" onClick={() => bulkRemove([...selected])} disabled={selected.size === 0}>🗑 Rimuovi ({selected.size})</button>
+            <button className="admin-btn-ghost" onClick={exitSel}>Annulla</button>
+          </>
+        ) : (
+          <button className="admin-btn-ghost" onClick={() => setSelMode(true)}>☑ Seleziona</button>
+        )}
+      </div>
       {loading ? <Skeleton /> : (
         <div className="admin-orders">
           {filtered.map((s) => {
@@ -2162,7 +2183,8 @@ function NewsletterPanel() {
             if (assoc.reviews.has(email)) tags.push({ label: "⭐ Recensione", cls: "amsg-badge-gold" });
             if (assoc.msgs.has(email)) tags.push({ label: "💬 Messaggi", cls: "" });
             return (
-              <div key={s.id} className="admin-order">
+              <div key={s.id} className={`admin-order ${selMode && selected.has(s.id) ? "drk-sel" : ""}`} onClick={selMode ? () => toggleSel(s.id) : undefined} style={selMode ? { cursor: "pointer" } : undefined}>
+                {selMode && <span className={`admin-drink-selcb ${selected.has(s.id) ? "on" : ""}`} style={{ position: "static", marginRight: 4 }} aria-hidden="true">{selected.has(s.id) ? "✓" : ""}</span>}
                 <div className="admin-order-info">
                   <h4>{s.name || "—"} <span style={{ opacity: 0.5, fontWeight: 400, fontSize: 13 }}>🌐 {s.language || "it"}</span></h4>
                   <p style={{ opacity: 0.7 }}>{s.email}</p>
@@ -2172,7 +2194,7 @@ function NewsletterPanel() {
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, flexShrink: 0 }}>
                   <span style={{ fontSize: 12, opacity: 0.5 }}>{s.created_at ? new Date(s.created_at).toLocaleDateString("it-IT") : ""}</span>
-                  <button className="admin-btn-sm admin-btn-danger" onClick={() => remove(s.id)}>🗑</button>
+                  {!selMode && <button className="admin-btn-sm admin-btn-danger" onClick={() => remove(s.id)}>🗑</button>}
                 </div>
               </div>
             );
