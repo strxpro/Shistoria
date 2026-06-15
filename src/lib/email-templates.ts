@@ -58,26 +58,73 @@ function row(label: string, value?: string | number): string {
   </tr>`;
 }
 
-function shell(innerHtml: string): string {
-  return `<!doctype html><html><body style="margin:0;padding:0;background:#081019;">
+// Stopka — tłumaczenia etykiet (przycisk nawigacji) per język
+const FOOTER_T: Record<Lang, { dir: string; visit: string }> = {
+  it: { dir: "Come arrivare", visit: "Visita il sito" },
+  pl: { dir: "Wyznacz trasę", visit: "Odwiedź stronę" },
+  en: { dir: "Get directions", visit: "Visit the site" },
+  de: { dir: "Route planen", visit: "Website besuchen" },
+  fr: { dir: "Itinéraire", visit: "Visiter le site" },
+  es: { dir: "Cómo llegar", visit: "Visitar el sitio" },
+};
+
+// Blok mapy w stopce: prawdziwa mapa (Google Static jeśli jest klucz), inaczej markowa karta lokalizacji.
+// Dzięki temu NIGDY nie pokazuje się zepsuty obrazek („?") — zawsze coś ładnego się renderuje.
+function mapBlock(lang: Lang): string {
+  const dir = (FOOTER_T[lang] ?? FOOTER_T.it).dir;
+  const dirUrl = "https://www.google.com/maps/dir/?api=1&destination=41.1660057,9.1777384";
+  const key = process.env.GOOGLE_STATIC_MAPS_KEY || process.env.GOOGLE_PLACES_API_KEY || "";
+  if (key) {
+    const img = `https://maps.googleapis.com/maps/api/staticmap?center=41.1660057,9.1777384&zoom=15&size=560x220&scale=2&maptype=roadmap&markers=color:0xE8927C%7C41.1660057,9.1777384&key=${key}`;
+    return `<a href="${dirUrl}" style="display:block;text-decoration:none;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,0.12);max-width:520px;margin:0 auto 16px;">
+      <img src="${img}" width="520" alt="Mappa — S'Historia, Rena Majore" style="display:block;width:100%;max-width:520px;height:auto;" />
+      <div style="background:${BRAND.coral};color:#1a1014;font-weight:800;font-size:13px;padding:11px;text-align:center;">📍 ${dir} →</div>
+    </a>`;
+  }
+  // Fallback — markowa karta lokalizacji (czysty HTML, zawsze działa)
+  return `<a href="${dirUrl}" style="display:block;text-decoration:none;max-width:520px;margin:0 auto 16px;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,0.12);background:linear-gradient(135deg,#0E222F,#16384c);">
+    <div style="padding:24px 20px;text-align:center;">
+      <div style="font-size:36px;line-height:1;">📍</div>
+      <div style="color:${BRAND.cream};font-weight:700;font-size:16px;margin-top:8px;">S'Historia — Rena Majore</div>
+      <div style="color:${BRAND.muted};font-size:12px;margin-top:3px;">Via Delfino · 07020 Rena Majore (OT), Sardegna</div>
+      <div style="display:inline-block;margin-top:16px;background:${BRAND.coral};color:#1a1014;font-weight:800;font-size:13px;padding:11px 24px;border-radius:999px;">📍 ${dir} →</div>
+    </div>
+  </a>`;
+}
+
+function shell(innerHtml: string, lang: Lang = "it"): string {
+  return `<!doctype html><html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    @keyframes shShimmer { 0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%} }
+    @keyframes shFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
+    @keyframes shPulse { 0%,100%{box-shadow:0 8px 24px rgba(232,146,124,0.35)} 50%{box-shadow:0 10px 34px rgba(232,146,124,0.6)} }
+    .sh-accent { background-size:200% 200%; animation:shShimmer 5s ease infinite; }
+    .sh-logo { animation:shFloat 4s ease-in-out infinite; }
+    .sh-cta { animation:shPulse 2.6s ease-in-out infinite; }
+    @media (prefers-reduced-motion: reduce){ .sh-accent,.sh-logo,.sh-cta{ animation:none!important; } }
+  </style></head>
+  <body style="margin:0;padding:0;background:#081019;">
   <div style="background:#081019;padding:30px 14px;font-family:'Helvetica Neue',Arial,sans-serif;">
   <div style="max-width:600px;margin:0 auto;border-radius:24px;overflow:hidden;background:${BRAND.card};box-shadow:0 28px 70px rgba(0,0,0,0.5);">
     <!-- Header z logo -->
-    <div style="text-align:center;padding:50px 28px 32px;background:linear-gradient(180deg,#0E222F,#0c2433);">
-      <img src="${BRAND.site}/logo.png" alt="S'Historia" width="132" style="display:inline-block;max-width:132px;height:auto;filter:brightness(0) invert(1);" />
-      <div style="font-size:11px;letter-spacing:5px;text-transform:uppercase;color:${BRAND.coral};margin-top:18px;">${BRAND.tagline}</div>
+    <div style="text-align:center;padding:48px 28px 18px;background:linear-gradient(180deg,#0E222F,#0c2433);">
+      <img class="sh-logo" src="${BRAND.site}/logo.png" alt="S'Historia" width="132" style="display:inline-block;max-width:132px;height:auto;filter:brightness(0) invert(1);" />
+      <div style="font-size:11px;letter-spacing:5px;text-transform:uppercase;color:${BRAND.coral};margin-top:16px;">${BRAND.tagline}</div>
     </div>
-    <div style="height:3px;background:linear-gradient(90deg,transparent,${BRAND.coral},${BRAND.sky},transparent);"></div>
+    <!-- Falista przerwa (jak premium newsletter) -->
+    <div style="background:#0c2433;font-size:0;line-height:0;">
+      <svg width="100%" height="40" viewBox="0 0 600 40" preserveAspectRatio="none" style="display:block;">
+        <path d="M0,18 C150,42 300,2 450,20 C525,29 570,24 600,16 L600,40 L0,40 Z" fill="${BRAND.card}"></path>
+      </svg>
+    </div>
+    <div class="sh-accent" style="height:4px;background:linear-gradient(90deg,${BRAND.coral},${BRAND.sky},${BRAND.coral});"></div>
     <!-- Body -->
-    <div style="background:${BRAND.card};padding:46px 42px;">
+    <div style="background:${BRAND.card};padding:38px 42px 46px;">
       ${innerHtml}
     </div>
     <!-- Footer -->
-    <div style="text-align:center;padding:32px 28px;background:#0a1822;color:${BRAND.muted};font-size:12px;line-height:2;border-top:1px solid rgba(255,255,255,0.06);">
-      <a href="https://www.google.com/maps/dir/?api=1&destination=41.1660057,9.1777384" style="display:block;margin:0 auto 18px;max-width:520px;text-decoration:none;">
-        <img src="https://staticmap.openstreetmap.de/staticmap.php?center=41.1660057,9.1777384&zoom=15&size=520x200&maptype=mapnik&markers=41.1660057,9.1777384,lightblue1" alt="Mappa — S'Historia, Rena Majore" width="520" style="display:block;width:100%;max-width:520px;height:auto;border-radius:14px;border:1px solid rgba(255,255,255,0.1);" />
-        <span style="display:inline-block;margin-top:8px;color:${BRAND.coral};font-weight:600;font-size:12px;">📍 Apri indicazioni / Otwórz nawigację →</span>
-      </a>
+    <div style="padding:30px 26px 34px;background:#0a1822;color:${BRAND.muted};font-size:12px;line-height:1.9;border-top:1px solid rgba(255,255,255,0.06);text-align:center;">
+      ${mapBlock(lang)}
       <a href="${BRAND.site}" style="color:${BRAND.sky};text-decoration:none;font-weight:600;letter-spacing:1px;">www.shistoria.it</a><br>
       Via Delfino · 07020 Rena Majore (OT), Sardegna<br>
       <span style="opacity:0.6;">info@shistoria.it · +39 328 764 8456</span>
@@ -106,7 +153,7 @@ export function clientEmailHTML(v: ReservationVars): { subject: string; html: st
     <a href="${BRAND.site}" style="display:inline-block;background:${BRAND.coral};color:#1a1014;text-decoration:none;font-weight:700;font-size:14px;padding:13px 26px;border-radius:999px;">${tr.cta} →</a>
     <p style="margin:24px 0 0;font-size:14px;color:${BRAND.muted};">${tr.footer} 🍸</p>
   `;
-  return { subject: tr.subject, html: shell(inner) };
+  return { subject: tr.subject, html: shell(inner, v.lang) };
 }
 
 /** E-mail do WŁAŚCICIELA — ZAWSZE po włosku. */
@@ -133,7 +180,7 @@ export function ownerEmailHTML(v: ReservationVars): { subject: string; html: str
     </table>
     <p style="margin:18px 0 0;font-size:12px;color:${BRAND.muted};">Rispondi al cliente nella sua lingua (${v.lang.toUpperCase()}).</p>
   `;
-  return { subject, html: shell(inner) };
+  return { subject, html: shell(inner, v.lang) };
 }
 
 /** Tekst WhatsApp do WŁAŚCICIELA — ZAWSZE po włosku (krótki). */
@@ -243,7 +290,7 @@ const WINNER_T: Record<Lang, {
 
 function ctaButton(label: string, link: string): string {
   return `<div style="text-align:center;margin:30px 0 8px;">
-    <a href="${link}" style="display:inline-block;background:${BRAND.coral};color:#1a1014;text-decoration:none;font-weight:700;font-size:14px;letter-spacing:0.5px;padding:15px 34px;border-radius:999px;box-shadow:0 8px 24px rgba(232,146,124,0.35);">${label} →</a>
+    <a class="sh-cta" href="${link}" style="display:inline-block;background:${BRAND.coral};color:#1a1014;text-decoration:none;font-weight:700;font-size:14px;letter-spacing:0.5px;padding:15px 34px;border-radius:999px;box-shadow:0 8px 24px rgba(232,146,124,0.35);">${label} →</a>
   </div>`;
 }
 
@@ -269,7 +316,7 @@ export function winnerEmailHTML(v: WinnerVars): { subject: string; html: string 
     ${codeBlock}
     ${ctaButton(tr.winCta, link)}
   `;
-  return { subject, html: shell(inner) };
+  return { subject, html: shell(inner, v.lang) };
 }
 
 /** E-mail do POZOSTAŁYCH twórców — w ich języku (ogłoszenie + zaproszenie). */
@@ -283,7 +330,7 @@ export function winnerOthersEmailHTML(v: WinnerVars): { subject: string; html: s
     <p style="margin:14px 0;font-size:15px;color:${BRAND.cream};line-height:1.6;text-align:center;">${tr.othBody(v.winnerDrink, v.winnerAuthor)}</p>
     ${ctaButton(tr.othCta, link)}
   `;
-  return { subject, html: shell(inner) };
+  return { subject, html: shell(inner, v.lang) };
 }
 
 
@@ -393,7 +440,7 @@ export function eventReminderHTML(v: EventVars, kind: "3d" | "5h"): { subject: s
     ${ctaButton(tr.cta, link)}
     <p style="margin:26px 0 0;font-size:14px;color:${BRAND.muted};text-align:center;">${tr.footer} 🍸</p>
   `;
-  return { subject, html: shell(inner) };
+  return { subject, html: shell(inner, v.lang) };
 }
 
 
@@ -415,7 +462,7 @@ export function adminReplyHTML(v: { name?: string; replyText: string; lang: Lang
     <div style="font-size:16px;line-height:1.65;color:${BRAND.cream};white-space:pre-wrap;">${v.replyText.replace(/</g, "&lt;").replace(/\n/g, "<br>")}</div>
     <div style="margin:22px 0 0;padding:14px 16px;background:rgba(232,146,124,0.1);border:1px solid rgba(232,146,124,0.3);border-radius:12px;font-size:13px;color:${BRAND.coral};">↩︎ ${tr.note}</div>
   `;
-  return { subject: tr.subject, html: shell(inner) };
+  return { subject: tr.subject, html: shell(inner, v.lang) };
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -437,7 +484,7 @@ export function newsletterWelcomeHTML(v: { name?: string; lang: Lang }): { subje
     <p style="margin:0 0 6px;font-size:16px;line-height:1.6;color:${BRAND.cream};text-align:center;">${tr.body}</p>
     ${ctaButton(tr.cta, BRAND.site)}
   `;
-  return { subject: tr.subject, html: shell(inner) };
+  return { subject: tr.subject, html: shell(inner, v.lang) };
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -504,7 +551,7 @@ export function reviewThankYouHTML(v: { name?: string; stars?: number; lang: Lan
     <p style="margin:0 0 6px;font-size:13px;line-height:1.6;color:${BRAND.muted};text-align:center;font-style:italic;">${tr.pending}</p>
     ${ctaButton(tr.cta, BRAND.site)}
   `;
-  return { subject: tr.subject, html: shell(inner) };
+  return { subject: tr.subject, html: shell(inner, v.lang) };
 }
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -611,5 +658,5 @@ export function newsletterBroadcastHTML(v: BroadcastVars): { subject: string; ht
     <p style="margin:22px 0 0;font-size:14px;color:${BRAND.muted};">${tr.footer} 🍸</p>
     <p style="margin:14px 0 0;font-size:11px;color:${BRAND.muted};opacity:0.7;">${tr.unsub}</p>
   `;
-  return { subject, html: shell(inner) };
+  return { subject, html: shell(inner, v.lang) };
 }
