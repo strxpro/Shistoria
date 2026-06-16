@@ -597,6 +597,7 @@ function MenuPanel() {
       {pdfPreview && (
         <div className="admin-modal-overlay" onClick={() => !pdfBusy && setPdfPreview(null)}>
           <div className="admin-modal admin-modal-wide" onClick={(e) => e.stopPropagation()}>
+            <button className="admin-modal-x" onClick={() => !pdfBusy && setPdfPreview(null)} aria-label="Chiudi">✕</button>
             <h3>Anteprima import PDF</h3>
             <p style={{ opacity: 0.7, fontSize: 13, marginTop: -12 }}>{pdfMsg}</p>
             <div className="pdf-preview-list">
@@ -620,6 +621,7 @@ function MenuPanel() {
       {editItem && (
         <div className="admin-modal-overlay" onClick={() => setEditItem(null)}>
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="admin-modal-x" onClick={() => setEditItem(null)} aria-label="Chiudi">✕</button>
             <h3>{editItem.id ? "Modifica" : "Nuovo piatto"}</h3>
             <div className="admin-form">
               <label>Foto del piatto</label>
@@ -816,6 +818,7 @@ function EventsPanel() {
       {editEvt && typeof document !== "undefined" && createPortal(
         <div className={`admin-modal-overlay ${adminThemeClass()}`} onClick={close}>
           <div className="admin-modal admin-modal-wide" onClick={(e) => e.stopPropagation()}>
+            <button className="admin-modal-x" onClick={close} aria-label="Chiudi">✕</button>
             {/* Stepper — 3 kroki */}
             <div className="ev-stepper">
               {[{ n: 1, l: "Template" }, { n: 2, l: "Dettagli" }, { n: 3, l: "Anteprima" }].map((s, i) => (
@@ -1017,6 +1020,7 @@ function DrinkStatsModal({ drink, onClose }: { drink: any; onClose: () => void }
   return createPortal(
     <div className={`admin-modal-overlay ${adminThemeClass()}`} onClick={onClose}>
       <div className="admin-modal admin-modal-wide sh-weather" onClick={(e) => e.stopPropagation()}>
+        <button className="admin-modal-x" onClick={onClose} aria-label="Chiudi">✕</button>
         {view ? (
           <>
             <div className="drk-detail-head">
@@ -1448,6 +1452,7 @@ function OrdersPanel() {
       {scanOpen && (
         <div className="admin-modal-overlay" onClick={() => { setScanOpen(false); setCamOn(false); }}>
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="admin-modal-x" onClick={() => { setScanOpen(false); setCamOn(false); }} aria-label="Chiudi">✕</button>
             <h3>Ritira drink</h3>
             <p style={{ opacity: 0.6, fontSize: 13, marginBottom: 14 }}>Inquadra il QR del cliente con la fotocamera, oppure inserisci il codice di 4 caratteri (valido 15 min).</p>
             {camOn ? <QrScanner onDetected={onScanDetected} /> : (
@@ -1504,6 +1509,7 @@ function OrdersPanel() {
       {detailOrder && (
         <div className="admin-modal-overlay" onClick={() => setDetailOrder(null)}>
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="admin-modal-x" onClick={() => setDetailOrder(null)} aria-label="Chiudi">✕</button>
             <h3>{detailOrder.drink_name} <span style={{ opacity: 0.5, fontWeight: 400, fontSize: 14 }}>di {detailOrder.author_name}</span></h3>
             <div className="drk-stats-grid" style={{ gridTemplateColumns: "repeat(3,1fr)" }}>
               <div className="drk-stat"><span className="drk-stat-ico">🥤</span><strong>{detailOrder.total_ml || 0}ml</strong><span>Volume</span></div>
@@ -1943,6 +1949,7 @@ function GuestDetailModal({ guest, onClose, onWrite }: { guest: any; onClose: ()
   return createPortal(
     <div className={`admin-modal-overlay ${adminThemeClass()}`} onClick={onClose}>
       <div className="admin-modal admin-modal-wide sh-weather" onClick={(e) => e.stopPropagation()}>
+        <button className="admin-modal-x" onClick={onClose} aria-label="Chiudi">✕</button>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span className="amsg-avatar" style={{ width: 48, height: 48, fontSize: 20 }}>{(guest.name || "?").charAt(0).toUpperCase()}</span>
           <div><h3 style={{ margin: 0 }}>{guest.name} <FlagImg code={LANG_CC[guest.lang]} size={18} /></h3><p style={{ margin: 0, opacity: 0.6, fontSize: 13 }}>{guest.email}</p></div>
@@ -2179,6 +2186,7 @@ function NewsletterPanel() {
       {bcOpen && (
         <div className="admin-modal-overlay" onClick={() => !bcBusy && setBcOpen(false)}>
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="admin-modal-x" onClick={() => !bcBusy && setBcOpen(false)} aria-label="Chiudi">✕</button>
             <h3>📣 Notifica agli iscritti</h3>
             <p style={{ opacity: 0.65, fontSize: 13, marginTop: -10 }}>
               L'email viene tradotta automaticamente nella lingua di ogni iscritto ({subs.length} destinatari).
@@ -2363,6 +2371,7 @@ function ReviewsPanel() {
       {addOpen && (
         <div className="admin-modal-overlay" onClick={() => !busy && setAddOpen(false)}>
           <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="admin-modal-x" onClick={() => !busy && setAddOpen(false)} aria-label="Chiudi">✕</button>
             <h3 style={{ margin: "0 0 12px" }}>Aggiungi recensione (Google / TripAdvisor)</h3>
             <p style={{ opacity: 0.65, fontSize: 13, marginTop: -6 }}>
               Copia una recensione reale da Google o TripAdvisor e incollala qui — apparirà subito sul sito.
@@ -3148,8 +3157,13 @@ function AdminStyles() {
       .admin-done-badge { color:#27ae60; font-size:13px; font-weight:600; }
 
       .admin-modal-overlay { position:fixed; inset:0; z-index:100; background:rgba(0,0,0,0.7); display:flex; align-items:center; justify-content:center; padding:24px; }
-      .admin-modal { width:min(520px,92vw); max-height:85vh; overflow-y:auto; background:#14181e; border-radius:20px; padding:32px; border:1px solid rgba(255,255,255,0.1); }
+      .admin-modal { position:relative; width:min(520px,92vw); max-height:85vh; overflow-y:auto; background:#14181e; border-radius:20px; padding:32px; border:1px solid rgba(255,255,255,0.1); }
       .admin-modal-wide { width:min(640px,94vw); }
+      /* Krzyżyk zamykający — wspólny dla wszystkich modali admina (prawy górny róg) */
+      .admin-modal-x { position:absolute; top:14px; right:14px; width:36px; height:36px; border-radius:50%; border:1px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.08); color:inherit; font-size:20px; line-height:1; cursor:pointer; display:grid; place-items:center; z-index:5; transition:background .2s, transform .2s; }
+      .admin-modal-x:hover { background:rgba(255,255,255,0.18); transform:scale(1.08); }
+      .admin-modal-x:active { transform:scale(0.94); }
+      .admin-theme-light .admin-modal-x { border-color:rgba(0,0,0,0.15); background:rgba(0,0,0,0.05); }
       /* Stepper 3-krokowy (eventy) */
       .ev-stepper { display:flex; align-items:center; justify-content:center; gap:0; margin:0 0 22px; }
       .ev-step { display:flex; flex-direction:column; align-items:center; gap:6px; cursor:default; }

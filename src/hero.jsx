@@ -59,7 +59,7 @@ function Hero({ t, variant = "launchex" }) {
         <div className={`hero-sub ${mounted ? "in" : ""}`}>
           <span className="eyebrow">— {t("hero.since")}</span>
         </div>
-        <h1 className="hero-title" ref={titleRef}>
+        <h1 className="hero-title notranslate" translate="no" ref={titleRef}>
           {letters.map((c, i) => (
             <span key={i} className={mounted ? "in" : ""} style={{ transitionDelay: `${0.2 + i * 0.05}s` }}>
               {c === " " ? "\u00A0" : c}

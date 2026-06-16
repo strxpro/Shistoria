@@ -101,17 +101,22 @@ function MobileFullMenu() {
   });
   const [burstKey, setBurstKey] = useStateM(null); // klucz dania z chwilową animacją serca (tylko na miniaturze)
   const sheetTouch = useRefM(null);
+  // Snapshot polubień z serwera — używany TYLKO do ustalenia kolejności listy.
+  // Dzięki temu polubienie na żywo nie przesortowuje listy (danie nie „przeskakuje").
+  const orderLikesRef = useRefM({});
 
   // Pobierz liczbę polubień dań z DB (łączymy po nazwie)
   useEffectM(() => {
     let alive = true;
-    getMenuLikes().then((m) => { if (alive) setLikesMap(m); }).catch(() => {});
+    getMenuLikes().then((m) => { if (alive) { orderLikesRef.current = m || {}; setLikesMap(m); } }).catch(() => {});
     return () => { alive = false; };
   }, []);
 
   // klucz pozycji = nazwa znormalizowana
   const itemKey = (it) => String(it.name || "").trim().toLowerCase();
   const getLikes = (it) => (likesMap[itemKey(it)]?.likes || 0);
+  // liczba polubień ze snapshotu serwera — STABILNA kolejność (nie reaguje na polubienia na żywo)
+  const orderLikes = (it) => (orderLikesRef.current[itemKey(it)]?.likes || 0);
   // Auto-tłumaczenie statycznego menu (gdy brak i18n w DB)
   const _lg = (typeof window !== "undefined" && window.currentLanguage) || "it";
   const _allTexts = useMemoM(() => {
@@ -302,10 +307,10 @@ function MobileFullMenu() {
             <h3 className="mfm-cat-title"><span className="mfm-cat-num">{String(ci + 1).padStart(2, "0")}</span>{cat.label}</h3>
             <ul className="mfm-list">
               {(() => {
-                const sorted = cat.items.slice().sort((a, b) => getLikes(b) - getLikes(a));
-                const topLikes = getLikes(sorted[0]);
+                const sorted = cat.items.slice().sort((a, b) => orderLikes(b) - orderLikes(a));
+                const topLikes = orderLikes(sorted[0]);
                 return sorted.map((it, i) => {
-                  const isTopLiked = topLikes > 0 && getLikes(it) === topLikes && i === 0;
+                  const isTopLiked = topLikes > 0 && orderLikes(it) === topLikes && i === 0;
                   return (
                 <li key={i} className={`mfm-item ${it.featured ? "feat" : ""} ${isTopLiked ? "top-liked" : ""}`} onClick={() => setDishPopout({ ...it, icon: cat.icon })}>
                   {isTopLiked && <span className="mfm-topliked-badge"><HeartIcon filled /> {({ it:"Il più amato", en:"Most loved", pl:"Najczęściej lubiane", de:"Beliebtest", fr:"Le plus aimé", es:"El más amado" })[lang] || "Il più amato"}</span>}
@@ -592,9 +597,11 @@ function DesktopFullMenu() {
     try { return new Set(JSON.parse(localStorage.getItem("sh-menu-liked") || "[]")); } catch { return new Set(); }
   });
   const [burstKey, setBurstKey] = useStateM(null);
-  useEffectM(() => { let a = true; getMenuLikes().then((m) => { if (a) setLikesMap(m); }).catch(() => {}); return () => { a = false; }; }, []);
+  const orderLikesRef = useRefM({});
+  useEffectM(() => { let a = true; getMenuLikes().then((m) => { if (a) { orderLikesRef.current = m || {}; setLikesMap(m); } }).catch(() => {}); return () => { a = false; }; }, []);
   const itemKey = (it) => String(it.name || "").trim().toLowerCase();
   const getLikes = (it) => (likesMap[itemKey(it)]?.likes || 0);
+  const orderLikes = (it) => (orderLikesRef.current[itemKey(it)]?.likes || 0);
   const isLiked = (it) => { const id = likesMap[itemKey(it)]?.id; return id ? likedSet.has(id) : false; };
   const _lgD = (typeof window !== "undefined" && window.currentLanguage) || "it";
   const _allTextsD = useMemoM(() => { const arr = []; (window.FULL_MENU || []).forEach((c) => (c.items || []).forEach((it) => { if (it.name) arr.push(it.name); if (it.desc) arr.push(it.desc); })); return arr; }, []);
@@ -840,10 +847,10 @@ function DesktopFullMenu() {
                 <ul className="fmenu-list">
                   {(() => {
                     const lang = (typeof window !== "undefined" && window.currentLanguage) || "it";
-                    const sorted = cat.items.slice().sort((a, b) => getLikes(b) - getLikes(a));
-                    const topLikes = getLikes(sorted[0]);
+                    const sorted = cat.items.slice().sort((a, b) => orderLikes(b) - orderLikes(a));
+                    const topLikes = orderLikes(sorted[0]);
                     return sorted.map((it, i) => {
-                      const isTopLiked = topLikes > 0 && getLikes(it) === topLikes && i === 0;
+                      const isTopLiked = topLikes > 0 && orderLikes(it) === topLikes && i === 0;
                       return (
                     <motion.li 
                       key={i} 
@@ -1087,9 +1094,11 @@ function MobileDrinksList({ dark = true }) {
   const [likesMap, setLikesMap] = useStateM({});
   const [likedSet, setLikedSet] = useStateM(() => { try { return new Set(JSON.parse(localStorage.getItem("sh-menu-liked") || "[]")); } catch { return new Set(); } });
   const [burstKey, setBurstKey] = useStateM(null);
-  useEffectM(() => { let a = true; getMenuLikes().then((m) => { if (a) setLikesMap(m); }).catch(() => {}); return () => { a = false; }; }, []);
+  const orderLikesRef = useRefM({});
+  useEffectM(() => { let a = true; getMenuLikes().then((m) => { if (a) { orderLikesRef.current = m || {}; setLikesMap(m); } }).catch(() => {}); return () => { a = false; }; }, []);
   const dKey = (it) => String(it.name || "").trim().toLowerCase();
   const dLikes = (it) => (likesMap[dKey(it)]?.likes || 0);
+  const dOrderLikes = (it) => (orderLikesRef.current[dKey(it)]?.likes || 0);
   const dLiked = (it) => { const id = likesMap[dKey(it)]?.id; return id ? likedSet.has(id) : false; };
   const dLastLike = useRefM({ k: null, t: 0 }); // anty-dubel (touchend + dblclick)
   const dLikeOnly = async (it) => {
@@ -1108,10 +1117,10 @@ function MobileDrinksList({ dark = true }) {
   // 👑 Ulubieniec baru: pozycje z sercami sortowane malejąco, lider z koroną na rogu
   const sortedItems = useMemoM(() => {
     if (!canLike) return items;
-    return items.slice().sort((a, b) => dLikes(b) - dLikes(a));
+    return items.slice().sort((a, b) => dOrderLikes(b) - dOrderLikes(a));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, canLike, likesMap]);
-  const topKey = canLike && sortedItems.length > 0 && dLikes(sortedItems[0]) > 0 ? dKey(sortedItems[0]) : null;
+  }, [items, canLike]);
+  const topKey = canLike && sortedItems.length > 0 && dOrderLikes(sortedItems[0]) > 0 ? dKey(sortedItems[0]) : null;
   const crownLabel = ({ it: "Il preferito del bar", pl: "Ulubieniec baru", en: "Bar favorite", de: "Bar-Favorit", fr: "Préféré du bar", es: "Favorito del bar" })[lang] || "Il preferito del bar";
   const dToggle = async (it) => {
     const k = dKey(it); const rec = likesMap[k]; if (!rec?.id) return;

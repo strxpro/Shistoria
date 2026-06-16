@@ -194,7 +194,7 @@ function Preloader({ onDone, t }) {
       {/* Year — small date above title */}
       <span className="pre-year">1996</span>
       {/* Main title — outlined letters that fill with wave */}
-      <div className="pre-main">
+      <div className="pre-main notranslate" translate="no">
         {title.split("").map((ch, i) => (
           <span key={i} className="pre-char" style={{ "--fill-h": "0%" }}>
             <span className="pre-char-outline">{ch === " " ? "\u00A0" : ch}</span>
@@ -203,7 +203,7 @@ function Preloader({ onDone, t }) {
         ))}
       </div>
       {/* Sub text — smaller, different font */}
-      <div className="pre-sub-row">
+      <div className="pre-sub-row notranslate" translate="no">
         {sub.split("").map((ch, i) => (
           <span key={i} className="pre-sub-char">{ch === " " ? "\u00A0" : ch}</span>
         ))}
