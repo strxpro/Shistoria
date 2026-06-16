@@ -89,7 +89,7 @@ export default function AdminPage() {
   const [pinErr, setPinErr] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [theme, setTheme] = useState<"dark" | "light">("dark");
-  const [notif, setNotif] = useState<{ messages: number; reviews: number; orders: number; comments: number }>({ messages: 0, reviews: 0, orders: 0, comments: 0 });
+  const [notif, setNotif] = useState<{ messages: number; reviews: number; orders: number; comments: number; newsletter: number }>({ messages: 0, reviews: 0, orders: 0, comments: 0, newsletter: 0 });
   const [bellOpen, setBellOpen] = useState(false);
   const [composeGuest, setComposeGuest] = useState<{ email: string; name?: string; lang?: string } | null>(null);
 
@@ -101,13 +101,15 @@ export default function AdminPage() {
         const since = new Date(Date.now() - 86400000).toISOString();
         // Komentarze do drinków: liczymy nowe od ostatniego "przeczytania" dzwonka (localStorage)
         const seenC = (typeof localStorage !== "undefined" && localStorage.getItem("sh-admin-comments-seen")) || since;
-        const [m, r, o, c] = await Promise.all([
+        const seenN = (typeof localStorage !== "undefined" && localStorage.getItem("sh-admin-newsletter-seen")) || since;
+        const [m, r, o, c, n] = await Promise.all([
           supabase.from("contact_messages").select("id", { count: "exact", head: true }).eq("is_read", false),
           supabase.from("reviews").select("id", { count: "exact", head: true }).eq("is_approved", false),
           supabase.from("drink_orders").select("id", { count: "exact", head: true }).gte("created_at", since),
           supabase.from("drink_comments").select("id", { count: "exact", head: true }).gte("created_at", seenC),
+          supabase.from("newsletter").select("id", { count: "exact", head: true }).gte("created_at", seenN),
         ]);
-        setNotif({ messages: m.count || 0, reviews: r.count || 0, orders: o.count || 0, comments: c.count || 0 });
+        setNotif({ messages: m.count || 0, reviews: r.count || 0, orders: o.count || 0, comments: c.count || 0, newsletter: n.count || 0 });
       } catch { /* ignore */ }
     };
     loadNotif();
@@ -116,15 +118,21 @@ export default function AdminPage() {
       .on("postgres_changes", { event: "*", schema: "public", table: "reviews" }, loadNotif)
       .on("postgres_changes", { event: "*", schema: "public", table: "drink_orders" }, loadNotif)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "drink_comments" }, loadNotif)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "newsletter" }, loadNotif)
       .subscribe();
     const poll = setInterval(loadNotif, 30000);
     return () => { supabase.removeChannel(ch); clearInterval(poll); };
   }, [authed]);
-  const totalNotif = notif.messages + notif.reviews + notif.comments;
+  const totalNotif = notif.messages + notif.reviews + notif.comments + notif.newsletter;
   // Oznacz komentarze jako przeczytane (zapamiętaj moment otwarcia dzwonka)
   const markCommentsSeen = () => {
     try { localStorage.setItem("sh-admin-comments-seen", new Date().toISOString()); } catch {}
     setNotif((n) => ({ ...n, comments: 0 }));
+  };
+  // Oznacz nowych zapisanych do newslettera jako przeczytanych
+  const markNewsletterSeen = () => {
+    try { localStorage.setItem("sh-admin-newsletter-seen", new Date().toISOString()); } catch {}
+    setNotif((n) => ({ ...n, newsletter: 0 }));
   };
 
   // Wczytaj zapamiętany motyw
@@ -216,7 +224,7 @@ export default function AdminPage() {
             { id: "reviews", label: "Recensioni", ico: "⭐" },
             { id: "stats", label: "Statistiche", ico: "📊" },
           ] as { id: Tab; label: string; ico: string }[]).map((t) => {
-            const badge = t.id === "messages" ? notif.messages : t.id === "reviews" ? notif.reviews : t.id === "drinks" ? notif.orders : 0;
+            const badge = t.id === "messages" ? notif.messages : t.id === "reviews" ? notif.reviews : t.id === "drinks" ? notif.orders : t.id === "newsletter" ? notif.newsletter : 0;
             return (
               <button
                 key={t.id}
@@ -266,6 +274,11 @@ export default function AdminPage() {
               {notif.orders > 0 && (
                 <button className="admin-bell-item" onClick={() => { setTab("drinks"); setBellOpen(false); }}>
                   📱 <span><strong>{notif.orders}</strong> ordini nelle 24h</span>
+                </button>
+              )}
+              {notif.newsletter > 0 && (
+                <button className="admin-bell-item" onClick={() => { setTab("newsletter"); markNewsletterSeen(); setBellOpen(false); }}>
+                  📧 <span><strong>{notif.newsletter}</strong> nuovi iscritti newsletter</span>
                 </button>
               )}
             </div>

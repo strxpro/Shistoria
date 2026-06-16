@@ -10,6 +10,10 @@ let _visitId: string | null = null;
 const _sectionTime: Record<string, number> = {};
 let _currentSection: string | null = null;
 let _sectionEnter = 0;
+// Aktywny czas (pauzuje gdy karta w tle) + heartbeat zapisujący czas na bieżąco
+let _activeMs = 0;
+let _lastTick = 0;
+let _heartbeat: ReturnType<typeof setInterval> | null = null;
 
 function detectReferrer(): { referrer: string; utm: string } {
   if (typeof window === "undefined") return { referrer: "direct", utm: "" };
@@ -60,6 +64,8 @@ export async function setIdentity(email?: string, name?: string) {
 export async function startTracking() {
   if (typeof window === "undefined" || _visitId) return;
   _started = Date.now();
+  _lastTick = Date.now();
+  _activeMs = 0;
   const sid = getSessionId();
   const { referrer, utm } = detectReferrer();
   const lang = (window as any).currentLanguage || (navigator.language || "it").split("-")[0];
@@ -85,21 +91,37 @@ export async function startTracking() {
     _visitId = res.data?.id || null;
   } catch { /* ignore */ }
 
-  // Zapisz czas trwania + sekcje przy wyjściu
-  const flush = () => {
-    if (_currentSection) { _sectionTime[_currentSection] = (_sectionTime[_currentSection] || 0) + (Date.now() - _sectionEnter) / 1000; }
-    const duration = Math.round((Date.now() - _started) / 1000);
-    const top = Object.entries(_sectionTime).sort((a, b) => b[1] - a[1])[0]?.[0] || "";
-    if (_visitId) {
-      // sendBeacon — działa nawet przy zamykaniu karty
-      try {
-        const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL || "https://slatelpipxtqveydgslc.supabase.co"}/rest/v1/analytics_visits?id=eq.${_visitId}`;
-        const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-        fetch(url, { method: "PATCH", headers: { "Content-Type": "application/json", apikey: key, Authorization: `Bearer ${key}`, Prefer: "return=minimal" },
-          body: JSON.stringify({ duration_seconds: duration, top_section: top }), keepalive: true });
-      } catch { /* ignore */ }
-    }
+  // Akumuluj aktywny czas (pomija czas gdy karta jest w tle)
+  const accumulate = () => {
+    const now = Date.now();
+    if (!document.hidden) _activeMs += now - _lastTick;
+    _lastTick = now;
   };
+  const currentDuration = () => {
+    accumulate();
+    return Math.max(0, Math.round(_activeMs / 1000));
+  };
+
+  // Zapis czasu trwania + sekcji. Heartbeat zapisuje na bieżąco (nie tylko przy wyjściu),
+  // dzięki czemu czas NIE jest już 0 nawet gdy beforeunload/pagehide nie zadziała (np. iOS Safari).
+  const persist = () => {
+    if (!_visitId) return;
+    if (_currentSection) { _sectionTime[_currentSection] = (_sectionTime[_currentSection] || 0) + (Date.now() - _sectionEnter) / 1000; _sectionEnter = Date.now(); }
+    const duration = currentDuration();
+    const top = Object.entries(_sectionTime).sort((a, b) => b[1] - a[1])[0]?.[0] || "";
+    const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL || "https://slatelpipxtqveydgslc.supabase.co"}/rest/v1/analytics_visits?id=eq.${_visitId}`;
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+    try {
+      fetch(url, { method: "PATCH", headers: { "Content-Type": "application/json", apikey: key, Authorization: `Bearer ${key}`, Prefer: "return=minimal" },
+        body: JSON.stringify({ duration_seconds: duration, top_section: top }), keepalive: true });
+    } catch { /* ignore */ }
+  };
+
+  const flush = () => persist();
+  // Heartbeat co 15 s — czas zapisuje się również podczas trwania wizyty (nie tylko przy zamknięciu)
+  _heartbeat = setInterval(() => { accumulate(); persist(); }, 15000);
+  // visibilitychange (hidden) jest dużo pewniejszy niż beforeunload na telefonach
+  document.addEventListener("visibilitychange", () => { accumulate(); if (document.hidden) persist(); });
   window.addEventListener("pagehide", flush);
   window.addEventListener("beforeunload", flush);
 
