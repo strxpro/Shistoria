@@ -43,6 +43,15 @@ function FlagImg({ code, size = 22 }: { code?: string; size?: number }) {
 // Język UI → kod kraju flagi (en → Wielka Brytania)
 const LANG_CC: Record<string, string> = { it: "it", pl: "pl", en: "gb", de: "de", fr: "fr", es: "es" };
 
+// Popouty renderowane przez createPortal trafiają do <body> — POZA elementem .admin,
+// więc tracą klasę motywu (i kolor tekstu). Ta funkcja odczytuje aktualny motyw z DOM,
+// żeby owinąć overlay w odpowiednią klasę (.admin-theme-dark/light) i kolory działały.
+function adminThemeClass(): string {
+  if (typeof document === "undefined") return "admin-theme-dark";
+  const el = document.querySelector(".admin");
+  return el?.classList.contains("admin-theme-light") ? "admin-theme-light" : "admin-theme-dark";
+}
+
 // Żywy podgląd motywu eventu — animowane SVG (SMIL, samowystarczalne, bez dodatkowego CSS)
 function EvTemplatePreview({ id, accent }: { id: string; accent: string }) {
   const a = accent || "#fff";
@@ -792,7 +801,7 @@ function EventsPanel() {
       </header>
 
       {editEvt && typeof document !== "undefined" && createPortal(
-        <div className="admin-modal-overlay" onClick={close}>
+        <div className={`admin-modal-overlay ${adminThemeClass()}`} onClick={close}>
           <div className="admin-modal admin-modal-wide" onClick={(e) => e.stopPropagation()}>
             {/* Stepper — 3 kroki */}
             <div className="ev-stepper">
@@ -993,8 +1002,8 @@ function DrinkStatsModal({ drink, onClose }: { drink: any; onClose: () => void }
   }, [view, ordersLoaded, drink.id]);
   if (typeof document === "undefined") return null;
   return createPortal(
-    <div className="admin-modal-overlay" onClick={onClose}>
-      <div className="admin-modal admin-modal-wide" onClick={(e) => e.stopPropagation()}>
+    <div className={`admin-modal-overlay ${adminThemeClass()}`} onClick={onClose}>
+      <div className="admin-modal admin-modal-wide sh-weather" onClick={(e) => e.stopPropagation()}>
         {view ? (
           <>
             <div className="drk-detail-head">
@@ -1919,8 +1928,8 @@ function GuestDetailModal({ guest, onClose, onWrite }: { guest: any; onClose: ()
   );
   if (typeof document === "undefined") return null;
   return createPortal(
-    <div className="admin-modal-overlay" onClick={onClose}>
-      <div className="admin-modal admin-modal-wide" onClick={(e) => e.stopPropagation()}>
+    <div className={`admin-modal-overlay ${adminThemeClass()}`} onClick={onClose}>
+      <div className="admin-modal admin-modal-wide sh-weather" onClick={(e) => e.stopPropagation()}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <span className="amsg-avatar" style={{ width: 48, height: 48, fontSize: 20 }}>{(guest.name || "?").charAt(0).toUpperCase()}</span>
           <div><h3 style={{ margin: 0 }}>{guest.name} <FlagImg code={LANG_CC[guest.lang]} size={18} /></h3><p style={{ margin: 0, opacity: 0.6, fontSize: 13 }}>{guest.email}</p></div>
@@ -3413,9 +3422,30 @@ function AdminStyles() {
       /* Modale — szklane, większy promień, miękkie wejście */
       .admin-modal-overlay { backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); background:rgba(4,8,14,0.5) !important; }
       .admin-modal { border-radius:24px !important; animation:adminPanelIn .4s var(--spring,cubic-bezier(.22,1,.36,1)) both; }
-      .admin-theme-dark .admin-modal { background:linear-gradient(180deg,#16222e,#0f1b26) !important; border:1px solid rgba(255,255,255,0.1) !important; box-shadow:0 40px 100px rgba(0,0,0,0.55) !important; }
-      .admin-theme-light .admin-modal { box-shadow:0 40px 100px rgba(17,34,51,0.18) !important; }
+      .admin-theme-dark .admin-modal { background:linear-gradient(180deg,#16222e,#0f1b26) !important; border:1px solid rgba(255,255,255,0.1) !important; box-shadow:0 40px 100px rgba(0,0,0,0.55) !important; color:#F5EDE0 !important; }
+      /* Tekst wewnątrz ciemnego popoutu zawsze jasny (popouty są w portalu — poza .admin, dlatego wymuszamy tu) */
+      .admin-theme-dark .admin-modal h3, .admin-theme-dark .admin-modal strong, .admin-theme-dark .admin-modal p, .admin-theme-dark .admin-modal span, .admin-theme-dark .admin-modal label, .admin-theme-dark .admin-modal div { color:inherit; }
+      .admin-theme-dark .admin-modal .drk-stat strong { color:#F5EDE0 !important; }
+      .admin-theme-light .admin-modal { box-shadow:0 40px 100px rgba(17,34,51,0.18) !important; background:#ffffff !important; color:#15202b !important; }
       .admin-modal h3 { font-weight:800; letter-spacing:-0.02em; }
+
+      /* Popouty: chowamy zwykły scrollbar (czysty wygląd, scroll dalej działa) */
+      .admin-modal { scrollbar-width:none; -ms-overflow-style:none; }
+      .admin-modal::-webkit-scrollbar { width:0 !important; height:0 !important; display:none !important; }
+
+      /* „Weather scroll" — kafelki/wiersze kurczą się i znikają u góry podczas przewijania (jak w apce Pogoda).
+         Działa na przeglądarkach ze scroll-driven animations (Chrome/Edge 115+); gdzie indziej po prostu scrolluje normalnie. */
+      @supports (animation-timeline: view()) {
+        @media (prefers-reduced-motion: no-preference) {
+          .sh-weather .drk-stats-grid > *, .sh-weather .drk-stats-cmts > .drk-cmt-row, .sh-weather .stats-country, .sh-weather .amsg-badge {
+            animation: shWeatherUp linear both;
+            animation-timeline: view(block);
+            animation-range: exit 0% exit 95%;
+          }
+        }
+      }
+      @keyframes shWeatherUp { to { opacity:0; transform:scale(0.78) translateY(-6px); filter:blur(2px); } }
+
 
       /* Suwaki zakresu statystyk — pigułki */
       .stats-range button { border-radius:999px !important; transition:all .25s var(--spring,ease) !important; }
