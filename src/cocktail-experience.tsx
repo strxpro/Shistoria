@@ -2233,12 +2233,12 @@ function CocktailExperience() {
         e = clamp01(e);
         const st = stageRef.current;
 
-        // ── 1) UI znika SZYBKO (szybciej niż reszta), robiąc miejsce ──
-        const uiOut = smooth(clamp01(e / 0.22));
+        // ── 1) UI znika (wolniej — nagłówek i boczne zakładki zostają dłużej widoczne) ──
+        const uiOut = smooth(clamp01(e / 0.5));
         dom(titleRef, { y: -70 * uiOut, opacity: 1 - uiOut });
-        dom(leftPanelRef, { xPercent: -130 * easeInCubic(clamp01(e / 0.25)), opacity: 1 - smooth(clamp01(e / 0.2)) });
-        dom(rightPanelRef, { xPercent: 130 * easeInCubic(clamp01(e / 0.25)), opacity: 1 - smooth(clamp01(e / 0.2)) });
-        dom(tableRef, { yPercent: 150 * easeInCubic(clamp01(e / 0.25)), opacity: 1 - smooth(clamp01(e / 0.2)) });
+        dom(leftPanelRef, { xPercent: -130 * easeInCubic(clamp01(e / 0.55)), opacity: 1 - smooth(clamp01(e / 0.5)) });
+        dom(rightPanelRef, { xPercent: 130 * easeInCubic(clamp01(e / 0.55)), opacity: 1 - smooth(clamp01(e / 0.5)) });
+        dom(tableRef, { yPercent: 150 * easeInCubic(clamp01(e / 0.55)), opacity: 1 - smooth(clamp01(e / 0.5)) });
 
         if (st === "glassReady") {
           // Szklanka kręci się i wyjeżdża w LEWO przy scrollu w dół.
