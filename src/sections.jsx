@@ -827,19 +827,26 @@ function Attrazioni({ t }) {
   const filtered = cat === "all" ? places : places.filter((p) => p.category === cat);
   const listRef = useRefE(null);
 
-  // Mobile: gdy scrollujesz listę, automatycznie zaznacz na mapie kartę najbliżej krawędzi pod mapą.
+  // Gdy scrollujesz, automatycznie zaznacz na mapie kartę najbliżej linii „focusa".
+  // Działa na telefonie I na komputerze (mapa jest sticky, więc reaguje na żywo + pokazuje dystans).
   useEffectE(() => {
-    if (typeof window === "undefined" || window.innerWidth >= 1024) return;
+    if (typeof window === "undefined") return;
     const onScroll = () => {
+      const section = document.getElementById("attrazioni");
+      if (!section) return;
+      const sr = section.getBoundingClientRect();
+      // działaj tylko gdy sekcja jest w kadrze (inaczej nie ruszaj wyboru)
+      if (sr.bottom < 0 || sr.top > window.innerHeight) return;
       const cards = listRef.current ? listRef.current.querySelectorAll("[data-atr-idx]") : [];
       const vh = window.innerHeight;
-      // mapa zajmuje górę ekranu (~64px + ~50vh); karty oceniamy względem punktu tuż pod mapą
-      const trigger = vh * 0.66;
+      const isDesk = window.innerWidth >= 1024;
+      // mapa na telefonie jest u góry → punkt focusa niżej; na desktopie bierzemy środek ekranu
+      const trigger = isDesk ? vh * 0.42 : vh * 0.66;
       let best = null, bestDist = Infinity;
       cards.forEach((el) => {
         const r = el.getBoundingClientRect();
-        const dist = Math.abs(r.top - trigger);
-        if (r.bottom > trigger - 60 && r.top < vh && dist < bestDist) { bestDist = dist; best = parseInt(el.dataset.atrIdx); }
+        const dist = Math.abs(r.top + r.height / 2 - trigger);
+        if (r.bottom > 0 && r.top < vh && dist < bestDist) { bestDist = dist; best = parseInt(el.dataset.atrIdx); }
       });
       if (best !== null && !Number.isNaN(best)) setSelected(best);
     };
