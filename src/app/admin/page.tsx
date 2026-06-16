@@ -1197,7 +1197,7 @@ function DrinksPanel() {
             {ranked.map((d, i) => {
               const sx = swipe.id === d.id ? swipe.x : 0;
               return (
-              <div key={d.id} className={`admin-drink-swipe ${selMode && selected.has(d.id) ? "drk-sel" : ""}`}>
+              <div key={d.id} className={`admin-drink-swipe ${selMode ? "sel-mode" : ""} ${selMode && selected.has(d.id) ? "drk-sel" : ""}`}>
                 {selMode && <span className={`admin-drink-selcb ${selected.has(d.id) ? "on" : ""}`} aria-hidden="true">{selected.has(d.id) ? "✓" : ""}</span>}
                 {!selMode && <button className="admin-drink-pin" onClick={() => nominate(d)} aria-label="Nomina">📌</button>}
                 {!selMode && <button className="admin-drink-trash" onClick={() => remove(d.id)} aria-label="Elimina">🗑</button>}
@@ -3092,20 +3092,31 @@ function AdminStyles() {
 
       .admin-drink-card { padding:16px; border-radius:16px; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.16); display:flex; flex-direction:column; gap:10px; }
       /* Swipe-to-delete (telefon): przesuń kartę w lewo → odsłania kosz */
-      .admin-drink-swipe { position:relative; border-radius:16px; overflow:hidden; }
-      .admin-drink-swipe .admin-drink-card { position:relative; z-index:2; background:#13212e; }
-      .admin-theme-light .admin-drink-swipe .admin-drink-card { background:#ffffff; }
+      .admin-drink-swipe { position:relative; border-radius:18px; overflow:hidden; }
+      /* Karta MUSI być nieprzezroczysta — inaczej zielony/czerwony pasek spod spodu prześwituje (bug z bokami).
+         Wysoka specyficzność + !important, żeby pokonać ogólną regułę .admin-theme-dark .admin-drink-card. */
+      .admin-theme-dark .admin-drink-swipe .admin-drink-card { position:relative; z-index:2; background:linear-gradient(165deg,#16303f,#0e2230) !important; box-shadow:none !important; }
+      .admin-theme-light .admin-drink-swipe .admin-drink-card { position:relative; z-index:2; background:#ffffff !important; }
+      .admin-theme-dark .admin-drink-swipe .admin-drink-card.is-month { background:linear-gradient(165deg,#2a2410,#1a1606) !important; border-color:rgba(241,196,15,0.6) !important; }
+      .admin-theme-light .admin-drink-swipe .admin-drink-card.is-month { background:#fffaf0 !important; border-color:rgba(241,196,15,0.7) !important; }
       .admin-drink-trash { position:absolute; top:0; right:0; bottom:0; width:84px; border:none; background:linear-gradient(90deg,#b91c1c,#dc2626); color:#fff; font-size:26px; cursor:pointer; z-index:1; display:flex; align-items:center; justify-content:center; }
       .admin-drink-pin { position:absolute; top:0; left:0; bottom:0; width:84px; border:none; background:linear-gradient(90deg,#15803d,#16a34a); color:#fff; font-size:24px; cursor:pointer; z-index:1; display:flex; align-items:center; justify-content:center; }
-      .admin-drink-swipe.drk-sel { outline:2px solid #E8927C; outline-offset:2px; border-radius:18px; }
-      .admin-drink-selcb { position:absolute; top:10px; left:10px; z-index:5; width:26px; height:26px; border-radius:50%; display:grid; place-items:center;
-        background:rgba(0,0,0,0.5); border:2px solid #E8927C; color:#fff; font-size:14px; font-weight:800; pointer-events:none; }
-      .admin-drink-selcb.on { background:#E8927C; }
+      /* Na desktopie nie ma swipe'a — chowamy paski (żeby nigdy nie wystawały po bokach). Zostają tylko ✕ i przyciski akcji. */
+      @media (hover:hover) and (pointer:fine) { .admin-drink-pin, .admin-drink-trash { display:none !important; } }
+      .admin-drink-swipe.drk-sel { outline:2px solid #E8927C; outline-offset:2px; border-radius:20px; }
+      .admin-theme-dark .admin-drink-swipe.drk-sel .admin-drink-card { background:linear-gradient(165deg,#1e3a2c,#142a20) !important; }
+      /* Checkbox zaznaczania — wyżej, większy, dobrze widoczny w lewym górnym rogu */
+      .admin-drink-selcb { position:absolute; top:12px; left:12px; z-index:6; width:30px; height:30px; border-radius:50%; display:grid; place-items:center;
+        background:rgba(0,0,0,0.55); border:2px solid #E8927C; color:#fff; font-size:15px; font-weight:800; pointer-events:none; box-shadow:0 2px 10px rgba(0,0,0,0.4); }
+      .admin-drink-selcb.on { background:#E8927C; box-shadow:0 4px 16px rgba(232,146,124,0.6); }
+      /* W trybie zaznaczania chowamy ✕ i przyciski akcji — czysto i równo, klik w kartę zaznacza */
+      .admin-drink-swipe.sel-mode .admin-drink-x, .admin-drink-swipe.sel-mode .admin-drink-actions { display:none !important; }
+      .admin-drink-swipe.sel-mode .admin-drink-card { cursor:pointer; }
       .admin-drink-ingr { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
       .admin-drink-ingr-pill { display:inline-flex; align-items:center; gap:5px; padding:3px 9px; border-radius:999px; background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.16); font-size:11px; font-weight:600; color:#fff; }
       .admin-drink-ingr-pill > span { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
       .admin-theme-light .admin-drink-ingr-pill { background:rgba(0,0,0,0.06); border-color:rgba(0,0,0,0.12); color:#15202b; }
-      .admin-drink-card.is-month { border-color:rgba(241,196,15,0.6); background:rgba(241,196,15,0.12); }
+      .admin-drink-card.is-month { border-color:rgba(241,196,15,0.6); }
       .admin-drink-photo { width:100%; height:120px; object-fit:cover; border-radius:10px; }
       .admin-drink-info h4 { margin:0; font-size:16px; } .admin-drink-info span { font-size:12px; opacity:0.6; display:block; }
       .admin-drink-actions { display:flex; gap:8px; flex-wrap:wrap; }
