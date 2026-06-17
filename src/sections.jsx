@@ -629,6 +629,32 @@ function EventCard({ item, index }) {
   );
 }
 
+// ─── Facebook — prawdziwa tablica przez oficjalny Page Plugin (bez tokenu) ──────
+// Pokazuje realne posty Strony. Adres Strony: env NEXT_PUBLIC_FB_PAGE_URL
+// albo window.__FB_PAGE_URL, domyślnie profil S'Historia.
+function FacebookFeed() {
+  const boxRef = useRefE(null);
+  const [w, setW] = useStateE(380);
+  useEffectE(() => {
+    const measure = () => { if (boxRef.current) setW(Math.max(200, Math.min(500, boxRef.current.clientWidth))); };
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+  const pageUrl = (typeof window !== "undefined" && window.__FB_PAGE_URL)
+    || process.env.NEXT_PUBLIC_FB_PAGE_URL
+    || "https://www.facebook.com/SHistoriaSardegna";
+  const src = `https://www.facebook.com/plugins/page.php?href=${encodeURIComponent(pageUrl)}&tabs=timeline&width=${w}&height=620&small_header=true&adapt_container_width=true&hide_cover=false&show_facepile=false`;
+  return (
+    <div ref={boxRef} className="social-fb-embed">
+      <iframe title="Facebook — S'Historia" src={src} width={w} height={620}
+        style={{ border: "none", overflow: "hidden", width: "100%", borderRadius: 14, background: "#fff" }}
+        scrolling="no" frameBorder="0" allowFullScreen
+        allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share" />
+    </div>
+  );
+}
+
 // ─── Social Feed ──────────────────────────────────────────────────────────────
 function SocialFeed({ t }) {
   const STORIES = [
@@ -707,28 +733,9 @@ function SocialFeed({ t }) {
                 <h4 className="social-handle">S'Historia Rena Majore</h4>
                 <span className="kicker">{t("social.facebook")}</span>
               </div>
-              <a href="#" className="social-link">→</a>
+              <a href="https://www.facebook.com/SHistoriaSardegna" target="_blank" rel="noopener" className="social-link">→</a>
             </div>
-            <div className="social-fb-list">
-              {[
-                { d: "ieri", t: "Aperitivo al tramonto", body: "Stasera musica acustica dalle 19:30. Vi aspettiamo con calici di Vermentino freddo e tagliere di pecorino." },
-                { d: "3 giorni fa", t: "Nuovo menu d'estate", body: "Da oggi nuova carta estiva: pesce crudo, fregula con vongole, gelato al mirto. Venite a provarla!" },
-                { d: "1 settimana fa", t: "Riservato il chef's table per chi vuole", body: "Otto coperti, otto portate. Lo chef cucina davanti a voi. Prenotate prima del weekend." },
-              ].map((p, i) => (
-                <article key={i} className="social-fb-card">
-                  <div className="social-fb-meta">
-                    <span className="social-fb-avatar">S'H</span>
-                    <div>
-                      <strong>S'Historia</strong>
-                      <span className="kicker" style={{ display: "block", marginTop: 2 }}>{p.d}</span>
-                    </div>
-                  </div>
-                  <h5 className="social-fb-title">{p.t}</h5>
-                  <p className="social-fb-body">{p.body}</p>
-                  <a href="#" className="social-fb-cta">Leggi su Facebook →</a>
-                </article>
-              ))}
-            </div>
+            <FacebookFeed />
           </div>
         </div>
       </div>
@@ -784,6 +791,8 @@ function SocialFeed({ t }) {
         .social-ig-overlay { position: absolute; inset: 0; background: rgba(26,61,82,0.6); color: #fff; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; font-family: var(--f-display); font-weight: 700; }
         .social-ig-cell:hover .social-ig-overlay { opacity: 1; }
         .social-fb-list { display: flex; flex-direction: column; gap: 16px; }
+        .social-fb-embed { width: 100%; border-radius: 14px; overflow: hidden; min-height: 620px; }
+        .social-fb-embed iframe { display: block; }
         .social-fb-card { background: #fff; padding: 20px; border-radius: 14px; border: 1px solid var(--c-line); }
         .social-fb-meta { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
         .social-fb-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--c-sky); color: #fff; display: flex; align-items: center; justify-content: center; font-family: var(--f-display); font-weight: 800; font-size: 12px; }
