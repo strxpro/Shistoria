@@ -783,7 +783,26 @@ function SocialFeed({ t }) {
                 ))}
               </div>
             ) : (
-              <FacebookFeed />
+              <div className="social-fb-list">
+                {[
+                  { d: "ieri", t: "Aperitivo al tramonto", body: "Stasera musica acustica dalle 19:30. Vi aspettiamo con calici di Vermentino freddo e tagliere di pecorino." },
+                  { d: "3 giorni fa", t: "Nuovo menu d'estate", body: "Da oggi nuova carta estiva: pesce crudo, fregula con vongole, gelato al mirto. Venite a provarla!" },
+                  { d: "1 settimana fa", t: "Chef's table su prenotazione", body: "Otto coperti, otto portate. Lo chef cucina davanti a voi. Prenotate prima del weekend." },
+                ].map((p, i) => (
+                  <a key={i} href="https://www.facebook.com/SHistoriaSardegna" target="_blank" rel="noopener" className="social-fb-card" style={{ textDecoration: "none", display: "block" }}>
+                    <div className="social-fb-meta">
+                      <span className="social-fb-avatar">S'H</span>
+                      <div>
+                        <strong>S'Historia</strong>
+                        <span className="kicker" style={{ display: "block", marginTop: 2 }}>{p.d}</span>
+                      </div>
+                    </div>
+                    <h5 className="social-fb-title">{p.t}</h5>
+                    <p className="social-fb-body">{p.body}</p>
+                    <span className="social-fb-cta">Leggi su Facebook →</span>
+                  </a>
+                ))}
+              </div>
             )}
           </div>
         </div>
