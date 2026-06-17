@@ -60,8 +60,11 @@ Vercel → Settings → Environment Variables:
 ```
 META_ACCESS_TOKEN = <PAGE_TOKEN z kroku 4>
 IG_USER_ID        = <instagram_business_account.id z kroku 4>
+FB_PAGE_ID        = <PAGE_ID z kroku 4 (me/accounts)>
 ```
-→ **Redeploy**. Sekcja „Social" pokaże prawdziwą galerię IG (zdjęcia + wideo + Reels). Bez kluczy strona pokazuje ładny placeholder (nic się nie psuje).
+→ **Redeploy**. Sekcja „Social" pokaże prawdziwą galerię IG (zdjęcia + wideo + Reels)
+oraz prawdziwe posty z Facebooka (przez Graph API — bez iframe, więc adblock ich nie zablokuje).
+Bez kluczy strona pokazuje ładny placeholder (nic się nie psuje).
 
 ## Test
 

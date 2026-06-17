@@ -671,11 +671,16 @@ function SocialFeed({ t }) {
 
   // Prawdziwe media z Instagrama (Graph API przez nasz /api/instagram)
   const [igMedia, setIgMedia] = useStateE([]);
+  const [fbPosts, setFbPosts] = useStateE([]);
   useEffectE(() => {
     let alive = true;
     fetch("/api/instagram")
       .then((r) => r.json())
       .then((j) => { if (alive && Array.isArray(j.media) && j.media.length) setIgMedia(j.media); })
+      .catch(() => {});
+    fetch("/api/facebook")
+      .then((r) => r.json())
+      .then((j) => { if (alive && Array.isArray(j.posts) && j.posts.length) setFbPosts(j.posts); })
       .catch(() => {});
     return () => { alive = false; };
   }, []);
@@ -758,7 +763,28 @@ function SocialFeed({ t }) {
               </div>
               <a href="https://www.facebook.com/SHistoriaSardegna" target="_blank" rel="noopener" className="social-link">→</a>
             </div>
-            <FacebookFeed />
+            {fbPosts.length > 0 ? (
+              <div className="social-fb-list">
+                {fbPosts.map((p) => (
+                  <a key={p.id} href={p.permalink} target="_blank" rel="noopener" className="social-fb-card" style={{ textDecoration: "none", display: "block" }}>
+                    <div className="social-fb-meta">
+                      <span className="social-fb-avatar">S'H</span>
+                      <div>
+                        <strong>S'Historia</strong>
+                        <span className="kicker" style={{ display: "block", marginTop: 2 }}>
+                          {p.created ? new Date(p.created).toLocaleDateString("it-IT", { day: "numeric", month: "long" }) : ""}
+                        </span>
+                      </div>
+                    </div>
+                    {p.image && <img src={p.image} alt="" loading="lazy" style={{ width: "100%", borderRadius: 10, margin: "4px 0 10px", display: "block" }} />}
+                    {p.message && <p className="social-fb-body">{p.message.length > 220 ? p.message.slice(0, 220) + "…" : p.message}</p>}
+                    <span className="social-fb-cta">Leggi su Facebook →</span>
+                  </a>
+                ))}
+              </div>
+            ) : (
+              <FacebookFeed />
+            )}
           </div>
         </div>
       </div>
