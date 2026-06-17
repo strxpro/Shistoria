@@ -19,7 +19,9 @@ $LANG  = "it"
 
 # --- WEBHOOKI ---------------------------------------------------------------
 $WH_EVENT   = "https://hook.eu1.make.com/4swpubn6ixliy7w2j77kxhyc9e6s1lfz"   # eventy (zapis do Data Store)
-$WH_COMMENT = "https://hook.eu1.make.com/ieeo3nyorpo6otmkv64ucdbndr4ho0pvi"  # komentarze (Twoj URL z pytania)
+# URL komentarzy ZOSTAW pusty - skrypt poprosi o wklejenie (kopiuj DOKLADNIE z modulu
+# Webhook w make -> "Copy address to clipboard"), zeby nie bylo literowki.
+$WH_COMMENT = ""
 
 function HtmlCard($title, $body) {
   $h = '<div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;background:#12303f;color:#fff;border-radius:18px;overflow:hidden;border:1px solid rgba(255,255,255,.12)">'
@@ -71,6 +73,10 @@ function Feed-Event {
 
 # 2) KOMENTARZ - payload jaki wysyla strona (notifyComment) ------------------
 function Feed-Comment {
+  if ([string]::IsNullOrWhiteSpace($WH_COMMENT)) {
+    $script:WH_COMMENT = (Read-Host "Wklej URL webhooka KOMENTARZY z make (Copy address to clipboard)").Trim()
+  }
+  if ([string]::IsNullOrWhiteSpace($WH_COMMENT)) { Write-Host "Brak URL - pomijam." -ForegroundColor Yellow; return }
   $body = @{
     type       = "new_comment"
     source     = "shistoria.it"
@@ -87,8 +93,8 @@ function Feed-Comment {
 # ============================================================================
 Write-Host ""
 Write-Host "=== NAKARM WEBHOOKI (najpierw 'Run once' w make!) ===" -ForegroundColor Magenta
-Write-Host " 1) Event   -> $WH_EVENT"
-Write-Host " 2) Komentarz-> $WH_COMMENT"
+Write-Host " 1) Event    -> $WH_EVENT"
+Write-Host " 2) Komentarz -> (URL wkleisz po wyborze 2)"
 Write-Host " 9) Oba po kolei"
 $c = Read-Host "`nWybierz numer (1/2/9)"
 switch ($c) {
