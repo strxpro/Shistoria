@@ -669,6 +669,17 @@ function SocialFeed({ t }) {
   const storyOpen = storyIdx >= 0;
   const storyTimer = useRefE(null);
 
+  // Prawdziwe media z Instagrama (Graph API przez nasz /api/instagram)
+  const [igMedia, setIgMedia] = useStateE([]);
+  useEffectE(() => {
+    let alive = true;
+    fetch("/api/instagram")
+      .then((r) => r.json())
+      .then((j) => { if (alive && Array.isArray(j.media) && j.media.length) setIgMedia(j.media); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
   // Auto-przejście co 4s + zamknięcie po ostatniej
   useEffectE(() => {
     if (!storyOpen) return;
@@ -705,24 +716,36 @@ function SocialFeed({ t }) {
               <a href="https://www.instagram.com/shistoria.renamajore" target="_blank" rel="noopener" className="social-link">→</a>
             </div>
             <div className="social-ig-grid">
-              {[
-                { type: "food", l: "Carbonara di mare" },
-                { type: "sea", l: "Tramonto · ieri" },
-                { type: "food", l: "Pasta del giorno" },
-                { type: "rock", l: "Sala domenica" },
-                { type: "food", l: "Aperitivo · 18h" },
-                { type: "sea", l: "Calma del mattino" },
-                { type: "rock", l: "Lavagna del giorno" },
-                { type: "food", l: "Dolce di nonna" },
-                { type: "sea", l: "Vista di sempre" },
-              ].map((p, i) => (
-                <div key={i} className="social-ig-cell">
-                  <Placeholder type={p.type} label={p.l} style={{ width: "100%", height: "100%" }} />
-                  <div className="social-ig-overlay">
-                    <span>♥ {Math.floor(80 + Math.random() * 400)}</span>
+              {igMedia.length > 0 ? (
+                igMedia.map((m) => (
+                  <a key={m.id} href={m.permalink || "https://www.instagram.com/shistoria.renamajore"}
+                    target="_blank" rel="noopener" className="social-ig-cell">
+                    {m.image ? <img src={m.image} alt={m.caption ? m.caption.slice(0, 60) : "Instagram"} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                             : <Placeholder type="food" label="" style={{ width: "100%", height: "100%" }} />}
+                    {(m.type === "VIDEO" || m.isReel) && <span className="social-ig-badge">{m.isReel ? "▶ Reel" : "▶"}</span>}
+                    <div className="social-ig-overlay"><span>{m.isReel ? "▶ Reel" : "Vedi su Instagram"}</span></div>
+                  </a>
+                ))
+              ) : (
+                [
+                  { type: "food", l: "Carbonara di mare" },
+                  { type: "sea", l: "Tramonto · ieri" },
+                  { type: "food", l: "Pasta del giorno" },
+                  { type: "rock", l: "Sala domenica" },
+                  { type: "food", l: "Aperitivo · 18h" },
+                  { type: "sea", l: "Calma del mattino" },
+                  { type: "rock", l: "Lavagna del giorno" },
+                  { type: "food", l: "Dolce di nonna" },
+                  { type: "sea", l: "Vista di sempre" },
+                ].map((p, i) => (
+                  <div key={i} className="social-ig-cell">
+                    <Placeholder type={p.type} label={p.l} style={{ width: "100%", height: "100%" }} />
+                    <div className="social-ig-overlay">
+                      <span>♥ {Math.floor(80 + Math.random() * 400)}</span>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
 
@@ -787,7 +810,8 @@ function SocialFeed({ t }) {
         .social-story:hover .social-story-ring { transform: scale(1.06); }
         .social-story-inner { display: block; width: 100%; height: 100%; border-radius: 50%; overflow: hidden; border: 2px solid var(--c-bg, #fff); background: #ccc; }
         .social-story-label { font-size: 11px; font-weight: 600; color: var(--c-deep); opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70px; }
-        .social-ig-cell { position: relative; aspect-ratio: 1; border-radius: 6px; overflow: hidden; cursor: pointer; }
+        .social-ig-cell { position: relative; display: block; aspect-ratio: 1; border-radius: 6px; overflow: hidden; cursor: pointer; text-decoration: none; }
+        .social-ig-badge { position: absolute; top: 6px; right: 6px; z-index: 2; background: rgba(0,0,0,0.6); color: #fff; font-size: 10px; font-weight: 700; padding: 3px 7px; border-radius: 999px; letter-spacing: 0.03em; }
         .social-ig-overlay { position: absolute; inset: 0; background: rgba(26,61,82,0.6); color: #fff; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; font-family: var(--f-display); font-weight: 700; }
         .social-ig-cell:hover .social-ig-overlay { opacity: 1; }
         .social-fb-list { display: flex; flex-direction: column; gap: 16px; }
