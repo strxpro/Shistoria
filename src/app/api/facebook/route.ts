@@ -1,44 +1,55 @@
 import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
 
 /**
- * /api/facebook — pobiera posty Strony FB przez Graph API (bez iframe,
- * więc adblock/anty-tracker tego NIE zablokuje — w przeciwieństwie do Page Plugin).
+ * /api/facebook — posty Strony FB dla sekcji "Social".
  *
- * Env (po stronie serwera):
- *   META_ACCESS_TOKEN — ten sam Page token co dla Instagrama
- *   FB_PAGE_ID        — ID Strony (z me/accounts; patrz INSTAGRAM_API_SETUP.md krok 4)
- *
- * Cache 30 min.
+ * ŹRÓDŁO 1 (zalecane): tabela Supabase `social_posts` (platform='facebook'),
+ *   napełniana przez make.com. Bez iframe → adblock nie blokuje.
+ * ŹRÓDŁO 2 (fallback): Graph API, jeśli ustawisz META_ACCESS_TOKEN + FB_PAGE_ID.
  */
 
-export const revalidate = 1800;
+export const revalidate = 300;
 
-type FbPost = {
-  id: string;
-  message: string;
-  image: string | null;
-  permalink: string;
-  created: string;
-};
+const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://slatelpipxtqveydgslc.supabase.co";
+const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 
-export async function GET() {
+async function fromSupabase() {
+  if (!SB_KEY) return null;
+  try {
+    const sb = createClient(SB_URL, SB_KEY);
+    const { data, error } = await sb
+      .from("social_posts")
+      .select("external_id,image_url,caption,permalink,posted_at")
+      .eq("platform", "facebook")
+      .eq("kind", "post")
+      .order("posted_at", { ascending: false })
+      .limit(8);
+    if (error || !data || data.length === 0) return null;
+    const posts = data.map((p: any) => ({
+      id: p.external_id,
+      message: p.caption || "",
+      image: p.image_url || null,
+      permalink: p.permalink || "",
+      created: p.posted_at || "",
+    }));
+    return { configured: true, source: "supabase", posts };
+  } catch {
+    return null;
+  }
+}
+
+async function fromGraph() {
   const token = process.env.META_ACCESS_TOKEN;
   const pageId = process.env.FB_PAGE_ID;
-
-  if (!token || !pageId) {
-    return NextResponse.json({ configured: false, posts: [] as FbPost[] });
-  }
-
+  if (!token || !pageId) return { configured: false, posts: [] };
   const fields = "message,story,full_picture,permalink_url,created_time";
   const url = `https://graph.facebook.com/v21.0/${pageId}/posts?fields=${fields}&limit=8&access_token=${token}`;
-
   try {
     const r = await fetch(url, { next: { revalidate: 1800 } });
     const j = await r.json();
-    if (j.error) {
-      return NextResponse.json({ configured: true, error: j.error.message || "graph error", posts: [] as FbPost[] });
-    }
-    const posts: FbPost[] = (j.data || [])
+    if (j.error) return { configured: true, error: j.error.message, posts: [] };
+    const posts = (j.data || [])
       .map((p: any) => ({
         id: p.id,
         message: p.message || p.story || "",
@@ -46,9 +57,15 @@ export async function GET() {
         permalink: p.permalink_url || `https://www.facebook.com/${pageId}`,
         created: p.created_time || "",
       }))
-      .filter((p: FbPost) => p.message || p.image);
-    return NextResponse.json({ configured: true, posts });
+      .filter((p: any) => p.message || p.image);
+    return { configured: true, source: "graph", posts };
   } catch (e) {
-    return NextResponse.json({ configured: true, error: String(e), posts: [] as FbPost[] });
+    return { configured: true, error: String(e), posts: [] };
   }
+}
+
+export async function GET() {
+  const sb = await fromSupabase();
+  if (sb) return NextResponse.json(sb);
+  return NextResponse.json(await fromGraph());
 }

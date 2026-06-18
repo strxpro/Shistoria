@@ -8,8 +8,9 @@ import { sendReservation, subscribeEventReminder, subscribeNewsletter, notifyRev
 const { useState: useStateE, useEffect: useEffectE, useRef: useRefE } = React;
 
 // ─── Instagram Stories (relacje) — kółka + podgląd fullscreen ───────────────────
+// Prawdziwe aktywne Stories z /api/instagram (napełniane przez make). Gdy brak — ozdobne.
 function IgStories() {
-  const STORIES = [
+  const DECOR = [
     { l: "Aperitivo", c: "#E8927C", t: "food" },
     { l: "Tramonto", c: "#5BB8D4", t: "sea" },
     { l: "Eventi", c: "#9b59b6", t: "rock" },
@@ -17,35 +18,53 @@ function IgStories() {
     { l: "Cocktail", c: "#C8102E", t: "food" },
     { l: "Mare", c: "#3FB68B", t: "sea" },
   ];
+  const [real, setReal] = useStateE([]); // realne stories z API
+  useEffectE(() => {
+    let alive = true;
+    fetch("/api/instagram").then((r) => r.json()).then((j) => {
+      if (alive && Array.isArray(j.stories) && j.stories.length) setReal(j.stories);
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, []);
+  const isReal = real.length > 0;
+  const items = isReal
+    ? real.map((m, i) => ({ real: true, img: m.image, video: m.video, l: "Story " + (i + 1), permalink: m.permalink, c: "#E8927C" }))
+    : DECOR.map((s) => ({ real: false, t: s.t, l: s.l, c: s.c }));
+
   const [storyIdx, setStoryIdx] = useStateE(-1);
   const storyOpen = storyIdx >= 0;
   const storyTimer = useRefE(null);
   useEffectE(() => {
     if (!storyOpen) return;
     if (typeof document !== "undefined") document.body.style.overflow = "hidden";
-    storyTimer.current = setTimeout(() => { setStoryIdx((i) => (i + 1 < STORIES.length ? i + 1 : -1)); }, 4000);
+    storyTimer.current = setTimeout(() => { setStoryIdx((i) => (i + 1 < items.length ? i + 1 : -1)); }, 4000);
     return () => { if (storyTimer.current) clearTimeout(storyTimer.current); if (typeof document !== "undefined") document.body.style.overflow = ""; };
-  }, [storyIdx, storyOpen]);
+  }, [storyIdx, storyOpen, items.length]);
   const closeStory = () => setStoryIdx(-1);
-  const nextStory = () => setStoryIdx((i) => (i + 1 < STORIES.length ? i + 1 : -1));
+  const nextStory = () => setStoryIdx((i) => (i + 1 < items.length ? i + 1 : -1));
   const prevStory = () => setStoryIdx((i) => (i > 0 ? i - 1 : 0));
+  const cur = storyIdx >= 0 ? items[storyIdx] : null;
   return (
     <>
       <div className="ig-stories-row">
-        {STORIES.map((s, i) => (
+        {items.map((s, i) => (
           <button key={i} type="button" className="social-story" onClick={() => setStoryIdx(i)}>
             <span className="social-story-ring" style={{ background: `conic-gradient(from 140deg, ${s.c}, #E8927C, #5BB8D4, ${s.c})` }}>
-              <span className="social-story-inner"><Placeholder type={s.t} label="" style={{ width: "100%", height: "100%" }} /></span>
+              <span className="social-story-inner">
+                {s.real && s.img
+                  ? <img src={s.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : <Placeholder type={s.t} label="" style={{ width: "100%", height: "100%" }} />}
+              </span>
             </span>
             <span className="social-story-label">{s.l}</span>
           </button>
         ))}
       </div>
-      {storyOpen && typeof document !== "undefined" && createPortal(
+      {storyOpen && cur && typeof document !== "undefined" && createPortal(
         <div className="story-overlay" onClick={closeStory}>
           <div className="story-view" onClick={(e) => e.stopPropagation()}>
             <div className="story-bars">
-              {STORIES.map((_, i) => (
+              {items.map((_, i) => (
                 <div key={i} className="story-bar"><div className="story-bar-fill" style={{ width: i < storyIdx ? "100%" : i > storyIdx ? "0%" : undefined, animation: i === storyIdx ? "storyFill 4s linear forwards" : "none" }} /></div>
               ))}
             </div>
@@ -55,10 +74,12 @@ function IgStories() {
               <button className="story-close" onClick={closeStory} aria-label="Chiudi">×</button>
             </div>
             <div className="story-img">
-              <Placeholder type={STORIES[storyIdx].t} label="" style={{ width: "100%", height: "100%" }} />
-              <span className="story-caption">{STORIES[storyIdx].l}</span>
+              {cur.real && cur.img
+                ? <img src={cur.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                : <Placeholder type={cur.t} label="" style={{ width: "100%", height: "100%" }} />}
+              {!cur.real && <span className="story-caption">{cur.l}</span>}
             </div>
-            <a href="https://www.instagram.com/shistoria.renamajore" target="_blank" rel="noopener" className="story-ig-link">Vedi su Instagram →</a>
+            <a href={cur.permalink || "https://www.instagram.com/shistoria.renamajore"} target="_blank" rel="noopener" className="story-ig-link">Vedi su Instagram →</a>
             <button className="story-nav story-nav-l" onClick={prevStory} aria-label="Precedente" />
             <button className="story-nav story-nav-r" onClick={nextStory} aria-label="Successivo" />
           </div>
@@ -720,6 +741,7 @@ function SocialFeed({ t }) {
               </div>
               <a href="https://www.instagram.com/shistoria.renamajore" target="_blank" rel="noopener" className="social-link">→</a>
             </div>
+            <IgStories />
             <div className="social-ig-grid">
               {igMedia.length > 0 ? (
                 igMedia.map((m) => (
