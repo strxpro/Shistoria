@@ -10,15 +10,7 @@ const { useState: useStateE, useEffect: useEffectE, useRef: useRefE } = React;
 // ─── Instagram Stories (relacje) — kółka + podgląd fullscreen ───────────────────
 // Prawdziwe aktywne Stories z /api/instagram (napełniane przez make). Gdy brak — ozdobne.
 function IgStories() {
-  const DECOR = [
-    { l: "Aperitivo", c: "#E8927C", t: "food" },
-    { l: "Tramonto", c: "#5BB8D4", t: "sea" },
-    { l: "Eventi", c: "#9b59b6", t: "rock" },
-    { l: "Menu", c: "#F4D03F", t: "food" },
-    { l: "Cocktail", c: "#C8102E", t: "food" },
-    { l: "Mare", c: "#3FB68B", t: "sea" },
-  ];
-  const [real, setReal] = useStateE([]); // realne stories z API
+  const [real, setReal] = useStateE([]); // realne aktywne Stories z API
   useEffectE(() => {
     let alive = true;
     fetch("/api/instagram").then((r) => r.json()).then((j) => {
@@ -26,58 +18,58 @@ function IgStories() {
     }).catch(() => {});
     return () => { alive = false; };
   }, []);
-  const isReal = real.length > 0;
-  const items = isReal
-    ? real.map((m, i) => ({ real: true, img: m.image, video: m.video, l: "Story " + (i + 1), permalink: m.permalink, c: "#E8927C" }))
-    : DECOR.map((s) => ({ real: false, t: s.t, l: s.l, c: s.c }));
-
+  const hasStories = real.length > 0;
+  const items = real; // aktywne Stories (24h) z API
   const [storyIdx, setStoryIdx] = useStateE(-1);
   const storyOpen = storyIdx >= 0;
   const storyTimer = useRefE(null);
   useEffectE(() => {
     if (!storyOpen) return;
     if (typeof document !== "undefined") document.body.style.overflow = "hidden";
-    storyTimer.current = setTimeout(() => { setStoryIdx((i) => (i + 1 < items.length ? i + 1 : -1)); }, 4000);
+    storyTimer.current = setTimeout(() => { setStoryIdx((i) => (i + 1 < items.length ? i + 1 : -1)); }, 4500);
     return () => { if (storyTimer.current) clearTimeout(storyTimer.current); if (typeof document !== "undefined") document.body.style.overflow = ""; };
   }, [storyIdx, storyOpen, items.length]);
+  const openStories = () => {
+    if (hasStories) setStoryIdx(0);
+    else if (typeof window !== "undefined") window.open("https://www.instagram.com/shistoria.renamajore", "_blank");
+  };
   const closeStory = () => setStoryIdx(-1);
   const nextStory = () => setStoryIdx((i) => (i + 1 < items.length ? i + 1 : -1));
   const prevStory = () => setStoryIdx((i) => (i > 0 ? i - 1 : 0));
   const cur = storyIdx >= 0 ? items[storyIdx] : null;
   return (
     <>
+      {/* Jedno duże kółko = logo S'Historia z obwódką relacji (jak zdjęcie profilowe na IG).
+          Klik → podgląd aktywnych relacji (24h). Gdy brak relacji — obwódka szara, klik → profil IG. */}
       <div className="ig-stories-row">
-        {items.map((s, i) => (
-          <button key={i} type="button" className="social-story" onClick={() => setStoryIdx(i)}>
-            <span className="social-story-ring" style={{ background: `conic-gradient(from 140deg, ${s.c}, #E8927C, #5BB8D4, ${s.c})` }}>
-              <span className="social-story-inner">
-                {s.real && s.img
-                  ? <img src={s.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  : <Placeholder type={s.t} label="" style={{ width: "100%", height: "100%" }} />}
-              </span>
+        <button type="button" className={`ig-profile ${hasStories ? "has" : ""}`} onClick={openStories} aria-label="Relacje S'Historia">
+          <span className="ig-profile-ring">
+            <span className="ig-profile-inner">
+              <img src="/logo.png" alt="S'Historia" />
             </span>
-            <span className="social-story-label">{s.l}</span>
-          </button>
-        ))}
+          </span>
+          <span className="social-story-label">S'Historia</span>
+        </button>
       </div>
       {storyOpen && cur && typeof document !== "undefined" && createPortal(
         <div className="story-overlay" onClick={closeStory}>
           <div className="story-view" onClick={(e) => e.stopPropagation()}>
             <div className="story-bars">
               {items.map((_, i) => (
-                <div key={i} className="story-bar"><div className="story-bar-fill" style={{ width: i < storyIdx ? "100%" : i > storyIdx ? "0%" : undefined, animation: i === storyIdx ? "storyFill 4s linear forwards" : "none" }} /></div>
+                <div key={i} className="story-bar"><div className="story-bar-fill" style={{ width: i < storyIdx ? "100%" : i > storyIdx ? "0%" : undefined, animation: i === storyIdx ? "storyFill 4.5s linear forwards" : "none" }} /></div>
               ))}
             </div>
             <div className="story-head">
-              <span className="story-avatar">S'H</span>
+              <span className="story-avatar"><img src="/logo.png" alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></span>
               <strong>shistoria.renamajore</strong>
               <button className="story-close" onClick={closeStory} aria-label="Chiudi">×</button>
             </div>
             <div className="story-img">
-              {cur.real && cur.img
-                ? <img src={cur.img} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                : <Placeholder type={cur.t} label="" style={{ width: "100%", height: "100%" }} />}
-              {!cur.real && <span className="story-caption">{cur.l}</span>}
+              {cur.video
+                ? <video src={cur.video} autoPlay muted playsInline style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                : cur.image
+                  ? <img src={cur.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : <Placeholder type="food" label="" style={{ width: "100%", height: "100%" }} />}
             </div>
             <a href={cur.permalink || "https://www.instagram.com/shistoria.renamajore"} target="_blank" rel="noopener" className="story-ig-link">Vedi su Instagram →</a>
             <button className="story-nav story-nav-l" onClick={prevStory} aria-label="Precedente" />
@@ -87,9 +79,13 @@ function IgStories() {
         document.body,
       )}
       <style>{`
-        .ig-stories-row { display:flex; gap:16px; overflow-x:auto; padding:4px 2px 22px; margin-bottom:8px; scrollbar-width:none; -webkit-overflow-scrolling:touch; justify-content:center; }
-        .ig-stories-row::-webkit-scrollbar { display:none; }
-        @media (max-width:768px){ .ig-stories-row { justify-content:flex-start; } }
+        .ig-stories-row { display:flex; gap:16px; padding:4px 2px 22px; margin-bottom:8px; justify-content:center; }
+        .ig-profile { display:flex; flex-direction:column; align-items:center; gap:8px; background:none; border:none; cursor:pointer; }
+        .ig-profile-ring { display:block; width:92px; height:92px; border-radius:50%; padding:4px; background:#d9d9d9; transition:transform .25s var(--ease-out, ease); }
+        .ig-profile.has .ig-profile-ring { background:conic-gradient(from 140deg, #E8927C, #F4D03F, #C8102E, #5BB8D4, #E8927C); }
+        .ig-profile:hover .ig-profile-ring { transform:scale(1.05); }
+        .ig-profile-inner { display:block; width:100%; height:100%; border-radius:50%; overflow:hidden; border:3px solid var(--c-bg, #fff); background:#fff; display:grid; place-items:center; }
+        .ig-profile-inner img { width:78%; height:78%; object-fit:contain; }
       `}</style>
     </>
   );
