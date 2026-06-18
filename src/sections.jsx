@@ -848,13 +848,22 @@ function SocialFeed({ t }) {
               <div className="ig-pop-comments">
                 {(igPopout.comments || []).length === 0
                   ? <p className="ig-pop-empty">Nessun commento ancora.</p>
-                  : (igPopout.comments || []).map((c, i) => (
-                    <div key={i} className="ig-pop-cmt">
-                      <strong>{c.author || c.username || c.from?.username || "utente"}</strong> {c.text || c.content || c.message || ""}
-                    </div>
-                  ))}
+                  : (igPopout.comments || []).map((c, i) => {
+                    const u = c.username || c.author || c.from?.username || "utente";
+                    const tx = c.text || c.content || c.message || "";
+                    const lk = c.like_count ?? c.likeCount ?? c.likes ?? 0;
+                    return (
+                      <div key={i} className="ig-pop-cmt">
+                        <div className="ig-pop-cmt-txt"><strong>{u}</strong> {tx}</div>
+                        <div className="ig-pop-cmt-meta">
+                          {lk > 0 && <span className="ig-pop-cmt-likes">♥ {lk}</span>}
+                          <a href={igPopout.permalink || "https://www.instagram.com/shistoria.renamajore"} target="_blank" rel="noopener">Rispondi su Instagram</a>
+                        </div>
+                      </div>
+                    );
+                  })}
               </div>
-              <a href={igPopout.permalink || "https://www.instagram.com/shistoria.renamajore"} target="_blank" rel="noopener" className="ig-pop-link">Vedi su Instagram →</a>
+              <a href={igPopout.permalink || "https://www.instagram.com/shistoria.renamajore"} target="_blank" rel="noopener" className="ig-pop-link">💬 Lascia un commento su Instagram →</a>
             </div>
           </div>
           <style>{`
@@ -875,6 +884,11 @@ function SocialFeed({ t }) {
             .ig-pop-comments { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:10px; min-height:60px; }
             .ig-pop-cmt { font-size:13px; line-height:1.45; color:#fff; }
             .ig-pop-cmt strong { margin-right:6px; }
+            .ig-pop-cmt-txt { color:#fff; }
+            .ig-pop-cmt-meta { display:flex; gap:14px; align-items:center; margin-top:3px; font-size:11px; color:rgba(255,255,255,0.55); }
+            .ig-pop-cmt-likes { color:#FE2C55; }
+            .ig-pop-cmt-meta a { color:rgba(255,255,255,0.6); text-decoration:none; }
+            .ig-pop-cmt-meta a:hover { color:#fff; }
             .ig-pop-empty { font-size:13px; color:rgba(255,255,255,0.5); font-style:italic; }
             .ig-pop-link { margin-top:14px; text-align:center; color:#fff; background:rgba(255,255,255,0.14); border:1px solid rgba(255,255,255,0.28); padding:10px; border-radius:999px; font-size:13px; font-weight:600; text-decoration:none; }
           `}</style>
