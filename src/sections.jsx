@@ -689,6 +689,7 @@ function SocialFeed({ t }) {
   // Prawdziwe media z Instagrama (Graph API przez nasz /api/instagram)
   const [igMedia, setIgMedia] = useStateE([]);
   const [fbPosts, setFbPosts] = useStateE([]);
+  const [igPopout, setIgPopout] = useStateE(null); // post IG otwarty w popoucie (z komentarzami)
   useEffectE(() => {
     let alive = true;
     fetch("/api/instagram")
@@ -741,13 +742,12 @@ function SocialFeed({ t }) {
             <div className="social-ig-grid">
               {igMedia.length > 0 ? (
                 igMedia.map((m) => (
-                  <a key={m.id} href={m.permalink || "https://www.instagram.com/shistoria.renamajore"}
-                    target="_blank" rel="noopener" className="social-ig-cell">
+                  <button key={m.id} type="button" onClick={() => setIgPopout(m)} className="social-ig-cell">
                     {m.image ? <img src={m.image} alt={m.caption ? m.caption.slice(0, 60) : "Instagram"} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                              : <Placeholder type="food" label="" style={{ width: "100%", height: "100%" }} />}
                     {(m.type === "VIDEO" || m.isReel) && <span className="social-ig-badge">{m.isReel ? "▶ Reel" : "▶"}</span>}
-                    <div className="social-ig-overlay"><span>{m.isReel ? "▶ Reel" : "Vedi su Instagram"}</span></div>
-                  </a>
+                    <div className="social-ig-overlay"><span>{(m.comments?.length || 0) > 0 ? `💬 ${m.comments.length}` : (m.isReel ? "▶ Reel" : "👁")}</span></div>
+                  </button>
                 ))
               ) : (
                 [
@@ -825,6 +825,62 @@ function SocialFeed({ t }) {
           </div>
         </div>
       </div>
+
+      {/* Popout posta IG — zdjęcie/wideo + opis + komentarze (klik w kafelek) */}
+      {igPopout && typeof document !== "undefined" && createPortal(
+        <div className="ig-pop-overlay" onClick={() => setIgPopout(null)}>
+          <div className="ig-pop" onClick={(e) => e.stopPropagation()}>
+            <button className="ig-pop-close" onClick={() => setIgPopout(null)} aria-label="Chiudi">×</button>
+            <div className="ig-pop-media">
+              {igPopout.video
+                ? <video src={igPopout.video} controls autoPlay playsInline style={{ width: "100%", height: "100%", objectFit: "contain", background: "#000" }} />
+                : igPopout.image
+                  ? <img src={igPopout.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : <Placeholder type="food" label="" style={{ width: "100%", height: "100%" }} />}
+            </div>
+            <div className="ig-pop-side">
+              <div className="ig-pop-head">
+                <span className="ig-pop-ava"><img src="/logo.png" alt="" /></span>
+                <strong>shistoria.renamajore</strong>
+              </div>
+              {igPopout.caption && <p className="ig-pop-cap">{igPopout.caption}</p>}
+              <div className="ig-pop-meta">♥ {igPopout.likes || 0} · 💬 {(igPopout.comments || []).length}</div>
+              <div className="ig-pop-comments">
+                {(igPopout.comments || []).length === 0
+                  ? <p className="ig-pop-empty">Nessun commento ancora.</p>
+                  : (igPopout.comments || []).map((c, i) => (
+                    <div key={i} className="ig-pop-cmt">
+                      <strong>{c.author || c.username || c.from?.username || "utente"}</strong> {c.text || c.content || c.message || ""}
+                    </div>
+                  ))}
+              </div>
+              <a href={igPopout.permalink || "https://www.instagram.com/shistoria.renamajore"} target="_blank" rel="noopener" className="ig-pop-link">Vedi su Instagram →</a>
+            </div>
+          </div>
+          <style>{`
+            .ig-pop-overlay { position:fixed; inset:0; z-index:6000; background:rgba(8,12,18,0.82); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; padding:20px; animation:storyFade .2s ease; }
+            .ig-pop { width:min(880px,96vw); max-height:90vh; background:#0f1620; border-radius:18px; overflow:hidden; display:grid; grid-template-columns:1.3fr 1fr; box-shadow:0 30px 90px rgba(0,0,0,0.6); position:relative; }
+            @media (max-width:760px){ .ig-pop { grid-template-columns:1fr; max-height:92vh; overflow-y:auto; } }
+            .ig-pop-close { position:absolute; top:10px; right:12px; z-index:5; width:38px; height:38px; border-radius:50%; border:none; background:rgba(0,0,0,0.5); color:#fff; font-size:22px; cursor:pointer; }
+            .ig-pop-media { background:#000; min-height:280px; max-height:90vh; display:flex; align-items:center; justify-content:center; }
+            @media (max-width:760px){ .ig-pop-media { aspect-ratio:1; min-height:0; } }
+            .ig-pop-media img { width:100%; height:100%; object-fit:cover; }
+            .ig-pop-side { display:flex; flex-direction:column; padding:18px 18px 16px; color:#fff; min-height:0; }
+            .ig-pop-head { display:flex; align-items:center; gap:10px; padding-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.1); }
+            .ig-pop-ava { width:34px; height:34px; border-radius:50%; background:#fff; display:grid; place-items:center; overflow:hidden; }
+            .ig-pop-ava img { width:80%; height:80%; object-fit:contain; }
+            .ig-pop-head strong { font-size:14px; }
+            .ig-pop-cap { font-size:14px; line-height:1.5; color:rgba(255,255,255,0.9); margin:12px 0; }
+            .ig-pop-meta { font-size:13px; color:rgba(255,255,255,0.7); margin-bottom:10px; }
+            .ig-pop-comments { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:10px; min-height:60px; }
+            .ig-pop-cmt { font-size:13px; line-height:1.45; color:#fff; }
+            .ig-pop-cmt strong { margin-right:6px; }
+            .ig-pop-empty { font-size:13px; color:rgba(255,255,255,0.5); font-style:italic; }
+            .ig-pop-link { margin-top:14px; text-align:center; color:#fff; background:rgba(255,255,255,0.14); border:1px solid rgba(255,255,255,0.28); padding:10px; border-radius:999px; font-size:13px; font-weight:600; text-decoration:none; }
+          `}</style>
+        </div>,
+        document.body,
+      )}
 
       {/* Podgląd relacji — fullscreen jak na Instagramie (paski postępu, tap lewo/prawo) */}
       {storyOpen && typeof document !== "undefined" && createPortal(

@@ -19,6 +19,8 @@ CREATE TABLE IF NOT EXISTS social_posts (
   video_url text,                          -- URL wideo (gdy VIDEO/REEL)
   caption text,
   permalink text,
+  likes integer DEFAULT 0,                 -- liczba polubień posta (z IG)
+  comments jsonb DEFAULT '[]'::jsonb,      -- komentarze: [{author, text, ts}]
   posted_at timestamptz,                   -- data publikacji (sortowanie)
   created_at timestamptz DEFAULT now()
 );
@@ -33,6 +35,8 @@ ALTER TABLE social_posts ADD COLUMN IF NOT EXISTS image_url text;
 ALTER TABLE social_posts ADD COLUMN IF NOT EXISTS video_url text;
 ALTER TABLE social_posts ADD COLUMN IF NOT EXISTS caption text;
 ALTER TABLE social_posts ADD COLUMN IF NOT EXISTS permalink text;
+ALTER TABLE social_posts ADD COLUMN IF NOT EXISTS likes integer DEFAULT 0;
+ALTER TABLE social_posts ADD COLUMN IF NOT EXISTS comments jsonb DEFAULT '[]'::jsonb;
 ALTER TABLE social_posts ADD COLUMN IF NOT EXISTS posted_at timestamptz;
 
 -- unikalność po external_id → make robi UPSERT (nie duplikuje tych samych postów)

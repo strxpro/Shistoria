@@ -23,7 +23,7 @@ async function fromSupabase() {
     const sb = createClient(SB_URL, SB_KEY);
     const { data, error } = await sb
       .from("social_posts")
-      .select("external_id,kind,media_type,is_reel,image_url,video_url,caption,permalink,posted_at")
+      .select("external_id,kind,media_type,is_reel,image_url,video_url,caption,permalink,posted_at,likes,comments")
       .eq("platform", "instagram")
       .order("posted_at", { ascending: false })
       .limit(60);
@@ -37,6 +37,8 @@ async function fromSupabase() {
       caption: m.caption || "",
       permalink: m.permalink || "",
       timestamp: m.posted_at || "",
+      likes: m.likes || 0,
+      comments: Array.isArray(m.comments) ? m.comments : [],
     });
     const media = data.filter((d: any) => d.kind === "post").slice(0, 24).map(map);
     const stories = data.filter((d: any) => d.kind === "story").slice(0, 12).map(map);
@@ -68,6 +70,8 @@ async function fromGraph() {
         caption: m.caption || "",
         permalink: m.permalink || "",
         timestamp: m.timestamp || "",
+        likes: m.like_count || 0,
+        comments: [],
       };
     });
     return { configured: true, source: "graph", media, stories: [] };
