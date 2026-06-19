@@ -896,10 +896,20 @@ function EventsPanel() {
   };
 
   const remove = async (id: string) => {
-    if (confirm("Eliminare questo evento?")) {
-      await supabase.from("events").delete().eq("id", id);
-      load();
+    if (!confirm("Eliminare questo evento?")) return;
+    try {
+      const { data, error } = await supabase.from("events").delete().eq("id", id).select();
+      if (error) { alert("Errore eliminazione: " + error.message); return; }
+      if (!data || data.length === 0) {
+        alert("Eliminazione bloccata (RLS). Esegui scripts/setup-events-table.sql in Supabase → SQL Editor.");
+        return;
+      }
+      setEvents((evs) => evs.filter((e) => e.id !== id));
+    } catch (e: any) {
+      alert("Errore eliminazione: " + (e?.message || e));
+      return;
     }
+    load();
   };
 
   return (
@@ -3749,6 +3759,43 @@ function AdminStyles() {
         .admin-table td.menu-row-actions::before { display:none; }
         .admin-theme-light .admin-table tr { background:#fff; border-color:rgba(0,0,0,0.08); }
       }
+
+      /* ════════ SOFT UI — miękki, gładki wygląd admina (nadpisanie) ════════ */
+      .admin *, .admin-login * { transition-timing-function: cubic-bezier(.22,1,.36,1); }
+
+      .admin-btn, .admin-btn-sm, .admin-btn-ghost {
+        border-radius:14px; font-weight:600; letter-spacing:.01em;
+        transition: transform .25s cubic-bezier(.22,1,.36,1), box-shadow .25s, background .25s, border-color .25s, opacity .25s; }
+      .admin-btn { background:linear-gradient(135deg,#efa088,#e8927c); color:#1b1410; border:none;
+        box-shadow:0 8px 22px -8px rgba(232,146,124,.6); padding:12px 20px; }
+      .admin-btn:hover { transform:translateY(-2px); box-shadow:0 14px 30px -10px rgba(232,146,124,.7); }
+      .admin-btn:active { transform:translateY(0); }
+      .admin-btn-sm { border-radius:12px; padding:8px 13px; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.16); color:#fff; }
+      .admin-btn-sm:hover { background:rgba(255,255,255,.16); transform:translateY(-1px); }
+      .admin-btn-ghost { background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.16); color:#fff; padding:11px 18px; }
+      .admin-btn-ghost:hover { background:rgba(255,255,255,.12); transform:translateY(-1px); }
+      .admin-btn-danger { background:rgba(231,76,60,.14)!important; border:1px solid rgba(231,76,60,.4)!important; color:#ff9081!important; box-shadow:none!important; }
+      .admin-btn-danger:hover { background:rgba(231,76,60,.26)!important; }
+
+      .admin-event-card, .admin-drink-card, .stats-kpi, .stats-section, .admin-modal,
+      .admin-bell-pop, .admin-login-card, .menu-card {
+        border-radius:20px; box-shadow:0 18px 44px -22px rgba(0,0,0,.5);
+        transition: transform .3s cubic-bezier(.22,1,.36,1), box-shadow .3s, border-color .3s; }
+      .admin-event-card:hover, .stats-kpi:hover { transform:translateY(-3px); box-shadow:0 26px 60px -26px rgba(0,0,0,.6); }
+
+      .admin-field input, .admin-field textarea, .hours-day, .hours-time, .hours-slots, .amsg-input textarea {
+        border-radius:14px; transition: border-color .25s, box-shadow .25s, background .25s; }
+      .admin-field input:focus, .admin-field textarea:focus {
+        border-color:rgba(232,146,124,.6); box-shadow:0 0 0 4px rgba(232,146,124,.14); outline:none; }
+
+      .admin-nav button { border-radius:14px; transition: background .25s, color .25s, transform .2s; }
+      .admin-nav button:hover { transform:translateX(2px); }
+
+      .stats-range button, .admin-subtabs button, .ev-preview-switch button { border-radius:999px; transition: all .25s cubic-bezier(.22,1,.36,1); }
+
+      .admin-modal-overlay { backdrop-filter: blur(10px); }
+      .admin-modal { animation: adminSoftIn .35s cubic-bezier(.22,1,.36,1) both; }
+      @keyframes adminSoftIn { from { opacity:0; transform:translateY(16px) scale(.98); } to { opacity:1; transform:none; } }
     `}</style>
 
 
