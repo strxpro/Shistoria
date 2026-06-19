@@ -172,10 +172,66 @@ export default function AdminPage() {
     return () => { window.removeEventListener("deviceorientation", onOrient); window.removeEventListener("mousemove", onMouse); window.removeEventListener("touchstart", start); };
   }, []);
 
-  // Prosty PIN do admina (w produkcji zastąpić Supabase Auth)
-  const checkPin = () => {
-    if (pin === "shistoria2026") { setAuthed(true); setPinErr(false); }
-    else { setPinErr(true); setPin(""); }
+  // Auto-login: token sesji z przeglądarki → sprawdź w bazie (czy sesja nie została cofnięta zdalnie)
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const tok = localStorage.getItem("sh-admin-session");
+        if (!tok) return;
+        const { data } = await supabase.from("admin_sessions").select("revoked").eq("token", tok).maybeSingle();
+        if (alive && data && !data.revoked) {
+          setAuthed(true);
+          supabase.from("admin_sessions").update({ last_seen: new Date().toISOString() }).eq("token", tok);
+        } else {
+          localStorage.removeItem("sh-admin-session");
+        }
+      } catch { /* ignore */ }
+    })();
+    return () => { alive = false; };
+  }, []);
+
+  // Zdalne wylogowanie: co 60s sprawdź, czy sesja nie została cofnięta (np. „wyloguj wszystkich")
+  useEffect(() => {
+    if (!authed) return;
+    const i = setInterval(async () => {
+      try {
+        const tok = localStorage.getItem("sh-admin-session");
+        if (!tok) { setAuthed(false); return; }
+        const { data } = await supabase.from("admin_sessions").select("revoked").eq("token", tok).maybeSingle();
+        if (!data || data.revoked) { localStorage.removeItem("sh-admin-session"); setAuthed(false); }
+        else supabase.from("admin_sessions").update({ last_seen: new Date().toISOString() }).eq("token", tok);
+      } catch { /* ignore */ }
+    }, 60000);
+    return () => clearInterval(i);
+  }, [authed]);
+
+  // Logowanie PIN + sesja zapamiętana w przeglądarce (token w localStorage + wpis w admin_sessions)
+  const adminDevice = () => {
+    if (typeof navigator === "undefined") return "Browser";
+    const ua = navigator.userAgent;
+    let b = "Browser";
+    if (/Edg/.test(ua)) b = "Edge"; else if (/OPR|Opera/.test(ua)) b = "Opera"; else if (/Firefox/.test(ua)) b = "Firefox"; else if (/Chrome/.test(ua)) b = "Chrome"; else if (/Safari/.test(ua)) b = "Safari";
+    let os = "";
+    if (/Windows/.test(ua)) os = "Windows"; else if (/Android/.test(ua)) os = "Android"; else if (/iPhone|iPad|iPod/.test(ua)) os = "iOS"; else if (/Mac/.test(ua)) os = "macOS"; else if (/Linux/.test(ua)) os = "Linux";
+    return os ? `${b} · ${os}` : b;
+  };
+  const checkPin = async () => {
+    if (pin !== "shistoria2026") { setPinErr(true); setPin(""); return; }
+    setAuthed(true); setPinErr(false);
+    try {
+      const tok = ((globalThis as any).crypto?.randomUUID?.() || (Math.random().toString(36).slice(2) + Date.now().toString(36)));
+      localStorage.setItem("sh-admin-session", tok);
+      await supabase.from("admin_sessions").insert({ token: tok, user_agent: navigator.userAgent, device: adminDevice() });
+    } catch { /* ignore */ }
+  };
+  const logout = async () => {
+    try {
+      const tok = localStorage.getItem("sh-admin-session");
+      if (tok) await supabase.from("admin_sessions").update({ revoked: true }).eq("token", tok);
+      localStorage.removeItem("sh-admin-session");
+    } catch { /* ignore */ }
+    setAuthed(false);
   };
 
   if (!authed) {
@@ -241,6 +297,9 @@ export default function AdminPage() {
         {/* Przełącznik motywu jasny/ciemny */}
         <button className="admin-theme-toggle" onClick={toggleTheme}>
           {theme === "dark" ? "☀️ Tema chiaro" : "🌙 Tema scuro"}
+        </button>
+        <button className="admin-theme-toggle" onClick={logout} style={{ marginTop: 8 }}>
+          🔒 Esci
         </button>
       </aside>
       <button className="admin-nav-toggle" onClick={() => setNavOpen((o) => !o)} aria-label="Menu">{navOpen ? "✕" : "☰"}</button>
@@ -2677,6 +2736,49 @@ function StatsCharts({ visits, byCountry }: { visits: any[]; byCountry: any[] })
   );
 }
 
+function AdminSessionsPanel() {
+  const [rows, setRows] = useState<any[]>([]);
+  const cur = (typeof localStorage !== "undefined" && localStorage.getItem("sh-admin-session")) || "";
+  const load = async () => {
+    try {
+      const { data } = await supabase.from("admin_sessions").select("*").eq("revoked", false).order("last_seen", { ascending: false });
+      setRows(data || []);
+    } catch { setRows([]); }
+  };
+  useEffect(() => { load(); }, []);
+  const revoke = async (token: string) => {
+    try { await supabase.from("admin_sessions").update({ revoked: true }).eq("token", token); } catch {}
+    load();
+  };
+  const revokeOthers = async () => {
+    if (!confirm("Disconnettere tutti gli altri dispositivi?")) return;
+    try { await supabase.from("admin_sessions").update({ revoked: true }).neq("token", cur); } catch {}
+    load();
+  };
+  const fmt = (s?: string) => s ? new Date(s).toLocaleString("it-IT", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
+  return (
+    <div className="stats-section">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+        <h3 style={{ margin: 0 }}>Accessi al pannello ({rows.length})</h3>
+        <button className="admin-btn-sm admin-btn-danger" onClick={revokeOthers}>Disconnetti altri dispositivi</button>
+      </div>
+      {rows.length === 0 ? <p className="admin-empty">Nessuna sessione attiva.</p> : (
+        <div className="admin-sessions">
+          {rows.map((s) => (
+            <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, padding: "10px 0", borderBottom: "1px solid rgba(128,128,128,0.18)" }}>
+              <div>
+                <strong>{s.device || "Dispositivo"}{s.token === cur ? " · questo dispositivo" : ""}</strong>
+                <div style={{ fontSize: 12, opacity: 0.6 }}>Accesso: {fmt(s.created_at)} · Ultima attività: {fmt(s.last_seen)}</div>
+              </div>
+              {s.token !== cur && <button className="admin-btn-sm" onClick={() => revoke(s.token)}>Disconnetti</button>}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StatsPanel() {
   const [loading, setLoading] = useState(true);
   const [range, setRange] = useState<"today" | "week" | "month" | "prevmonth" | "all">("month");
@@ -2766,6 +2868,7 @@ function StatsPanel() {
 
       {loading ? <Skeleton /> : (
         <>
+          <AdminSessionsPanel />
           {/* KPI ogólne */}
           <div className="stats-kpis">
             <div className="stats-kpi stats-kpi-online"><span className="stats-kpi-val"><span className="stats-online-dot" />{online}</span><span className="stats-kpi-lbl">Online ora</span></div>
