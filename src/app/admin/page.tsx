@@ -736,6 +736,7 @@ function EventsPanel() {
   const [editEvt, setEditEvt] = useState<any>(null);
   const [step, setStep] = useState<1 | 2 | 3>(1); // 3-krokowy stepper
   const [previewMode, setPreviewMode] = useState<"mobile" | "desktop">("mobile");
+  const [sharePanel, setSharePanel] = useState<any>(null); // panel udostępniania po zapisie (Story ręcznie)
   const [uploading, setUploading] = useState(false);
   const [genreInput, setGenreInput] = useState("");
 
@@ -825,8 +826,14 @@ function EventsPanel() {
         });
       } catch (e) { console.error("event publish webhook error", e); }
     }
-    close();
     load();
+    if (sharing && saved?.id) {
+      const b = (typeof window !== "undefined" ? window.location.origin : "https://www.shistoria.it");
+      close();
+      setSharePanel({ id: saved.id, base: b, story: !!shareStory, ig: !!shareInstagram, fb: !!shareFacebook, title: saved.title || "" });
+    } else {
+      close();
+    }
   };
 
   const remove = async (id: string) => {
@@ -975,6 +982,37 @@ function EventsPanel() {
                 </div>
               </>
             )}
+          </div>
+        </div>,
+        document.body,
+      )}
+
+      {sharePanel && createPortal(
+        <div className="admin-modal-overlay" onClick={() => setSharePanel(null)}>
+          <div className="admin-modal" onClick={(e) => e.stopPropagation()}>
+            <button className="admin-modal-x" onClick={() => setSharePanel(null)} aria-label="Chiudi">✕</button>
+            <h3>Condividi l'evento</h3>
+            <p style={{ opacity: 0.72, fontSize: 13, marginTop: -8, lineHeight: 1.5 }}>
+              Post IG/FB vengono pubblicati automaticamente. La <strong>Story</strong> caricala a mano: scarica l'immagine qui sotto e in Instagram aggiungi lo sticker link a <strong>www.shistoria.it</strong>.
+            </p>
+            <div style={{ display: "flex", gap: 18, flexWrap: "wrap", justifyContent: "center", margin: "18px 0 6px" }}>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 12, opacity: 0.6, letterSpacing: 1, textTransform: "uppercase" }}>Post</span>
+                <img src={`${sharePanel.base}/api/event-image?id=${sharePanel.id}&format=post`} alt="post" style={{ width: 190, height: 190, objectFit: "cover", borderRadius: 12, border: "1px solid rgba(255,255,255,0.12)" }} />
+                <a className="admin-btn-sm" href={`${sharePanel.base}/api/event-image?id=${sharePanel.id}&format=post`} download="evento-post.png" target="_blank" rel="noopener">⬇ Scarica post</a>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+                <span style={{ fontSize: 12, opacity: 0.6, letterSpacing: 1, textTransform: "uppercase" }}>Story</span>
+                <img src={`${sharePanel.base}/api/event-image?id=${sharePanel.id}&format=story`} alt="story" style={{ width: 112, height: 199, objectFit: "cover", borderRadius: 12, border: "1px solid rgba(255,255,255,0.12)" }} />
+                <a className="admin-btn-sm" href={`${sharePanel.base}/api/event-image?id=${sharePanel.id}&format=story`} download="evento-story.png" target="_blank" rel="noopener">⬇ Scarica Story</a>
+              </div>
+            </div>
+            <div className="admin-modal-actions" style={{ flexWrap: "wrap" }}>
+              <a className="admin-btn" href="https://www.instagram.com" target="_blank" rel="noopener">📷 Apri Instagram</a>
+              <a className="admin-btn-ghost" href={`https://wa.me/?text=${encodeURIComponent(sharePanel.base + "/#eventi")}`} target="_blank" rel="noopener">WhatsApp</a>
+              <button className="admin-btn-ghost" onClick={() => { try { navigator.clipboard?.writeText(`${sharePanel.base}/api/event-image?id=${sharePanel.id}&format=post`); } catch {} }}>📋 Copia link immagine</button>
+              <button className="admin-btn-ghost" onClick={() => setSharePanel(null)}>Chiudi</button>
+            </div>
           </div>
         </div>,
         document.body,
