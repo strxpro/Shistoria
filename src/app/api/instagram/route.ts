@@ -17,16 +17,35 @@ export const revalidate = 300; // 5 min
 const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "https://slatelpipxtqveydgslc.supabase.co";
 const SB_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
 
+// Normalizuje pole `children` (karuzela) do tablicy { image, video, type }.
+function normChildren(raw: any): any[] {
+  let arr = raw;
+  if (typeof arr === "string") {
+    try { arr = JSON.parse(arr); } catch { arr = null; }
+  }
+  if (!Array.isArray(arr)) return [];
+  return arr
+    .map((c: any) => {
+      const isVideo = c.media_type === "VIDEO" || !!c.video_url || !!c.video;
+      return {
+        type: c.media_type || (isVideo ? "VIDEO" : "IMAGE"),
+        image: c.image_url || c.thumbnail_url || c.media_url || c.image || (isVideo ? null : c.url) || null,
+        video: isVideo ? (c.video_url || c.media_url || c.video || null) : null,
+      };
+    })
+    .filter((c: any) => c.image || c.video);
+}
+
 async function fromSupabase() {
   if (!SB_KEY) return null;
   try {
     const sb = createClient(SB_URL, SB_KEY);
     const { data, error } = await sb
       .from("social_posts")
-      .select("external_id,kind,media_type,is_reel,image_url,video_url,caption,permalink,posted_at,likes,comments")
+      .select("external_id,kind,media_type,is_reel,image_url,video_url,caption,permalink,posted_at,likes,comments,children,username")
       .eq("platform", "instagram")
       .order("posted_at", { ascending: false })
-      .limit(60);
+      .limit(80);
     if (error || !data) return null;
     const map = (m: any) => ({
       id: m.external_id,
@@ -39,11 +58,15 @@ async function fromSupabase() {
       timestamp: m.posted_at || "",
       likes: m.likes || 0,
       comments: Array.isArray(m.comments) ? m.comments : [],
+      children: normChildren(m.children),
+      username: m.username || "",
     });
-    const media = data.filter((d: any) => d.kind === "post").slice(0, 24).map(map);
-    const stories = data.filter((d: any) => d.kind === "story").slice(0, 12).map(map);
-    if (media.length === 0 && stories.length === 0) return null;
-    return { configured: true, source: "supabase", media, stories };
+    const byDate = (a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+    const media = data.filter((d: any) => d.kind === "post").map(map).sort(byDate).slice(0, 30);
+    const stories = data.filter((d: any) => d.kind === "story").map(map).sort(byDate).slice(0, 12);
+    const mentions = data.filter((d: any) => d.kind === "mention").map(map).sort(byDate).slice(0, 12);
+    if (media.length === 0 && stories.length === 0 && mentions.length === 0) return null;
+    return { configured: true, source: "supabase", media, stories, mentions };
   } catch {
     return null;
   }
@@ -52,15 +75,20 @@ async function fromSupabase() {
 async function fromGraph() {
   const token = process.env.META_ACCESS_TOKEN;
   const igId = process.env.IG_USER_ID;
-  if (!token || !igId) return { configured: false, media: [], stories: [] };
-  const fields = ["id", "caption", "media_type", "media_product_type", "media_url", "thumbnail_url", "permalink", "timestamp"].join(",");
-  const url = `https://graph.facebook.com/v21.0/${igId}/media?fields=${encodeURIComponent(fields)}&limit=24&access_token=${token}`;
+  if (!token || !igId) return { configured: false, media: [], stories: [], mentions: [] };
+  const childFields = "children{media_type,media_url,thumbnail_url}";
+  const fields = ["id", "caption", "media_type", "media_product_type", "media_url", "thumbnail_url", "permalink", "timestamp", "like_count", "comments_count", childFields].join(",");
+  const url = `https://graph.facebook.com/v21.0/${igId}/media?fields=${encodeURIComponent(fields)}&limit=30&access_token=${token}`;
   try {
     const r = await fetch(url, { next: { revalidate: 1800 } });
     const j = await r.json();
-    if (j.error) return { configured: true, error: j.error.message, media: [], stories: [] };
+    if (j.error) return { configured: true, error: j.error.message, media: [], stories: [], mentions: [] };
     const media = (j.data || []).map((m: any) => {
       const isVideo = m.media_type === "VIDEO";
+      const children = (m.children?.data || []).map((c: any) => {
+        const cv = c.media_type === "VIDEO";
+        return { type: c.media_type, image: cv ? (c.thumbnail_url || c.media_url || null) : (c.media_url || null), video: cv ? (c.media_url || null) : null };
+      }).filter((c: any) => c.image || c.video);
       return {
         id: m.id,
         type: m.media_type,
@@ -72,11 +100,14 @@ async function fromGraph() {
         timestamp: m.timestamp || "",
         likes: m.like_count || 0,
         comments: [],
+        children,
+        username: "",
       };
     });
-    return { configured: true, source: "graph", media, stories: [] };
+    media.sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    return { configured: true, source: "graph", media, stories: [], mentions: [] };
   } catch (e) {
-    return { configured: true, error: String(e), media: [], stories: [] };
+    return { configured: true, error: String(e), media: [], stories: [], mentions: [] };
   }
 }
 

@@ -9,60 +9,80 @@ const { useState: useStateE, useEffect: useEffectE, useRef: useRefE } = React;
 
 // ─── Instagram Stories (relacje) — kółka + podgląd fullscreen ───────────────────
 // Prawdziwe aktywne Stories z /api/instagram (napełniane przez make). Gdy brak — ozdobne.
-function IgStories() {
-  const [real, setReal] = useStateE([]); // realne aktywne Stories z API
+// Pokazuje: kółko profilu (nasze relacje 24h) + kółka "Oznaczenia" (posty, w których ktoś
+// oznaczył restaurację — też znikają po 24h).
+function IgStories({ t }) {
+  const tt = typeof t === "function" ? t : (k) => k;
+  const [real, setReal] = useStateE([]);       // nasze aktywne Stories (24h)
+  const [mentions, setMentions] = useStateE([]); // oznaczenia (24h)
   useEffectE(() => {
     let alive = true;
     fetch("/api/instagram").then((r) => r.json()).then((j) => {
-      if (alive && Array.isArray(j.stories) && j.stories.length) setReal(j.stories);
+      if (!alive) return;
+      if (Array.isArray(j.stories) && j.stories.length) setReal(j.stories);
+      if (Array.isArray(j.mentions) && j.mentions.length) setMentions(j.mentions);
     }).catch(() => {});
     return () => { alive = false; };
   }, []);
   const hasStories = real.length > 0;
-  const items = real; // aktywne Stories (24h) z API
-  const [storyIdx, setStoryIdx] = useStateE(-1);
-  const storyOpen = storyIdx >= 0;
+
+  // Unified viewer — items = aktualnie otwarta kolekcja (nasze relacje lub oznaczenia)
+  const [viewer, setViewer] = useStateE(null); // { items, idx, title }
   const storyTimer = useRefE(null);
+  const open = viewer !== null;
   useEffectE(() => {
-    if (!storyOpen) return;
+    if (!open) return;
     if (typeof document !== "undefined") document.body.style.overflow = "hidden";
-    storyTimer.current = setTimeout(() => { setStoryIdx((i) => (i + 1 < items.length ? i + 1 : -1)); }, 4500);
+    storyTimer.current = setTimeout(() => {
+      setViewer((v) => (v && v.idx + 1 < v.items.length ? { ...v, idx: v.idx + 1 } : null));
+    }, 4500);
     return () => { if (storyTimer.current) clearTimeout(storyTimer.current); if (typeof document !== "undefined") document.body.style.overflow = ""; };
-  }, [storyIdx, storyOpen, items.length]);
-  const openStories = () => {
-    if (hasStories) setStoryIdx(0);
+  }, [viewer, open]);
+
+  const openOurs = () => {
+    if (hasStories) setViewer({ items: real, idx: 0, title: "shistoria.renamajore" });
     else if (typeof window !== "undefined") window.open("https://www.instagram.com/shistoria.renamajore", "_blank");
   };
-  const closeStory = () => setStoryIdx(-1);
-  const nextStory = () => setStoryIdx((i) => (i + 1 < items.length ? i + 1 : -1));
-  const prevStory = () => setStoryIdx((i) => (i > 0 ? i - 1 : 0));
-  const cur = storyIdx >= 0 ? items[storyIdx] : null;
+  const openMentions = (i) => setViewer({ items: mentions, idx: i, kind: "mention" });
+  const close = () => setViewer(null);
+  const next = () => setViewer((v) => (v && v.idx + 1 < v.items.length ? { ...v, idx: v.idx + 1 } : null));
+  const prev = () => setViewer((v) => (v && v.idx > 0 ? { ...v, idx: v.idx - 1 } : v));
+  const items = viewer?.items || [];
+  const cur = viewer ? items[viewer.idx] : null;
+  const curUser = cur?.username || viewer?.title || "shistoria.renamajore";
+
   return (
     <>
-      {/* Jedno duże kółko = logo S'Historia z obwódką relacji (jak zdjęcie profilowe na IG).
-          Klik → podgląd aktywnych relacji (24h). Gdy brak relacji — obwódka szara, klik → profil IG. */}
       <div className="ig-stories-row">
-        <button type="button" className={`ig-profile ${hasStories ? "has" : ""}`} onClick={openStories} aria-label="Relacje S'Historia">
+        <button type="button" className={`ig-profile ${hasStories ? "has" : ""}`} onClick={openOurs} aria-label={tt("social.stories")}>
           <span className="ig-profile-ring">
-            <span className="ig-profile-inner">
-              <img src="/logo.png" alt="S'Historia" />
-            </span>
+            <span className="ig-profile-inner"><img src="/logo.png" alt="S'Historia" /></span>
           </span>
           <span className="social-story-label">S'Historia</span>
         </button>
+        {mentions.map((m, i) => (
+          <button key={m.id || i} type="button" className="ig-profile ig-mention has" onClick={() => openMentions(i)} aria-label={tt("social.mentions")}>
+            <span className="ig-profile-ring">
+              <span className="ig-profile-inner ig-mention-inner">
+                {m.image ? <img src={m.image} alt="" /> : <Placeholder type="food" label="" style={{ width: "100%", height: "100%" }} />}
+              </span>
+            </span>
+            <span className="social-story-label">{m.username ? `@${m.username}` : tt("social.mentions")}</span>
+          </button>
+        ))}
       </div>
-      {storyOpen && cur && typeof document !== "undefined" && createPortal(
-        <div className="story-overlay" onClick={closeStory}>
+      {open && cur && typeof document !== "undefined" && createPortal(
+        <div className="story-overlay" onClick={close}>
           <div className="story-view" onClick={(e) => e.stopPropagation()}>
             <div className="story-bars">
               {items.map((_, i) => (
-                <div key={i} className="story-bar"><div className="story-bar-fill" style={{ width: i < storyIdx ? "100%" : i > storyIdx ? "0%" : undefined, animation: i === storyIdx ? "storyFill 4.5s linear forwards" : "none" }} /></div>
+                <div key={i} className="story-bar"><div className="story-bar-fill" style={{ width: i < viewer.idx ? "100%" : i > viewer.idx ? "0%" : undefined, animation: i === viewer.idx ? "storyFill 4.5s linear forwards" : "none" }} /></div>
               ))}
             </div>
             <div className="story-head">
               <span className="story-avatar"><img src="/logo.png" alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} /></span>
-              <strong>shistoria.renamajore</strong>
-              <button className="story-close" onClick={closeStory} aria-label="Chiudi">×</button>
+              <strong>{curUser}</strong>
+              <button className="story-close" onClick={close} aria-label={tt("social.close")}>×</button>
             </div>
             <div className="story-img">
               {cur.video
@@ -71,21 +91,23 @@ function IgStories() {
                   ? <img src={cur.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   : <Placeholder type="food" label="" style={{ width: "100%", height: "100%" }} />}
             </div>
-            <a href={cur.permalink || "https://www.instagram.com/shistoria.renamajore"} target="_blank" rel="noopener" className="story-ig-link">Vedi su Instagram →</a>
-            <button className="story-nav story-nav-l" onClick={prevStory} aria-label="Precedente" />
-            <button className="story-nav story-nav-r" onClick={nextStory} aria-label="Successivo" />
+            <a href={cur.permalink || "https://www.instagram.com/shistoria.renamajore"} target="_blank" rel="noopener" className="story-ig-link">{tt("social.viewOnIg")}</a>
+            <button className="story-nav story-nav-l" onClick={prev} aria-label="‹" />
+            <button className="story-nav story-nav-r" onClick={next} aria-label="›" />
           </div>
         </div>,
         document.body,
       )}
       <style>{`
-        .ig-stories-row { display:flex; gap:16px; padding:4px 2px 22px; margin-bottom:8px; justify-content:center; }
-        .ig-profile { display:flex; flex-direction:column; align-items:center; gap:8px; background:none; border:none; cursor:pointer; }
-        .ig-profile-ring { display:block; width:92px; height:92px; border-radius:50%; padding:4px; background:#d9d9d9; transition:transform .25s var(--ease-out, ease); }
+        .ig-stories-row { display:flex; gap:16px; padding:4px 2px 22px; margin-bottom:8px; justify-content:flex-start; overflow-x:auto; scrollbar-width:none; }
+        .ig-stories-row::-webkit-scrollbar { display:none; }
+        .ig-profile { flex:0 0 auto; display:flex; flex-direction:column; align-items:center; gap:8px; background:none; border:none; cursor:pointer; width:86px; }
+        .ig-profile-ring { display:block; width:78px; height:78px; border-radius:50%; padding:3px; background:#d9d9d9; transition:transform .25s var(--ease-out, ease); }
         .ig-profile.has .ig-profile-ring { background:conic-gradient(from 140deg, #E8927C, #F4D03F, #C8102E, #5BB8D4, #E8927C); }
         .ig-profile:hover .ig-profile-ring { transform:scale(1.05); }
-        .ig-profile-inner { display:block; width:100%; height:100%; border-radius:50%; overflow:hidden; border:3px solid var(--c-bg, #fff); background:#fff; display:grid; place-items:center; }
+        .ig-profile-inner { display:grid; place-items:center; width:100%; height:100%; border-radius:50%; overflow:hidden; border:3px solid var(--c-bg, #fff); background:#fff; }
         .ig-profile-inner img { width:78%; height:78%; object-fit:contain; }
+        .ig-mention-inner img { width:100%; height:100%; object-fit:cover; }
       `}</style>
     </>
   );
@@ -93,7 +115,7 @@ function IgStories() {
 
 // ─── Pogoda (Open-Meteo — darmowe, BEZ klucza API) ──────────────────────────────
 // Rena Majore, Sardegna ≈ 41.05N, 9.19E
-const WEATHER_COORDS = { lat: 41.053, lon: 9.187 };
+const WEATHER_COORDS = { lat: 41.166, lon: 9.178 };
 // Mapowanie kodu WMO → klucz pogody + ikona SVG inline
 const wmoToKey = (code) => {
   if (code === 0) return "clear";
@@ -133,6 +155,37 @@ const WEATHER_BG = {
 };
 
 // ─── Eventi ───────────────────────────────────────────────────────────────────
+// Animowane tło szablonu eventu (SVG/SMIL) — to samo co w podglądzie admina,
+// żeby karty nie były „nudne". Pokazuje się gdy event nie ma własnego zdjęcia.
+function EvTemplateAnim({ id, accent }) {
+  const a = accent || "#fff";
+  const svg = { width: "100%", height: "100%", viewBox: "0 0 120 80", preserveAspectRatio: "xMidYMid slice", style: { display: "block" }, "aria-hidden": "true" };
+  switch (id) {
+    case "festa":
+      return (<svg {...svg}>{Array.from({ length: 10 }).map((_, i) => { const x = 6 + i * 11.5; const dur = 1.8 + (i % 4) * 0.5; return (
+        <rect key={i} x={x} y={-6} width="4" height="4" rx="1" fill={i % 2 ? a : "#fff"} opacity="0.9">
+          <animate attributeName="y" from="-6" to="86" dur={`${dur}s`} repeatCount="indefinite" begin={`${i * 0.2}s`} />
+          <animateTransform attributeName="transform" type="rotate" from={`0 ${x} 0`} to={`360 ${x} 80`} dur={`${dur}s`} repeatCount="indefinite" begin={`${i * 0.2}s`} />
+        </rect>); })}</svg>);
+    case "dj":
+      return (<svg {...svg}><g transform="translate(34,40)"><circle r="22" fill="rgba(0,0,0,0.35)" stroke={a} strokeWidth="1.5" /><circle r="13" fill="none" stroke={a} strokeWidth="0.6" opacity="0.5" /><g><circle r="5" fill={a} /><circle cx="0" cy="-13" r="1.6" fill="#fff" /><animateTransform attributeName="transform" type="rotate" from="0 0 0" to="360 0 0" dur="3s" repeatCount="indefinite" /></g></g>{[0, 1, 2, 3, 4].map((i) => (<rect key={i} x={70 + i * 9} width="6" rx="2" fill={a}><animate attributeName="height" values="10;42;16;34;10" dur={`${0.7 + i * 0.13}s`} repeatCount="indefinite" /><animate attributeName="y" values="55;23;49;31;55" dur={`${0.7 + i * 0.13}s`} repeatCount="indefinite" /></rect>))}</svg>);
+    case "ospite":
+      return (<svg {...svg}><polygon points="60,8 52,80 68,80" fill={a} opacity="0.18"><animate attributeName="opacity" values="0.1;0.28;0.1" dur="2.5s" repeatCount="indefinite" /></polygon><path d="M60 22l4 9 10 1-7.5 7 2 10-8.5-5-8.5 5 2-10-7.5-7 10-1z" fill={a}><animateTransform attributeName="transform" type="rotate" from="0 60 36" to="360 60 36" dur="9s" repeatCount="indefinite" /></path></svg>);
+    case "live":
+      return (<svg {...svg}><path d="M0 50 Q15 35 30 50 T60 50 T90 50 T120 50" fill="none" stroke={a} strokeWidth="2" opacity="0.6"><animate attributeName="d" values="M0 50 Q15 35 30 50 T60 50 T90 50 T120 50;M0 50 Q15 62 30 50 T60 50 T90 50 T120 50;M0 50 Q15 35 30 50 T60 50 T90 50 T120 50" dur="2.5s" repeatCount="indefinite" /></path>{[20, 55, 90].map((x, i) => (<g key={i}><circle cx={x} cy={28} r="5" fill={a}><animate attributeName="cy" values="28;20;28" dur={`${1.4 + i * 0.4}s`} repeatCount="indefinite" /></circle><rect x={x + 4} y={10} width="2" height="18" fill={a}><animate attributeName="y" values="10;2;10" dur={`${1.4 + i * 0.4}s`} repeatCount="indefinite" /></rect></g>))}</svg>);
+    case "degustazione":
+      return (<svg {...svg}>{[35, 60, 85].map((x, i) => (<g key={i} transform={`translate(${x},20)`}><path d="M-7 0 a7 7 0 0 0 14 0 z" fill={a} opacity="0.85"><animate attributeName="opacity" values="0.5;0.9;0.5" dur={`${2 + i * 0.5}s`} repeatCount="indefinite" /></path><rect x="-0.7" y="7" width="1.5" height="20" fill={a} /><rect x="-6" y="27" width="12" height="2" rx="1" fill={a} /></g>))}</svg>);
+    case "aperitivo":
+      return (<svg {...svg}><path d="M44 26 L76 26 L62 50 L58 50 Z" fill={a} opacity="0.8" /><rect x="59" y="50" width="2" height="16" fill={a} /><rect x="50" y="66" width="20" height="2" rx="1" fill={a} />{[52, 60, 68].map((x, i) => (<circle key={i} cx={x} cy={30} r="2" fill="#fff" opacity="0.9"><animate attributeName="cy" from="34" to="20" dur={`${1.6 + i * 0.4}s`} repeatCount="indefinite" begin={`${i * 0.3}s`} /><animate attributeName="opacity" values="0;0.9;0" dur={`${1.6 + i * 0.4}s`} repeatCount="indefinite" begin={`${i * 0.3}s`} /></circle>))}</svg>);
+    case "cena":
+      return (<svg {...svg}><circle cx="60" cy="40" r="22" fill="none" stroke={a} strokeWidth="2"><animate attributeName="r" values="20;23;20" dur="3s" repeatCount="indefinite" /></circle><circle cx="60" cy="40" r="13" fill="none" stroke={a} strokeWidth="1" opacity="0.5" /><g stroke={a} strokeWidth="2" strokeLinecap="round"><line x1="30" y1="26" x2="30" y2="54" /><line x1="90" y1="26" x2="90" y2="54" /></g></svg>);
+    case "notte":
+      return (<svg {...svg}>{[[35, 30], [80, 24], [60, 50]].map(([cx, cy], i) => (<g key={i}>{Array.from({ length: 8 }).map((_, j) => { const ang = (j * Math.PI) / 4; return (<line key={j} x1={cx} y1={cy} x2={cx + Math.cos(ang) * 12} y2={cy + Math.sin(ang) * 12} stroke={i % 2 ? "#fff" : a} strokeWidth="1.5" strokeLinecap="round"><animate attributeName="opacity" values="0;1;0" dur={`${1.8 + i * 0.4}s`} repeatCount="indefinite" begin={`${i * 0.5}s`} /></line>); })}</g>))}</svg>);
+    default:
+      return null;
+  }
+}
+
 function Eventi({ t }) {
   const [events, setEvents] = useStateE([]);
   const [activeIdx, setActiveIdx] = useStateE(0);
@@ -355,7 +408,9 @@ function Eventi({ t }) {
                   </button>
                 )}
                 <div className="ev-card-bg" style={{ background: e.custom_colors?.bg || (e.phType === "food" ? "#2d1b0e" : e.phType === "sea" ? "#0e2840" : "#1a1040") }}>
-                  {e.image_url && <img src={e.image_url} alt="" style={{ width:"100%", height:"100%", objectFit:"cover", opacity:0.7 }} />}
+                  {e.image_url
+                    ? <img src={e.image_url} alt="" style={{ width:"100%", height:"100%", objectFit:"cover", opacity:0.7 }} />
+                    : <div style={{ position:"absolute", inset:0, opacity:0.55, pointerEvents:"none" }}><EvTemplateAnim id={e.template} accent={e.custom_colors?.accent} /></div>}
                 </div>
                 {(() => { const b = dateBadge(e.event_date || e.date); return b ? (
                   <div className="ev-date-badge"><span className="ev-date-badge-day">{b.day}</span><span className="ev-date-badge-mon">{b.mon}</span></div>
@@ -407,7 +462,9 @@ function Eventi({ t }) {
           <div className="ev-full" onClick={(ev) => ev.stopPropagation()}>
             <button className="ev-rem-close ev-full-close" onClick={() => setEventPopout(null)} aria-label="Chiudi">×</button>
             <div className="ev-full-img" style={{ background: eventPopout.custom_colors?.bg || (eventPopout.phType === "food" ? "#2d1b0e" : eventPopout.phType === "sea" ? "#0e2840" : "#1a1040") }}>
-              {eventPopout.image_url && <img src={eventPopout.image_url} alt={eventPopout.title} />}
+              {eventPopout.image_url
+                ? <img src={eventPopout.image_url} alt={eventPopout.title} />
+                : <div style={{ position:"absolute", inset:0, opacity:0.6, pointerEvents:"none" }}><EvTemplateAnim id={eventPopout.template} accent={eventPopout.custom_colors?.accent} /></div>}
               <span className="ev-card-tag ev-full-tag">{eventPopout.tag || "Evento"}</span>
               {(() => { const b = dateBadge(eventPopout.event_date || eventPopout.date); return b ? (
                 <div className="ev-date-badge ev-date-badge-lg"><span className="ev-date-badge-day">{b.day}</span><span className="ev-date-badge-mon">{b.mon}</span></div>
@@ -673,6 +730,161 @@ function FacebookFeed() {
 }
 
 // ─── Social Feed ──────────────────────────────────────────────────────────────
+
+// Popout posta IG — jak na Instagramie: karuzela slajdów (◄ ►/kropki),
+// na telefonie układ pionowy z przewijaniem, gest w dół zamyka, strzałka ‹ wstecz w rogu.
+function IgPostModal({ post, posts, onClose, t }) {
+  const tt = typeof t === "function" ? t : (k) => k;
+  const list = Array.isArray(posts) && posts.length ? posts : [post];
+  const [active, setActive] = useStateE(post);
+  const slides = (active.children && active.children.length > 0)
+    ? active.children
+    : [{ image: active.image, video: active.video, type: active.type }];
+  const [idx, setIdx] = useStateE(0);
+  const [dragY, setDragY] = useStateE(0);
+  const touch = useRefE({ x: 0, y: 0, active: false });
+  const scrollRef = useRefE(null);
+  const user = active.username || "shistoria.renamajore";
+  const link = active.permalink || "https://www.instagram.com/shistoria.renamajore";
+  const comments = active.comments || [];
+
+  useEffectE(() => { setIdx(0); if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [active]);
+  useEffectE(() => {
+    if (typeof document !== "undefined") document.body.style.overflow = "hidden";
+    const onKey = (e) => { if (e.key === "Escape") onClose(); if (e.key === "ArrowLeft") go(-1); if (e.key === "ArrowRight") go(1); };
+    window.addEventListener("keydown", onKey);
+    return () => { window.removeEventListener("keydown", onKey); if (typeof document !== "undefined") document.body.style.overflow = ""; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slides.length]);
+
+  const go = (d) => setIdx((i) => Math.max(0, Math.min(slides.length - 1, i + d)));
+  const openPost = (p) => { setActive(p); setDragY(0); };
+  const onTouchStart = (e) => { const tch = e.touches[0]; touch.current = { x: tch.clientX, y: tch.clientY, active: true }; };
+  const onTouchMove = (e) => {
+    if (!touch.current.active) return;
+    const dy = e.touches[0].clientY - touch.current.y;
+    const dx = e.touches[0].clientX - touch.current.x;
+    if (dy > 0 && Math.abs(dy) > Math.abs(dx)) setDragY(dy * 0.6);
+  };
+  const onTouchEnd = (e) => {
+    if (!touch.current.active) return;
+    const tch = e.changedTouches[0];
+    const dx = tch.clientX - touch.current.x;
+    const dy = tch.clientY - touch.current.y;
+    touch.current.active = false;
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 45) { go(dx < 0 ? 1 : -1); setDragY(0); return; }
+    if (dy > 110) { onClose(); return; }
+    setDragY(0);
+  };
+
+  const cur = slides[idx] || {};
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="ig-pop-overlay" onClick={onClose}>
+      <div className="ig-pop" onClick={(e) => e.stopPropagation()} style={dragY ? { transform: `translateY(${dragY}px)`, transition: "none" } : undefined}>
+        <button className="ig-pop-back" onClick={onClose} aria-label={tt("social.close")}>‹</button>
+        <button className="ig-pop-close" onClick={onClose} aria-label={tt("social.close")}>×</button>
+        <div className="ig-pop-media" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
+          <span className="ig-pop-grab" />
+          {cur.video
+            ? <video key={cur.video} src={cur.video} controls autoPlay playsInline style={{ width: "100%", height: "100%", objectFit: "contain", background: "#000" }} />
+            : cur.image
+              ? <img src={cur.image} alt="" draggable={false} style={{ width: "100%", height: "100%", objectFit: "contain", background: "#000" }} />
+              : <Placeholder type="food" label="" style={{ width: "100%", height: "100%" }} />}
+          {slides.length > 1 && (
+            <>
+              {idx > 0 && <button className="ig-pop-arrow ig-pop-arrow-l" onClick={() => go(-1)} aria-label="‹">‹</button>}
+              {idx < slides.length - 1 && <button className="ig-pop-arrow ig-pop-arrow-r" onClick={() => go(1)} aria-label="›">›</button>}
+              <div className="ig-pop-dots">{slides.map((_, i) => <span key={i} className={i === idx ? "on" : ""} />)}</div>
+              <span className="ig-pop-count">{idx + 1}/{slides.length}</span>
+            </>
+          )}
+        </div>
+        <div className="ig-pop-side" ref={scrollRef}>
+          <div className="ig-pop-head">
+            <span className="ig-pop-ava"><img src="/logo.png" alt="" /></span>
+            <strong>{user}</strong>
+          </div>
+          {active.caption && <p className="ig-pop-cap">{active.caption}</p>}
+          <div className="ig-pop-meta">♥ {active.likes || 0} · 💬 {comments.length}</div>
+          <div className="ig-pop-comments">
+            {comments.length === 0
+              ? <p className="ig-pop-empty">{tt("social.noComments")}</p>
+              : comments.map((c, i) => {
+                const u = c.username || c.author || c.from?.username || c.from?.name || "utente";
+                const tx = c.text || c.content || c.message || "";
+                const lk = c.like_count ?? c.likeCount ?? c.likes ?? 0;
+                return (
+                  <div key={i} className="ig-pop-cmt">
+                    <div className="ig-pop-cmt-txt"><strong>{u}</strong> {tx}</div>
+                    <div className="ig-pop-cmt-meta">
+                      {lk > 0 && <span className="ig-pop-cmt-likes">♥ {lk}</span>}
+                      <a href={link} target="_blank" rel="noopener">{tt("social.replyOnIg")}</a>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+          <a href={link} target="_blank" rel="noopener" className="ig-pop-link">💬 {tt("social.commentOnIg")}</a>
+          {list.length > 1 && (
+            <div className="ig-pop-more">
+              {list.map((p) => (
+                <button key={p.id} type="button" className={`ig-pop-more-cell ${p.id === active.id ? "on" : ""}`} onClick={() => openPost(p)}>
+                  {p.image ? <img src={p.image} alt="" loading="lazy" /> : <Placeholder type="food" label="" style={{ width: "100%", height: "100%" }} />}
+                  {(p.type === "VIDEO" || p.isReel) && <span className="ig-pop-more-badge">▶</span>}
+                  {(p.type === "CAROUSEL_ALBUM" || (p.children && p.children.length > 1)) && <span className="ig-pop-more-badge">▦</span>}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      <style>{`
+        .ig-pop-overlay { position:fixed; inset:0; z-index:6000; background:rgba(8,12,18,0.85); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; padding:20px; animation:storyFade .2s ease; }
+        .ig-pop { width:min(900px,96vw); max-height:90vh; background:#0f1620; border-radius:18px; overflow:hidden; display:grid; grid-template-columns:1.3fr 1fr; box-shadow:0 30px 90px rgba(0,0,0,0.6); position:relative; transition:transform .2s ease; }
+        @media (max-width:760px){ .ig-pop { grid-template-columns:1fr; width:100vw; height:100dvh; max-height:100dvh; border-radius:0; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; } }
+        .ig-pop-back { position:absolute; top:10px; left:12px; z-index:6; width:40px; height:40px; border-radius:50%; border:none; background:rgba(0,0,0,0.5); color:#fff; font-size:30px; line-height:1; cursor:pointer; display:grid; place-items:center; padding-bottom:3px; }
+        .ig-pop-close { position:absolute; top:10px; right:12px; z-index:6; width:38px; height:38px; border-radius:50%; border:none; background:rgba(0,0,0,0.5); color:#fff; font-size:22px; cursor:pointer; }
+        @media (max-width:760px){ .ig-pop-close { display:none; } }
+        .ig-pop-media { position:relative; background:#000; min-height:280px; max-height:90vh; display:flex; align-items:center; justify-content:center; touch-action:pan-y; }
+        @media (max-width:760px){ .ig-pop-media { aspect-ratio:1; min-height:0; max-height:62vh; } }
+        .ig-pop-grab { display:none; }
+        @media (max-width:760px){ .ig-pop-grab { display:block; position:absolute; top:8px; left:50%; transform:translateX(-50%); width:42px; height:5px; border-radius:3px; background:rgba(255,255,255,0.6); z-index:5; } }
+        .ig-pop-arrow { position:absolute; top:50%; transform:translateY(-50%); z-index:4; width:36px; height:36px; border-radius:50%; border:none; background:rgba(0,0,0,0.45); color:#fff; font-size:24px; line-height:1; cursor:pointer; display:grid; place-items:center; }
+        .ig-pop-arrow-l { left:10px; } .ig-pop-arrow-r { right:10px; }
+        .ig-pop-dots { position:absolute; bottom:12px; left:0; right:0; display:flex; gap:6px; justify-content:center; z-index:4; }
+        .ig-pop-dots span { width:6px; height:6px; border-radius:50%; background:rgba(255,255,255,0.45); transition:all .2s; }
+        .ig-pop-dots span.on { background:#fff; transform:scale(1.25); }
+        .ig-pop-count { position:absolute; top:10px; left:50%; transform:translateX(-50%); z-index:4; background:rgba(0,0,0,0.55); color:#fff; font-size:11px; font-weight:700; padding:3px 9px; border-radius:999px; }
+        @media (max-width:760px){ .ig-pop-count { top:auto; } }
+        .ig-pop-side { display:flex; flex-direction:column; padding:18px 18px 16px; color:#fff; min-height:0; overflow-y:auto; overscroll-behavior:contain; }
+        .ig-pop-head { display:flex; align-items:center; gap:10px; padding-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.1); }
+        .ig-pop-ava { width:34px; height:34px; border-radius:50%; background:#fff; display:grid; place-items:center; overflow:hidden; }
+        .ig-pop-ava img { width:80%; height:80%; object-fit:contain; }
+        .ig-pop-head strong { font-size:14px; }
+        .ig-pop-cap { font-size:14px; line-height:1.5; color:rgba(255,255,255,0.9); margin:12px 0; white-space:pre-wrap; }
+        .ig-pop-meta { font-size:13px; color:rgba(255,255,255,0.7); margin-bottom:10px; }
+        .ig-pop-comments { overflow-y:auto; display:flex; flex-direction:column; gap:10px; min-height:40px; }
+        .ig-pop-cmt { font-size:13px; line-height:1.45; color:#fff; }
+        .ig-pop-cmt strong { margin-right:6px; }
+        .ig-pop-cmt-txt { color:#fff; }
+        .ig-pop-cmt-meta { display:flex; gap:14px; align-items:center; margin-top:3px; font-size:11px; color:rgba(255,255,255,0.55); }
+        .ig-pop-cmt-likes { color:#FE2C55; }
+        .ig-pop-cmt-meta a { color:rgba(255,255,255,0.6); text-decoration:none; }
+        .ig-pop-cmt-meta a:hover { color:#fff; }
+        .ig-pop-empty { font-size:13px; color:rgba(255,255,255,0.5); font-style:italic; }
+        .ig-pop-link { margin-top:14px; text-align:center; color:#fff; background:rgba(255,255,255,0.14); border:1px solid rgba(255,255,255,0.28); padding:10px; border-radius:999px; font-size:13px; font-weight:600; text-decoration:none; }
+        .ig-pop-more { margin-top:18px; padding-top:14px; border-top:1px solid rgba(255,255,255,0.1); display:grid; grid-template-columns:repeat(3,1fr); gap:2px; }
+        .ig-pop-more-cell { position:relative; aspect-ratio:1; overflow:hidden; border:none; padding:0; cursor:pointer; background:#1a222c; }
+        .ig-pop-more-cell img { width:100%; height:100%; object-fit:cover; display:block; }
+        .ig-pop-more-cell.on { outline:2px solid #fff; outline-offset:-2px; }
+        .ig-pop-more-badge { position:absolute; top:4px; right:4px; color:#fff; font-size:11px; text-shadow:0 1px 3px rgba(0,0,0,0.7); }
+      `}</style>
+    </div>,
+    document.body,
+  );
+}
+
 function SocialFeed({ t }) {
   const STORIES = [
     { l: "Aperitivo", c: "#E8927C", t: "food" },
@@ -689,12 +901,14 @@ function SocialFeed({ t }) {
   // Prawdziwe media z Instagrama (Graph API przez nasz /api/instagram)
   const [igMedia, setIgMedia] = useStateE([]);
   const [fbPosts, setFbPosts] = useStateE([]);
-  const [igPopout, setIgPopout] = useStateE(null); // post IG otwarty w popoucie (z komentarzami)
+  const [igPopout, setIgPopout] = useStateE(null); // post IG/FB otwarty w popoucie (z komentarzami)
+  const [igLimit, setIgLimit] = useStateE(9); // ile zdjęć IG pokazać (3x3, "zobacz więcej" dokłada)
+  const byNewest = (a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime();
   useEffectE(() => {
     let alive = true;
     fetch("/api/instagram")
       .then((r) => r.json())
-      .then((j) => { if (alive && Array.isArray(j.media) && j.media.length) setIgMedia(j.media); })
+      .then((j) => { if (alive && Array.isArray(j.media) && j.media.length) setIgMedia([...j.media].sort(byNewest)); })
       .catch(() => {});
     fetch("/api/facebook")
       .then((r) => r.json())
@@ -738,15 +952,16 @@ function SocialFeed({ t }) {
               </div>
               <a href="https://www.instagram.com/shistoria.renamajore" target="_blank" rel="noopener" className="social-link">→</a>
             </div>
-            <IgStories />
+            <IgStories t={t} />
             <div className="social-ig-grid">
               {igMedia.length > 0 ? (
-                igMedia.map((m) => (
+                igMedia.slice(0, igLimit).map((m) => (
                   <button key={m.id} type="button" onClick={() => setIgPopout(m)} className="social-ig-cell">
                     {m.image ? <img src={m.image} alt={m.caption ? m.caption.slice(0, 60) : "Instagram"} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                              : <Placeholder type="food" label="" style={{ width: "100%", height: "100%" }} />}
                     {(m.type === "VIDEO" || m.isReel) && <span className="social-ig-badge">{m.isReel ? "▶ Reel" : "▶"}</span>}
-                    <div className="social-ig-overlay"><span>{(m.comments?.length || 0) > 0 ? `💬 ${m.comments.length}` : (m.isReel ? "▶ Reel" : "👁")}</span></div>
+                    {(m.type === "CAROUSEL_ALBUM" || (m.children && m.children.length > 1)) && <span className="social-ig-badge social-ig-badge-album">▦</span>}
+                    <div className="social-ig-overlay"><span>♥ {m.likes || 0}{(m.comments?.length || 0) > 0 ? `  💬 ${m.comments.length}` : ""}</span></div>
                   </button>
                 ))
               ) : (
@@ -770,6 +985,11 @@ function SocialFeed({ t }) {
                 ))
               )}
             </div>
+            {igMedia.length > igLimit && (
+              <button type="button" className="social-ig-more" onClick={() => setIgLimit((n) => n + 9)}>
+                {t("social.more")}
+              </button>
+            )}
           </div>
 
           <div className="social-col">
@@ -796,7 +1016,7 @@ function SocialFeed({ t }) {
                     </div>
                     {p.image && <img src={p.image} alt="" loading="lazy" style={{ width: "100%", borderRadius: 10, margin: "4px 0 10px", display: "block" }} />}
                     {p.message && <p className="social-fb-body">{p.message.length > 220 ? p.message.slice(0, 220) + "…" : p.message}</p>}
-                    <span className="social-fb-cta">Leggi su Facebook →</span>
+                    <span className="social-fb-cta">{t("social.readOnFb")}</span>
                   </a>
                 ))}
               </div>
@@ -817,7 +1037,7 @@ function SocialFeed({ t }) {
                     </div>
                     <h5 className="social-fb-title">{p.t}</h5>
                     <p className="social-fb-body">{p.body}</p>
-                    <span className="social-fb-cta">Leggi su Facebook →</span>
+                    <span className="social-fb-cta">{t("social.readOnFb")}</span>
                   </a>
                 ))}
               </div>
@@ -826,75 +1046,8 @@ function SocialFeed({ t }) {
         </div>
       </div>
 
-      {/* Popout posta IG — zdjęcie/wideo + opis + komentarze (klik w kafelek) */}
-      {igPopout && typeof document !== "undefined" && createPortal(
-        <div className="ig-pop-overlay" onClick={() => setIgPopout(null)}>
-          <div className="ig-pop" onClick={(e) => e.stopPropagation()}>
-            <button className="ig-pop-close" onClick={() => setIgPopout(null)} aria-label="Chiudi">×</button>
-            <div className="ig-pop-media">
-              {igPopout.video
-                ? <video src={igPopout.video} controls autoPlay playsInline style={{ width: "100%", height: "100%", objectFit: "contain", background: "#000" }} />
-                : igPopout.image
-                  ? <img src={igPopout.image} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  : <Placeholder type="food" label="" style={{ width: "100%", height: "100%" }} />}
-            </div>
-            <div className="ig-pop-side">
-              <div className="ig-pop-head">
-                <span className="ig-pop-ava"><img src="/logo.png" alt="" /></span>
-                <strong>shistoria.renamajore</strong>
-              </div>
-              {igPopout.caption && <p className="ig-pop-cap">{igPopout.caption}</p>}
-              <div className="ig-pop-meta">♥ {igPopout.likes || 0} · 💬 {(igPopout.comments || []).length}</div>
-              <div className="ig-pop-comments">
-                {(igPopout.comments || []).length === 0
-                  ? <p className="ig-pop-empty">Nessun commento ancora.</p>
-                  : (igPopout.comments || []).map((c, i) => {
-                    const u = c.username || c.author || c.from?.username || "utente";
-                    const tx = c.text || c.content || c.message || "";
-                    const lk = c.like_count ?? c.likeCount ?? c.likes ?? 0;
-                    return (
-                      <div key={i} className="ig-pop-cmt">
-                        <div className="ig-pop-cmt-txt"><strong>{u}</strong> {tx}</div>
-                        <div className="ig-pop-cmt-meta">
-                          {lk > 0 && <span className="ig-pop-cmt-likes">♥ {lk}</span>}
-                          <a href={igPopout.permalink || "https://www.instagram.com/shistoria.renamajore"} target="_blank" rel="noopener">Rispondi su Instagram</a>
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-              <a href={igPopout.permalink || "https://www.instagram.com/shistoria.renamajore"} target="_blank" rel="noopener" className="ig-pop-link">💬 Lascia un commento su Instagram →</a>
-            </div>
-          </div>
-          <style>{`
-            .ig-pop-overlay { position:fixed; inset:0; z-index:6000; background:rgba(8,12,18,0.82); backdrop-filter:blur(8px); display:flex; align-items:center; justify-content:center; padding:20px; animation:storyFade .2s ease; }
-            .ig-pop { width:min(880px,96vw); max-height:90vh; background:#0f1620; border-radius:18px; overflow:hidden; display:grid; grid-template-columns:1.3fr 1fr; box-shadow:0 30px 90px rgba(0,0,0,0.6); position:relative; }
-            @media (max-width:760px){ .ig-pop { grid-template-columns:1fr; max-height:92vh; overflow-y:auto; } }
-            .ig-pop-close { position:absolute; top:10px; right:12px; z-index:5; width:38px; height:38px; border-radius:50%; border:none; background:rgba(0,0,0,0.5); color:#fff; font-size:22px; cursor:pointer; }
-            .ig-pop-media { background:#000; min-height:280px; max-height:90vh; display:flex; align-items:center; justify-content:center; }
-            @media (max-width:760px){ .ig-pop-media { aspect-ratio:1; min-height:0; } }
-            .ig-pop-media img { width:100%; height:100%; object-fit:cover; }
-            .ig-pop-side { display:flex; flex-direction:column; padding:18px 18px 16px; color:#fff; min-height:0; }
-            .ig-pop-head { display:flex; align-items:center; gap:10px; padding-bottom:12px; border-bottom:1px solid rgba(255,255,255,0.1); }
-            .ig-pop-ava { width:34px; height:34px; border-radius:50%; background:#fff; display:grid; place-items:center; overflow:hidden; }
-            .ig-pop-ava img { width:80%; height:80%; object-fit:contain; }
-            .ig-pop-head strong { font-size:14px; }
-            .ig-pop-cap { font-size:14px; line-height:1.5; color:rgba(255,255,255,0.9); margin:12px 0; }
-            .ig-pop-meta { font-size:13px; color:rgba(255,255,255,0.7); margin-bottom:10px; }
-            .ig-pop-comments { flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:10px; min-height:60px; }
-            .ig-pop-cmt { font-size:13px; line-height:1.45; color:#fff; }
-            .ig-pop-cmt strong { margin-right:6px; }
-            .ig-pop-cmt-txt { color:#fff; }
-            .ig-pop-cmt-meta { display:flex; gap:14px; align-items:center; margin-top:3px; font-size:11px; color:rgba(255,255,255,0.55); }
-            .ig-pop-cmt-likes { color:#FE2C55; }
-            .ig-pop-cmt-meta a { color:rgba(255,255,255,0.6); text-decoration:none; }
-            .ig-pop-cmt-meta a:hover { color:#fff; }
-            .ig-pop-empty { font-size:13px; color:rgba(255,255,255,0.5); font-style:italic; }
-            .ig-pop-link { margin-top:14px; text-align:center; color:#fff; background:rgba(255,255,255,0.14); border:1px solid rgba(255,255,255,0.28); padding:10px; border-radius:999px; font-size:13px; font-weight:600; text-decoration:none; }
-          `}</style>
-        </div>,
-        document.body,
-      )}
+      {/* Popout posta IG — karuzela + komentarze (klik w kafelek), zamykanie gestem/strzałką */}
+      {igPopout && <IgPostModal post={igPopout} posts={igMedia} onClose={() => setIgPopout(null)} t={t} />}
 
       {/* Podgląd relacji — fullscreen jak na Instagramie (paski postępu, tap lewo/prawo) */}
       {storyOpen && typeof document !== "undefined" && createPortal(
@@ -934,7 +1087,7 @@ function SocialFeed({ t }) {
         .social-handle { font-family: var(--f-display); font-weight: 700; font-size: 18px; letter-spacing: -0.01em; }
         .social-link { margin-left: auto; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--c-line); display: flex; align-items: center; justify-content: center; transition: all 0.3s; }
         .social-link:hover { background: var(--c-deep); color: #fff; border-color: var(--c-deep); }
-        .social-ig-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+        .social-ig-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; }
         /* Relacje (stories) — kółka jak na Instagramie */
         .social-stories { display: flex; gap: 16px; overflow-x: auto; padding: 0 2px 18px; margin-bottom: 6px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
         .social-stories::-webkit-scrollbar { display: none; }
@@ -943,8 +1096,9 @@ function SocialFeed({ t }) {
         .social-story:hover .social-story-ring { transform: scale(1.06); }
         .social-story-inner { display: block; width: 100%; height: 100%; border-radius: 50%; overflow: hidden; border: 2px solid var(--c-bg, #fff); background: #ccc; }
         .social-story-label { font-size: 11px; font-weight: 600; color: var(--c-deep); opacity: 0.8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 70px; }
-        .social-ig-cell { position: relative; display: block; aspect-ratio: 1; border-radius: 6px; overflow: hidden; cursor: pointer; text-decoration: none; }
+        .social-ig-cell { position: relative; display: block; aspect-ratio: 1; border-radius: 0; overflow: hidden; cursor: pointer; text-decoration: none; }
         .social-ig-badge { position: absolute; top: 6px; right: 6px; z-index: 2; background: rgba(0,0,0,0.6); color: #fff; font-size: 10px; font-weight: 700; padding: 3px 7px; border-radius: 999px; letter-spacing: 0.03em; }
+        .social-ig-badge-album { padding: 3px 6px; font-size: 13px; line-height: 1; }
         .social-ig-overlay { position: absolute; inset: 0; background: rgba(26,61,82,0.6); color: #fff; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; font-family: var(--f-display); font-weight: 700; }
         .social-ig-cell:hover .social-ig-overlay { opacity: 1; }
         .social-fb-list { display: flex; flex-direction: column; gap: 16px; }

@@ -763,7 +763,7 @@ function EventsPanel() {
   useEffect(() => { load(); }, []);
 
   const openNew = () => { setEditEvt({ title: "", description: "", event_date: "", tag: "", template: "festa", custom_colors: TEMPLATES[0].colors, genres: [] }); setStep(1); };
-  const openEdit = (evt: any) => { setEditEvt({ ...evt, shareInstagram: !!evt.share_instagram, shareFacebook: !!evt.share_facebook }); setStep(1); };
+  const openEdit = (evt: any) => { setEditEvt({ ...evt, shareInstagram: !!evt.share_instagram, shareFacebook: !!evt.share_facebook, shareStory: !!evt.share_story }); setStep(1); };
   const close = () => { setEditEvt(null); setStep(1); };
 
   const handleImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -792,11 +792,39 @@ function EventsPanel() {
     let ed: string | null = rest.event_date || null;
     if (ed && !/^\d{4}-\d{2}-\d{2}$/.test(String(ed))) { const d = new Date(ed); ed = isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10); }
     if (!rest.title || !rest.title.trim()) { alert("Inserisci il titolo dell'evento."); return; }
-    const payload: any = { ...rest, event_date: ed, tag, is_published: true, share_instagram: !!shareInstagram, share_facebook: !!shareFacebook, posted: false };
+    const payload: any = { ...rest, event_date: ed, tag, is_published: true, share_instagram: !!shareInstagram, share_facebook: !!shareFacebook, share_story: !!shareStory, posted: false };
     const res = evt.id
-      ? await supabase.from("events").update(payload).eq("id", evt.id)
-      : await supabase.from("events").insert(payload);
+      ? await supabase.from("events").update(payload).eq("id", evt.id).select().single()
+      : await supabase.from("events").insert(payload).select().single();
     if (res.error) { alert("Errore nel salvataggio dell'evento: " + res.error.message); console.error("event save error", res.error); return; }
+
+    // Webhook do make — natychmiastowa publikacja (as data arrived), tylko gdy coś zaznaczone
+    const saved: any = res.data;
+    const sharing = !!shareInstagram || !!shareFacebook || !!shareStory;
+    const hook = process.env.NEXT_PUBLIC_MAKE_EVENT_PUBLISH_WEBHOOK;
+    if (sharing && hook && saved?.id) {
+      const base = (typeof window !== "undefined" ? window.location.origin : "https://www.shistoria.it");
+      try {
+        await fetch(hook, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: saved.id,
+            title: saved.title || "",
+            event_date: saved.event_date || "",
+            description: saved.description || "",
+            tag: saved.tag || "",
+            image_url: saved.image_url || "",
+            share_instagram: !!saved.share_instagram,
+            share_facebook: !!saved.share_facebook,
+            share_story: !!saved.share_story,
+            image_post: `${base}/api/event-image?id=${saved.id}&format=post`,
+            image_story: `${base}/api/event-image?id=${saved.id}&format=story`,
+            link: `${base}/#eventi`,
+          }),
+        });
+      } catch (e) { console.error("event publish webhook error", e); }
+    }
     close();
     load();
   };

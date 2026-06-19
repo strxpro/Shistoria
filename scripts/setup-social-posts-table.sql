@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS social_posts (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   external_id text UNIQUE,                 -- ID z IG/FB (do deduplikacji / upsert)
   platform text NOT NULL DEFAULT 'instagram', -- 'instagram' | 'facebook'
-  kind text NOT NULL DEFAULT 'post',       -- 'post' | 'story'
+  kind text NOT NULL DEFAULT 'post',       -- 'post' | 'story' | 'mention'
   media_type text,                         -- IMAGE | VIDEO | CAROUSEL_ALBUM | REEL
   is_reel boolean DEFAULT false,
   image_url text,                          -- miniatura / zdjęcie
@@ -21,6 +21,8 @@ CREATE TABLE IF NOT EXISTS social_posts (
   permalink text,
   likes integer DEFAULT 0,                 -- liczba polubień posta (z IG)
   comments jsonb DEFAULT '[]'::jsonb,      -- komentarze: [{author, text, ts}]
+  children jsonb DEFAULT '[]'::jsonb,      -- karuzela: [{media_type,image_url,video_url}]
+  username text,                           -- autor (dla 'mention' = kto oznaczył)
   posted_at timestamptz,                   -- data publikacji (sortowanie)
   created_at timestamptz DEFAULT now()
 );
@@ -37,6 +39,8 @@ ALTER TABLE social_posts ADD COLUMN IF NOT EXISTS caption text;
 ALTER TABLE social_posts ADD COLUMN IF NOT EXISTS permalink text;
 ALTER TABLE social_posts ADD COLUMN IF NOT EXISTS likes integer DEFAULT 0;
 ALTER TABLE social_posts ADD COLUMN IF NOT EXISTS comments jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE social_posts ADD COLUMN IF NOT EXISTS children jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE social_posts ADD COLUMN IF NOT EXISTS username text;
 ALTER TABLE social_posts ADD COLUMN IF NOT EXISTS posted_at timestamptz;
 
 -- unikalność po external_id → make robi UPSERT (nie duplikuje tych samych postów)

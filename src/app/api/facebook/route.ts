@@ -20,7 +20,7 @@ async function fromSupabase() {
     const sb = createClient(SB_URL, SB_KEY);
     const { data, error } = await sb
       .from("social_posts")
-      .select("external_id,image_url,caption,permalink,posted_at")
+      .select("external_id,image_url,caption,permalink,posted_at,likes,comments")
       .eq("platform", "facebook")
       .eq("kind", "post")
       .order("posted_at", { ascending: false })
@@ -32,6 +32,8 @@ async function fromSupabase() {
       image: p.image_url || null,
       permalink: p.permalink || "",
       created: p.posted_at || "",
+      likes: p.likes || 0,
+      comments: Array.isArray(p.comments) ? p.comments : [],
     }));
     return { configured: true, source: "supabase", posts };
   } catch {

@@ -5721,8 +5721,8 @@ function DbDrinkCard({ d }: { d: any }) {
 
       {popout && typeof document !== "undefined" && createPortal(
         <div className="cx-cc-popout-overlay" onClick={() => setPopout(false)}>
+          <button className="cx-cc-popout-close cx-cc-popout-close-fixed" onClick={() => setPopout(false)} aria-label="Chiudi">×</button>
           <div className="cx-cc-popout" onClick={(e) => e.stopPropagation()}>
-            <button className="cx-cc-popout-close cx-cc-popout-close-incard" onClick={() => setPopout(false)} aria-label="Chiudi">×</button>
             <div className={`cx-cc-popout-left ${d.photo_url ? "has-photo" : ""}`} onClick={d.photo_url ? popHeart : undefined}>
               {d.photo_url ? <img src={d.photo_url} alt={d.name} /> : <div style={{ fontSize: 60 }}>🍸</div>}
               {hearts.map((h) => (

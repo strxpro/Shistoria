@@ -50,6 +50,15 @@ window.I18N = {
       heading: "Vivi\nil momento",
       instagram: "Su Instagram",
       facebook: "Su Facebook",
+      more: "Vedi altri",
+      close: "Chiudi",
+      noComments: "Nessun commento ancora.",
+      replyOnIg: "Rispondi su Instagram",
+      commentOnIg: "Commenta su Instagram →",
+      viewOnIg: "Vedi su Instagram →",
+      readOnFb: "Leggi su Facebook →",
+      stories: "Storie",
+      mentions: "Menzioni",
     },
     attrazioni: {
       eyebrow: "Dintorni",
@@ -113,7 +122,7 @@ window.I18N = {
       apertivoCta: "Aperitivo o zachodzie",
     },
     eventi: { eyebrow: "Wydarzenia", heading: "Co się dzieje\nw S'Historia", intro: "Co tydzień coś nowego: muzyka na żywo, degustacje, kolacje na cztery ręce, wieczory jazzowe pod gwiazdami." },
-    social: { eyebrow: "Social", heading: "Bądź\nz nami", instagram: "Na Instagramie", facebook: "Na Facebooku" },
+    social: { eyebrow: "Social", heading: "Bądź\nz nami", instagram: "Na Instagramie", facebook: "Na Facebooku", more: "Zobacz więcej", close: "Zamknij", noComments: "Brak komentarzy.", replyOnIg: "Odpowiedz na Instagramie", commentOnIg: "Skomentuj na Instagramie →", viewOnIg: "Zobacz na Instagramie →", readOnFb: "Czytaj na Facebooku →", stories: "Relacje", mentions: "Oznaczenia" },
     attrazioni: { eyebrow: "Okolica", heading: "Co zobaczyć\nw pobliżu", intro: "Rena Majore to brama do północnej Sardynii. Plaże, klify, wyspy.", directions: "Wyznacz trasę" },
     recensioni: { eyebrow: "Głosy", heading: "Co mówią\ngoście" },
     contatti: {
@@ -157,7 +166,7 @@ window.I18N = {
       hoursTitle: "Open", apertivoCta: "Sunset aperitivo",
     },
     eventi: { eyebrow: "Events", heading: "What's on\nat S'Historia", intro: "Every week something new: live music, tastings, four-hands dinners, jazz nights under the stars." },
-    social: { eyebrow: "Social", heading: "Live\nthe moment", instagram: "On Instagram", facebook: "On Facebook" },
+    social: { eyebrow: "Social", heading: "Live\nthe moment", instagram: "On Instagram", facebook: "On Facebook", more: "See more", close: "Close", noComments: "No comments yet.", replyOnIg: "Reply on Instagram", commentOnIg: "Comment on Instagram →", viewOnIg: "View on Instagram →", readOnFb: "Read on Facebook →", stories: "Stories", mentions: "Mentions" },
     attrazioni: { eyebrow: "Nearby", heading: "Things to do\nnearby", intro: "Rena Majore is the gateway to northern Sardinia. Beaches, cliffs, islands.", directions: "Directions from here" },
     recensioni: { eyebrow: "Voices", heading: "What\nguests say" },
     contatti: {
@@ -201,7 +210,7 @@ window.I18N = {
       hoursTitle: "Geöffnet", apertivoCta: "Aperitivo bei Sonnenuntergang",
     },
     eventi: { eyebrow: "Events", heading: "Was läuft\nbei S'Historia", intro: "Jede Woche etwas Neues: Live-Musik, Verkostungen, Vier-Hände-Dinner, Jazz-Nächte unter den Sternen." },
-    social: { eyebrow: "Social", heading: "Lebe\nden Moment", instagram: "Auf Instagram", facebook: "Auf Facebook" },
+    social: { eyebrow: "Social", heading: "Lebe\nden Moment", instagram: "Auf Instagram", facebook: "Auf Facebook", more: "Mehr ansehen", close: "Schließen", noComments: "Noch keine Kommentare.", replyOnIg: "Auf Instagram antworten", commentOnIg: "Auf Instagram kommentieren →", viewOnIg: "Auf Instagram ansehen →", readOnFb: "Auf Facebook lesen →", stories: "Storys", mentions: "Erwähnungen" },
     attrazioni: { eyebrow: "Umgebung", heading: "Unternehmungen\nin der Nähe", intro: "Rena Majore ist das Tor zum Norden Sardiniens. Strände, Klippen, Inseln.", directions: "Wegbeschreibung von hier" },
     recensioni: { eyebrow: "Stimmen", heading: "Was Gäste\nsagen" },
     contatti: {
@@ -245,7 +254,7 @@ window.I18N = {
       hoursTitle: "Ouvert", apertivoCta: "Aperitivo au coucher du soleil",
     },
     eventi: { eyebrow: "Événements", heading: "À l'affiche\nchez S'Historia", intro: "Chaque semaine une nouveauté : musique live, dégustations, dîners à quatre mains, nuits jazz sous les étoiles." },
-    social: { eyebrow: "Social", heading: "Vivez\nle moment", instagram: "Sur Instagram", facebook: "Sur Facebook" },
+    social: { eyebrow: "Social", heading: "Vivez\nle moment", instagram: "Sur Instagram", facebook: "Sur Facebook", more: "Voir plus", close: "Fermer", noComments: "Aucun commentaire pour le moment.", replyOnIg: "Répondre sur Instagram", commentOnIg: "Commenter sur Instagram →", viewOnIg: "Voir sur Instagram →", readOnFb: "Lire sur Facebook →", stories: "Stories", mentions: "Mentions" },
     attrazioni: { eyebrow: "À proximité", heading: "Que faire\naux alentours", intro: "Rena Majore est la porte d'entrée du nord de la Sardaigne. Plages, falaises, îles.", directions: "Itinéraire d'ici" },
     recensioni: { eyebrow: "Voix", heading: "Ce que disent\nles invités" },
     contatti: {
@@ -289,7 +298,7 @@ window.I18N = {
       hoursTitle: "Abierto", apertivoCta: "Aperitivo al atardecer",
     },
     eventi: { eyebrow: "Eventos", heading: "Qué pasa\nen S'Historia", intro: "Cada semana algo nuevo: música en vivo, catas, cenas a cuatro manos, noches de jazz bajo las estrellas." },
-    social: { eyebrow: "Social", heading: "Vive\nel momento", instagram: "En Instagram", facebook: "En Facebook" },
+    social: { eyebrow: "Social", heading: "Vive\nel momento", instagram: "En Instagram", facebook: "En Facebook", more: "Ver más", close: "Cerrar", noComments: "Aún no hay comentarios.", replyOnIg: "Responder en Instagram", commentOnIg: "Comentar en Instagram →", viewOnIg: "Ver en Instagram →", readOnFb: "Leer en Facebook →", stories: "Historias", mentions: "Menciones" },
     attrazioni: { eyebrow: "Alrededores", heading: "Qué hacer\ncerca", intro: "Rena Majore es la puerta al norte de Cerdeña. Playas, acantilados, islas.", directions: "Cómo llegar desde aquí" },
     recensioni: { eyebrow: "Voces", heading: "Lo que dicen\nlos invitados" },
     contatti: {
@@ -349,7 +358,7 @@ window.EVENTI_DATA = [
 ];
 
 window.ATTRAZIONI_DATA = [
-  { name: "Spiaggia di Rena Majore", dist: "0,1 km", category: "Spiagge", icon: "🏖", desc: "La nostra spiaggia. Sabbia bianca, ginepri, pini.", lat: 40.9889, lng: 9.0972 },
+  { name: "Spiaggia di Rena Majore", dist: "0,3 km", category: "Spiagge", icon: "🏖", desc: "La nostra spiaggia. Sabbia bianca, ginepri, pini.", lat: 41.1660057, lng: 9.1777384 },
   { name: "Capo Testa", dist: "12 km", category: "Natura", icon: "🌿", desc: "Formazioni granitiche modellate dal vento. Faro storico.", lat: 41.2436, lng: 9.1430 },
   { name: "Valle della Luna", dist: "15 km", category: "Natura", icon: "🌿", desc: "Valle di rocce, leggendaria meta hippie degli anni '70.", lat: 41.2360, lng: 9.1500 },
   { name: "Santa Teresa Gallura", dist: "11 km", category: "Cultura", icon: "🏛", desc: "Borgo storico e porto per la Corsica.", lat: 41.2403, lng: 9.1880 },
