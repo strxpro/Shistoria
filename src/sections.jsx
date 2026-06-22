@@ -418,7 +418,7 @@ function Eventi({ t }) {
                 <div className="ev-card-content">
                   <span className="ev-card-tag">{e.tag || "Evento"}</span>
                   <h4 className="ev-card-title">{e.title}</h4>
-                  <span className="ev-card-date">{e.event_date || e.date || ""}</span>
+                  <span className="ev-card-date">{e.event_date || e.date || ""}{e.event_time ? ` · ${e.event_time}` : ""}</span>
                   {(() => { const f = forecastFor(e.event_date || e.date); return f ? (
                     <span className="ev-card-weather" title={WEATHER_TR[f.key]?.[evLang]}>
                       <span aria-hidden="true">{WEATHER_ICON[f.key]}</span> {f.tmax}°/{f.tmin}°
@@ -471,7 +471,7 @@ function Eventi({ t }) {
               ) : null; })()}
             </div>
             <div className="ev-full-body">
-              <span className="ev-full-date">{eventPopout.event_date || eventPopout.date || ""}</span>
+              <span className="ev-full-date">{eventPopout.event_date || eventPopout.date || ""}{eventPopout.event_time ? ` · ${eventPopout.event_time}` : ""}</span>
               {(() => { const f = forecastFor(eventPopout.event_date || eventPopout.date); return f ? (
                 <span className="ev-card-weather ev-full-weather" title={WEATHER_TR[f.key]?.[evLang]}>
                   <span aria-hidden="true">{WEATHER_ICON[f.key]}</span> {WEATHER_TR[f.key]?.[evLang]} · {f.tmax}°/{f.tmin}°

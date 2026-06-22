@@ -789,6 +789,42 @@ function ItalianCalendar({ value, onChange, accent }: { value: string; onChange:
   );
 }
 
+// ─── Selettore orario (ore a sinistra, minuti 00/15/30/45 a destra) ──────────
+function TimePicker({ value, onChange, accent }: { value?: string; onChange: (t: string) => void; accent?: string }) {
+  const [hh, mm] = (value && /^\d{1,2}:\d{2}$/.test(value)) ? value.split(":") : ["", ""];
+  const hours = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
+  const minutes = ["00", "15", "30", "45"];
+  const set = (h: string, m: string) => onChange(`${h}:${m}`);
+  return (
+    <div className="ev-time">
+      <div className="ev-time-col">
+        <span className="ev-time-lbl">Ora</span>
+        <div className="ev-time-list">
+          {hours.map((h) => (
+            <button type="button" key={h} className={`ev-time-cell ${hh === h ? "sel" : ""}`}
+              style={hh === h && accent ? { background: accent, borderColor: accent } : undefined}
+              onClick={() => set(h, mm || "00")}>{h}</button>
+          ))}
+        </div>
+      </div>
+      <span className="ev-time-sep">:</span>
+      <div className="ev-time-col">
+        <span className="ev-time-lbl">Minuti</span>
+        <div className="ev-time-list ev-time-min">
+          {minutes.map((m) => (
+            <button type="button" key={m} className={`ev-time-cell ${mm === m ? "sel" : ""}`}
+              style={mm === m && accent ? { background: accent, borderColor: accent } : undefined}
+              onClick={() => set(hh || "00", m)}>{m}</button>
+          ))}
+        </div>
+      </div>
+      {value && (
+        <button type="button" className="ev-time-clear" onClick={() => onChange("")} aria-label="Cancella orario">✕</button>
+      )}
+    </div>
+  );
+}
+
 function EventsPanel() {
   const [events, setEvents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -851,8 +887,10 @@ function EventsPanel() {
     // event_date to kolumna typu `date` — pusty string ją wywala. Normalizuj: pusty → null, inaczej → YYYY-MM-DD
     let ed: string | null = rest.event_date || null;
     if (ed && !/^\d{4}-\d{2}-\d{2}$/.test(String(ed))) { const d = new Date(ed); ed = isNaN(d.getTime()) ? null : d.toISOString().slice(0, 10); }
+    // event_time to kolumna typu `text` (HH:MM) — pusty string → null
+    const et: string | null = (rest.event_time && /^\d{1,2}:\d{2}$/.test(String(rest.event_time))) ? rest.event_time : null;
     if (!rest.title || !rest.title.trim()) { alert("Inserisci il titolo dell'evento."); return; }
-    const payload: any = { ...rest, event_date: ed, tag, is_published: true, share_instagram: !!shareInstagram, share_facebook: !!shareFacebook, share_story: !!shareStory, posted: false };
+    const payload: any = { ...rest, event_date: ed, event_time: et, tag, is_published: true, share_instagram: !!shareInstagram, share_facebook: !!shareFacebook, share_story: !!shareStory, posted: false };
     const res = evt.id
       ? await supabase.from("events").update(payload).eq("id", evt.id).select().single()
       : await supabase.from("events").insert(payload).select().single();
@@ -872,6 +910,7 @@ function EventsPanel() {
             id: saved.id,
             title: saved.title || "",
             event_date: saved.event_date || "",
+            event_time: saved.event_time || "",
             description: saved.description || "",
             tag: saved.tag || "",
             image_url: saved.image_url || "",
@@ -981,6 +1020,8 @@ function EventsPanel() {
                   <input value={editEvt.title} onChange={(e) => setEditEvt({ ...editEvt, title: e.target.value })} placeholder="Nome dell'evento" />
                   <label>Data</label>
                   <ItalianCalendar value={editEvt.event_date} onChange={(d) => setEditEvt({ ...editEvt, event_date: d })} accent={editEvt.custom_colors?.accent} />
+                  <label>Orario (opzionale)</label>
+                  <TimePicker value={editEvt.event_time || ""} onChange={(t) => setEditEvt({ ...editEvt, event_time: t })} accent={editEvt.custom_colors?.accent} />
                   <label>Tag</label>
                   <input value={editEvt.tag || ""} onChange={(e) => setEditEvt({ ...editEvt, tag: e.target.value })} placeholder="es. Live Music, Degustazione..." />
                   <label>Generi musicali (opzionale)</label>
@@ -1038,7 +1079,7 @@ function EventsPanel() {
                     <div className="ev-preview-content">
                       <span className="ev-preview-tag" style={{ color: editEvt.custom_colors?.accent || "#E8927C" }}>{editEvt.tag || "Evento"}</span>
                       <h4 className="ev-preview-title">{editEvt.title || "Titolo evento"}</h4>
-                      {editEvt.event_date && <span className="ev-preview-date">{new Date(editEvt.event_date + "T00:00:00").toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" })}</span>}
+                      {editEvt.event_date && <span className="ev-preview-date">{new Date(editEvt.event_date + "T00:00:00").toLocaleDateString("it-IT", { weekday: "long", day: "numeric", month: "long" })}{editEvt.event_time ? ` · ${editEvt.event_time}` : ""}</span>}
                       {editEvt.description && <p className="ev-preview-desc">{editEvt.description}</p>}
                       <button className="ev-preview-btn" style={{ borderColor: editEvt.custom_colors?.accent }}>Avvisami</button>
                     </div>
@@ -1091,7 +1132,7 @@ function EventsPanel() {
         <div className="admin-grid">
           {events.map((evt) => (
             <div key={evt.id} className="admin-event-card" style={{ borderLeftColor: evt.custom_colors?.accent || "#E8927C" }}>
-              <span className="admin-event-date">{evt.event_date}</span>
+              <span className="admin-event-date">{evt.event_date}{evt.event_time ? ` · ${evt.event_time}` : ""}</span>
               <h4>{evt.title}</h4>
               <span className="admin-event-tag">{evt.tag}</span>
               <div className="admin-event-actions">
@@ -1245,7 +1286,11 @@ function DrinksPanel() {
   const bulkDeleteDrinks = async (ids: string[]) => {
     if (ids.length === 0) return;
     if (!confirm(`Eliminare ${ids.length} drink selezionati?`)) return;
-    await supabase.from("community_drinks").delete().in("id", ids);
+    const { data, error } = await supabase.from("community_drinks").delete().in("id", ids).select();
+    if (error) { alert("Errore eliminazione: " + error.message); return; }
+    if (!data || data.length === 0) {
+      alert("Nessun drink eliminato. Controlla le policy RLS (manca la policy DELETE su community_drinks).");
+    }
     exitSel(); load();
   };
   const [, forceTick] = useState(0);
@@ -1296,7 +1341,15 @@ function DrinksPanel() {
   };
 
   const remove = async (id: string) => {
-    if (confirm("Eliminare questo drink?")) { await supabase.from("community_drinks").delete().eq("id", id); load(); }
+    if (!confirm("Eliminare questo drink?")) return;
+    const { data, error } = await supabase.from("community_drinks").delete().eq("id", id).select();
+    if (error) { alert("Errore eliminazione: " + error.message); return; }
+    if (!data || data.length === 0) {
+      alert("Drink non eliminato. Manca la policy DELETE su community_drinks (vedi scripts/setup-community-tables.sql).");
+      return;
+    }
+    setDrinks((prev) => prev.filter((d) => d.id !== id));
+    load(true);
   };
   // Swipe w prawo → przypnij (Nomina jako zwycięzca = korona, ląduje wyżej)
   const nominate = async (d: any) => {
@@ -1512,7 +1565,12 @@ function OrdersPanel() {
     load();
   };
   const deleteOrder = async (id: string) => {
-    await supabase.from("drink_orders").delete().eq("id", id);
+    const { data, error } = await supabase.from("drink_orders").delete().eq("id", id).select();
+    if (error) { alert("Errore eliminazione: " + error.message); return; }
+    if (!data || data.length === 0) {
+      alert("Ordine non eliminato. Manca la policy DELETE su drink_orders (vedi scripts/setup-community-tables.sql).");
+      return;
+    }
     setOrders((prev) => prev.filter((o) => o.id !== id));
   };
   // Tryb zaznaczania + masowe usuwanie
@@ -3173,6 +3231,21 @@ function AdminStyles() {
       .admin-theme-light .ev-cal { background:#f6f8fb; border-color:rgba(0,0,0,0.08); }
       .admin-theme-light .ev-cal-day { background:rgba(0,0,0,0.04); }
 
+      /* Selettore orario (ore | minuti) */
+      .ev-time { display:flex; gap:12px; align-items:flex-start; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.12); border-radius:14px; padding:12px; margin-bottom:14px; position:relative; }
+      .ev-time-col { display:flex; flex-direction:column; gap:6px; flex:1; min-width:0; }
+      .ev-time-lbl { font-size:10px; font-weight:700; opacity:0.5; text-transform:uppercase; letter-spacing:0.06em; }
+      .ev-time-list { display:grid; grid-template-columns:repeat(4,1fr); gap:5px; max-height:148px; overflow-y:auto; padding-right:2px; }
+      .ev-time-min { grid-template-columns:repeat(2,1fr); align-content:start; }
+      .ev-time-cell { padding:8px 0; border-radius:9px; border:1px solid transparent; background:rgba(255,255,255,0.05); color:inherit; font-size:13px; font-weight:600; cursor:pointer; transition:all .15s; text-align:center; }
+      .ev-time-cell:hover { background:rgba(255,255,255,0.14); }
+      .ev-time-cell.sel { background:var(--c-coral,#E8927C); border-color:transparent; color:#fff; font-weight:800; }
+      .ev-time-sep { align-self:center; font-size:22px; font-weight:800; opacity:0.4; padding-top:16px; }
+      .ev-time-clear { position:absolute; top:8px; right:8px; width:26px; height:26px; border-radius:50%; border:1px solid rgba(255,255,255,0.16); background:rgba(255,255,255,0.06); color:inherit; cursor:pointer; font-size:12px; line-height:1; }
+      .ev-time-clear:hover { background:rgba(231,76,60,.2); }
+      .admin-theme-light .ev-time { background:#f6f8fb; border-color:rgba(0,0,0,0.08); }
+      .admin-theme-light .ev-time-cell { background:rgba(0,0,0,0.04); }
+
       /* ── Ospiti: węższe karty w siatce ── */
       .ospiti-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:12px; }
       .ospiti-card { background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:16px; padding:14px; cursor:pointer; display:flex; flex-direction:column; gap:10px; transition:transform .2s, border-color .2s; }
@@ -3796,6 +3869,49 @@ function AdminStyles() {
       .admin-modal-overlay { backdrop-filter: blur(10px); }
       .admin-modal { animation: adminSoftIn .35s cubic-bezier(.22,1,.36,1) both; }
       @keyframes adminSoftIn { from { opacity:0; transform:translateY(16px) scale(.98); } to { opacity:1; transform:none; } }
+
+      /* ════════ CONSISTENCY LAYER — równe guziki i boksy, czysty UI ════════ */
+      /* Wszystkie przyciski: ta sama wysokość, wyśrodkowane ikony+tekst, brak rozjazdów */
+      .admin .admin-btn, .admin .admin-btn-ghost {
+        height:42px; display:inline-flex; align-items:center; justify-content:center; gap:8px;
+        padding:0 20px; font-size:13px; line-height:1; white-space:nowrap; box-sizing:border-box; }
+      .admin .admin-btn-sm {
+        height:34px; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+        padding:0 14px; font-size:12.5px; line-height:1; white-space:nowrap; box-sizing:border-box; }
+      /* Ikonowe guziki (✎ ✕ 🗑 📌 ☆) — równe kwadraty */
+      .admin .menu-row-actions .admin-btn-sm,
+      .admin .admin-event-actions .admin-btn-sm,
+      .admin .admin-drink-actions .admin-btn-sm:last-child {
+        width:34px; padding:0; }
+      .admin .menu-row-actions, .admin .admin-event-actions, .admin .admin-drink-actions {
+        display:flex; gap:8px; align-items:center; }
+      .admin .admin-drink-actions .admin-btn-sm:first-child { flex:1; }
+
+      /* Grupy przycisków w nagłówku — równe wyrównanie do prawej, spójny odstęp */
+      .admin .admin-panel-head > div { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+      .admin .ord-filter, .admin .stats-range { display:inline-flex; gap:6px; align-items:center; }
+      .admin .ord-filter button, .admin .stats-range button { height:42px; padding:0 16px; display:inline-flex; align-items:center; }
+
+      /* Wszystkie karty/boksy — jednolity promień i ramka, równa wysokość w gridzie */
+      .admin .admin-grid { display:grid; gap:18px; align-items:stretch; }
+      .admin .admin-drink-card, .admin .admin-event-card, .admin .menu-card,
+      .admin .ospiti-card, .admin .stats-kpi, .admin .stats-section {
+        border-radius:18px; border:1px solid rgba(255,255,255,.10);
+        background:rgba(255,255,255,.04); box-sizing:border-box; height:100%; }
+      .admin .admin-drink-card { display:flex; flex-direction:column; }
+      .admin .admin-drink-info { flex:1; }
+      .admin .admin-drink-actions { margin-top:auto; }
+
+      /* Modale — spójne akcje na dole, równe guziki */
+      .admin .admin-modal-actions { display:flex; gap:12px; align-items:center; }
+      .admin .admin-modal-actions .admin-btn,
+      .admin .admin-modal-actions .admin-btn-ghost { flex:1; }
+
+      /* Pola formularzy — jednolita wysokość i promień */
+      .admin .admin-field input, .admin .admin-field select { height:44px; box-sizing:border-box; }
+
+      /* Light theme — zachowaj czytelność guzików */
+      .admin-theme-light .admin-btn-sm, .admin-theme-light .admin-btn-ghost { background:rgba(0,0,0,.04); }
     `}</style>
 
 

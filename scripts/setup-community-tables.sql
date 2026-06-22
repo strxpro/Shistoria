@@ -121,6 +121,8 @@ CREATE TABLE IF NOT EXISTS events (
 -- Jeśli tabela już istnieje:
 ALTER TABLE events ADD COLUMN IF NOT EXISTS posted boolean DEFAULT false;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS share_facebook boolean DEFAULT false;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS share_story boolean DEFAULT false;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS event_time text;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS image_url text;
 
 -- ─── RPC Functions ────────────────────────────────────────────────────────
@@ -145,18 +147,30 @@ ALTER TABLE drink_likes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE drink_comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE events ENABLE ROW LEVEL SECURITY;
 
--- Public read access
+-- Public read access (idempotent — DROP przed CREATE, można uruchamiać wielokrotnie)
+DROP POLICY IF EXISTS "Public read community_drinks" ON community_drinks;
 CREATE POLICY "Public read community_drinks" ON community_drinks FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public insert community_drinks" ON community_drinks;
 CREATE POLICY "Public insert community_drinks" ON community_drinks FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Public read drink_orders" ON drink_orders;
 CREATE POLICY "Public read drink_orders" ON drink_orders FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public insert drink_orders" ON drink_orders;
 CREATE POLICY "Public insert drink_orders" ON drink_orders FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Public update drink_orders" ON drink_orders;
 CREATE POLICY "Public update drink_orders" ON drink_orders FOR UPDATE USING (true);
+DROP POLICY IF EXISTS "Public read drink_likes" ON drink_likes;
 CREATE POLICY "Public read drink_likes" ON drink_likes FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public insert drink_likes" ON drink_likes;
 CREATE POLICY "Public insert drink_likes" ON drink_likes FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Public read drink_comments" ON drink_comments;
 CREATE POLICY "Public read drink_comments" ON drink_comments FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Public insert drink_comments" ON drink_comments;
 CREATE POLICY "Public insert drink_comments" ON drink_comments FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Public read events" ON events;
 CREATE POLICY "Public read events" ON events FOR SELECT USING (is_published = true);
+DROP POLICY IF EXISTS "Admin manage events" ON events;
 CREATE POLICY "Admin manage events" ON events FOR ALL USING (true);
+DROP POLICY IF EXISTS "Public update community_drinks" ON community_drinks;
 CREATE POLICY "Public update community_drinks" ON community_drinks FOR UPDATE USING (true);
 
 
@@ -182,8 +196,11 @@ ALTER TABLE reviews ADD COLUMN IF NOT EXISTS ext_id text;
 CREATE UNIQUE INDEX IF NOT EXISTS reviews_ext_id_uniq ON reviews (ext_id) WHERE ext_id IS NOT NULL;
 
 ALTER TABLE reviews ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public read approved reviews" ON reviews;
 CREATE POLICY "Public read approved reviews" ON reviews FOR SELECT USING (is_approved = true);
+DROP POLICY IF EXISTS "Public insert reviews" ON reviews;
 CREATE POLICY "Public insert reviews" ON reviews FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Admin manage reviews" ON reviews;
 CREATE POLICY "Admin manage reviews" ON reviews FOR ALL USING (true);
 
 -- ─── Contact Messages (formularz kontaktowy) ──────────────────────────────────
@@ -202,14 +219,18 @@ CREATE TABLE IF NOT EXISTS contact_messages (
 );
 
 ALTER TABLE contact_messages ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Public insert contact_messages" ON contact_messages;
 CREATE POLICY "Public insert contact_messages" ON contact_messages FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS "Admin manage contact_messages" ON contact_messages;
 CREATE POLICY "Admin manage contact_messages" ON contact_messages FOR ALL USING (true);
 
 -- ─── Kod odbioru drinka (4 znaki, ważny 15 min) ─────────────────────────────
 ALTER TABLE drink_orders ADD COLUMN IF NOT EXISTS pickup_code text;
 CREATE INDEX IF NOT EXISTS idx_orders_pickup_code ON drink_orders(pickup_code);
--- Realtime dla zamówień (panel admin na żywo)
-ALTER PUBLICATION supabase_realtime ADD TABLE drink_orders;
+-- Realtime dla zamówień (panel admin na żywo) — idempotentnie
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE drink_orders;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 
 -- ─── Czat: odpowiedzi obsługi jako osobne wiadomości (dymki) ──────────────────
@@ -267,3 +288,31 @@ BEGIN
   UPDATE community_drinks SET views = COALESCE(views, 0) + 1 WHERE id = drink_uuid;
 END;
 $$ LANGUAGE plpgsql;
+
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- FIX: brakujące polityki DELETE (usuwanie drinków/ordini nie działało)
+-- RLS było włączone, ale bez polityki DELETE Supabase „usuwał" 0 wierszy
+-- bez błędu → w panelu admina drink wracał po odświeżeniu.
+-- Uruchom w Supabase SQL Editor.
+-- ═══════════════════════════════════════════════════════════════════════════
+DROP POLICY IF EXISTS "Public delete community_drinks" ON community_drinks;
+CREATE POLICY "Public delete community_drinks" ON community_drinks FOR DELETE USING (true);
+
+DROP POLICY IF EXISTS "Public delete drink_orders" ON drink_orders;
+CREATE POLICY "Public delete drink_orders" ON drink_orders FOR DELETE USING (true);
+
+DROP POLICY IF EXISTS "Public delete drink_comments" ON drink_comments;
+CREATE POLICY "Public delete drink_comments" ON drink_comments FOR DELETE USING (true);
+
+DROP POLICY IF EXISTS "Public delete drink_likes" ON drink_likes;
+CREATE POLICY "Public delete drink_likes" ON drink_likes FOR DELETE USING (true);
+
+DROP POLICY IF EXISTS "Public delete reviews" ON reviews;
+CREATE POLICY "Public delete reviews" ON reviews FOR DELETE USING (true);
+
+DROP POLICY IF EXISTS "Public delete contact_messages" ON contact_messages;
+CREATE POLICY "Public delete contact_messages" ON contact_messages FOR DELETE USING (true);
+
+DROP POLICY IF EXISTS "Public delete newsletter" ON newsletter;
+CREATE POLICY "Public delete newsletter" ON newsletter FOR DELETE USING (true);

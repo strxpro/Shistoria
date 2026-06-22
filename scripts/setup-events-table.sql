@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS events (
   title text NOT NULL,
   description text,
   event_date date,                       -- data wydarzenia (może być NULL)
+  event_time text,                       -- godzina wydarzenia HH:MM (może być NULL)
   tag text,                              -- np. "Live Music · Jazz, Pop"
   template text DEFAULT 'festa',         -- motyw karty (festa/dj/live/...)
   custom_colors jsonb DEFAULT '{}'::jsonb, -- { bg, accent }
@@ -30,6 +31,7 @@ CREATE TABLE IF NOT EXISTS events (
 ALTER TABLE events ADD COLUMN IF NOT EXISTS title text;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS description text;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS event_date date;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS event_time text;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS tag text;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS template text DEFAULT 'festa';
 ALTER TABLE events ADD COLUMN IF NOT EXISTS custom_colors jsonb DEFAULT '{}'::jsonb;
@@ -37,6 +39,7 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS image_url text;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS is_published boolean DEFAULT true;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS share_instagram boolean DEFAULT false;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS share_facebook boolean DEFAULT false;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS share_story boolean DEFAULT false;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS posted boolean DEFAULT false;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
 
