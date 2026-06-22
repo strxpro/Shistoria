@@ -316,3 +316,14 @@ CREATE POLICY "Public delete contact_messages" ON contact_messages FOR DELETE US
 
 DROP POLICY IF EXISTS "Public delete newsletter" ON newsletter;
 CREATE POLICY "Public delete newsletter" ON newsletter FOR DELETE USING (true);
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- FIX: foreign key drink_orders.drink_id blokował usuwanie drinków
+-- ("violates foreign key constraint drink_orders_drink_id_fkey").
+-- Przebudowujemy constraint na ON DELETE SET NULL — usunięcie drinka NIE kasuje
+-- historii zamówień, tylko zeruje powiązanie (drink_id → NULL).
+-- ═══════════════════════════════════════════════════════════════════════════
+ALTER TABLE drink_orders DROP CONSTRAINT IF EXISTS drink_orders_drink_id_fkey;
+ALTER TABLE drink_orders
+  ADD CONSTRAINT drink_orders_drink_id_fkey
+  FOREIGN KEY (drink_id) REFERENCES community_drinks(id) ON DELETE SET NULL;

@@ -114,7 +114,7 @@ export default function App() {
   const handleLangChange = (lang) => {
     if (lang === t.language) return;
     // Zapamiętaj, że użytkownik wybrał język ręcznie → auto-detekcja go nie nadpisze
-    try { localStorage.setItem("sh-lang-manual", "1"); } catch {}
+    try { localStorage.setItem("sh-lang-manual", "1"); localStorage.setItem("sh-lang", lang); } catch {}
 
     const selectors = [
       '.srt', '.text-clip-line', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p',
@@ -175,6 +175,19 @@ export default function App() {
     document.documentElement.dataset.palette = t.palette;
   }, [t.palette]);
 
+  // Przywróć zapisany język na starcie (przed auto-detekcją) — flaga i treść zawsze zgodne
+  useEffectA(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const saved = localStorage.getItem("sh-lang");
+      const SUPPORTED = ["it", "pl", "en", "de", "fr", "es"];
+      if (saved && SUPPORTED.includes(saved) && saved !== t.language) {
+        setTweak("language", saved);
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Auto-wykrywanie języka wg geolokalizacji (tylko raz, jeśli użytkownik nie wybrał ręcznie)
   useEffectA(() => {
     if (typeof window === "undefined") return;
@@ -191,7 +204,7 @@ export default function App() {
     };
     const applyLang = (lang) => {
       if (!SUPPORTED.includes(lang) || lang === t.language) return;
-      try { localStorage.setItem("sh-lang-auto", "1"); } catch {}
+      try { localStorage.setItem("sh-lang-auto", "1"); localStorage.setItem("sh-lang", lang); } catch {}
       setTweak("language", lang);
     };
     (async () => {

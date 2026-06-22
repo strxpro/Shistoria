@@ -1286,6 +1286,8 @@ function DrinksPanel() {
   const bulkDeleteDrinks = async (ids: string[]) => {
     if (ids.length === 0) return;
     if (!confirm(`Eliminare ${ids.length} drink selezionati?`)) return;
+    // Najpierw odepnij zamówienia (FK drink_orders.drink_id) — inaczej DB blokuje usunięcie
+    await supabase.from("drink_orders").update({ drink_id: null }).in("drink_id", ids);
     const { data, error } = await supabase.from("community_drinks").delete().in("id", ids).select();
     if (error) { alert("Errore eliminazione: " + error.message); return; }
     if (!data || data.length === 0) {
@@ -1342,6 +1344,8 @@ function DrinksPanel() {
 
   const remove = async (id: string) => {
     if (!confirm("Eliminare questo drink?")) return;
+    // Najpierw odepnij zamówienia (FK drink_orders.drink_id) — inaczej DB blokuje usunięcie
+    await supabase.from("drink_orders").update({ drink_id: null }).eq("drink_id", id);
     const { data, error } = await supabase.from("community_drinks").delete().eq("id", id).select();
     if (error) { alert("Errore eliminazione: " + error.message); return; }
     if (!data || data.length === 0) {
