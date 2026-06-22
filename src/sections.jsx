@@ -663,7 +663,7 @@ function Eventi({ t }) {
         .ev-cta { margin-top: 56px; text-align: center; }
 
         @media (max-width:768px) {
-          .ev-carousel { height:min(560px, 80vh); }
+          .ev-carousel { height:142vw; max-height:600px; }
           .ev-card { width:min(300px, 80vw); }
           .ev-arrows { display:none; }
         }

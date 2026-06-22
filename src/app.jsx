@@ -33,10 +33,10 @@ function RiseCard({ children, z = 2, distance = 240, peek = null, peekBg = "line
     if (isMobile) return p >= 0.99 ? "none" : `translateY(${(distance * 0.4) * (1 - p)}px)`;
     return p >= 0.99 ? "none" : `translateY(${distance * (1 - p)}px)`;
   });
-  const peekY = useTransform(scrollYProgress, [0, 0.5, 0.95], [80, 0, 70]);
-  const peekOpacity = useTransform(scrollYProgress, [0, 0.1, 0.82, 0.98], [0, 1, 1, 0]);
+  const peekY = useTransform(scrollYProgress, [0, 0.32, 0.68, 0.95], [80, 0, 0, 70]);
+  const peekOpacity = useTransform(scrollYProgress, [0, 0.1, 0.86, 0.98], [0, 1, 1, 0]);
   // mobile: peek chowa się przy scrollu (fade) — jak wcześniej
-  const peekOpacityMobile = useTransform(scrollYProgress, [0, 0.12, 0.78, 0.96], [0, 1, 1, 0]);
+  const peekOpacityMobile = useTransform(scrollYProgress, [0, 0.12, 0.82, 0.96], [0, 1, 1, 0]);
 
   // `bg` paints behind the card so the rise's transient gap never exposes the
   // fixed full-screen background images from earlier sections (e.g. Storia).

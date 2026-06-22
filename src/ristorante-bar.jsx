@@ -307,6 +307,9 @@ function Bar({ t, dark = true }) {
           .bar-hours-title { font-size: clamp(28px, 8vw, 40px); overflow-wrap: anywhere; }
           .bar-hours-num { font-size: clamp(30px, 8.5vw, 44px); white-space: nowrap; }
           .bar-cta-sub { font-size: 18px !important; overflow-wrap: anywhere; }
+          /* guzik aperitivo: wyśrodkowany, nie wychodzi poza ekran */
+          .bar-hours-right { display: flex; flex-direction: column; align-items: center; text-align: center; }
+          .bar-cta { width: 100%; max-width: 360px; justify-content: center; padding: 18px 20px; font-size: 13px; white-space: normal; text-align: center; }
         }
       `}</style>
     </section>
