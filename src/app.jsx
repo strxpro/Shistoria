@@ -208,6 +208,15 @@ export default function App() {
       setTweak("language", lang);
     };
     (async () => {
+      // Najpewniej: serwerowy /api/geo (nagłówki Vercel/Cloudflare) — natychmiast, bez CORS
+      try {
+        const res = await fetch("/api/geo", { cache: "no-store" });
+        if (res.ok) {
+          const d = await res.json();
+          const cc = (d.country || "").toString().toUpperCase().slice(0, 2);
+          if (cc) { applyLang(COUNTRY_LANG[cc] || "en"); return; }
+        }
+      } catch { /* spróbuj klienckich API niżej */ }
       // Próbujemy kilku darmowych API geolokalizacji po IP (gdy jedno padnie/limit → następne)
       const endpoints = [
         { url: "https://ipwho.is/", pick: (d) => d.country_code },

@@ -24,9 +24,9 @@ const { useState: useStateM, useEffect: useEffectM, useRef: useRefM, useMemo: us
 // pula współbieżności (max 6). Gorszy przypadek = zostaje oryginał (włoski).
 const _mtMem = {}; // { `${lang}:${text}`: translated }
 async function _gTranslate(text, lang) {
-  const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=it&tl=${lang}&dt=t&q=${encodeURIComponent(text)}`);
+  const r = await fetch("/api/translate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ q: text, target: lang, source: "it" }) });
   const j = await r.json();
-  return (j?.[0] || []).map((s) => s[0]).join("") || text;
+  return j?.text || text;
 }
 function useMenuAutoTr(texts, lang) {
   const [, force] = useStateM(0);

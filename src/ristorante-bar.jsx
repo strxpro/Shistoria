@@ -263,7 +263,7 @@ function Bar({ t, dark = true }) {
             <span className="eyebrow">— {t("bar.hoursTitle")}</span>
             <h4 className="bar-hours-title">Tutti i giorni</h4>
             <div className="bar-hours-num">12:00 → 14:30</div>
-            <div className="bar-hours-num">19:00 → 23:00</div>
+            <div className="bar-hours-num">18:30 → 23:00</div>
             <div className="bar-hours-day">Martedì · chiuso</div>
           </div>
           <div className="bar-hours-right">

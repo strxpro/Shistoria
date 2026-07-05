@@ -1740,11 +1740,11 @@ async function toItalian(text: string): Promise<string> {
   if (!text) return text;
   if (_trCache[text]) return _trCache[text];
   try {
-    // sl=auto → Google sam wykrywa język wiadomości, tl=it → zawsze włoski
-    const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=it&dt=t&q=${encodeURIComponent(text)}`);
+    // serwerowy /api/translate: source=auto → wykrywa język, target=it → zawsze włoski
+    const r = await fetch("/api/translate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ q: text, target: "it", source: "auto" }) });
     const j = await r.json();
-    const detected = j?.[2]; // wykryty język źródłowy
-    const out = (j?.[0] || []).map((s: any) => s[0]).join("");
+    const detected = j?.detected; // wykryty język źródłowy
+    const out = j?.text || "";
     // jeśli wykryto włoski — nie pokazuj tłumaczenia (to samo)
     const final = detected === "it" ? text : (out || text);
     _trCache[text] = final;
@@ -1914,9 +1914,9 @@ function MessagesPanel({ compose, onComposeUsed }: { compose?: { email: string; 
     const clientMsg = ([...activeThread.msgs].reverse().find((m: any) => !m.is_staff)?.message) || "";
     if (clientMsg) {
       try {
-        const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=en&dt=t&q=${encodeURIComponent(clientMsg.slice(0, 200))}`);
+        const r = await fetch("/api/translate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ q: clientMsg.slice(0, 200), target: "en", source: "auto" }) });
         const j = await r.json();
-        const detected = j?.[2];
+        const detected = j?.detected;
         if (detected && ["it", "pl", "en", "de", "fr", "es"].includes(detected)) lang = detected;
       } catch { /* zostaw domyślny */ }
     }
@@ -1936,9 +1936,9 @@ function MessagesPanel({ compose, onComposeUsed }: { compose?: { email: string; 
     let replyTranslated = replyIt;
     if (lang !== "it" && !isUrl) {
       try {
-        const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=it&tl=${lang}&dt=t&q=${encodeURIComponent(replyIt)}`);
+        const r = await fetch("/api/translate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ q: replyIt, target: lang, source: "it" }) });
         const j = await r.json();
-        replyTranslated = (j?.[0] || []).map((s: any) => s[0]).join("") || replyIt;
+        replyTranslated = j?.text || replyIt;
       } catch { replyTranslated = replyIt; }
     }
     // Markowy, ładny HTML w języku klienta (logo, kolory) — make wysyła gotowe pola
@@ -2648,8 +2648,8 @@ function HoursPanel() {
   const load = async () => {
     setLoading(true);
     const { data } = await supabase.from("opening_hours").select("*").eq("id", 1).single();
-    setRows(data?.hours || [{ day: "Lun — Dom", time: "12:00 — 14:30 · 19:00 — 23:00", closed: false }, { day: "Martedì", time: "chiuso", closed: true }]);
-    const sl = data?.time_slots || ["12:00","12:30","13:00","13:30","14:00","14:30","19:00","19:30","20:00","20:30","21:00","21:30","22:00","22:30","23:00"];
+    setRows(data?.hours || [{ day: "Lun — Dom", time: "12:00 — 14:30 · 18:30 — 23:00", closed: false }, { day: "Martedì", time: "chiuso", closed: true }]);
+    const sl = data?.time_slots || ["12:00","12:30","13:00","13:30","14:00","14:30","18:30","19:00","19:30","20:00","20:30","21:00","21:30","22:00","22:30","23:00"];
     setSlots(sl);
     setClosedDates(data?.closed_dates || []);
     setLoading(false);

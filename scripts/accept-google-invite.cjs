@@ -50,12 +50,15 @@ async function main() {
 
       for (const inv of invitations) {
         console.log(`   📩 Zaproszenie: ${inv.name} (rola: ${inv.role})`);
-        console.log(`      Cel: ${inv.targetLocation || inv.targetAccount}`);
+        console.log(`      Cel: ${JSON.stringify(inv.targetLocation || inv.targetAccount || inv.targetType)}`);
         try {
           await mybusiness.accounts.invitations.accept({ name: inv.name });
           console.log(`   ✅ ZAAKCEPTOWANO: ${inv.name}`);
         } catch (e) {
           console.error(`   ❌ Błąd akceptacji:`, e.message);
+          // Pełny szczegół błędu z API (powód precondition / quota / rola)
+          const details = e?.response?.data || e?.errors || null;
+          if (details) console.error('   ↳ Szczegóły API:', JSON.stringify(details, null, 2));
         }
       }
     } catch (e) {

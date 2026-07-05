@@ -66,9 +66,9 @@ export async function sendReservation(data: {
   let messageIt = data.message || "";
   if (data.message && lang !== "it") {
     try {
-      const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=it&dt=t&q=${encodeURIComponent(data.message)}`);
+      const r = await fetch("/api/translate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ q: data.message, target: "it", source: "auto" }) });
       const j = await r.json();
-      messageIt = (j?.[0] || []).map((s: any) => s[0]).join("") || data.message;
+      messageIt = j?.text || data.message;
     } catch { messageIt = data.message; }
   }
   const vars = {
@@ -198,9 +198,9 @@ export async function subscribeEventReminder(data: {
   const tr = async (txt?: string) => {
     if (!txt || lang === "it") return txt || "";
     try {
-      const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${lang}&dt=t&q=${encodeURIComponent(txt)}`);
+      const r = await fetch("/api/translate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ q: txt, target: lang, source: "it" }) });
       const j = await r.json();
-      return (j?.[0] || []).map((s: any) => s[0]).join("") || txt;
+      return j?.text || txt;
     } catch { return txt; }
   };
   const [titleTr, descTr, tagTr] = await Promise.all([tr(data.event_title), tr(data.event_description), tr(data.tag)]);

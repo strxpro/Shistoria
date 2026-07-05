@@ -5555,9 +5555,9 @@ function DbDrinkCard({ d }: { d: any }) {
     if (cmtTr[c.id]) { setCmtTr((m) => { const n = { ...m }; delete n[c.id]; return n; }); return; }
     const tlang = (typeof window !== "undefined" && (window as any).currentLanguage) || "it";
     try {
-      const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${tlang}&dt=t&q=${encodeURIComponent(c.content)}`);
+      const r = await fetch("/api/translate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ q: c.content, target: tlang, source: "auto" }) });
       const j = await r.json();
-      const txt = (j?.[0] || []).map((s: any) => s[0]).join("") || c.content;
+      const txt = j?.text || c.content;
       setCmtTr((m) => ({ ...m, [c.id]: txt }));
     } catch { /* ignore */ }
   };

@@ -56,8 +56,8 @@ ALTER TABLE opening_hours ADD COLUMN IF NOT EXISTS closed_dates jsonb DEFAULT '[
 -- Domyślne godziny
 INSERT INTO opening_hours (id, hours, time_slots)
 VALUES (1,
-  '[{"day":"Lun — Dom","time":"12:00 — 14:30 · 19:00 — 23:00","closed":false},{"day":"Martedì","time":"chiuso","closed":true}]'::jsonb,
-  '["12:00","12:30","13:00","13:30","14:00","14:30","19:00","19:30","20:00","20:30","21:00","21:30","22:00","22:30","23:00"]'::jsonb
+  '[{"day":"Lun — Dom","time":"12:00 — 14:30 · 18:30 — 23:00","closed":false},{"day":"Martedì","time":"chiuso","closed":true}]'::jsonb,
+  '["12:00","12:30","13:00","13:30","14:00","14:30","18:30","19:00","19:30","20:00","20:30","21:00","21:30","22:00","22:30","23:00"]'::jsonb
 )
 ON CONFLICT (id) DO NOTHING;
 

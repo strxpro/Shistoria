@@ -21,7 +21,24 @@ export async function translateText(text: string, targetLang: Lang): Promise<str
   if (!text || !text.trim()) return "";
   if (targetLang === "it") return text; // oryginał
 
-  // Próba z Google Translate API (wymaga klucza)
+  // W przeglądarce: serwerowy endpoint /api/translate (darmowy endpoint Google jest
+  // blokowany przez CORS, więc bezpośredni fetch z frontu cicho padał).
+  if (typeof window !== "undefined") {
+    try {
+      const res = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ q: text, target: targetLang, source: "it" }),
+      });
+      if (res.ok) {
+        const d = await res.json();
+        if (d?.text) return d.text;
+      }
+    } catch { /* fallback niżej */ }
+    return text;
+  }
+
+  // Serwer: Próba z Google Translate API (wymaga klucza)
   if (API_KEY) {
     try {
       const res = await fetch(`${GOOGLE_TRANSLATE_URL}?key=${API_KEY}`, {

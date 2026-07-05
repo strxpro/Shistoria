@@ -1325,9 +1325,9 @@ function Recensioni({ t }) {
   const translateReview = async (idx, text) => {
     if (recTr[idx]) { setRecTr((p) => { const n = { ...p }; delete n[idx]; return n; }); return; }
     try {
-      const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${recLang}&dt=t&q=${encodeURIComponent(text)}`);
+      const r = await fetch("/api/translate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ q: text, target: recLang, source: "auto" }) });
       const j = await r.json();
-      const tr = (j?.[0] || []).map((s) => s[0]).join("") || text;
+      const tr = j?.text || text;
       setRecTr((p) => ({ ...p, [idx]: tr }));
     } catch {}
   };
@@ -1747,11 +1747,11 @@ function Contatti({ t }) {
   };
 
   // Godziny do wyboru (wg godzin otwarcia restauracji)
-  const TIME_SLOTS = ["12:00","12:30","13:00","13:30","14:00","14:30","19:00","19:30","20:00","20:30","21:00","21:30","22:00","22:30","23:00"];
+  const TIME_SLOTS = ["12:00","12:30","13:00","13:30","14:00","14:30","18:30","19:00","19:30","20:00","20:30","21:00","21:30","22:00","22:30","23:00"];
 
   // Godziny otwarcia z DB (edytowalne z admina, zmiana NA ŻYWO)
   const [hours, setHours] = useStateE([
-    { day: "Lun — Dom", time: "12:00 — 14:30 · 19:00 — 23:00", closed: false },
+    { day: "Lun — Dom", time: "12:00 — 14:30 · 18:30 — 23:00", closed: false },
     { day: "Martedì", time: "chiuso", closed: true },
   ]);
   const [slots, setSlots] = useStateE(TIME_SLOTS);
@@ -1832,9 +1832,9 @@ function Contatti({ t }) {
       let msgIt = form.message || "";
       if (msgIt && lang !== "it") {
         try {
-          const r = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=it&dt=t&q=${encodeURIComponent(msgIt)}`);
+          const r = await fetch("/api/translate", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ q: msgIt, target: "it", source: "auto" }) });
           const j = await r.json();
-          msgIt = (j?.[0] || []).map((s) => s[0]).join("") || form.message;
+          msgIt = j?.text || form.message;
         } catch { /* zostaw oryginał */ }
       }
       // Naturalna wiadomość po włosku
