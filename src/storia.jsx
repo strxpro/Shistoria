@@ -249,9 +249,16 @@ function StoriaArc({ data }) {
     let animId = 0;
     let snapping = false;
 
+    // Stabilna wysokość viewportu = wysokość elementu sticky (px). window.innerHeight
+    // zmienia się przy chowaniu paska adresu → progress skakał przy scrollu.
+    const stickyH = () => {
+      const st = sec.querySelector(".sarc-sticky");
+      return st ? st.offsetHeight : window.innerHeight;
+    };
+
     const computeProgress = () => {
       const rect = sec.getBoundingClientRect();
-      const total = sec.offsetHeight - window.innerHeight;
+      const total = sec.offsetHeight - stickyH();
       if (total <= 0) return null;
       return Math.min(1, Math.max(0, -rect.top / total));
     };
@@ -314,7 +321,7 @@ function StoriaArc({ data }) {
       // dociągaj tylko gdy blisko daty (0.05–0.3) — nie szarpie z daleka, nie przeskakuje
       if (frac < 0.05 || frac > 0.3) return;
       const targetP = (nearest / (nLocal - 1)) * 0.84;
-      const total = sec.offsetHeight - window.innerHeight;
+      const total = sec.offsetHeight - stickyH();
       const secTop = sec.getBoundingClientRect().top + window.scrollY;
       animateTo(Math.round(secTop + targetP * total));
     };
@@ -324,7 +331,7 @@ function StoriaArc({ data }) {
       const nLocal = data.length;
       const i = Math.max(0, Math.min(nLocal - 1, idx));
       const targetP = (i / (nLocal - 1)) * 0.84;
-      const total = sec.offsetHeight - window.innerHeight;
+      const total = sec.offsetHeight - stickyH();
       const secTop = sec.getBoundingClientRect().top + window.scrollY;
       animateTo(Math.round(secTop + targetP * total));
     };
@@ -337,12 +344,17 @@ function StoriaArc({ data }) {
       return Math.round(travel * (data.length - 1));
     };
 
+    let lastP = -1;
     const onScroll = () => {
       if (!raf) {
         raf = requestAnimationFrame(() => {
           raf = 0;
           const p = computeProgress();
-          if (p != null) setProgress(p);
+          // re-render tylko przy realnej zmianie — nie co piksel scrolla
+          if (p != null && (Math.abs(p - lastP) > 0.003 || ((p === 0 || p === 1) && p !== lastP))) {
+            lastP = p;
+            setProgress(p);
+          }
         });
       }
       if (snapTimer) clearTimeout(snapTimer);
@@ -561,14 +573,21 @@ function StoriaHorizontal({ data }) {
     const sidePad = isMobile ? window.innerWidth * 0.09 : window.innerWidth / 2 - 210;
     const maxX = sidePad + (data.length - 1) * cardW + (isMobile ? window.innerWidth * 0.41 : 210) - window.innerWidth / 2;
 
+    let lastP = -1;
     const onScroll = () => {
       const rect = sec.getBoundingClientRect();
-      const vh = window.innerHeight;
+      // Wysokość elementu sticky (px) zamiast window.innerHeight — innerHeight
+      // zmienia się gdy Chrome chowa pasek adresu i karuzela „teleportowała się".
+      const vh = stickyRef.current ? stickyRef.current.offsetHeight : window.innerHeight;
       const total = sec.offsetHeight - vh;
       if (total <= 0) return;
       const p = Math.min(1, Math.max(0, -rect.top / total));
-      setProgress(p);
-      
+      // re-render (rok/pasek postępu/karty) tylko przy realnej zmianie — nie co piksel
+      if (Math.abs(p - lastP) > 0.003 || ((p === 0 || p === 1) && p !== lastP)) {
+        lastP = p;
+        setProgress(p);
+      }
+
       const travelP = p < 0.78 ? p / 0.78 : 1;
       const baseX = travelP * Math.max(0, maxX);
       // Combine scroll-driven position with touch offset
