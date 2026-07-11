@@ -421,6 +421,13 @@ body[data-cursor-zobacz="true"] .cursor-text {
   opacity: 0.5;
   animation: float-blob 18s ease-in-out infinite;
 }
+/* Telefony: mniejszy blur = mniej pracy GPU, mniej zacinania */
+@media (max-width: 1023px) {
+  .blob { filter: blur(36px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .blob { animation: none; }
+}
 
 /* Form */
 .field {

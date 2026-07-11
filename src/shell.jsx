@@ -13,9 +13,21 @@ function CustomCursor({ enabled }) {
   const pos = useRef({ x: 0, y: 0 });
   const ring = useRef({ x: 0, y: 0 });
   const firstMove = useRef(true);
+  // Na dotykowych urządzeniach kursor jest ukryty CSS-em — nie odpalaj pętli rAF
+  // ani listenerów (oszczędza baterię i klatki na telefonie).
+  const [finePointer, setFinePointer] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(pointer: fine)");
+    const upd = () => setFinePointer(mq.matches);
+    upd();
+    if (mq.addEventListener) mq.addEventListener("change", upd);
+    return () => { if (mq.removeEventListener) mq.removeEventListener("change", upd); };
+  }, []);
+  const active = enabled && finePointer;
 
   useEffect(() => {
-    if (!enabled) {
+    if (!active) {
       document.documentElement.dataset.cursor = "off";
       document.body.dataset.cursor = "off";
       return;
@@ -91,9 +103,9 @@ function CustomCursor({ enabled }) {
       document.body.dataset.cursorHover = "false";
       document.body.dataset.cursorZobacz = "false";
     };
-  }, [enabled]);
+  }, [active]);
 
-  if (!enabled) return null;
+  if (!active) return null;
   return (
     <div ref={ringRef} className="cursor-pos">
       <div className="cursor-ring">
@@ -293,11 +305,12 @@ function MobileLink({ l, i, onSelectSection, setMobileOpen }) {
   const handleClick = (e) => {
     e.preventDefault();
     setClicked(true);
+    // Krótkie opóźnienie na animację liter — 800ms czuło się jak zacięcie.
     setTimeout(() => {
       setMobileOpen(false);
       onSelectSection(l.id);
       setClicked(false);
-    }, 800);
+    }, 420);
   };
   
   return (
@@ -345,7 +358,16 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
       const img = logoRef.current.querySelector(".nav-logo-img");
       if (!img) return;
       const r = img.getBoundingClientRect();
-      if (r.width > 0) setLogoBox({ top: r.top, left: r.left, width: r.width, height: r.height });
+      if (r.width > 0) {
+        // Aktualizuj stan TYLKO gdy pozycja realnie się zmieniła — inaczej każdy
+        // piksel scrolla re-renderował całą nawigację (zacinanie na telefonie).
+        setLogoBox((prev) => (
+          prev &&
+          Math.abs(prev.top - r.top) < 0.5 &&
+          Math.abs(prev.left - r.left) < 0.5 &&
+          Math.abs(prev.width - r.width) < 0.5
+        ) ? prev : { top: r.top, left: r.left, width: r.width, height: r.height });
+      }
     };
     update();
     window.addEventListener("scroll", update, { passive: true });
@@ -356,10 +378,11 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
 
   useEffect(() => {
     let lastY = window.scrollY;
+    let lastProgress = -1;
     const onScroll = () => {
       const currentY = window.scrollY;
       setScrolled(currentY > 80);
-      
+
       const hero = document.getElementById("top");
       const storia = document.getElementById("storia");
       let heroEnd = 120;
@@ -369,7 +392,12 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
         const heroHeight = hero.offsetHeight;
         heroEnd = heroHeight;
         const progress = Math.min(1, Math.max(0, currentY / (heroHeight * 0.8)));
-        setScrollProgress(progress);
+        // Re-render dopiero przy zauważalnej zmianie (>2%) albo na krańcach —
+        // ciągłe setState przy każdym pikselu scrolla powodowało zacinanie.
+        if (Math.abs(progress - lastProgress) > 0.02 || ((progress === 0 || progress === 1) && progress !== lastProgress)) {
+          lastProgress = progress;
+          setScrollProgress(progress);
+        }
       }
       if (storia) {
         storiaEnd = storia.offsetTop + storia.offsetHeight;
@@ -411,6 +439,14 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
       setCenterW(centerRef.current.offsetWidth);
     }
   }, [locale]); // recalculate if language changes width
+
+  // Otwarte menu mobilne = zablokuj scroll strony pod spodem (menu ma własny scroll)
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    if (mobileOpen) document.body.style.overflow = "hidden";
+    else document.body.style.overflow = "";
+    return () => { document.body.style.overflow = ""; };
+  }, [mobileOpen]);
 
   // Set body attribute when in cocktail creator section (hamburger shifts right)
   useEffect(() => {
@@ -728,30 +764,29 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
           overflow-y: auto;
           -webkit-overflow-scrolling: touch;
           overscroll-behavior: contain;
+          will-change: clip-path;
         }
         .mobile-menu.open {
           clip-path: ellipse(120% 120% at 50% 100%);
           pointer-events: auto;
         }
-        
+
         .mobile-header-mirror {
           position: absolute;
           top: 0;
           left: 0;
           right: 0;
-          height: 100px;
+          height: calc(72px + env(safe-area-inset-top));
+          padding: env(safe-area-inset-top) 20px 0;
           display: flex;
           align-items: center;
           justify-content: space-between;
-          padding: 0 24px;
+          gap: 12px;
           pointer-events: none;
-          transition: height 0.6s cubic-bezier(0.65, 0, 0.35, 1);
           z-index: 10;
         }
         .mobile-header-mirror > * { pointer-events: auto; }
-        .nav.scrolled .mobile-header-mirror {
-          height: 80px;
-        }
+        .mobile-header-mirror .nav-logo { flex: 0 0 auto; min-width: 0; }
         .mobile-header-mirror .nav-logo {
           color: #fff !important;
         }
@@ -759,7 +794,11 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
           color: #fff !important;
           opacity: 0.6;
         }
-        .mobile-lang { display:flex; gap:6px; align-items:center; }
+        .mobile-lang { display:flex; gap:6px; align-items:center; flex-wrap:nowrap; min-width:0; }
+        @media (max-width: 400px) {
+          .mobile-lang { gap:4px; }
+          .mobile-lang-btn { width:28px !important; height:28px !important; }
+        }
         .mobile-lang-btn { width:32px; height:32px; border-radius:50%; border:2px solid transparent; padding:0; cursor:pointer; overflow:hidden; opacity:0.5; transition:all .3s; background:none;
           transform:scale(0); }
         .mobile-menu.open .mobile-lang-btn { animation:mlFlagIn .5s cubic-bezier(.2,1.3,.4,1) both; }
@@ -778,24 +817,27 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
         /* Highlight Cocktail Maker link in mobile menu */
         .mobile-links a.nav-highlight { color:var(--c-coral,#E8927C) !important; }
         
-        .mobile-menu-inner { position: relative; z-index: 2; padding: calc(110px + env(safe-area-inset-top)) 24px calc(130px + env(safe-area-inset-bottom)); margin-top: 0; max-width: 100%; box-sizing: border-box; flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; min-height: 100%; }
+        /* justify-content:flex-start + margin:auto na .mobile-links = wyśrodkowanie,
+           które przy przepełnieniu NIE ucina góry listy (center ucinał pierwsze linki
+           na niskich ekranach — górna część była nieosiągalna scrollem). */
+        .mobile-menu-inner { position: relative; z-index: 2; padding: calc(84px + env(safe-area-inset-top)) 22px calc(104px + env(safe-area-inset-bottom)); margin-top: 0; max-width: 100%; box-sizing: border-box; flex: 1; display: flex; flex-direction: column; justify-content: flex-start; align-items: flex-start; min-height: 100%; }
         .nav.scrolled .mobile-menu-inner { margin-top: 0; }
-        .mobile-links { display: flex; flex-direction: column; gap: 8px; margin: auto 0; max-width: 100%; width: 100%; align-items: flex-start; text-align: left; }
-        .mobile-social { display:flex; gap:14px; margin-top:28px; align-self:flex-start; }
-        .mobile-social a { display:grid; place-items:center; width:48px; height:48px; border-radius:50%; border:1px solid rgba(255,255,255,0.25); background:rgba(255,255,255,0.06); color:#fff; transition:background .25s, border-color .25s, transform .25s; opacity:0; transform:translateY(10px); }
-        .mobile-menu.open .mobile-social a { opacity:1; transform:translateY(0); transition-delay:.6s; }
+        .mobile-links { display: flex; flex-direction: column; gap: 6px; margin: auto 0 0; max-width: 100%; width: 100%; align-items: flex-start; text-align: left; }
+        .mobile-social { display:flex; gap:12px; margin:24px 0 auto; align-self:flex-start; flex-wrap:wrap; }
+        .mobile-social a { display:grid; place-items:center; width:46px; height:46px; border-radius:50%; border:1px solid rgba(255,255,255,0.25); background:rgba(255,255,255,0.06); color:#fff; transition:background .25s, border-color .25s, transform .25s, opacity .4s; opacity:0; transform:translateY(10px); }
+        .mobile-menu.open .mobile-social a { opacity:1; transform:translateY(0); transition-delay:.55s; }
         .mobile-social a:hover { background:var(--c-coral,#E8927C); border-color:transparent; transform:translateY(-2px); }
-        .mobile-social svg { width:22px; height:22px; }
+        .mobile-social svg { width:21px; height:21px; }
         .mobile-links a {
           font-family: var(--f-display);
           font-weight: 800;
-          font-size: clamp(20px, 6vw, 38px);
+          font-size: clamp(19px, 5.6vw, 34px);
           color: #fff;
           display: flex;
           justify-content: space-between;
           align-items: center;
           gap: 12px;
-          padding: 10px 0;
+          padding: 9px 0;
           border-bottom: 1px solid rgba(255,255,255,0.08);
           opacity: 0;
           transform: translateY(30px);
@@ -807,6 +849,16 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
           overflow: hidden;
           max-width: 100%;
           min-width: 0;
+          width: 100%;
+        }
+        /* Niskie ekrany (SE, mini): ciaśniej, żeby CAŁE menu + social weszło bez scrolla */
+        @media (max-height: 720px) {
+          .mobile-menu-inner { padding-top: calc(76px + env(safe-area-inset-top)); padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
+          .mobile-links { gap: 4px; }
+          .mobile-links a { font-size: clamp(17px, 4.8vw, 26px); padding: 7px 0; }
+          .mobile-social { margin-top: 16px; }
+          .mobile-social a { width: 40px; height: 40px; }
+          .mobile-social svg { width: 18px; height: 18px; }
         }
         .mobile-menu.open .mobile-links a {
           opacity: 1;
@@ -841,6 +893,7 @@ function SplitReveal({ children, className = "", as = "h2", invert = false }) {
     if (!el) return;
     const chars = el.querySelectorAll(".char");
 
+    let lastProgress = -1;
     const onScroll = () => {
       const rect = el.getBoundingClientRect();
       const vh = window.innerHeight;
@@ -848,6 +901,9 @@ function SplitReveal({ children, className = "", as = "h2", invert = false }) {
       const start = vh * 0.95;
       const end = vh * 0.15;
       const progress = Math.min(1, Math.max(0, (start - rect.top) / (start - end)));
+      // Poza ekranem progress stoi na 0/1 — nie przepisuj wtedy stylów wszystkich liter
+      if (Math.abs(progress - lastProgress) < 0.002) return;
+      lastProgress = progress;
       const total = chars.length;
       chars.forEach((c, i) => {
         // Use a more forgiving distribution so trailing chars complete by end of scroll
@@ -1028,7 +1084,11 @@ function Marquee({ items, separator = "✦" }) {
     const scrollFactor = mobile ? 0.025 : 0.05;
     const moveFactor = mobile ? 0.011 : 0.015;
 
+    // Pauza animacji, gdy marquee poza ekranem — rAF nie mieli w tle (płynność/bateria)
+    let visible = true;
+
     const tick = () => {
+      if (!visible) return;
       const scrollY = window.scrollY;
       const scrollDelta = scrollY - lastScrollY.current;
       lastScrollY.current = scrollY;
@@ -1047,11 +1107,27 @@ function Marquee({ items, separator = "✦" }) {
       rafId = requestAnimationFrame(tick);
     };
 
+    let io = null;
+    if (typeof IntersectionObserver !== "undefined") {
+      io = new IntersectionObserver((entries) => {
+        const nowVisible = entries.some((e) => e.isIntersecting);
+        if (nowVisible && !visible) {
+          visible = true;
+          lastScrollY.current = window.scrollY;
+          rafId = requestAnimationFrame(tick);
+        } else if (!nowVisible) {
+          visible = false;
+        }
+      }, { rootMargin: "120px" });
+      io.observe(track.parentElement);
+    }
+
     lastScrollY.current = window.scrollY;
     rafId = requestAnimationFrame(tick);
 
     return () => {
       cancelAnimationFrame(rafId);
+      if (io) io.disconnect();
       track.parentElement.removeEventListener("mouseenter", onEnter);
       track.parentElement.removeEventListener("mouseleave", onLeave);
       track.parentElement.removeEventListener("touchstart", onTouchStart);

@@ -2476,6 +2476,28 @@ function ReviewsPanel() {
   const [addOpen, setAddOpen] = useState(false);
   const [form, setForm] = useState({ name: "", content: "", stars: 5, source: "Google", photo_url: "", language: "it" });
   const [busy, setBusy] = useState(false);
+  const [gBusy, setGBusy] = useState(false);
+  const [gMsg, setGMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+  // Import recenzji z wizytówki Google (endpoint /api/import-google-reviews).
+  // Działa, gdy w env są klucze GOOGLE_* (Business Profile lub Places) — patrz GOOGLE_REVIEWS_IMPORT.md.
+  const importFromGoogle = async () => {
+    setGBusy(true); setGMsg(null);
+    try {
+      const res = await fetch(`/api/import-google-reviews?pin=shistoria2026`);
+      const j = await res.json();
+      if (j.ok) {
+        setGMsg({ ok: true, text: `✓ Importate ${j.imported ?? 0} nuove recensioni (trovate ${j.found ?? 0}, ${j.mode === "business_profile" ? "Business Profile" : "Places"}).` });
+        load();
+      } else if (j.error === "missing_config") {
+        setGMsg({ ok: false, text: "Google API non configurata — aggiungi le chiavi GOOGLE_* nelle variabili d'ambiente (vedi GOOGLE_REVIEWS_IMPORT.md)." });
+      } else {
+        setGMsg({ ok: false, text: `Errore import: ${j.error || res.status}${j.detail ? " — " + String(j.detail).slice(0, 120) : ""}` });
+      }
+    } catch (e: any) {
+      setGMsg({ ok: false, text: "Errore di rete: " + (e?.message || e) });
+    } finally { setGBusy(false); }
+  };
 
   const load = async () => {
     setLoading(true);
@@ -2551,6 +2573,9 @@ function ReviewsPanel() {
         <h1>Recensioni</h1>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <span className="admin-count">{reviews.filter(r => !r.is_approved).length} in attesa</span>
+          <button className="admin-btn-ghost" onClick={importFromGoogle} disabled={gBusy} title="Importa automaticamente le recensioni dalla scheda Google">
+            {gBusy ? "⏳ Importo…" : "⬇ Importa da Google"}
+          </button>
           <button className="admin-btn" onClick={() => setAddOpen(true)}>+ Recensione esterna</button>
           {selMode ? (
             <>
@@ -2564,6 +2589,12 @@ function ReviewsPanel() {
           )}
         </div>
       </header>
+
+      {gMsg && (
+        <p style={{ margin: "-16px 0 20px", fontSize: 13, fontWeight: 600, color: gMsg.ok ? "#2ecc71" : "#ff9081" }}>
+          {gMsg.text}
+        </p>
+      )}
 
       {addOpen && (
         <div className="admin-modal-overlay" onClick={() => !busy && setAddOpen(false)}>
@@ -3916,6 +3947,67 @@ function AdminStyles() {
 
       /* Light theme — zachowaj czytelność guzików */
       .admin-theme-light .admin-btn-sm, .admin-theme-light .admin-btn-ghost { background:rgba(0,0,0,.04); }
+
+      /* ════════ MOBILE POLISH — pop-outy/modale: schludne bottom-sheety ════════ */
+      /* Tytuł modala nigdy pod krzyżykiem ✕ */
+      .admin-modal h3 { padding-right:44px; }
+      /* Stopka akcji modala — gradient w kolorze tła motywu (bez „szwu") */
+      .admin-theme-dark .admin-modal-actions { background:linear-gradient(to top, #0f1b26 70%, rgba(15,27,38,0)) !important; }
+
+      @keyframes adminSheetUp { from { transform:translateY(64px); opacity:.55; } to { transform:none; opacity:1; } }
+
+      @media (max-width:768px) {
+        /* Bottom-sheet: wjazd od dołu, uchwyt, bezpieczne marginesy (notch/home bar) */
+        .admin-modal, .admin-modal-wide {
+          max-height:92dvh !important;
+          padding:30px 18px calc(16px + env(safe-area-inset-bottom)) !important;
+          animation:adminSheetUp .38s cubic-bezier(.22,1,.36,1) both !important;
+          box-shadow:0 -18px 60px rgba(0,0,0,.45) !important;
+        }
+        .admin-modal::before {
+          content:""; position:absolute; top:8px; left:50%; transform:translateX(-50%);
+          width:44px; height:5px; border-radius:3px; background:rgba(255,255,255,.32); z-index:6;
+        }
+        .admin-theme-light .admin-modal::before { background:rgba(0,0,0,.18); }
+        /* Krzyżyk — większy cel dotykowy */
+        .admin-modal-x { width:40px !important; height:40px !important; top:16px !important; right:14px !important; font-size:22px !important; }
+        /* Przyklejone akcje z poprawnym odstępem od dołu ekranu */
+        .admin-modal-actions {
+          position:sticky !important; bottom:calc(-16px - env(safe-area-inset-bottom)) !important;
+          padding:14px 0 calc(12px + env(safe-area-inset-bottom)) !important; margin-bottom:0 !important;
+        }
+        .admin .admin-modal-actions .admin-btn, .admin .admin-modal-actions .admin-btn-ghost { height:46px; }
+        /* 16px w polach = iOS nie przybliża ekranu przy focusie */
+        .admin-modal input, .admin-modal textarea, .admin-modal select,
+        .admin-form input, .admin-form textarea, .admin-form select { font-size:16px !important; }
+
+        /* Popout statystyk kraju — też bottom-sheet */
+        .stats-pop-overlay { align-items:flex-end !important; padding:0 !important; backdrop-filter:none !important; }
+        .stats-pop {
+          width:100vw !important; max-width:100vw !important; border-radius:22px 22px 0 0 !important;
+          max-height:88dvh; overflow-y:auto; padding:30px 18px calc(18px + env(safe-area-inset-bottom)) !important;
+          animation:adminSheetUp .38s cubic-bezier(.22,1,.36,1) both;
+        }
+        .stats-pop::before {
+          content:""; position:absolute; top:8px; left:50%; transform:translateX(-50%);
+          width:44px; height:5px; border-radius:3px; background:rgba(255,255,255,.32);
+        }
+        .stats-pop-close { width:40px !important; height:40px !important; }
+
+        /* Dzwonek powiadomień — panel na całą szerokość, zawsze się mieści */
+        .admin-bell-pop {
+          position:fixed !important; top:calc(66px + env(safe-area-inset-top)) !important;
+          left:12px !important; right:12px !important; width:auto !important;
+        }
+
+        /* Płynność: statyczna aurora + lżejszy blur (telefonowe GPU) */
+        .admin-aurora span { animation:none !important; filter:blur(44px) !important; opacity:.4 !important; }
+        .admin-theme-dark .admin-nav, .admin-theme-light .admin-nav { backdrop-filter:blur(14px) !important; -webkit-backdrop-filter:blur(14px) !important; }
+        .admin-modal-overlay { backdrop-filter:blur(4px) !important; -webkit-backdrop-filter:blur(4px) !important; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .admin-modal, .admin-modal-wide, .stats-pop { animation:none !important; }
+      }
     `}</style>
 
 

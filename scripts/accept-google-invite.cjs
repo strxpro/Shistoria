@@ -12,10 +12,35 @@
 
 const { google } = require('googleapis');
 const path = require('path');
+const fs = require('fs');
 
-const CREDENTIALS_PATH = path.join(__dirname, '..', 'shistoria-menu-bot-0041f7fe2016.json');
+// Klucz serwisowy szukany w kolejności:
+// 1. env GOOGLE_APPLICATION_CREDENTIALS (ścieżka do pliku)
+// 2. dokładna nazwa shistoria-menu-bot-0041f7fe2016.json w katalogu projektu
+// 3. dowolny shistoria-menu-bot-*.json w katalogu projektu
+function findCredentials() {
+  const envPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (envPath && fs.existsSync(envPath)) return envPath;
+  const root = path.join(__dirname, '..');
+  const exact = path.join(root, 'shistoria-menu-bot-0041f7fe2016.json');
+  if (fs.existsSync(exact)) return exact;
+  const candidate = fs.readdirSync(root).find((f) => /^shistoria-menu-bot-.*\.json$/.test(f));
+  if (candidate) return path.join(root, candidate);
+  return null;
+}
 
 async function main() {
+  const CREDENTIALS_PATH = findCredentials();
+  if (!CREDENTIALS_PATH) {
+    console.error('❌ Brak pliku klucza serwisowego (shistoria-menu-bot-*.json).');
+    console.error('   Pobierz go z Google Cloud Console:');
+    console.error('   IAM & Admin → Service Accounts → shistoria-bot@shistoria-menu-bot.iam.gserviceaccount.com');
+    console.error('   → Keys → Add key → JSON, i zapisz plik w katalogu projektu:');
+    console.error('   ' + path.join(__dirname, '..'));
+    process.exit(2);
+  }
+  console.log('🔑 Klucz: ' + CREDENTIALS_PATH);
+
   const auth = new google.auth.GoogleAuth({
     keyFile: CREDENTIALS_PATH,
     scopes: ['https://www.googleapis.com/auth/business.manage'],

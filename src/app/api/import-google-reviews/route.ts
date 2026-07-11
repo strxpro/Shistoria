@@ -142,7 +142,9 @@ async function importPlaces() {
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
-  if (process.env.ANNOUNCE_SECRET && searchParams.get("secret") !== SECRET) {
+  // Autoryzacja: sekret crona LUB PIN admina (przycisk „Importa da Google" w panelu).
+  const pinOk = searchParams.get("pin") === (process.env.ADMIN_PIN || "shistoria2026");
+  if (process.env.ANNOUNCE_SECRET && searchParams.get("secret") !== SECRET && !pinOk) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
