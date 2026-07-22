@@ -232,7 +232,17 @@ function Eventi({ t }) {
     else { const dt = new Date(rawDate); if (!isNaN(dt)) iso = dt.toISOString().slice(0, 10); }
     return forecast[iso] || null;
   };
-  const weatherBg = weather ? WEATHER_BG[weather.key] : "";
+  // Kolor sekcji wg TEMPERATURY (ciepło→zimno), nie wg rodzaju pogody
+  const tempColor = (tp) => {
+    if (tp == null) return "";
+    if (tp >= 30) return "radial-gradient(120% 90% at 70% -10%, rgba(255,94,58,0.30), transparent 55%), radial-gradient(90% 70% at 8% 8%, rgba(255,159,64,0.20), transparent 55%)";
+    if (tp >= 25) return "radial-gradient(120% 90% at 70% -10%, rgba(255,138,76,0.26), transparent 55%), radial-gradient(90% 70% at 8% 8%, rgba(255,196,120,0.18), transparent 55%)";
+    if (tp >= 19) return "radial-gradient(120% 90% at 70% -10%, rgba(255,196,120,0.20), transparent 55%), radial-gradient(90% 70% at 8% 8%, rgba(120,200,180,0.16), transparent 55%)";
+    if (tp >= 12) return "radial-gradient(120% 90% at 65% -10%, rgba(120,190,220,0.22), transparent 55%), radial-gradient(90% 70% at 8% 8%, rgba(90,150,210,0.16), transparent 55%)";
+    if (tp >= 5)  return "radial-gradient(120% 90% at 60% -10%, rgba(90,150,220,0.26), transparent 55%), radial-gradient(90% 70% at 8% 8%, rgba(70,110,190,0.18), transparent 55%)";
+    return "radial-gradient(120% 90% at 60% -10%, rgba(120,130,220,0.28), transparent 55%), radial-gradient(90% 70% at 8% 8%, rgba(80,90,180,0.20), transparent 55%)";
+  };
+  const weatherBg = weather ? tempColor(weather.temp) : "";
 
   // Ozdobny badge daty (duży dzień + miesiąc) w rogu karty eventu
   const MONTHS = {
@@ -619,6 +629,15 @@ function Eventi({ t }) {
       )}
       <style>{`
         .eventi { background: var(--c-bg); padding: 120px 0; overflow:hidden; position:relative; }
+        @media (max-width: 768px) {
+          /* Telefon: kompaktowo — nagłówek + pogoda + karuzela + CTA mieszczą się w kadrze */
+          .eventi { padding: 68px 0 48px; }
+          .ev-head { margin-bottom: 20px; }
+          .ev-intro { font-size: 14px; margin-top: 12px; }
+          .ev-carousel { height: min(420px, 56vh); }
+          .ev-dots { margin-top: 6px; }
+          .ev-cta { margin-top: 10px; }
+        }
         .ev-weather-bg { position:absolute; inset:0; z-index:0; pointer-events:none; opacity:0; animation: evWxFade 1.2s ease forwards; transition: background 1.5s ease; }
         @keyframes evWxFade { to { opacity:1; } }
         .eventi .container { position:relative; z-index:1; }
