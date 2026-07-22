@@ -1,8 +1,44 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Storia } from "./storia";
 
 // Hero — 3 variants: video, liquid 3D blobs, crystal float
 const { useState: useStateH, useEffect: useEffectH, useRef: useRefH } = React;
+
+// Zasłona-przejście w stylu preloadera — odpalana po kliknięciu guzika w hero.
+// Zakrywa ekran (wipe od dołu), pod spodem robimy scroll, potem odsłania cel.
+function HeroTransition({ target }) {
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="hero-transition" aria-hidden="true" data-target={target}>
+      <div className="hero-transition-panel" />
+      <span className="hero-transition-mark notranslate" translate="no">S'Historia</span>
+      <style>{`
+        .hero-transition { position: fixed; inset: 0; z-index: 9500; pointer-events: auto; }
+        .hero-transition-panel { position: absolute; inset: 0; background: var(--c-deep, #1A3D52);
+          clip-path: ellipse(140% 0% at 50% 100%); animation: heroWipe 1.15s cubic-bezier(0.77,0,0.175,1) forwards; }
+        .hero-transition-mark { position: absolute; inset: 0; display: grid; place-items: center; color: #fff;
+          font-family: var(--f-display); font-weight: 800; font-size: clamp(30px, 9vw, 68px); letter-spacing: -0.02em;
+          opacity: 0; animation: heroMark 1.15s ease forwards; }
+        @keyframes heroWipe {
+          0% { clip-path: ellipse(140% 0% at 50% 100%); }
+          40% { clip-path: ellipse(180% 180% at 50% 50%); }
+          60% { clip-path: ellipse(180% 180% at 50% 50%); }
+          100% { clip-path: ellipse(140% 0% at 50% 0%); }
+        }
+        @keyframes heroMark {
+          0%,12% { opacity: 0; transform: translateY(18px); }
+          40%,60% { opacity: 1; transform: translateY(0); }
+          88%,100% { opacity: 0; transform: translateY(-18px); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .hero-transition-panel, .hero-transition-mark { animation-duration: 0.4s; }
+        }
+      `}</style>
+    </div>,
+    document.body,
+  );
+}
 
 function Hero({ t, variant = "launchex" }) {
   const titleRef = useRefH(null);
@@ -12,6 +48,29 @@ function Hero({ t, variant = "launchex" }) {
     const id = setTimeout(() => setMounted(true), 100);
     return () => clearTimeout(id);
   }, []);
+
+  // Guziki hero → przejście „preloader" → scroll do sekcji (Menu / Kontakt)
+  const [transitionTo, setTransitionTo] = useStateH(null);
+  const go = (id) => {
+    if (transitionTo) return;
+    try { if (navigator.vibrate) navigator.vibrate(8); } catch {}
+    setTransitionTo(id);
+  };
+  useEffectH(() => {
+    if (!transitionTo) return;
+    const id = transitionTo;
+    // scroll gdy ekran zakryty zasłoną (~połowa animacji)
+    const scrollT = setTimeout(() => {
+      const el = document.getElementById(id);
+      if (el) {
+        const topPos = el.getBoundingClientRect().top + window.scrollY - 60;
+        if (typeof window !== "undefined" && window.lenis) window.lenis.scrollTo(topPos, { immediate: true });
+        else window.scrollTo({ top: topPos, behavior: "auto" });
+      }
+    }, 520);
+    const clearT = setTimeout(() => setTransitionTo(null), 1200);
+    return () => { clearTimeout(scrollT); clearTimeout(clearT); };
+  }, [transitionTo]);
 
   // Parallax on hero bg
   const bgRef = useRefH(null);
@@ -51,7 +110,7 @@ function Hero({ t, variant = "launchex" }) {
         <span className="kicker">{t("hero.since")}</span>
       </div>
       <div className="hero-corner hero-corner-br">
-        <span className="kicker">01 — Storia</span>
+        <span className="kicker">01 — {t("nav.storia")}</span>
       </div>
 
       {/* Content */}
@@ -68,11 +127,16 @@ function Hero({ t, variant = "launchex" }) {
         </h1>
         <div className={`hero-location ${mounted ? "in" : ""}`}>{t("hero.sub")}</div>
         <div className={`hero-cta ${mounted ? "in" : ""}`}>
-          <a href="#storia" className="btn" onClick={(e) => { e.preventDefault(); document.getElementById("storia")?.scrollIntoView({ behavior: "smooth" }); }}>
-            {t("hero.cta")} <span className="arrow">↓</span>
+          <a href="#menu" className="btn hero-btn hero-btn-primary" onClick={(e) => { e.preventDefault(); go("menu"); }}>
+            {t("hero.menuCta")} <span className="arrow">→</span>
+          </a>
+          <a href="#contatti" className="btn btn-ghost hero-btn" onClick={(e) => { e.preventDefault(); go("contatti"); }}>
+            {t("hero.contactCta")} <span className="arrow">→</span>
           </a>
         </div>
       </div>
+
+      {transitionTo && <HeroTransition target={transitionTo} />}
 
       {/* Scroll indicator */}
       <div className="scroll-indicator">
@@ -98,8 +162,14 @@ function Hero({ t, variant = "launchex" }) {
         .hero-title span.in { opacity: 1; transform: translateY(0); }
         .hero-location { font-family: var(--f-body); font-weight: 500; font-size: clamp(12px, 1vw, 14px); letter-spacing: 0.35em; text-transform: uppercase; opacity: 0; transform: translateY(20px); transition: all 0.7s 0.6s var(--ease-out); color: ${isLight ? "var(--c-deep)" : "#fff"}; }
         .hero-location.in { opacity: 1; transform: translateY(0); }
-        .hero-cta { margin-top: 48px; opacity: 0; transform: scale(0.9); transition: all 0.6s 0.9s var(--ease-out); }
+        .hero-cta { margin-top: 44px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; justify-content: center; opacity: 0; transform: scale(0.9); transition: all 0.6s 0.9s var(--ease-out); }
         .hero-cta.in { opacity: 1; transform: scale(1); }
+        .hero-btn { justify-content: center; }
+        /* Telefon w centrum uwagi: dwa duże guziki dzielą rząd, wygodne pod kciuk */
+        @media (max-width: 600px) {
+          .hero-cta { width: 100%; max-width: 420px; margin-left: auto; margin-right: auto; gap: 10px; margin-top: 32px; }
+          .hero-btn { flex: 1 1 42%; min-width: 138px; padding-top: 16px; padding-bottom: 16px; }
+        }
         
         .hero-corner { position: absolute; z-index: 5; padding: 28px 32px; pointer-events: none; }
         .hero-corner-tl { top: 70px; left: 0; }

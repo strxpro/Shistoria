@@ -367,7 +367,9 @@ export default function App() {
           </ErrorBoundary>
         </RiseCard>
         <ErrorBoundary><Eventi t={tr} /></ErrorBoundary>
-        <ErrorBoundary><Attrazioni t={tr} /></ErrorBoundary>
+        {/* Sekcja atrakcji (mapa "Cosa fare vicino a noi") — TYMCZASOWO WYŁĄCZONA na prośbę.
+            Kod zostaje (Attrazioni + AttrazioniMap); wystarczy odkomentować, by wrócić. */}
+        {/* <ErrorBoundary><Attrazioni t={tr} /></ErrorBoundary> */}
         <ErrorBoundary><SocialFeed t={tr} /></ErrorBoundary>
         <ErrorBoundary><Recensioni t={tr} /></ErrorBoundary>
         <ErrorBoundary><Contatti t={tr} /></ErrorBoundary>

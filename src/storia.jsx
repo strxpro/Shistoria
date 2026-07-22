@@ -64,6 +64,7 @@ function LightboxMorph({ pos, onClose }) {
 function Storia({ t, orientation = "horizontal" }) {
   const data = window.STORIA_DATA;
   const [lightboxOpen, setLightboxOpen] = useStateS(false);
+  const [timelineOpen, setTimelineOpen] = useStateS(false);
   const [isMobileStoria, setIsMobileStoria] = useStateS(typeof window !== "undefined" && window.innerWidth < 768);
   const fgImgRef = useRefS(null);
 
@@ -121,9 +122,14 @@ function Storia({ t, orientation = "horizontal" }) {
             <div className="storia-meta">
               <div className="storia-meta-row">
                 <span className="storia-num">01 / {String(data.length).padStart(2, "0")}</span>
-                <span className="storia-hint">{(isMobileStoria || orientation !== "horizontal") ? t("storia.orientationVertical") : t("storia.orientationHorizontal")}</span>
+                <span className="storia-hint">{data[0].year} — {data[data.length - 1].year}</span>
               </div>
               <SplitReveal as="h3" className="storia-heading">{t("storia.heading")}</SplitReveal>
+              <button type="button" className="storia-discover" onClick={() => setTimelineOpen(true)}>
+                <span className="storia-discover-dot" aria-hidden="true" />
+                {t("storia.discoverHint")}
+                <span className="arrow" aria-hidden="true">→</span>
+              </button>
             </div>
           </div>
         </div>
@@ -133,7 +139,9 @@ function Storia({ t, orientation = "horizontal" }) {
         <LightboxMorph pos={lightboxOpen} onClose={() => setLightboxOpen(false)} />
       )}
 
-      {orientation === "horizontal" ? <StoriaResponsive data={data} /> : <StoriaVertical data={data} />}
+      {/* Oś czasu jako POPOUT z karuzelą — otwierana guzikiem „Scopri la nostra storia".
+          Stary inline timeline (StoriaResponsive/StoriaVertical) zostaje w pliku, ale nie jest renderowany. */}
+      {timelineOpen && <StoriaPopout data={data} t={t} onClose={() => setTimelineOpen(false)} />}
 
       <style>{`
         .storia { background: var(--c-bg); position: relative; padding-top: 96px; }
@@ -151,6 +159,16 @@ function Storia({ t, orientation = "horizontal" }) {
         .storia-num { font-family: var(--f-display); font-weight: 800; font-size: 14px; letter-spacing: 0.05em; color: var(--c-sky); }
         .storia-hint { font-family: var(--f-serif); font-style: italic; font-size: 16px; color: var(--c-mute); }
         .storia-heading { font-size: clamp(40px, 5vw, 80px); margin-top: 8px; }
+        .storia-discover { margin-top: 28px; align-self: flex-start; display: inline-flex; align-items: center; gap: 12px;
+          padding: 14px 22px; border-radius: 999px; border: 1px solid var(--c-line); background: rgba(255,255,255,0.6);
+          color: var(--c-deep); font-family: var(--f-body); font-weight: 600; font-size: 14px; cursor: pointer;
+          transition: background .3s var(--ease-out), color .3s, transform .3s var(--ease-out), box-shadow .3s; backdrop-filter: blur(6px); }
+        .storia-discover:hover { background: var(--c-deep); color: #fff; border-color: var(--c-deep); transform: translateY(-2px); box-shadow: 0 12px 30px rgba(26,61,82,0.2); }
+        .storia-discover .arrow { transition: transform .3s var(--ease-out); }
+        .storia-discover:hover .arrow { transform: translateX(4px); }
+        .storia-discover-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c-coral, #E8927C); box-shadow: 0 0 0 4px rgba(232,146,124,0.2);
+          animation: storiaPulse 2s ease-in-out infinite; }
+        @keyframes storiaPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .5; transform: scale(1.3); } }
 
         .hero-lightbox { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 40px; pointer-events: none; }
         .hero-lightbox.open { pointer-events: auto; }
@@ -977,6 +995,143 @@ function StoriaVerticalRow({ item, index }) {
         .svrow-img { height: 360px; border-radius: 20px; overflow: hidden; box-shadow: 0 24px 60px rgba(26,61,82,0.12); }
       `}</style>
     </div>
+  );
+}
+
+// ─── Storia POPOUT: karuzela historii (daty + zdjęcia), swipe L/P, strzałki, ×, klawiatura ──
+function StoriaPopout({ data, t, onClose }) {
+  const [idx, setIdx] = useStateS(0);
+  const [isMobile, setIsMobile] = useStateS(typeof window !== "undefined" && window.innerWidth < 768);
+  const touch = useRefS({ x: 0, y: 0, moved: false });
+  const n = data.length;
+  const closeLabel = (typeof t === "function" ? t("storia.close") : "") || "Chiudi";
+
+  const go = (i) => setIdx(Math.max(0, Math.min(n - 1, i)));
+  const next = () => setIdx((i) => Math.min(n - 1, i + 1));
+  const prev = () => setIdx((i) => Math.max(0, i - 1));
+
+  useEffectS(() => {
+    const onR = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", onR);
+    return () => window.removeEventListener("resize", onR);
+  }, []);
+
+  // Blokada scrolla strony pod spodem + klawiatura (← → Esc)
+  useEffectS(() => {
+    document.body.style.overflow = "hidden";
+    if (typeof window !== "undefined" && window.lenis) window.lenis.stop();
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+      else if (e.key === "ArrowRight") setIdx((i) => Math.min(n - 1, i + 1));
+      else if (e.key === "ArrowLeft") setIdx((i) => Math.max(0, i - 1));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      if (typeof window !== "undefined" && window.lenis) window.lenis.start();
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [n, onClose]);
+
+  // SWIPE poziomy jak karuzela (lewo = następna, prawo = poprzednia)
+  const onTouchStart = (e) => { touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, moved: false }; };
+  const onTouchMove = (e) => {
+    const dx = e.touches[0].clientX - touch.current.x;
+    const dy = e.touches[0].clientY - touch.current.y;
+    if (!touch.current.moved && Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.3) {
+      touch.current.moved = true;
+      if (dx < 0) next(); else prev();
+    }
+  };
+
+  const cardStyle = (i) => {
+    const diff = i - idx;
+    const abs = Math.abs(diff);
+    if (abs > 2) return { opacity: 0, visibility: "hidden", pointerEvents: "none", transform: "translate(-50%,-50%) scale(0.7)" };
+    const step = isMobile ? 100 : 60; // % przesunięcia na sąsiada (mobile: pełny slajd; desktop: peek)
+    const scale = diff === 0 ? 1 : 0.86;
+    const opacity = abs === 0 ? 1 : abs === 1 ? (isMobile ? 0 : 0.45) : 0;
+    return {
+      transform: `translate(-50%,-50%) translateX(${diff * step}%) scale(${scale})`,
+      opacity,
+      zIndex: 10 - abs,
+      visibility: opacity === 0 ? "hidden" : "visible",
+      pointerEvents: opacity > 0 ? "auto" : "none",
+    };
+  };
+
+  if (typeof document === "undefined") return null;
+  return createPortal(
+    <div className="spop-overlay" onClick={onClose}>
+      <button className="spop-close" onClick={(e) => { e.stopPropagation(); onClose(); }} aria-label={closeLabel}>×</button>
+      <div className="spop-counter">{data[idx].year} · {String(idx + 1).padStart(2, "0")}/{String(n).padStart(2, "0")}</div>
+
+      <div className="spop-stage" onTouchStart={onTouchStart} onTouchMove={onTouchMove}>
+        {data.map((item, i) => (
+          <article key={i} className={`spop-card ${i === idx ? "active" : ""}`} style={cardStyle(i)}
+            onClick={(e) => { e.stopPropagation(); if (i !== idx) go(i); }}>
+            <div className="spop-photo">
+              <Placeholder type={item.phType} style={{ width: "100%", height: "100%" }} />
+              <div className="spop-photo-grad" />
+              <span className="spop-chapter">— Capitolo {String(i + 1).padStart(2, "0")}</span>
+            </div>
+            <div className="spop-body">
+              <span className="spop-year">{item.year}</span>
+              <h3 className="spop-title">{item.title}</h3>
+              <p className="spop-text">{item.text}</p>
+            </div>
+          </article>
+        ))}
+        <button className="spop-nav spop-nav-l" onClick={(e) => { e.stopPropagation(); prev(); }} disabled={idx === 0} aria-label="‹">‹</button>
+        <button className="spop-nav spop-nav-r" onClick={(e) => { e.stopPropagation(); next(); }} disabled={idx === n - 1} aria-label="›">›</button>
+      </div>
+
+      <div className="spop-dots">
+        {data.map((_, i) => (
+          <button key={i} className={`spop-dot ${i === idx ? "active" : ""}`} onClick={(e) => { e.stopPropagation(); go(i); }} aria-label={`${data[i].year}`} />
+        ))}
+      </div>
+
+      <style>{`
+        .spop-overlay { position: fixed; inset: 0; z-index: 10000; background: rgba(6,12,18,0.9); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+          display: flex; align-items: center; justify-content: center; animation: spopFade .3s ease; overflow: hidden; }
+        @keyframes spopFade { from { opacity: 0; } to { opacity: 1; } }
+        .spop-close { position: fixed; top: max(18px, env(safe-area-inset-top)); right: 18px; z-index: 4; width: 48px; height: 48px;
+          border-radius: 50%; background: rgba(255,255,255,0.12); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.28);
+          color: #fff; font-size: 26px; line-height: 1; cursor: pointer; display: grid; place-items: center; transition: all .25s; }
+        .spop-close:hover { background: #fff; color: var(--c-deep); transform: scale(1.08); }
+        .spop-counter { position: fixed; top: max(26px, env(safe-area-inset-top)); left: 24px; z-index: 4; color: rgba(255,255,255,0.75);
+          font-family: var(--f-display); font-weight: 700; font-size: 13px; letter-spacing: 0.15em; }
+        .spop-stage { position: relative; width: 100%; height: 100%; }
+        .spop-card { position: absolute; left: 50%; top: 50%; width: min(520px, 90vw); max-height: 86vh;
+          background: #fff; border-radius: 24px; overflow: hidden; box-shadow: 0 40px 100px rgba(0,0,0,0.5);
+          transition: transform .55s cubic-bezier(.22,.9,.36,1), opacity .45s ease; display: flex; flex-direction: column; will-change: transform, opacity; }
+        .spop-card:not(.active) { cursor: pointer; }
+        .spop-photo { position: relative; width: 100%; height: min(360px, 44vh); flex-shrink: 0; overflow: hidden; }
+        .spop-photo-grad { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.35) 100%); }
+        .spop-chapter { position: absolute; left: 20px; bottom: 16px; color: #fff; font-family: var(--f-serif); font-style: italic; font-size: 13px; text-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+        .spop-body { padding: 24px 26px 28px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+        .spop-year { font-family: var(--f-display); font-weight: 800; font-size: clamp(44px, 8vw, 64px); line-height: 1; color: var(--c-sky); letter-spacing: -0.03em; }
+        .spop-title { font-family: var(--f-display); font-weight: 700; font-size: clamp(20px, 4vw, 26px); color: var(--c-deep); line-height: 1.1; }
+        .spop-text { font-size: 15px; line-height: 1.6; color: var(--c-mute); }
+        .spop-nav { position: fixed; top: 50%; transform: translateY(-50%); z-index: 4; width: 52px; height: 52px; border-radius: 50%;
+          background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.25); color: #fff; font-size: 26px; cursor: pointer;
+          display: grid; place-items: center; transition: all .25s; backdrop-filter: blur(6px); }
+        .spop-nav:hover:not(:disabled) { background: #fff; color: var(--c-deep); }
+        .spop-nav:disabled { opacity: 0.25; cursor: default; }
+        .spop-nav-l { left: max(16px, 3vw); }
+        .spop-nav-r { right: max(16px, 3vw); }
+        .spop-dots { position: fixed; bottom: max(22px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); z-index: 4;
+          display: flex; gap: 8px; max-width: 80vw; flex-wrap: wrap; justify-content: center; }
+        .spop-dot { width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,0.3); border: none; cursor: pointer; padding: 0; transition: all .25s; }
+        .spop-dot.active { background: var(--c-coral, #E8927C); transform: scale(1.25); }
+        @media (max-width: 768px) {
+          .spop-nav { display: none; }  /* telefon: tylko swipe + kropki */
+          .spop-card { width: 90vw; }
+        }
+      `}</style>
+    </div>,
+    document.body,
   );
 }
 
