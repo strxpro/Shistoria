@@ -315,8 +315,10 @@ function MobileLink({ l, i, onSelectSection, setMobileOpen }) {
   
   return (
     <a href={`#${l.id}`} onClick={handleClick} className={`${clicked ? "clicked" : ""} ${l.highlight ? "nav-highlight" : ""}`} style={{ "--item-idx": i }}>
-      <span className="ml-word">
-        {l.label.split("").map((char, ci) => (
+      <span className="ml-num" aria-hidden="true">{String(i + 1).padStart(2, "0")}</span>
+      <span className="ml-word">{l.label}</span>
+      <span style={{ display: "none" }} aria-hidden="true">
+        {[].map((char, ci) => (
           <span className="ml-char-wrap" key={ci} style={{ transitionDelay: `${ci * 0.03}s` }}>
             <span className="ml-char-front">{char === " " ? "\u00A0" : char}</span>
             <span className="ml-char-back">{char === " " ? "\u00A0" : char}</span>
@@ -830,26 +832,25 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
         .mobile-links a {
           font-family: var(--f-display);
           font-weight: 800;
-          font-size: clamp(19px, 5.6vw, 34px);
+          font-size: clamp(22px, 6.6vw, 38px);
           color: #fff;
           display: flex;
-          justify-content: space-between;
+          justify-content: flex-start;
           align-items: center;
-          gap: 12px;
-          padding: 9px 0;
-          border-bottom: 1px solid rgba(255,255,255,0.08);
+          gap: 14px;
+          padding: 16px 8px;
+          border-bottom: 1px solid rgba(255,255,255,0.14);
           opacity: 0;
           transform: translateY(30px);
-          transition: opacity 0.5s var(--ease-out), transform 0.5s var(--ease-out);
+          transition: opacity 0.5s var(--ease-out), transform 0.5s var(--ease-out), color 0.25s, padding-left 0.25s;
           letter-spacing: -0.02em;
-          perspective: 1000px;
           text-decoration: none;
           white-space: nowrap;
-          overflow: hidden;
           max-width: 100%;
           min-width: 0;
           width: 100%;
         }
+        .mobile-links a:active, .mobile-links a.clicked { color: var(--c-coral, #E8927C); padding-left: 16px; }
         /* Niskie ekrany (SE, mini): ciaśniej, żeby CAŁE menu + social weszło bez scrolla */
         @media (max-height: 720px) {
           .mobile-menu-inner { padding-top: calc(76px + env(safe-area-inset-top)); padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
@@ -865,16 +866,11 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
           transition-delay: calc(0.2s + var(--item-idx, 0) * 0.08s);
         }
         
-        /* 3D wave text effect */
-        .ml-word { display: flex; flex-wrap: wrap; min-width: 0; overflow: hidden; justify-content: flex-start; }
-        .mobile-links a .arrow { flex: 0 0 auto; }
-        .ml-char-wrap { position: relative; display: inline-block; transform-style: preserve-3d; transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1); transform-origin: 50% 50% -0.4em; }
-        .ml-char-front { display: inline-block; transform: translateZ(0.4em); }
-        .ml-char-back { position: absolute; left: 0; top: 0; transform: rotateX(90deg) translateZ(0.4em); color: var(--c-coral, #E8927C); opacity: 0; transition: opacity 0.1s 0.2s; }
-        .mobile-links a.clicked .ml-char-wrap { transform: rotateX(-90deg); }
-        .mobile-links a.clicked .ml-char-back { opacity: 1; transition: opacity 0.1s; }
-        
-        .mobile-links a .arrow { font-size: 18px; opacity: 0.5; transition: opacity 0.3s; }
+        /* Czyste, czytelne linki (bez 3D-flip który dublował litery) + numeracja */
+        .ml-word { display: inline-block; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+        .ml-num { flex: 0 0 auto; font-family: var(--f-body); font-weight: 600; font-size: 12px; letter-spacing: 0.12em; color: var(--c-coral, #E8927C); opacity: 0.75; width: 24px; }
+        .mobile-links a .arrow { flex: 0 0 auto; margin-left: auto; font-size: 20px; opacity: 0.45; transition: transform 0.25s var(--ease-out), opacity 0.25s; }
+        .mobile-links a:active .arrow, .mobile-links a.clicked .arrow { opacity: 1; transform: translateX(6px); }
         @keyframes mobLinkIn { to { opacity: 1; transform: translateY(0); } }
 
       `}</style>

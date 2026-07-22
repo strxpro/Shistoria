@@ -135,6 +135,7 @@ a { color: inherit; text-decoration: none; }
   white-space: normal;        /* pozwól zawijać MIĘDZY słowami */
   max-width: 100%;
   overflow-wrap: break-word;
+  font-family: var(--f-display);   /* wszystkie nagłówki SplitReveal na czcionce display (nie fallback Inter) */
 }
 /* każde słowo trzyma litery razem — nigdy nie łamie się w środku wyrazu */
 .srt-word {
@@ -151,24 +152,24 @@ a { color: inherit; text-decoration: none; }
     word-break: normal;
   }
 }
+/* Nagłówki SOLIDNE i czytelne (poprzedni efekt „obrys + wypełnienie na scroll"
+   zostawiał puste kontury gdy scroll nie odpalił → litery wyglądały na porozwalane). */
 .srt .char {
   display: inline-block;
   position: relative;
-  color: transparent;
-  -webkit-text-stroke: 1px var(--c-deep);
-  background: linear-gradient(90deg, var(--c-deep) 0%, var(--c-deep) var(--fill, 0%), transparent var(--fill, 0%));
-  background-clip: text;
-  -webkit-background-clip: text;
-  transition: --fill 0.4s var(--ease-out);
+  color: var(--c-deep);
+  -webkit-text-fill-color: var(--c-deep);
+  -webkit-text-stroke: 0;
+  background: none;
   padding: 0.15em 0;
   margin-top: -0.15em;
   margin-bottom: -0.15em;
 }
 .srt.invert .char {
-  -webkit-text-stroke: 1px rgba(255, 255, 255, 0.99);
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.99) 0%, rgba(255, 255, 255, 0.99) var(--fill, 0%), transparent var(--fill, 0%));
-  background-clip: text;
-  -webkit-background-clip: text;
+  color: #fff;
+  -webkit-text-fill-color: #fff;
+  -webkit-text-stroke: 0;
+  background: none;
 }
 @property --fill {
   syntax: '<percentage>';
@@ -520,6 +521,6 @@ body[data-cursor-zobacz="true"] .cursor-text {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--c-deep);
 }
-.dark-section .srt .char { -webkit-text-stroke: 1px rgba(255, 255, 255, 0.99) !important; background: linear-gradient(90deg, rgba(255, 255, 255, 0.99) 0%, rgba(255, 255, 255, 0.99) var(--fill, 0%), transparent var(--fill, 0%)) !important; background-clip: text !important; -webkit-background-clip: text !important; }
+.dark-section .srt .char { color: #fff !important; -webkit-text-fill-color: #fff !important; -webkit-text-stroke: 0 !important; background: none !important; }
 /* Bar section: solid white heading, no outline/stroke */
 .bar.dark-section .bar-head .srt .char { -webkit-text-stroke: 0 !important; color: #fff !important; -webkit-text-fill-color: #fff !important; background: none !important; -webkit-background-clip: border-box !important; background-clip: border-box !important; opacity: 1 !important; }
