@@ -159,16 +159,18 @@ function Storia({ t, orientation = "horizontal" }) {
         .storia-num { font-family: var(--f-display); font-weight: 800; font-size: 14px; letter-spacing: 0.05em; color: var(--c-sky); }
         .storia-hint { font-family: var(--f-serif); font-style: italic; font-size: 16px; color: var(--c-mute); }
         .storia-heading { font-size: clamp(40px, 5vw, 80px); margin-top: 8px; }
-        .storia-discover { margin-top: 28px; align-self: flex-start; display: inline-flex; align-items: center; gap: 12px;
-          padding: 14px 22px; border-radius: 999px; border: 1px solid var(--c-line); background: rgba(255,255,255,0.6);
-          color: var(--c-deep); font-family: var(--f-body); font-weight: 600; font-size: 14px; cursor: pointer;
-          transition: background .3s var(--ease-out), color .3s, transform .3s var(--ease-out), box-shadow .3s; backdrop-filter: blur(6px); }
-        .storia-discover:hover { background: var(--c-deep); color: #fff; border-color: var(--c-deep); transform: translateY(-2px); box-shadow: 0 12px 30px rgba(26,61,82,0.2); }
-        .storia-discover .arrow { transition: transform .3s var(--ease-out); }
-        .storia-discover:hover .arrow { transform: translateX(4px); }
-        .storia-discover-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--c-coral, #E8927C); box-shadow: 0 0 0 4px rgba(232,146,124,0.2);
-          animation: storiaPulse 2s ease-in-out infinite; }
-        @keyframes storiaPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .5; transform: scale(1.3); } }
+        .storia-discover { margin-top: 32px; align-self: flex-start; display: inline-flex; align-items: center; gap: 14px;
+          padding: 18px 30px; border-radius: 999px; border: none; cursor: pointer;
+          background: linear-gradient(135deg, var(--c-deep) 0%, #2f6285 100%); color: #fff;
+          font-family: var(--f-body); font-weight: 600; font-size: clamp(14px, 2vw, 16px); letter-spacing: 0.01em;
+          box-shadow: 0 16px 38px rgba(26,61,82,0.32); transition: transform .3s var(--ease-out), box-shadow .3s; }
+        .storia-discover:hover { transform: translateY(-3px) scale(1.02); box-shadow: 0 22px 50px rgba(26,61,82,0.42); }
+        .storia-discover:active { transform: translateY(-1px) scale(0.99); }
+        .storia-discover .arrow { font-size: 18px; transition: transform .3s var(--ease-out); }
+        .storia-discover:hover .arrow { transform: translateX(5px); }
+        .storia-discover-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c-coral, #E8927C); box-shadow: 0 0 0 5px rgba(232,146,124,0.4);
+          animation: storiaPulse 1.8s ease-in-out infinite; }
+        @keyframes storiaPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .5; transform: scale(1.45); } }
 
         .hero-lightbox { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 40px; pointer-events: none; }
         .hero-lightbox.open { pointer-events: auto; }
@@ -1086,10 +1088,17 @@ function StoriaPopout({ data, t, onClose }) {
         <button className="spop-nav spop-nav-r" onClick={(e) => { e.stopPropagation(); next(); }} disabled={idx === n - 1} aria-label="›">›</button>
       </div>
 
-      <div className="spop-dots">
-        {data.map((_, i) => (
-          <button key={i} className={`spop-dot ${i === idx ? "active" : ""}`} onClick={(e) => { e.stopPropagation(); go(i); }} aria-label={`${data[i].year}`} />
-        ))}
+      {/* Oś czasu — linia z postępem + węzły lat (klik = skok do rozdziału) */}
+      <div className="spop-timeline" onClick={(e) => e.stopPropagation()}>
+        <div className="spop-timeline-line"><div className="spop-timeline-fill" style={{ width: `${n > 1 ? (idx / (n - 1)) * 100 : 0}%` }} /></div>
+        <div className="spop-timeline-ticks">
+          {data.map((item, i) => (
+            <button key={i} className={`spop-tick ${i === idx ? "active" : ""} ${i < idx ? "done" : ""}`} onClick={() => go(i)} aria-label={`${item.year}`}>
+              <span className="spop-tick-dot" />
+              {i === idx && <span className="spop-tick-year">{item.year}</span>}
+            </button>
+          ))}
+        </div>
       </div>
 
       <style>{`
@@ -1121,10 +1130,18 @@ function StoriaPopout({ data, t, onClose }) {
         .spop-nav:disabled { opacity: 0.25; cursor: default; }
         .spop-nav-l { left: max(16px, 3vw); }
         .spop-nav-r { right: max(16px, 3vw); }
-        .spop-dots { position: fixed; bottom: max(22px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); z-index: 4;
-          display: flex; gap: 8px; max-width: 80vw; flex-wrap: wrap; justify-content: center; }
-        .spop-dot { width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,0.3); border: none; cursor: pointer; padding: 0; transition: all .25s; }
-        .spop-dot.active { background: var(--c-coral, #E8927C); transform: scale(1.25); }
+        .spop-timeline { position: fixed; bottom: max(28px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); z-index: 4;
+          width: min(720px, 88vw); height: 44px; }
+        .spop-timeline-line { position: absolute; left: 0; right: 0; top: 8px; height: 2px; background: rgba(255,255,255,0.18); border-radius: 2px; }
+        .spop-timeline-fill { position: absolute; left: 0; top: 0; height: 100%; background: var(--c-coral, #E8927C); border-radius: 2px; transition: width .45s var(--ease-out); }
+        .spop-timeline-ticks { position: absolute; left: 0; right: 0; top: 0; display: flex; justify-content: space-between; }
+        .spop-tick { position: relative; width: 18px; height: 18px; background: none; border: none; cursor: pointer; padding: 0; display: grid; place-items: center; }
+        .spop-tick-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.45); transition: width .3s var(--ease-out), height .3s var(--ease-out), background .3s, box-shadow .3s; }
+        .spop-tick.done .spop-tick-dot { background: var(--c-coral, #E8927C); }
+        .spop-tick.active .spop-tick-dot { width: 15px; height: 15px; background: var(--c-coral, #E8927C); box-shadow: 0 0 0 5px rgba(232,146,124,0.28); }
+        .spop-tick-year { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); font-family: var(--f-display); font-weight: 800;
+          font-size: 15px; color: #fff; white-space: nowrap; }
+        @media (max-width: 520px) { .spop-tick { width: 14px; height: 14px; } .spop-tick-year { font-size: 14px; } }
         @media (max-width: 768px) {
           .spop-nav { display: none; }  /* telefon: tylko swipe + kropki */
           .spop-card { width: 90vw; }
