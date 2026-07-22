@@ -475,11 +475,10 @@ function Navigation({ t, locale, setLocale, activeSection, onSelectSection }) {
     return () => { if (io) io.disconnect(); clearTimeout(retryId); delete document.body.dataset.shFooter; };
   }, []);
 
+  // Menu rozdzielone na czytelne bloki (bez Storia — jest teraz popoutem; Menu+Dolci wpadają pod Ristorante).
+  // Ristorante → sekcja restauracji z menu i cenami; Bar → sekcja bar/aperitivo; Cocktail Maker osobno.
   const links = [
-    { id: "storia", label: t("nav.storia") },
     { id: "ristorante", label: t("nav.ristorante") },
-    { id: "menu", label: "Menu" },
-    { id: "desserts", label: "Dolci" },
     { id: "bar", label: t("nav.bar") },
     { id: "cocktail-rise", label: "Cocktail Maker", highlight: true },
     { id: "eventi", label: t("nav.eventi") },

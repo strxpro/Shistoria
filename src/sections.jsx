@@ -194,6 +194,7 @@ function Eventi({ t }) {
   const touchRef = useRefE({ startX: 0, startY: 0 });
   const [reminderEvent, setReminderEvent] = useStateE(null);
   const [eventPopout, setEventPopout] = useStateE(null); // G9: fullscreen popout eventu
+  const [allEventsOpen, setAllEventsOpen] = useStateE(false); // popout ze WSZYSTKIMI wydarzeniami (byłe + nadchodzące)
   const [remForm, setRemForm] = useStateE({ name: "", email: "" });
   const [remSent, setRemSent] = useStateE(false);
   const evLang = (typeof window !== "undefined" && window.currentLanguage) || "it";
@@ -277,19 +278,47 @@ function Eventi({ t }) {
     return () => { try { ch?.unsubscribe?.(); } catch {} };
   }, []);
 
+  // Event znika DZIEŃ PO zakończeniu: pokazujemy tylko te z datą (końca) >= dziś 00:00.
+  // Bez rozpoznawalnej daty (np. dane demo "12 GIU" bez roku) — nie ukrywamy.
+  const parseEvDate = (e) => {
+    const raw = e.event_end_date || e.end_date || e.event_date || e.date;
+    if (!raw) return null;
+    const m = String(raw).match(/(\d{4})-(\d{2})-(\d{2})/);
+    const d = m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(raw);
+    return isNaN(d) ? null : d;
+  };
+  const _todayStart = new Date(); _todayStart.setHours(0, 0, 0, 0);
+  const isUpcoming = (e) => {
+    const d = parseEvDate(e);
+    if (!d) return true;
+    d.setHours(0, 0, 0, 0);
+    return d >= _todayStart;
+  };
+  const upcoming = events.filter(isUpcoming);
+  // WSZYSTKIE posortowane: nadchodzące rosnąco, potem byłe malejąco (najnowsze byłe wyżej)
+  const allSorted = [...events].sort((a, b) => {
+    const ua = isUpcoming(a), ub = isUpcoming(b);
+    if (ua !== ub) return ua ? -1 : 1;
+    const da = parseEvDate(a), db = parseEvDate(b);
+    if (!da || !db) return 0;
+    return ua ? da - db : db - da;
+  });
+  // gdy lista skróci się (event wygasł) — nie zostawaj na nieistniejącym indeksie
+  useEffectE(() => { setActiveIdx((i) => (i >= upcoming.length ? 0 : i)); }, [upcoming.length]);
+
   // Auto-przesuwanie co 4s (tylko gdy playing i bez otwartego popoutu)
   useEffectE(() => {
-    if (events.length <= 1 || !playing || eventPopout) return;
+    if (upcoming.length <= 1 || !playing || eventPopout || allEventsOpen) return;
     intervalRef.current = setInterval(() => {
-      setActiveIdx(i => (i + 1) % events.length);
+      setActiveIdx(i => (i + 1) % upcoming.length);
     }, 4000);
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [events.length, playing, eventPopout]);
+  }, [upcoming.length, playing, eventPopout, allEventsOpen]);
 
-  // G9: blokada scrolla gdy fullscreen popout eventu otwarty
+  // G9: blokada scrolla gdy fullscreen popout eventu / wszystkich wydarzeń otwarty
   useEffectE(() => {
     if (typeof document === "undefined") return;
-    if (eventPopout) {
+    if (eventPopout || allEventsOpen) {
       document.body.style.overflow = "hidden";
       if (typeof window !== "undefined" && window.lenis) window.lenis.stop();
     } else {
@@ -300,10 +329,10 @@ function Eventi({ t }) {
       document.body.style.overflow = "";
       if (typeof window !== "undefined" && window.lenis) window.lenis.start();
     };
-  }, [eventPopout]);
+  }, [eventPopout, allEventsOpen]);
 
-  const goNext = () => setActiveIdx(i => (i + 1) % events.length);
-  const goPrev = () => setActiveIdx(i => (i - 1 + events.length) % events.length);
+  const goNext = () => setActiveIdx(i => (i + 1) % upcoming.length);
+  const goPrev = () => setActiveIdx(i => (i - 1 + upcoming.length) % upcoming.length);
 
   // Swipe na mobile
   const onTouchStart = (e) => { touchRef.current.startX = e.touches[0].clientX; };
@@ -337,21 +366,6 @@ function Eventi({ t }) {
     return { visible: true, scale, opacity, x, z };
   };
 
-  if (events.length === 0) return (
-    <section className="eventi" id="eventi">
-      <div className="container">
-        <div className="ev-head reveal">
-          <span className="kicker">— {t("eventi.eyebrow")} · 05</span>
-          <SplitReveal as="h2" className="h2">{t("eventi.heading")}</SplitReveal>
-        </div>
-        <div className="ev-empty reveal">
-          <span className="ev-empty-ico">🗓️</span>
-          <p>{({ it: "Nessun evento in programma al momento. Torna presto — stiamo preparando qualcosa di speciale!", pl: "Brak zaplanowanych wydarzeń. Zajrzyj wkrótce — szykujemy coś specjalnego!", en: "No events scheduled right now. Check back soon — something special is coming!", de: "Aktuell keine Events geplant. Schau bald wieder vorbei — etwas Besonderes kommt!", fr: "Aucun événement prévu pour le moment. Reviens bientôt — on prépare quelque chose de spécial !", es: "No hay eventos programados por ahora. Vuelve pronto — ¡estamos preparando algo especial!" })[evLang] || "Nessun evento in programma."}</p>
-        </div>
-      </div>
-    </section>
-  );
-
   return (
     <section className="eventi" id="eventi" data-weather={weather?.key || ""}>
       {weatherBg && <div className="ev-weather-bg" style={{ background: weatherBg }} aria-hidden="true" />}
@@ -373,11 +387,17 @@ function Eventi({ t }) {
         {/* Relacje z Instagrama (stories) — pod nagłówkiem, nad eventami. TYMCZASOWO WYŁĄCZONE. */}
         {/* <IgStories /> */}
 
+        {upcoming.length === 0 ? (
+          <div className="ev-empty reveal">
+            <span className="ev-empty-ico">🗓️</span>
+            <p>{({ it: "Nessun evento in programma al momento. Torna presto — stiamo preparando qualcosa di speciale!", pl: "Brak zaplanowanych wydarzeń. Zajrzyj wkrótce — szykujemy coś specjalnego!", en: "No events scheduled right now. Check back soon — something special is coming!", de: "Aktuell keine Events geplant. Schau bald wieder vorbei — etwas Besonderes kommt!", fr: "Aucun événement prévu pour le moment. Reviens bientôt — on prépare quelque chose de spécial !", es: "No hay eventos programados por ahora. Vuelve pronto — ¡estamos preparando algo especial!" })[evLang] || "Nessun evento in programma."}</p>
+          </div>
+        ) : (<>
         {/* Piramidowa karuzela — klik lewa/prawa = nawigacja */}
         <div className="ev-carousel" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} onClick={onCarouselClick}>
 
-          {events.map((e, i) => {
-            const s = getCardStyle(i, events.length);
+          {upcoming.map((e, i) => {
+            const s = getCardStyle(i, upcoming.length);
             if (!s.visible) return null;
             const isActive = i === activeIdx;
             return (
@@ -393,7 +413,7 @@ function Eventi({ t }) {
                 {/* Progress indicators (stories style) — tylko na aktywnej */}
                 {isActive && (
                   <div className="ev-progress">
-                    {events.map((_, pi) => (
+                    {upcoming.map((_, pi) => (
                       <div key={pi} className={`ev-progress-seg ${pi === activeIdx ? "active" : pi < activeIdx ? "done" : ""}`}>
                         {pi === activeIdx && playing && <div className="ev-progress-fill" />}
                         {pi === activeIdx && !playing && <div className="ev-progress-fill" style={{ animationPlayState: "paused", width: "30%" }} />}
@@ -438,7 +458,7 @@ function Eventi({ t }) {
 
         {/* Dots */}
         <div className="ev-dots">
-          {events.map((_, i) => (
+          {upcoming.map((_, i) => (
             <button key={i} className={`ev-dot ${i === activeIdx ? "active" : ""}`} onClick={() => setActiveIdx(i)} aria-label={`Evento ${i + 1}`} />
           ))}
         </div>
@@ -448,11 +468,78 @@ function Eventi({ t }) {
           <button className="ev-arrow ev-arrow-l" onClick={goPrev} aria-label="Precedente">‹</button>
           <button className="ev-arrow ev-arrow-r" onClick={goNext} aria-label="Successivo">›</button>
         </div>
+        </>)}
 
+        {events.length > 0 && (
         <div className="ev-cta reveal">
-          <a href="#contatti" className="btn btn-ghost">{({ it: "Tutti gli eventi", pl: "Wszystkie wydarzenia", en: "All events", de: "Alle Events", fr: "Tous les événements", es: "Todos los eventos" })[evLang] || "Tutti gli eventi"} <span className="arrow">→</span></a>
+          <button type="button" className="btn btn-ghost" onClick={() => setAllEventsOpen(true)}>{({ it: "Tutti gli eventi", pl: "Wszystkie wydarzenia", en: "All events", de: "Alle Events", fr: "Tous les événements", es: "Todos los eventos" })[evLang] || "Tutti gli eventi"} <span className="arrow">→</span></button>
         </div>
+        )}
       </div>
+
+      {/* Popout: WSZYSTKIE wydarzenia (byłe + nadchodzące). Klik kliknięcia „Tutti gli eventi". */}
+      {allEventsOpen && typeof document !== "undefined" && createPortal(
+        <div className="ev-all-overlay" onClick={() => setAllEventsOpen(false)}>
+          <div className="ev-all" onClick={(ev) => ev.stopPropagation()}>
+            <div className="ev-all-head">
+              <h3>{({ it: "Tutti gli eventi", pl: "Wszystkie wydarzenia", en: "All events", de: "Alle Events", fr: "Tous les événements", es: "Todos los eventos" })[evLang] || "Tutti gli eventi"}</h3>
+              <button className="ev-rem-close ev-all-close" onClick={() => setAllEventsOpen(false)} aria-label="Chiudi">×</button>
+            </div>
+            <div className="ev-all-list">
+              {allSorted.map((e, i) => {
+                const past = !isUpcoming(e);
+                const b = dateBadge(e.event_date || e.date);
+                const pastLabel = ({ it: "Passato", pl: "Minione", en: "Past", de: "Vergangen", fr: "Passé", es: "Pasado" })[evLang] || "Passato";
+                return (
+                  <button key={e.id || i} type="button" className={`ev-all-item ${past ? "past" : ""}`}
+                    onClick={() => { setAllEventsOpen(false); setEventPopout(e); }}>
+                    <span className="ev-all-thumb" style={{ background: e.custom_colors?.bg || (e.phType === "food" ? "#2d1b0e" : e.phType === "sea" ? "#0e2840" : "#1a1040") }}>
+                      {e.image_url
+                        ? <img src={e.image_url} alt="" />
+                        : <span className="ev-all-thumb-anim"><EvTemplateAnim id={e.template} accent={e.custom_colors?.accent} /></span>}
+                      {b && <span className="ev-all-badge"><span className="d">{b.day}</span><span className="m">{b.mon}</span></span>}
+                    </span>
+                    <span className="ev-all-info">
+                      <span className="ev-all-tag">{e.tag || "Evento"}{past ? ` · ${pastLabel}` : ""}</span>
+                      <span className="ev-all-title">{e.title}</span>
+                      <span className="ev-all-date">{e.event_date || e.date || ""}{e.event_time ? ` · ${e.event_time}` : ""}</span>
+                    </span>
+                    <span className="ev-all-arrow">→</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <style>{`
+            .ev-all-overlay { position:fixed; inset:0; z-index:5000; background:rgba(6,10,16,0.92); backdrop-filter:blur(10px);
+              display:flex; align-items:center; justify-content:center; padding:18px; animation:evFadeIn .25s ease; }
+            .ev-all { position:relative; width:min(680px,96vw); max-height:88vh; background:#0f1620; border-radius:24px; overflow:hidden;
+              display:flex; flex-direction:column; box-shadow:0 40px 100px rgba(0,0,0,0.6); animation:evPopIn .35s cubic-bezier(.2,.85,.2,1); }
+            .ev-all-head { display:flex; align-items:center; justify-content:space-between; padding:20px 22px; border-bottom:1px solid rgba(255,255,255,0.08); flex:0 0 auto; }
+            .ev-all-head h3 { font-family:var(--f-display); font-weight:800; font-size:22px; color:#fff; margin:0; }
+            .ev-all-close { position:static; }
+            .ev-all-list { overflow-y:auto; padding:10px; display:flex; flex-direction:column; gap:8px; -webkit-overflow-scrolling:touch; }
+            .ev-all-item { display:flex; align-items:center; gap:14px; padding:10px; border-radius:16px; border:1px solid rgba(255,255,255,0.07);
+              background:rgba(255,255,255,0.03); cursor:pointer; text-align:left; transition:background .2s, transform .2s; width:100%; }
+            .ev-all-item:hover { background:rgba(255,255,255,0.08); transform:translateX(2px); }
+            .ev-all-item.past { opacity:0.55; }
+            .ev-all-thumb { position:relative; flex:0 0 auto; width:88px; height:66px; border-radius:12px; overflow:hidden; display:block; }
+            .ev-all-thumb img { width:100%; height:100%; object-fit:cover; opacity:0.85; }
+            .ev-all-thumb-anim { position:absolute; inset:0; opacity:0.6; }
+            .ev-all-badge { position:absolute; top:4px; left:4px; display:flex; flex-direction:column; align-items:center; line-height:1;
+              background:rgba(20,16,28,0.6); border:1px solid rgba(255,255,255,0.25); border-radius:8px; padding:3px 6px; color:#fff; }
+            .ev-all-badge .d { font-family:var(--f-display); font-weight:800; font-size:16px; }
+            .ev-all-badge .m { font-size:8px; font-weight:700; letter-spacing:1px; opacity:.85; }
+            .ev-all-info { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
+            .ev-all-tag { font-size:10px; letter-spacing:0.12em; text-transform:uppercase; color:var(--c-coral,#E8927C); font-weight:700; }
+            .ev-all-title { font-family:var(--f-display); font-weight:700; font-size:16px; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+            .ev-all-date { font-size:12px; color:rgba(255,255,255,0.6); }
+            .ev-all-arrow { color:rgba(255,255,255,0.5); font-size:18px; flex:0 0 auto; }
+            @media (max-width:520px){ .ev-all-thumb { width:64px; height:52px; } .ev-all-title { font-size:15px; } }
+          `}</style>
+        </div>,
+        document.body,
+      )}
 
       {/* G9: fullscreen popout eventu — klik środkowej karty.
           H5: PORTAL do body — transform na przodkach (reveal/parallax) łamał
