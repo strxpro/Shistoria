@@ -171,6 +171,14 @@ function Storia({ t, orientation = "horizontal" }) {
         .storia-discover-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c-coral, #E8927C); box-shadow: 0 0 0 5px rgba(232,146,124,0.4);
           animation: storiaPulse 1.8s ease-in-out infinite; }
         @keyframes storiaPulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .5; transform: scale(1.45); } }
+        /* Telefon: intro Storii wyśrodkowane (jak wcześniej) */
+        @media (max-width: 1023px) {
+          .storia-intro-right { align-items: center; text-align: center; }
+          .storia-quote { text-align: center; }
+          .storia-meta { align-items: center; }
+          .storia-meta-row { justify-content: center; }
+          .storia-discover { align-self: center; }
+        }
 
         .hero-lightbox { position: fixed; inset: 0; z-index: 10000; display: flex; align-items: center; justify-content: center; padding: 40px; pointer-events: none; }
         .hero-lightbox.open { pointer-events: auto; }
@@ -1103,7 +1111,8 @@ function StoriaPopout({ data, t, onClose }) {
 
       <style>{`
         .spop-overlay { position: fixed; inset: 0; z-index: 10000; background: rgba(6,12,18,0.9); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-          display: flex; align-items: center; justify-content: center; animation: spopFade .3s ease; overflow: hidden; }
+          display: flex; align-items: center; justify-content: center; animation: spopFade .3s ease; overflow: hidden;
+          overscroll-behavior: none; touch-action: none; }
         @keyframes spopFade { from { opacity: 0; } to { opacity: 1; } }
         .spop-close { position: fixed; top: max(18px, env(safe-area-inset-top)); right: 18px; z-index: 4; width: 48px; height: 48px;
           border-radius: 50%; background: rgba(255,255,255,0.12); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.28);
@@ -1111,7 +1120,7 @@ function StoriaPopout({ data, t, onClose }) {
         .spop-close:hover { background: #fff; color: var(--c-deep); transform: scale(1.08); }
         .spop-counter { position: fixed; top: max(26px, env(safe-area-inset-top)); left: 24px; z-index: 4; color: rgba(255,255,255,0.75);
           font-family: var(--f-display); font-weight: 700; font-size: 13px; letter-spacing: 0.15em; }
-        .spop-stage { position: relative; width: 100%; height: 100%; }
+        .spop-stage { position: relative; width: 100%; height: 100%; touch-action: none; }
         .spop-card { position: absolute; left: 50%; top: 50%; width: min(520px, 90vw); max-height: 86vh;
           background: #fff; border-radius: 24px; overflow: hidden; box-shadow: 0 40px 100px rgba(0,0,0,0.5);
           transition: transform .55s cubic-bezier(.22,.9,.36,1), opacity .45s ease; display: flex; flex-direction: column; will-change: transform, opacity; }
@@ -1119,7 +1128,7 @@ function StoriaPopout({ data, t, onClose }) {
         .spop-photo { position: relative; width: 100%; height: min(360px, 44vh); flex-shrink: 0; overflow: hidden; }
         .spop-photo-grad { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.35) 100%); }
         .spop-chapter { position: absolute; left: 20px; bottom: 16px; color: #fff; font-family: var(--f-serif); font-style: italic; font-size: 13px; text-shadow: 0 2px 8px rgba(0,0,0,0.4); }
-        .spop-body { padding: 24px 26px 28px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+        .spop-body { padding: 24px 26px 28px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; touch-action: pan-y; overscroll-behavior: contain; }
         .spop-year { font-family: var(--f-display); font-weight: 800; font-size: clamp(44px, 8vw, 64px); line-height: 1; color: var(--c-sky); letter-spacing: -0.03em; }
         .spop-title { font-family: var(--f-display); font-weight: 700; font-size: clamp(20px, 4vw, 26px); color: var(--c-deep); line-height: 1.1; }
         .spop-text { font-size: 15px; line-height: 1.6; color: var(--c-mute); }
