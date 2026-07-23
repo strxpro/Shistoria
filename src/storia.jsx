@@ -1003,7 +1003,7 @@ function StoriaPopout({ data, t, onClose }) {
   const clamp = (v) => Math.max(0, Math.min(n - 1, v));
   const idx = clamp(Math.round(pos));
   const item = data[idx];
-  const STEP_PX = 52;                           // px ciągnięcia na jedną datę
+  const STEP_PX = 96;                           // px ciągnięcia na jedną datę (większy = delikatniejsze, spokojniejsze)
   const dragHint = ({ it: "Trascina", pl: "Przeciągnij", en: "Drag", de: "Ziehen", fr: "Glissez", es: "Arrastra" })[(typeof window !== "undefined" && window.currentLanguage) || "it"] || "Trascina";
 
   const goTo = (i) => setPos(clamp(i));
@@ -1040,7 +1040,7 @@ function StoriaPopout({ data, t, onClose }) {
   const endDrag = () => {
     if (!dragging) return;
     setDragging(false);
-    const flick = -dragRef.current.vel * 120 / STEP_PX;       // szybki gest → magnetyczny przeskok o kilka slajdów
+    const flick = -dragRef.current.vel * 80 / STEP_PX;        // szybki gest → magnetyczny przeskok (łagodny)
     setPos((p) => clamp(Math.round(p + flick)));
   };
 
@@ -1057,7 +1057,7 @@ function StoriaPopout({ data, t, onClose }) {
       filter: blur > 0.2 ? `blur(${blur}px)` : "none",
       opacity,
       zIndex: 30 - Math.round(abs * 6),
-      transition: dragging ? "none" : "transform .42s cubic-bezier(.2,.8,.2,1), opacity .3s, filter .3s",
+      transition: dragging ? "none" : "transform .6s cubic-bezier(.16,1,.3,1), opacity .4s, filter .4s",
     };
   };
 
@@ -1147,7 +1147,7 @@ function StoriaPopout({ data, t, onClose }) {
         .spop-counter { position: fixed; top: max(26px, env(safe-area-inset-top)); left: 24px; z-index: 6; color: rgba(255,255,255,0.75);
           font-family: var(--f-display); font-weight: 700; font-size: 13px; letter-spacing: 0.15em; }
         .spop-stage { position: absolute; inset: 0; touch-action: none; }
-        .spop-card { position: absolute; left: 50%; top: 40%; width: min(380px, 80vw); max-height: 56vh;
+        .spop-card { position: absolute; left: 50%; top: 43%; width: min(380px, 80vw); max-height: 56vh;
           background: #fff; border-radius: 24px; overflow: hidden; box-shadow: 0 40px 100px rgba(0,0,0,0.55);
           display: flex; flex-direction: column; will-change: transform, opacity, filter; }
         .spop-card.active { box-shadow: 0 46px 120px rgba(0,0,0,0.6); }
@@ -1159,13 +1159,13 @@ function StoriaPopout({ data, t, onClose }) {
         .spop-title { font-family: var(--f-display); font-weight: 700; font-size: clamp(18px, 4vw, 24px); color: var(--c-deep); line-height: 1.15; }
         .spop-text { font-size: 14px; line-height: 1.55; color: var(--c-mute); }
         /* Koło fortuny */
-        .swheel { position: fixed; left: 0; right: 0; bottom: 0; height: 200px; z-index: 5; touch-action: none; cursor: grab; overflow: hidden; -webkit-user-select: none; user-select: none; }
+        .swheel { position: fixed; left: 0; right: 0; bottom: 28px; height: 200px; z-index: 5; touch-action: none; cursor: grab; overflow: hidden; -webkit-user-select: none; user-select: none; }
         .swheel.dragging { cursor: grabbing; }
         .swheel::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent, rgba(6,12,18,0.55)); pointer-events: none; }
         .swheel-ring { position: absolute; left: 50%; top: calc(100% + 130px); width: 1px; height: 1px; }
         .swheel-year { position: absolute; left: 0; top: 0; background: none; border: none; cursor: pointer; padding: 4px 8px;
           font-family: var(--f-display); font-weight: 800; font-size: 18px; color: rgba(255,255,255,0.9); white-space: nowrap;
-          transition: transform .35s cubic-bezier(.2,.8,.2,1), opacity .25s, color .25s, font-size .25s; will-change: transform, opacity; }
+          transition: transform .55s cubic-bezier(.16,1,.3,1), opacity .35s, color .3s, font-size .3s; will-change: transform, opacity; }
         .swheel.dragging .swheel-year { transition: none; }
         .swheel-year.active { color: var(--c-coral, #E8927C); font-size: 27px; }
         .swheel-marker { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); z-index: 3; width: 0; height: 0;

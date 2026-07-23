@@ -1257,11 +1257,11 @@ function MobileDrinksList({ dark = true }) {
         .mdr-burst svg { font-size: 48px; color: #FE2C55; animation: fmenuHeartPop .6s cubic-bezier(.17,.89,.32,1.28); }
         /* 👑 Ulubieniec baru — lider polubień wyróżniony złotem + korona na rogu */
         .mdr-card.mdr-top { position: relative; overflow: visible; border: 1.5px solid rgba(244,208,63,0.7); box-shadow: 0 10px 30px rgba(244,208,63,0.22), 0 6px 20px rgba(0,0,0,0.18); }
-        .mdr-crown { position: absolute; top: -11px; right: 10px; z-index: 5; display: inline-flex; align-items: center; gap: 4px;
-          padding: 3px 10px; border-radius: 999px; background: linear-gradient(135deg, #F4D03F, #E0A92E); color: #3a2a05;
+        .mdr-crown { position: absolute; top: -11px; left: 50%; transform: translateX(-50%); z-index: 5; display: inline-flex; align-items: center; gap: 4px;
+          padding: 3px 12px; border-radius: 999px; background: linear-gradient(135deg, #F4D03F, #E0A92E); color: #3a2a05;
           font-size: 10px; font-weight: 800; letter-spacing: 0.02em; white-space: nowrap; box-shadow: 0 4px 14px rgba(244,208,63,0.5); }
         .mdr-row.mdr-top-row { position: relative; border: 1px solid rgba(244,208,63,0.55); border-radius: 12px; background: rgba(244,208,63,0.08); margin-top: 16px; padding: 16px 12px 12px; }
-        .mdr-crown-row { top: -10px; left: 10px; right: auto; }
+        .mdr-crown-row { top: -10px; left: 10px; right: auto; transform: none; }
         .mdr-row-like { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 3px; padding: 4px 9px; border-radius: 999px; border: 1px solid ${dark ? "rgba(255,255,255,0.18)" : "var(--c-line)"}; background: ${dark ? "rgba(255,255,255,0.06)" : "#fff"}; color: ${dark ? "#fff" : "var(--c-deep)"}; font-size: 11px; font-weight: 700; cursor: pointer; line-height: 1; }
         .mdr-row-like svg { font-size: 13px; width: 13px; height: 13px; display: block; }
         .mdr-row-like.is-liked { border-color: #FE2C55; color: #FE2C55; }

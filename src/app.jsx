@@ -175,6 +175,34 @@ export default function App() {
     document.documentElement.dataset.palette = t.palette;
   }, [t.palette]);
 
+  // Smooth scroll (Lenis) — płynne przewijanie na CAŁEJ stronie, również palcem (mobile).
+  // Cały kod już zakłada window.lenis (scrollTo/stop/start) — to domyka zamierzony design.
+  useEffectA(() => {
+    if (typeof window === "undefined") return;
+    let lenis, rafId, alive = true;
+    import("lenis").then(({ default: Lenis }) => {
+      if (!alive) return;
+      lenis = new Lenis({
+        lerp: 0.1,
+        smoothWheel: true,
+        syncTouch: true,              // płynne przewijanie palcem na telefonie
+        syncTouchLerp: 0.08,
+        touchInertiaMultiplier: 20,
+      });
+      window.lenis = lenis;
+      const raf = (time) => { if (lenis) { lenis.raf(time); rafId = requestAnimationFrame(raf); } };
+      rafId = requestAnimationFrame(raf);
+    });
+    return () => { alive = false; if (rafId) cancelAnimationFrame(rafId); if (lenis) lenis.destroy(); window.lenis = null; };
+  }, []);
+
+  // Cocktail Maker — BEZ smooth scrolla (natywne przewijanie dla interakcji 3D)
+  useEffectA(() => {
+    if (!window.lenis) return;
+    if (["cocktail-rise", "cocktail-builder"].includes(activeSection)) window.lenis.stop();
+    else window.lenis.start();
+  }, [activeSection]);
+
   // Przywróć zapisany język na starcie (przed auto-detekcją) — flaga i treść zawsze zgodne
   useEffectA(() => {
     if (typeof window === "undefined") return;

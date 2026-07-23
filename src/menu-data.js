@@ -111,7 +111,7 @@ window.DRINKS_MENU = {
     { cat: "cocktails", name: "Margarita", price: "7,00 €", desc: "Tequila, Triple Sec, Lime", img: "https://www.thecocktaildb.com/images/media/drink/5noda61589575158.jpg" },
     { cat: "cocktails", name: "Daiquiri", price: "7,00 €", desc: "Rum, Lime, Zucchero", img: "https://www.thecocktaildb.com/images/media/drink/mrz9091589574515.jpg" },
     { cat: "cocktails", name: "Negroni", price: "7,00 €", desc: "Campari, Vermouth Rosso, Gin", img: "https://www.thecocktaildb.com/images/media/drink/qgdu971561574065.jpg" },
-    { cat: "cocktails", name: "Caipiroska", price: "6,00 €", desc: "Vodka, Lime, Zucchero", img: "https://www.thecocktaildb.com/images/media/drink/jgvn7p1582484435.jpg" },
+    { cat: "cocktails", name: "Caipiroska", price: "6,00 €", desc: "Vodka, Lime, Zucchero", img: "https://www.thecocktaildb.com/images/media/drink/yd47111503565515.jpg" },
     { cat: "cocktails", name: "Caipirina", price: "6,00 €", desc: "Cachaca, Lime, Zucchero", img: "https://www.thecocktaildb.com/images/media/drink/jgvn7p1582484435.jpg" },
     { cat: "cocktails", name: "El Diablo", price: "8,00 €", desc: "Tequila, Crème de Cassis", img: "https://www.thecocktaildb.com/images/media/drink/quqyqp1480879103.jpg" },
     { cat: "cocktails", name: "Piña Colada", price: "9,00 €", desc: "Rum, Ananas, Cocco, Lime", img: "https://www.thecocktaildb.com/images/media/drink/upgsue1668419912.jpg" },

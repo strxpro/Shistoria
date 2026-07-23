@@ -2242,9 +2242,37 @@ function Contatti({ t }) {
 }
 
 // ─── Footer ───────────────────────────────────────────────────────────────────
+const LEGAL_BODY = {
+  privacy: {
+    it: "I dati che ci fornisci (nome, email, telefono) sono usati solo per gestire prenotazioni, richieste e newsletter. Non li vendiamo a terzi. Puoi chiedere in qualsiasi momento la modifica o la cancellazione scrivendo a info@shistoria.it. Trattamento ai sensi del Reg. UE 2016/679 (GDPR).",
+    pl: "Dane, które nam podajesz (imię, email, telefon), wykorzystujemy wyłącznie do obsługi rezerwacji, zapytań i newslettera. Nie sprzedajemy ich osobom trzecim. W każdej chwili możesz poprosić o zmianę lub usunięcie danych, pisząc na info@shistoria.it. Przetwarzanie zgodnie z RODO (UE 2016/679).",
+    en: "The data you provide (name, email, phone) is used only to handle bookings, requests and the newsletter. We do not sell it to third parties. You may request changes or deletion at any time by writing to info@shistoria.it. Processing under EU Reg. 2016/679 (GDPR).",
+    de: "Die von dir angegebenen Daten (Name, E-Mail, Telefon) werden nur für Reservierungen, Anfragen und den Newsletter verwendet. Wir verkaufen sie nicht an Dritte. Du kannst jederzeit Änderung oder Löschung unter info@shistoria.it verlangen. Verarbeitung gemäß EU-VO 2016/679 (DSGVO).",
+    fr: "Les données que tu fournis (nom, e-mail, téléphone) servent uniquement à gérer les réservations, les demandes et la newsletter. Nous ne les vendons pas à des tiers. Tu peux demander à tout moment leur modification ou suppression à info@shistoria.it. Traitement selon le Règ. UE 2016/679 (RGPD).",
+    es: "Los datos que nos facilitas (nombre, email, teléfono) se usan solo para gestionar reservas, solicitudes y el boletín. No los vendemos a terceros. Puedes pedir su modificación o eliminación en cualquier momento escribiendo a info@shistoria.it. Tratamiento conforme al Reg. UE 2016/679 (RGPD).",
+  },
+  terms: {
+    it: "Le prenotazioni sono soggette a disponibilità e vengono confermate dal nostro staff. In caso di impossibilità a presentarti, ti chiediamo di avvisarci in anticipo. Prezzi e menu possono variare secondo stagione e disponibilità dei prodotti. Coperto e servizio come indicato nel menu.",
+    pl: "Rezerwacje zależą od dostępności i są potwierdzane przez naszą obsługę. W razie niemożności przybycia prosimy o wcześniejsze powiadomienie. Ceny i menu mogą się zmieniać w zależności od sezonu i dostępności produktów. Opłata za nakrycie i serwis zgodnie z menu.",
+    en: "Bookings are subject to availability and confirmed by our staff. If you cannot make it, please let us know in advance. Prices and menu may vary by season and product availability. Cover and service charge as indicated in the menu.",
+    de: "Reservierungen erfolgen nach Verfügbarkeit und werden von unserem Team bestätigt. Falls du nicht kommen kannst, sag uns bitte rechtzeitig Bescheid. Preise und Menü können je nach Saison und Verfügbarkeit variieren. Gedeck und Service laut Speisekarte.",
+    fr: "Les réservations sont soumises à disponibilité et confirmées par notre équipe. En cas d'empêchement, merci de nous prévenir à l'avance. Les prix et le menu peuvent varier selon la saison et la disponibilité. Couvert et service comme indiqué au menu.",
+    es: "Las reservas están sujetas a disponibilidad y las confirma nuestro personal. Si no puedes venir, avísanos con antelación. Los precios y el menú pueden variar según la temporada y la disponibilidad. Cubierto y servicio según se indica en el menú.",
+  },
+  cookie: {
+    it: "Questo sito usa solo cookie tecnici necessari al funzionamento (es. lingua scelta). Non usiamo cookie di profilazione né pubblicitari. Alcuni contenuti esterni (mappe, social) possono impostare propri cookie quando li apri.",
+    pl: "Ta strona używa tylko niezbędnych cookies technicznych (np. wybrany język). Nie stosujemy cookies profilujących ani reklamowych. Niektóre treści zewnętrzne (mapy, social) mogą ustawiać własne cookies, gdy je otworzysz.",
+    en: "This site uses only technical cookies needed to work (e.g. chosen language). We do not use profiling or advertising cookies. Some external content (maps, social) may set its own cookies when you open it.",
+    de: "Diese Seite verwendet nur technisch notwendige Cookies (z. B. gewählte Sprache). Wir nutzen keine Profiling- oder Werbe-Cookies. Externe Inhalte (Karten, Social) können eigene Cookies setzen, wenn du sie öffnest.",
+    fr: "Ce site n'utilise que des cookies techniques nécessaires au fonctionnement (ex. langue choisie). Nous n'utilisons pas de cookies de profilage ni publicitaires. Certains contenus externes (cartes, réseaux) peuvent déposer leurs propres cookies.",
+    es: "Este sitio usa solo cookies técnicas necesarias para funcionar (p. ej. el idioma elegido). No usamos cookies de perfilado ni publicitarias. Algunos contenidos externos (mapas, redes) pueden establecer sus propias cookies al abrirlos.",
+  },
+};
+
 function Footer({ t }) {
   const lang = (typeof window !== "undefined" && window.currentLanguage) || "it";
   const [news, setNews] = useStateE({ email: "", name: "", open: false, sent: false });
+  const [legalDoc, setLegalDoc] = useStateE(null);
   const L = {
     news: { it:"Una mail al mese. Stagioni, eventi, ricette.", pl:"Jeden mail miesięcznie. Sezony, wydarzenia, przepisy.", en:"One email a month. Seasons, events, recipes.", de:"Eine Mail im Monat. Saisons, Events, Rezepte.", fr:"Un e-mail par mois. Saisons, événements, recettes.", es:"Un correo al mes. Temporadas, eventos, recetas." },
     name: { it:"Il tuo nome", pl:"Twoje imię", en:"Your name", de:"Dein Name", fr:"Ton nom", es:"Tu nombre" },
@@ -2346,10 +2374,35 @@ function Footer({ t }) {
         <div className="footer-legal">
           <span className="footer-legal-title">{tr("legal")}</span>
           <div className="footer-legal-links">
-            <a href="#">{tr("privacy")}</a>
-            <a href="#">{tr("terms")}</a>
-            <a href="#">{tr("cookie")}</a>
+            <button type="button" onClick={() => setLegalDoc("privacy")}>{tr("privacy")}</button>
+            <button type="button" onClick={() => setLegalDoc("terms")}>{tr("terms")}</button>
+            <button type="button" onClick={() => setLegalDoc("cookie")}>{tr("cookie")}</button>
           </div>
+
+          {legalDoc && typeof document !== "undefined" && createPortal(
+            <div className="flegal-overlay" onClick={() => setLegalDoc(null)}>
+              <div className="flegal-modal" onClick={(e) => e.stopPropagation()}>
+                <button className="flegal-close" onClick={() => setLegalDoc(null)} aria-label="×">×</button>
+                <h3 className="flegal-title">{tr(legalDoc)}</h3>
+                <p className="flegal-text">{LEGAL_BODY[legalDoc]?.[lang] || LEGAL_BODY[legalDoc]?.it}</p>
+                <p className="flegal-info">S'Historia di Giovanni Taras · P.IVA 01234567890 · Via Delfino, 07020 Rena Majore (OT), Italia · info@shistoria.it</p>
+              </div>
+              <style>{`
+                .flegal-overlay { position:fixed; inset:0; z-index:10001; background:rgba(6,12,18,0.72); backdrop-filter:blur(8px);
+                  display:flex; align-items:center; justify-content:center; padding:20px; animation:flegalFade .25s ease; }
+                @keyframes flegalFade { from { opacity:0; } to { opacity:1; } }
+                .flegal-modal { position:relative; width:min(560px,94vw); max-height:82vh; overflow-y:auto; background:#fff; color:var(--c-deep);
+                  border-radius:20px; padding:30px 26px 26px; box-shadow:0 40px 100px rgba(0,0,0,0.4); animation:flegalPop .3s cubic-bezier(.2,.85,.2,1); }
+                @keyframes flegalPop { from { opacity:0; transform:translateY(16px) scale(.97); } to { opacity:1; transform:none; } }
+                .flegal-close { position:absolute; top:14px; right:14px; width:36px; height:36px; border-radius:50%; border:none; background:var(--c-bg,#EEF4F6);
+                  color:var(--c-deep); font-size:22px; line-height:1; cursor:pointer; display:grid; place-items:center; }
+                .flegal-title { font-family:var(--f-display); font-weight:800; font-size:24px; margin:0 0 16px; color:var(--c-deep); }
+                .flegal-text { font-size:15px; line-height:1.65; color:var(--c-mute,#5a6b74); margin:0 0 18px; }
+                .flegal-info { font-size:12px; line-height:1.6; color:var(--c-mute); opacity:0.7; margin:0; padding-top:14px; border-top:1px solid var(--c-line,#e3e9ec); overflow-wrap:anywhere; }
+              `}</style>
+            </div>,
+            document.body,
+          )}
           <p className="footer-legal-info">S'Historia di Giovanni Taras · P.IVA 01234567890 · Via Delfino, 07020 Rena Majore (OT), Italia</p>
         </div>
 
@@ -2395,8 +2448,8 @@ function Footer({ t }) {
         .footer-legal { padding-top:32px; margin-top:48px; border-top:1px solid rgba(255,255,255,0.1); }
         .footer-legal-title { display:block; font-size:11px; letter-spacing:0.15em; text-transform:uppercase; color:var(--c-sky); margin-bottom:12px; }
         .footer-legal-links { display:flex; gap:20px; flex-wrap:wrap; }
-        .footer-legal-links a { font-size:13px; color:rgba(255,255,255,0.7); transition:color .2s; }
-        .footer-legal-links a:hover { color:var(--c-coral); }
+        .footer-legal-links a, .footer-legal-links button { font-size:13px; color:rgba(255,255,255,0.7); transition:color .2s; background:none; border:none; padding:0; cursor:pointer; font-family:inherit; }
+        .footer-legal-links a:hover, .footer-legal-links button:hover { color:var(--c-coral); }
         .footer-legal-info { font-size:11px; opacity:0.5; margin-top:14px; line-height:1.6; overflow-wrap:anywhere; }
         .footer-bottom { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding-top: 32px; margin-top: 40px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 11px; letter-spacing: 0.1em; color: rgba(255,255,255,0.5); }
         .footer-credit { text-align:center; padding-top:18px; }
