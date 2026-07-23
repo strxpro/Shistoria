@@ -76,6 +76,39 @@ function parseAllergens(str) {
 }
 const allergenTitle = { it:"Allergeni", en:"Allergens", pl:"Alergeny", de:"Allergene", fr:"Allergènes", es:"Alérgenos" };
 
+// ─── Tłumaczenia nazw KATEGORII menu (jedzenie + napoje) na 6 języków ──────────
+const CAT_I18N = {
+  // jedzenie
+  antipasti:  { it: "Antipasti", pl: "Przystawki", en: "Starters", de: "Vorspeisen", fr: "Entrées", es: "Entrantes" },
+  primi:      { it: "Primi", pl: "Pierwsze dania", en: "First courses", de: "Erste Gänge", fr: "Entrées", es: "Primeros" },
+  secondi:    { it: "Secondi", pl: "Dania główne", en: "Main courses", de: "Hauptgerichte", fr: "Plats", es: "Segundos" },
+  contorni:   { it: "Contorni", pl: "Dodatki", en: "Sides", de: "Beilagen", fr: "Accompagnements", es: "Guarniciones" },
+  pizze:      { it: "Pizze", pl: "Pizze", en: "Pizzas", de: "Pizzen", fr: "Pizzas", es: "Pizzas" },
+  dolci:      { it: "Dolci", pl: "Desery", en: "Desserts", de: "Desserts", fr: "Desserts", es: "Postres" },
+  // napoje / bar
+  all:              { it: "Tutti", pl: "Wszystkie", en: "All", de: "Alle", fr: "Tout", es: "Todos" },
+  cocktails:        { it: "Cocktails", pl: "Koktajle", en: "Cocktails", de: "Cocktails", fr: "Cocktails", es: "Cócteles" },
+  analcolici:       { it: "Analcolici", pl: "Bezalkoholowe", en: "Non-alcoholic", de: "Alkoholfrei", fr: "Sans alcool", es: "Sin alcohol" },
+  smoothie:         { it: "Smoothie", pl: "Smoothie", en: "Smoothie", de: "Smoothie", fr: "Smoothie", es: "Smoothie" },
+  bibite:           { it: "Bibite", pl: "Napoje", en: "Soft drinks", de: "Getränke", fr: "Boissons", es: "Refrescos" },
+  "birre-spina":    { it: "Birre spina", pl: "Piwo lane", en: "Draft beer", de: "Bier vom Fass", fr: "Bière pression", es: "Cerveza de barril" },
+  "birre-bottiglia":{ it: "Birre bottiglia", pl: "Piwo butelkowe", en: "Bottled beer", de: "Flaschenbier", fr: "Bière bouteille", es: "Cerveza botella" },
+  "birre-artigianali":{ it: "Artigianali", pl: "Rzemieślnicze", en: "Craft", de: "Craft", fr: "Artisanales", es: "Artesanales" },
+  gin:        { it: "Gin + Tonica", pl: "Gin + Tonik", en: "Gin + Tonic", de: "Gin + Tonic", fr: "Gin + Tonic", es: "Gin + Tónica" },
+  vodka:      { it: "Vodka + Tonica", pl: "Wódka + Tonik", en: "Vodka + Tonic", de: "Wodka + Tonic", fr: "Vodka + Tonic", es: "Vodka + Tónica" },
+  tequila:    { it: "Tequila", pl: "Tequila", en: "Tequila", de: "Tequila", fr: "Tequila", es: "Tequila" },
+  whisky:     { it: "Whisky", pl: "Whisky", en: "Whisky", de: "Whisky", fr: "Whisky", es: "Whisky" },
+  rum:        { it: "Rum", pl: "Rum", en: "Rum", de: "Rum", fr: "Rhum", es: "Ron" },
+  grappe:     { it: "Grappe", pl: "Grappa", en: "Grappa", de: "Grappa", fr: "Grappa", es: "Grappa" },
+  amari:      { it: "Amari", pl: "Amari (gorzkie)", en: "Amari", de: "Amari", fr: "Amari", es: "Amari" },
+  caffe:      { it: "Caffetteria", pl: "Kawy", en: "Coffee", de: "Kaffee", fr: "Cafés", es: "Cafetería" },
+};
+function catLabel(id, fallback) {
+  const lang = (typeof window !== "undefined" && window.currentLanguage) || "it";
+  const m = CAT_I18N[id];
+  return (m && m[lang]) || fallback;
+}
+
 // ─── Full categorized menu ───────────────────────────────────────────────────
 function FullMenu() {
   const [isMobile, setIsMobile] = useStateM(typeof window !== "undefined" && window.innerWidth < 768);
@@ -294,7 +327,7 @@ function MobileFullMenu() {
             <button key={c.id} data-mcatbtn={c.id}
               className={`mfm-cattab ${activeCat === c.id ? "active" : ""}`}
               onClick={() => goToCat(c.id)}>
-              <span className="mfm-cattab-icon">{c.icon}</span>{c.label}
+              <span className="mfm-cattab-icon">{c.icon}</span>{catLabel(c.id, c.label)}
             </button>
           ))}
         </div>
@@ -304,7 +337,7 @@ function MobileFullMenu() {
       <div className="mfm-cats">
         {window.FULL_MENU.map((cat, ci) => (
           <div key={cat.id} className="mfm-cat" data-mcat={cat.id}>
-            <h3 className="mfm-cat-title"><span className="mfm-cat-num">{String(ci + 1).padStart(2, "0")}</span>{cat.label}</h3>
+            <h3 className="mfm-cat-title"><span className="mfm-cat-num">{String(ci + 1).padStart(2, "0")}</span>{catLabel(cat.id, cat.label)}</h3>
             <ul className="mfm-list">
               {(() => {
                 const sorted = cat.items.slice().sort((a, b) => orderLikes(b) - orderLikes(a));
@@ -395,7 +428,7 @@ function MobileFullMenu() {
               {window.FULL_MENU.map((c) => (
                 <button key={c.id} className={`mfm-sheet-btn ${activeCat === c.id ? "active" : ""}`} onClick={() => goToCat(c.id)}>
                   <span className="mfm-sheet-icon">{c.icon}</span>
-                  <span>{c.label}</span>
+                  <span>{catLabel(c.id, c.label)}</span>
                   <span className="mfm-sheet-count">{c.items.length}</span>
                 </button>
               ))}
@@ -790,7 +823,7 @@ function DesktopFullMenu() {
                   />
                   <button onClick={() => scrollToCat(c.id)} className={activeCat === c.id ? "active" : ""}>
                     <span className="fmenu-nav-icon">{c.icon}</span>
-                    <span>{c.label}</span>
+                    <span>{catLabel(c.id, c.label)}</span>
                     <span className="fmenu-nav-count">{String(c.items.length).padStart(2, "0")}</span>
                   </button>
                 </li>
@@ -819,7 +852,7 @@ function DesktopFullMenu() {
                 {window.FULL_MENU.map((c) => (
                   <button key={c.id} className={`fmenu-cat-popout-btn ${activeCat === c.id ? "active" : ""}`} onClick={() => scrollToCat(c.id)}>
                     <span>{c.icon}</span>
-                    <span>{c.label}</span>
+                    <span>{catLabel(c.id, c.label)}</span>
                     <span className="fmenu-cat-popout-count">{c.items.length}</span>
                   </button>
                 ))}
@@ -840,7 +873,7 @@ function DesktopFullMenu() {
                     viewport={{ once: true, amount: 0.5 }}
                     transition={{ duration: 0.7, ease: "easeOut" }}
                   >
-                    {cat.label}
+                    {catLabel(cat.id, cat.label)}
                   </motion.h3>
                   <span className="fmenu-cat-line" />
                 </header>
@@ -1141,7 +1174,7 @@ function MobileDrinksList({ dark = true }) {
           if (count === 0) return null;
           return (
             <button key={f.id} className={`mdr-filter ${filter === f.id ? "active" : ""}`} onClick={() => setFilter(f.id)}>
-              {f.label}<span className="mdr-filter-num">{count}</span>
+              {catLabel(f.id, f.label)}<span className="mdr-filter-num">{count}</span>
             </button>
           );
         })}
@@ -1281,7 +1314,7 @@ function DesktopDrinksList({ dark = true }) {
         <div className="drinks-filters">
           {drinksMenu.filters.map((f) => (
             <button key={f.id} className={`drinks-filter ${filter === f.id ? "active" : ""}`} onClick={() => setFilter(f.id)}>
-              {f.label}
+              {catLabel(f.id, f.label)}
               <span className="drinks-filter-num">{f.id === "all" ? drinksMenu.items.length : drinksMenu.items.filter((i) => i.cat === f.id).length}</span>
             </button>
           ))}
@@ -1290,7 +1323,7 @@ function DesktopDrinksList({ dark = true }) {
           {drinksMenu.filters.filter((f) => f.id !== "all").map((f) => {
             const catItems = drinksMenu.items.filter((i) => i.cat === f.id);
             if (catItems.length === 0) return null;
-            return <DrinksCategorySection key={f.id} label={f.label} items={catItems} dark={dark} />;
+            return <DrinksCategorySection key={f.id} label={catLabel(f.id, f.label)} items={catItems} dark={dark} />;
           })}
         </div>
         <DrinkStyles dark={dark} />
@@ -1303,7 +1336,7 @@ function DesktopDrinksList({ dark = true }) {
       <div className="drinks-filters">
         {drinksMenu.filters.map((f) => (
           <button key={f.id} className={`drinks-filter ${filter === f.id ? "active" : ""}`} onClick={() => setFilter(f.id)}>
-            {f.label}
+            {catLabel(f.id, f.label)}
             <span className="drinks-filter-num">{f.id === "all" ? drinksMenu.items.length : drinksMenu.items.filter((i) => i.cat === f.id).length}</span>
           </button>
         ))}

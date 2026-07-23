@@ -116,7 +116,6 @@ function Ristorante({ t }) {
               {t("ristorante.intro")}
             </ScrollReveal>
             <div className="rist-meta">
-              <div><span>20</span><label>{({ it: "posti", pl: "miejsca", en: "seats", de: "Plätze", fr: "places", es: "plazas" })[lang] || "posti"}</label></div>
               <div><span>{new Date().getFullYear() - 1996}+</span><label>{({ it: "anni", pl: "lat", en: "years", de: "Jahre", fr: "ans", es: "años" })[lang] || "anni"}</label></div>
               <div><span>1</span><label>{({ it: "famiglia", pl: "rodzina", en: "family", de: "Familie", fr: "famille", es: "familia" })[lang] || "famiglia"}</label></div>
             </div>

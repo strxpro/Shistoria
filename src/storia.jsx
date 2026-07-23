@@ -998,7 +998,7 @@ function StoriaPopout({ data, t, onClose }) {
   const n = data.length;
   const [pos, setPos] = useStateS(0);          // pozycja ułamkowa (kręcenie kołem)
   const [dragging, setDragging] = useStateS(false);
-  const dragRef = useRefS({ startX: 0, base: 0, moved: false });
+  const dragRef = useRefS({ startX: 0, base: 0, moved: false, lastX: 0, lastT: 0, vel: 0 });
   const closeLabel = (typeof t === "function" ? t("storia.close") : "") || "Chiudi";
   const clamp = (v) => Math.max(0, Math.min(n - 1, v));
   const idx = clamp(Math.round(pos));
@@ -1026,14 +1026,40 @@ function StoriaPopout({ data, t, onClose }) {
   }, [n, onClose]);
 
   // Kręcenie kołem palcem / myszką — środkowa data = aktywna, po puszczeniu dociąga do najbliższej
-  const startDrag = (x) => { dragRef.current = { startX: x, base: pos, moved: false }; setDragging(true); };
+  const startDrag = (x) => { dragRef.current = { startX: x, base: pos, moved: false, lastX: x, lastT: performance.now(), vel: 0 }; setDragging(true); };
   const moveDrag = (x) => {
     if (!dragging) return;
+    const now = performance.now();
+    const dt = Math.max(8, now - dragRef.current.lastT);
+    dragRef.current.vel = (x - dragRef.current.lastX) / dt;   // px/ms
+    dragRef.current.lastX = x; dragRef.current.lastT = now;
     const dx = x - dragRef.current.startX;
     if (Math.abs(dx) > 4) dragRef.current.moved = true;
-    setPos(clamp(dragRef.current.base - dx / STEP_PX));   // ciągnięcie w prawo = wcześniejsze daty
+    setPos(clamp(dragRef.current.base - dx / STEP_PX));       // ciągnięcie w prawo = wcześniejsze daty
   };
-  const endDrag = () => { if (!dragging) return; setDragging(false); setPos((p) => clamp(Math.round(p))); };
+  const endDrag = () => {
+    if (!dragging) return;
+    setDragging(false);
+    const flick = -dragRef.current.vel * 120 / STEP_PX;       // szybki gest → magnetyczny przeskok o kilka slajdów
+    setPos((p) => clamp(Math.round(p + flick)));
+  };
+
+  // Coverflow: aktywna karta na środku (ostra), sąsiednie podglądają z boków — zblurowane, w cieniu
+  const cardStyle = (i) => {
+    const diff = i - pos;
+    const abs = Math.abs(diff);
+    if (abs > 2.2) return null;
+    const scale = Math.max(0.76, 1 - abs * 0.14);
+    const blur = Math.min(7, abs * 4.5);
+    const opacity = Math.max(0.28, 1 - abs * 0.42);
+    return {
+      transform: `translate(-50%,-50%) translateX(${diff * 84}%) scale(${scale})`,
+      filter: blur > 0.2 ? `blur(${blur}px)` : "none",
+      opacity,
+      zIndex: 30 - Math.round(abs * 6),
+      transition: dragging ? "none" : "transform .42s cubic-bezier(.2,.8,.2,1), opacity .3s, filter .3s",
+    };
+  };
 
   if (typeof document === "undefined") return null;
 
@@ -1045,20 +1071,35 @@ function StoriaPopout({ data, t, onClose }) {
       <button className="spop-close" onClick={(e) => { e.stopPropagation(); onClose(); }} aria-label={closeLabel}>×</button>
       <div className="spop-counter">{String(idx + 1).padStart(2, "0")} / {String(n).padStart(2, "0")}</div>
 
-      {/* Karta aktywnej daty */}
-      <div className="spop-stage" onClick={(e) => e.stopPropagation()}>
-        <article className="spop-card">
-          <div className="spop-photo">
-            <Placeholder type={item.phType} style={{ width: "100%", height: "100%" }} />
-            <div className="spop-photo-grad" />
-            <span className="spop-chapter">— Capitolo {String(idx + 1).padStart(2, "0")}</span>
-          </div>
-          <div className="spop-body">
-            <span className="spop-year">{item.year}</span>
-            <h3 className="spop-title">{item.title}</h3>
-            <p className="spop-text">{item.text}</p>
-          </div>
-        </article>
+      {/* Karty coverflow — środkowa ostra, sąsiednie peek+blur; swipe palcem/myszką */}
+      <div className="spop-stage"
+        onTouchStart={(e) => { startDrag(e.touches[0].clientX); }}
+        onTouchMove={(e) => { moveDrag(e.touches[0].clientX); }}
+        onTouchEnd={endDrag}
+        onMouseDown={(e) => { startDrag(e.clientX); }}
+        onMouseMove={(e) => moveDrag(e.clientX)}
+        onMouseUp={endDrag}
+        onMouseLeave={endDrag}
+        onClick={(e) => e.stopPropagation()}>
+        {data.map((it, i) => {
+          const st = cardStyle(i);
+          if (!st) return null;
+          return (
+            <article key={i} className={`spop-card ${i === idx ? "active" : ""}`} style={st}
+              onClick={(e) => { e.stopPropagation(); if (!dragRef.current.moved && i !== idx) goTo(i); }}>
+              <div className="spop-photo">
+                <Placeholder type={it.phType} style={{ width: "100%", height: "100%" }} />
+                <div className="spop-photo-grad" />
+                <span className="spop-chapter">— Capitolo {String(i + 1).padStart(2, "0")}</span>
+              </div>
+              <div className="spop-body">
+                <span className="spop-year">{it.year}</span>
+                <h3 className="spop-title">{it.title}</h3>
+                <p className="spop-text">{it.text}</p>
+              </div>
+            </article>
+          );
+        })}
       </div>
 
       {/* KOŁO FORTUNY — daty na łuku; ciągnij palcem, środkowa data pod znacznikiem = aktywna */}
@@ -1105,11 +1146,11 @@ function StoriaPopout({ data, t, onClose }) {
         .spop-close:hover { background: #fff; color: var(--c-deep); transform: scale(1.08); }
         .spop-counter { position: fixed; top: max(26px, env(safe-area-inset-top)); left: 24px; z-index: 6; color: rgba(255,255,255,0.75);
           font-family: var(--f-display); font-weight: 700; font-size: 13px; letter-spacing: 0.15em; }
-        .spop-stage { position: absolute; inset: 0; }
-        .spop-card { position: absolute; left: 50%; top: 38%; transform: translate(-50%,-50%); width: min(440px, 88vw); max-height: 58vh;
-          background: #fff; border-radius: 24px; overflow: hidden; box-shadow: 0 40px 100px rgba(0,0,0,0.5);
-          display: flex; flex-direction: column; animation: spopCardIn .4s ease; }
-        @keyframes spopCardIn { from { opacity: 0; transform: translate(-50%,-44%); } to { opacity: 1; transform: translate(-50%,-50%); } }
+        .spop-stage { position: absolute; inset: 0; touch-action: none; }
+        .spop-card { position: absolute; left: 50%; top: 40%; width: min(380px, 80vw); max-height: 56vh;
+          background: #fff; border-radius: 24px; overflow: hidden; box-shadow: 0 40px 100px rgba(0,0,0,0.55);
+          display: flex; flex-direction: column; will-change: transform, opacity, filter; }
+        .spop-card.active { box-shadow: 0 46px 120px rgba(0,0,0,0.6); }
         .spop-photo { position: relative; width: 100%; height: min(240px, 30vh); flex-shrink: 0; overflow: hidden; }
         .spop-photo-grad { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.35) 100%); }
         .spop-chapter { position: absolute; left: 18px; bottom: 14px; color: #fff; font-family: var(--f-serif); font-style: italic; font-size: 13px; text-shadow: 0 2px 8px rgba(0,0,0,0.4); }
