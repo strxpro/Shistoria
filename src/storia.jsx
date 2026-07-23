@@ -995,21 +995,18 @@ function StoriaVerticalRow({ item, index }) {
 
 // ─── Storia POPOUT: karuzela historii (daty + zdjęcia), swipe L/P, strzałki, ×, klawiatura ──
 function StoriaPopout({ data, t, onClose }) {
-  const [idx, setIdx] = useStateS(0);
-  const [isMobile, setIsMobile] = useStateS(typeof window !== "undefined" && window.innerWidth < 768);
-  const touch = useRefS({ x: 0, y: 0, moved: false });
   const n = data.length;
+  const [pos, setPos] = useStateS(0);          // pozycja ułamkowa (kręcenie kołem)
+  const [dragging, setDragging] = useStateS(false);
+  const dragRef = useRefS({ startX: 0, base: 0, moved: false });
   const closeLabel = (typeof t === "function" ? t("storia.close") : "") || "Chiudi";
+  const clamp = (v) => Math.max(0, Math.min(n - 1, v));
+  const idx = clamp(Math.round(pos));
+  const item = data[idx];
+  const STEP_PX = 52;                           // px ciągnięcia na jedną datę
+  const dragHint = ({ it: "Trascina", pl: "Przeciągnij", en: "Drag", de: "Ziehen", fr: "Glissez", es: "Arrastra" })[(typeof window !== "undefined" && window.currentLanguage) || "it"] || "Trascina";
 
-  const go = (i) => setIdx(Math.max(0, Math.min(n - 1, i)));
-  const next = () => setIdx((i) => Math.min(n - 1, i + 1));
-  const prev = () => setIdx((i) => Math.max(0, i - 1));
-
-  useEffectS(() => {
-    const onR = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener("resize", onR);
-    return () => window.removeEventListener("resize", onR);
-  }, []);
+  const goTo = (i) => setPos(clamp(i));
 
   // Blokada scrolla strony pod spodem + klawiatura (← → Esc)
   useEffectS(() => {
@@ -1017,8 +1014,8 @@ function StoriaPopout({ data, t, onClose }) {
     if (typeof window !== "undefined" && window.lenis) window.lenis.stop();
     const onKey = (e) => {
       if (e.key === "Escape") onClose();
-      else if (e.key === "ArrowRight") setIdx((i) => Math.min(n - 1, i + 1));
-      else if (e.key === "ArrowLeft") setIdx((i) => Math.max(0, i - 1));
+      else if (e.key === "ArrowRight") setPos((p) => clamp(Math.round(p) + 1));
+      else if (e.key === "ArrowLeft") setPos((p) => clamp(Math.round(p) - 1));
     };
     window.addEventListener("keydown", onKey);
     return () => {
@@ -1028,118 +1025,112 @@ function StoriaPopout({ data, t, onClose }) {
     };
   }, [n, onClose]);
 
-  // SWIPE poziomy jak karuzela (lewo = następna, prawo = poprzednia)
-  const onTouchStart = (e) => { touch.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, moved: false }; };
-  const onTouchMove = (e) => {
-    const dx = e.touches[0].clientX - touch.current.x;
-    const dy = e.touches[0].clientY - touch.current.y;
-    if (!touch.current.moved && Math.abs(dx) > 45 && Math.abs(dx) > Math.abs(dy) * 1.3) {
-      touch.current.moved = true;
-      if (dx < 0) next(); else prev();
-    }
+  // Kręcenie kołem palcem / myszką — środkowa data = aktywna, po puszczeniu dociąga do najbliższej
+  const startDrag = (x) => { dragRef.current = { startX: x, base: pos, moved: false }; setDragging(true); };
+  const moveDrag = (x) => {
+    if (!dragging) return;
+    const dx = x - dragRef.current.startX;
+    if (Math.abs(dx) > 4) dragRef.current.moved = true;
+    setPos(clamp(dragRef.current.base - dx / STEP_PX));   // ciągnięcie w prawo = wcześniejsze daty
   };
-
-  const cardStyle = (i) => {
-    const diff = i - idx;
-    const abs = Math.abs(diff);
-    if (abs > 2) return { opacity: 0, visibility: "hidden", pointerEvents: "none", transform: "translate(-50%,-50%) scale(0.7)" };
-    const step = isMobile ? 100 : 60; // % przesunięcia na sąsiada (mobile: pełny slajd; desktop: peek)
-    const scale = diff === 0 ? 1 : 0.86;
-    const opacity = abs === 0 ? 1 : abs === 1 ? (isMobile ? 0 : 0.45) : 0;
-    return {
-      transform: `translate(-50%,-50%) translateX(${diff * step}%) scale(${scale})`,
-      opacity,
-      zIndex: 10 - abs,
-      visibility: opacity === 0 ? "hidden" : "visible",
-      pointerEvents: opacity > 0 ? "auto" : "none",
-    };
-  };
+  const endDrag = () => { if (!dragging) return; setDragging(false); setPos((p) => clamp(Math.round(p))); };
 
   if (typeof document === "undefined") return null;
+
+  const R = 300;      // promień koła (px) — duży = łagodny łuk
+  const SPREAD = 18;  // stopni między datami
+
   return createPortal(
     <div className="spop-overlay" onClick={onClose}>
       <button className="spop-close" onClick={(e) => { e.stopPropagation(); onClose(); }} aria-label={closeLabel}>×</button>
-      <div className="spop-counter">{data[idx].year} · {String(idx + 1).padStart(2, "0")}/{String(n).padStart(2, "0")}</div>
+      <div className="spop-counter">{String(idx + 1).padStart(2, "0")} / {String(n).padStart(2, "0")}</div>
 
-      <div className="spop-stage" onTouchStart={onTouchStart} onTouchMove={onTouchMove}>
-        {data.map((item, i) => (
-          <article key={i} className={`spop-card ${i === idx ? "active" : ""}`} style={cardStyle(i)}
-            onClick={(e) => { e.stopPropagation(); if (i !== idx) go(i); }}>
-            <div className="spop-photo">
-              <Placeholder type={item.phType} style={{ width: "100%", height: "100%" }} />
-              <div className="spop-photo-grad" />
-              <span className="spop-chapter">— Capitolo {String(i + 1).padStart(2, "0")}</span>
-            </div>
-            <div className="spop-body">
-              <span className="spop-year">{item.year}</span>
-              <h3 className="spop-title">{item.title}</h3>
-              <p className="spop-text">{item.text}</p>
-            </div>
-          </article>
-        ))}
-        <button className="spop-nav spop-nav-l" onClick={(e) => { e.stopPropagation(); prev(); }} disabled={idx === 0} aria-label="‹">‹</button>
-        <button className="spop-nav spop-nav-r" onClick={(e) => { e.stopPropagation(); next(); }} disabled={idx === n - 1} aria-label="›">›</button>
+      {/* Karta aktywnej daty */}
+      <div className="spop-stage" onClick={(e) => e.stopPropagation()}>
+        <article className="spop-card">
+          <div className="spop-photo">
+            <Placeholder type={item.phType} style={{ width: "100%", height: "100%" }} />
+            <div className="spop-photo-grad" />
+            <span className="spop-chapter">— Capitolo {String(idx + 1).padStart(2, "0")}</span>
+          </div>
+          <div className="spop-body">
+            <span className="spop-year">{item.year}</span>
+            <h3 className="spop-title">{item.title}</h3>
+            <p className="spop-text">{item.text}</p>
+          </div>
+        </article>
       </div>
 
-      {/* Oś czasu — linia z postępem + węzły lat (klik = skok do rozdziału) */}
-      <div className="spop-timeline" onClick={(e) => e.stopPropagation()}>
-        <div className="spop-timeline-line"><div className="spop-timeline-fill" style={{ width: `${n > 1 ? (idx / (n - 1)) * 100 : 0}%` }} /></div>
-        <div className="spop-timeline-ticks">
-          {data.map((item, i) => (
-            <button key={i} className={`spop-tick ${i === idx ? "active" : ""} ${i < idx ? "done" : ""}`} onClick={() => go(i)} aria-label={`${item.year}`}>
-              <span className="spop-tick-dot" />
-              {i === idx && <span className="spop-tick-year">{item.year}</span>}
-            </button>
-          ))}
+      {/* KOŁO FORTUNY — daty na łuku; ciągnij palcem, środkowa data pod znacznikiem = aktywna */}
+      <div className={`swheel ${dragging ? "dragging" : ""}`}
+        onTouchStart={(e) => { e.stopPropagation(); startDrag(e.touches[0].clientX); }}
+        onTouchMove={(e) => { e.stopPropagation(); moveDrag(e.touches[0].clientX); }}
+        onTouchEnd={(e) => { e.stopPropagation(); endDrag(); }}
+        onMouseDown={(e) => { e.stopPropagation(); startDrag(e.clientX); }}
+        onMouseMove={(e) => moveDrag(e.clientX)}
+        onMouseUp={endDrag}
+        onMouseLeave={endDrag}
+        onClick={(e) => e.stopPropagation()}>
+        <span className="swheel-marker" aria-hidden="true" />
+        <div className="swheel-ring">
+          {data.map((it, i) => {
+            const angle = (i - pos) * SPREAD - 90;   // -90° = góra łuku
+            const rad = angle * Math.PI / 180;
+            const x = Math.cos(rad) * R;
+            const y = Math.sin(rad) * R;
+            const dist = Math.abs(i - pos);
+            if (dist > 5) return null;
+            const op = Math.max(0.18, 1 - dist * 0.24);
+            const sc = Math.max(0.6, 1 - dist * 0.12);
+            const isActive = i === idx;
+            return (
+              <button key={i} className={`swheel-year ${isActive ? "active" : ""}`}
+                style={{ transform: `translate(-50%,-50%) translate(${x}px, ${y}px) rotate(${angle + 90}deg) scale(${sc})`, opacity: op }}
+                onClick={(e) => { e.stopPropagation(); if (!dragRef.current.moved) goTo(i); }}>
+                {it.year}
+              </button>
+            );
+          })}
         </div>
+        <span className="swheel-hint">{dragHint} ↔</span>
       </div>
 
       <style>{`
-        .spop-overlay { position: fixed; inset: 0; z-index: 10000; background: rgba(6,12,18,0.9); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-          display: flex; align-items: center; justify-content: center; animation: spopFade .3s ease; overflow: hidden;
-          overscroll-behavior: none; touch-action: none; }
+        .spop-overlay { position: fixed; inset: 0; z-index: 10000; background: rgba(6,12,18,0.92); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+          animation: spopFade .3s ease; overflow: hidden; overscroll-behavior: none; touch-action: none; }
         @keyframes spopFade { from { opacity: 0; } to { opacity: 1; } }
-        .spop-close { position: fixed; top: max(18px, env(safe-area-inset-top)); right: 18px; z-index: 4; width: 48px; height: 48px;
+        .spop-close { position: fixed; top: max(18px, env(safe-area-inset-top)); right: 18px; z-index: 6; width: 48px; height: 48px;
           border-radius: 50%; background: rgba(255,255,255,0.12); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.28);
           color: #fff; font-size: 26px; line-height: 1; cursor: pointer; display: grid; place-items: center; transition: all .25s; }
         .spop-close:hover { background: #fff; color: var(--c-deep); transform: scale(1.08); }
-        .spop-counter { position: fixed; top: max(26px, env(safe-area-inset-top)); left: 24px; z-index: 4; color: rgba(255,255,255,0.75);
+        .spop-counter { position: fixed; top: max(26px, env(safe-area-inset-top)); left: 24px; z-index: 6; color: rgba(255,255,255,0.75);
           font-family: var(--f-display); font-weight: 700; font-size: 13px; letter-spacing: 0.15em; }
-        .spop-stage { position: relative; width: 100%; height: 100%; touch-action: none; }
-        .spop-card { position: absolute; left: 50%; top: 50%; width: min(520px, 90vw); max-height: 86vh;
+        .spop-stage { position: absolute; inset: 0; }
+        .spop-card { position: absolute; left: 50%; top: 38%; transform: translate(-50%,-50%); width: min(440px, 88vw); max-height: 58vh;
           background: #fff; border-radius: 24px; overflow: hidden; box-shadow: 0 40px 100px rgba(0,0,0,0.5);
-          transition: transform .55s cubic-bezier(.22,.9,.36,1), opacity .45s ease; display: flex; flex-direction: column; will-change: transform, opacity; }
-        .spop-card:not(.active) { cursor: pointer; }
-        .spop-photo { position: relative; width: 100%; height: min(360px, 44vh); flex-shrink: 0; overflow: hidden; }
+          display: flex; flex-direction: column; animation: spopCardIn .4s ease; }
+        @keyframes spopCardIn { from { opacity: 0; transform: translate(-50%,-44%); } to { opacity: 1; transform: translate(-50%,-50%); } }
+        .spop-photo { position: relative; width: 100%; height: min(240px, 30vh); flex-shrink: 0; overflow: hidden; }
         .spop-photo-grad { position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(0,0,0,0.35) 100%); }
-        .spop-chapter { position: absolute; left: 20px; bottom: 16px; color: #fff; font-family: var(--f-serif); font-style: italic; font-size: 13px; text-shadow: 0 2px 8px rgba(0,0,0,0.4); }
-        .spop-body { padding: 24px 26px 28px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; touch-action: pan-y; overscroll-behavior: contain; }
-        .spop-year { font-family: var(--f-display); font-weight: 800; font-size: clamp(44px, 8vw, 64px); line-height: 1; color: var(--c-sky); letter-spacing: -0.03em; }
-        .spop-title { font-family: var(--f-display); font-weight: 700; font-size: clamp(20px, 4vw, 26px); color: var(--c-deep); line-height: 1.1; }
-        .spop-text { font-size: 15px; line-height: 1.6; color: var(--c-mute); }
-        .spop-nav { position: fixed; top: 50%; transform: translateY(-50%); z-index: 4; width: 52px; height: 52px; border-radius: 50%;
-          background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.25); color: #fff; font-size: 26px; cursor: pointer;
-          display: grid; place-items: center; transition: all .25s; backdrop-filter: blur(6px); }
-        .spop-nav:hover:not(:disabled) { background: #fff; color: var(--c-deep); }
-        .spop-nav:disabled { opacity: 0.25; cursor: default; }
-        .spop-nav-l { left: max(16px, 3vw); }
-        .spop-nav-r { right: max(16px, 3vw); }
-        .spop-timeline { position: fixed; bottom: max(28px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); z-index: 4;
-          width: min(720px, 88vw); height: 44px; }
-        .spop-timeline-line { position: absolute; left: 0; right: 0; top: 8px; height: 2px; background: rgba(255,255,255,0.18); border-radius: 2px; }
-        .spop-timeline-fill { position: absolute; left: 0; top: 0; height: 100%; background: var(--c-coral, #E8927C); border-radius: 2px; transition: width .45s var(--ease-out); }
-        .spop-timeline-ticks { position: absolute; left: 0; right: 0; top: 0; display: flex; justify-content: space-between; }
-        .spop-tick { position: relative; width: 18px; height: 18px; background: none; border: none; cursor: pointer; padding: 0; display: grid; place-items: center; }
-        .spop-tick-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.45); transition: width .3s var(--ease-out), height .3s var(--ease-out), background .3s, box-shadow .3s; }
-        .spop-tick.done .spop-tick-dot { background: var(--c-coral, #E8927C); }
-        .spop-tick.active .spop-tick-dot { width: 15px; height: 15px; background: var(--c-coral, #E8927C); box-shadow: 0 0 0 5px rgba(232,146,124,0.28); }
-        .spop-tick-year { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); font-family: var(--f-display); font-weight: 800;
-          font-size: 15px; color: #fff; white-space: nowrap; }
-        @media (max-width: 520px) { .spop-tick { width: 14px; height: 14px; } .spop-tick-year { font-size: 14px; } }
-        @media (max-width: 768px) {
-          .spop-nav { display: none; }  /* telefon: tylko swipe + kropki */
-          .spop-card { width: 90vw; }
-        }
+        .spop-chapter { position: absolute; left: 18px; bottom: 14px; color: #fff; font-family: var(--f-serif); font-style: italic; font-size: 13px; text-shadow: 0 2px 8px rgba(0,0,0,0.4); }
+        .spop-body { padding: 18px 22px 22px; display: flex; flex-direction: column; gap: 6px; overflow-y: auto; touch-action: pan-y; overscroll-behavior: contain; }
+        .spop-year { font-family: var(--f-display); font-weight: 800; font-size: clamp(36px, 7vw, 52px); line-height: 1; color: var(--c-sky); letter-spacing: -0.03em; }
+        .spop-title { font-family: var(--f-display); font-weight: 700; font-size: clamp(18px, 4vw, 24px); color: var(--c-deep); line-height: 1.15; }
+        .spop-text { font-size: 14px; line-height: 1.55; color: var(--c-mute); }
+        /* Koło fortuny */
+        .swheel { position: fixed; left: 0; right: 0; bottom: 0; height: 200px; z-index: 5; touch-action: none; cursor: grab; overflow: hidden; -webkit-user-select: none; user-select: none; }
+        .swheel.dragging { cursor: grabbing; }
+        .swheel::before { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent, rgba(6,12,18,0.55)); pointer-events: none; }
+        .swheel-ring { position: absolute; left: 50%; top: calc(100% + 130px); width: 1px; height: 1px; }
+        .swheel-year { position: absolute; left: 0; top: 0; background: none; border: none; cursor: pointer; padding: 4px 8px;
+          font-family: var(--f-display); font-weight: 800; font-size: 18px; color: rgba(255,255,255,0.9); white-space: nowrap;
+          transition: transform .35s cubic-bezier(.2,.8,.2,1), opacity .25s, color .25s, font-size .25s; will-change: transform, opacity; }
+        .swheel.dragging .swheel-year { transition: none; }
+        .swheel-year.active { color: var(--c-coral, #E8927C); font-size: 27px; }
+        .swheel-marker { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); z-index: 3; width: 0; height: 0;
+          border-left: 7px solid transparent; border-right: 7px solid transparent; border-top: 11px solid var(--c-coral, #E8927C); }
+        .swheel-hint { position: absolute; left: 50%; bottom: max(10px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 3;
+          color: rgba(255,255,255,0.42); font-size: 11px; letter-spacing: 0.15em; text-transform: uppercase; pointer-events: none; }
       `}</style>
     </div>,
     document.body,
