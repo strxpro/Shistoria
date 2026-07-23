@@ -3,23 +3,6 @@
 
 window.FULL_MENU = [
   {
-    id: "aperitivo", label: "L'Aperitivo", icon: "🍸",
-    items: [
-      { name: "Spritz", price: "6,00 €", desc: "Aperol, Prosecco, Soda", img: "https://www.thecocktaildb.com/images/media/drink/j9evx11504373665.jpg" },
-      { name: "Moscow Mule", price: "7,00 €", desc: "Vodka, Ginger Beer, Lime", img: "https://www.thecocktaildb.com/images/media/drink/3pylqc1504370988.jpg" },
-      { name: "Mojito", price: "7,00 €", desc: "Rum, Menta, Lime, Zucchero, Soda", img: "https://www.thecocktaildb.com/images/media/drink/metwgh1606770327.jpg" },
-      { name: "Americano", price: "7,00 €", desc: "Campari, Vermouth Rosso, Soda", img: "https://www.thecocktaildb.com/images/media/drink/709s6m1613655124.jpg" },
-      { name: "Dark N' Stormy", price: "8,00 €", desc: "Rum Scuro, Ginger Beer, Lime", img: "https://www.thecocktaildb.com/images/media/drink/t1tn0s1504374905.jpg" },
-      { name: "Margarita", price: "7,00 €", desc: "Tequila, Triple Sec, Lime", img: "https://www.thecocktaildb.com/images/media/drink/5noda61589575158.jpg" },
-      { name: "Daiquiri", price: "7,00 €", desc: "Rum, Lime, Zucchero", img: "https://www.thecocktaildb.com/images/media/drink/mrz9091589574515.jpg" },
-      { name: "Negroni", price: "7,00 €", desc: "Campari, Vermouth Rosso, Gin", img: "https://www.thecocktaildb.com/images/media/drink/qgdu971561574065.jpg" },
-      { name: "Caipiroska", price: "6,00 €", desc: "Vodka, Lime, Zucchero", img: "https://www.thecocktaildb.com/images/media/drink/jgvn7p1582484435.jpg" },
-      { name: "Caipirina", price: "6,00 €", desc: "Cachaca, Lime, Zucchero", img: "https://www.thecocktaildb.com/images/media/drink/jgvn7p1582484435.jpg" },
-      { name: "El Diablo", price: "8,00 €", desc: "Tequila, Crème de Cassis", img: "https://www.thecocktaildb.com/images/media/drink/quqyqp1480879103.jpg" },
-      { name: "Piña Colada", price: "9,00 €", desc: "Rum, Ananas, Cocco, Lime", img: "https://www.thecocktaildb.com/images/media/drink/upgsue1668419912.jpg" },
-    ],
-  },
-  {
     id: "antipasti", label: "Antipasti", icon: "✦",
     items: [
       { name: "Tagliere di salumi sardi", price: "15,00 €" },

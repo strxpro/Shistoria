@@ -116,9 +116,9 @@ function Ristorante({ t }) {
               {t("ristorante.intro")}
             </ScrollReveal>
             <div className="rist-meta">
-              <div><span>20</span><label>posti</label></div>
-              <div><span>{new Date().getFullYear() - 1996}+</span><label>anni</label></div>
-              <div><span>1</span><label>famiglia</label></div>
+              <div><span>20</span><label>{({ it: "posti", pl: "miejsca", en: "seats", de: "Plätze", fr: "places", es: "plazas" })[lang] || "posti"}</label></div>
+              <div><span>{new Date().getFullYear() - 1996}+</span><label>{({ it: "anni", pl: "lat", en: "years", de: "Jahre", fr: "ans", es: "años" })[lang] || "anni"}</label></div>
+              <div><span>1</span><label>{({ it: "famiglia", pl: "rodzina", en: "family", de: "Familie", fr: "famille", es: "familia" })[lang] || "famiglia"}</label></div>
             </div>
           </div>
         </div>
@@ -136,13 +136,8 @@ function Ristorante({ t }) {
       <div className="container">
         <div className="rist-chef reveal">
           <div className="rist-chef-img">
-            <video
-              className="rist-chef-video"
-              src="/kuchnia-web.mp4"
-              poster="/kuchnia-poster.webp"
-              autoPlay loop muted playsInline preload="metadata"
-              style={{ width: "100%", height: "100%", objectFit: "cover" }}
-            />
+            {/* Filmik „przy stole" TYMCZASOWO wyłączony — placeholder */}
+            <Placeholder type="dark" style={{ width: "100%", height: "100%" }} />
           </div>
           <div className="rist-chef-text">
             <span className="eyebrow">— {t("ristorante.chefEyebrow")}</span>

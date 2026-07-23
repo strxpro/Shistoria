@@ -1073,7 +1073,8 @@ function DrinksList({ dark = true }) {
 }
 
 // kategorie, które mają sens ze zdjęciem (gotowe drinki, piwa, kawy, bibite)
-const DRINKS_WITH_PHOTO = new Set(["cocktails", "analcolici", "smoothie", "bibite", "birre-spina", "birre-bottiglia", "birre-artigianali", "caffe"]);
+// Zdjęcia TYLKO przy miksowanych drinkach (koktajle + analcolici). Coca-cola, piwa, kawa itd. → prosta lista bez zdjęć.
+const DRINKS_WITH_PHOTO = new Set(["cocktails", "analcolici"]);
 // kategorie ALKOHOLI z polubieniem (NIE piwa, NIE kawy, NIE bibite/analcolici)
 const ALCOHOL_LIKE_CATS = new Set(["cocktails", "vodka", "gin", "rum", "whisky", "tequila", "grappe", "grappa", "liquori", "amari", "distillati", "bianchi", "rossi", "rosati", "bollicine", "vini", "vino", "brandy", "cognac"]);
 
@@ -1209,8 +1210,13 @@ function MobileDrinksList({ dark = true }) {
         .mdr-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
         .mdr-card { background: ${dark ? "rgba(255,255,255,0.06)" : "#fff"}; border-radius: 16px; overflow: hidden; box-shadow: 0 6px 20px rgba(0,0,0,0.10); display: flex; flex-direction: column; }
         .mdr-card-img { position: relative; aspect-ratio: 4/3; background: ${dark ? "linear-gradient(135deg,#1a3d52,#0e2230)" : "linear-gradient(135deg, var(--c-sand), #E8DDC8)"}; display: grid; place-items: center; overflow: hidden; }
-        .mdr-card-img img { width: 100%; height: 100%; object-fit: cover; }
-        .mdr-card-img svg { width: 56%; height: 70%; }
+        .mdr-card-img img { width: 100%; height: 100%; object-fit: cover; position: relative; z-index: 1; }
+        .mdr-card-img svg { width: 56%; height: 70%; position: relative; z-index: 1; }
+        /* skeleton loading — shimmer widoczny dopóki zdjęcie się nie wczyta (potem je zakrywa) */
+        .mdr-card-img::before { content: ""; position: absolute; inset: 0; z-index: 0;
+          background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,0.22) 50%, transparent 70%);
+          background-size: 200% 100%; animation: mdrShimmer 1.4s linear infinite; }
+        @keyframes mdrShimmer { 0% { background-position: 150% 0; } 100% { background-position: -150% 0; } }
         /* serce na karcie drinka (tylko alkohole) */
         .mdr-like { position: absolute; bottom: 6px; right: 6px; display: inline-flex; align-items: center; gap: 3px; padding: 3px 7px; border-radius: 999px; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px); color: #fff; font-size: 11px; font-weight: 700; cursor: pointer; line-height: 1; z-index: 3; }
         .mdr-like svg { font-size: 12px; width: 12px; height: 12px; display: block; }

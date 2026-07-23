@@ -97,34 +97,14 @@ function Storia({ t, orientation = "horizontal" }) {
     <section className="storia" id="storia">
       {/* Intro */}
       <div className="container">
-        <div className="storia-intro reveal">
-          <div className="storia-intro-left">
-            <div 
-              className="storia-image-mask"
-              onClick={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                setLightboxOpen({ x: e.clientX, y: e.clientY });
-              }}
-            >
-              <Placeholder 
-                type="vintage" 
-                className="storia-image-inner" 
-                ref={fgImgRef}
-                hoverCircle={true}
-              />
-            </div>
-          </div>
+        <div className="storia-intro storia-intro-noimg reveal">
           <div className="storia-intro-right">
             <span className="kicker">— {t("storia.eyebrow")}</span>
-            <h2 className="serif-quote storia-quote">
-              {t("storia.quote").split("\n").map((l, i) => <span key={i}>{l}<br /></span>)}
-            </h2>
             <div className="storia-meta">
               <div className="storia-meta-row">
                 <span className="storia-num">01 / {String(data.length).padStart(2, "0")}</span>
                 <span className="storia-hint">{data[0].year} — {data[data.length - 1].year}</span>
               </div>
-              <SplitReveal as="h3" className="storia-heading">{t("storia.heading")}</SplitReveal>
               <button type="button" className="storia-discover" onClick={() => setTimelineOpen(true)}>
                 <span className="storia-discover-dot" aria-hidden="true" />
                 {t("storia.discoverHint")}
@@ -148,6 +128,11 @@ function Storia({ t, orientation = "horizontal" }) {
         @media (min-width: 1024px) { .storia { padding-top: 160px; } }
         .storia-intro { display: grid; grid-template-columns: 1fr; gap: 64px; margin-bottom: 96px; }
         @media (min-width: 1024px) { .storia-intro { grid-template-columns: 1fr 1fr; gap: 96px; align-items: center; margin-bottom: 120px; } }
+        /* Intro bez zdjęcia — jedna kolumna, wyśrodkowane */
+        .storia-intro-noimg { grid-template-columns: 1fr !important; text-align: center; margin-bottom: 64px; }
+        .storia-intro-noimg .storia-intro-right { align-items: center; max-width: 620px; margin: 0 auto; }
+        .storia-intro-noimg .storia-meta { width: 100%; align-items: center; }
+        .storia-intro-noimg .storia-meta-row { justify-content: center; }
         
         .storia-image-mask { position: relative; width: 100%; aspect-ratio: 4/5; border-radius: 20px; overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.1); cursor: none; }
         .storia-image-inner { position: absolute; inset: -10%; background: url('/hero-vintage.png') center/cover no-repeat; will-change: transform; }
