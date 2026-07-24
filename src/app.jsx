@@ -183,11 +183,9 @@ export default function App() {
     import("lenis").then(({ default: Lenis }) => {
       if (!alive) return;
       lenis = new Lenis({
-        lerp: 0.1,
+        lerp: 0.12,
         smoothWheel: true,
-        syncTouch: true,              // płynne przewijanie palcem na telefonie
-        syncTouchLerp: 0.08,
-        touchInertiaMultiplier: 20,
+        syncTouch: false,             // telefon: natywne przewijanie (szybkie, płynne, bez lagów i konfliktu z 3D w Cocktail Makerze)
       });
       window.lenis = lenis;
       const raf = (time) => { if (lenis) { lenis.raf(time); rafId = requestAnimationFrame(raf); } };
@@ -196,12 +194,8 @@ export default function App() {
     return () => { alive = false; if (rafId) cancelAnimationFrame(rafId); if (lenis) lenis.destroy(); window.lenis = null; };
   }, []);
 
-  // Cocktail Maker — BEZ smooth scrolla (natywne przewijanie dla interakcji 3D)
-  useEffectA(() => {
-    if (!window.lenis) return;
-    if (["cocktail-rise", "cocktail-builder"].includes(activeSection)) window.lenis.stop();
-    else window.lenis.start();
-  }, [activeSection]);
+  // (Cocktail Maker sam zarządza Lenisem — stop/start tylko podczas mieszania/nalewania,
+  //  patrz cocktail-experience. NIE dublujemy tego tutaj, bo blokowało cały scroll.)
 
   // Przywróć zapisany język na starcie (przed auto-detekcją) — flaga i treść zawsze zgodne
   useEffectA(() => {
